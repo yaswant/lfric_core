@@ -337,12 +337,12 @@ function get_nodes(self) result(nodal_coords)
   return
 end function get_nodes
 
-function which(self) result(V)
+function which(self) result(fs)
   implicit none
   class(function_space_type),  intent(in) :: self
-  integer :: V
+  integer :: fs
   
-  V = self%fs
+  fs = self%fs
   return
 end function which
 
