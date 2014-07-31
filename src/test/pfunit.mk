@@ -11,13 +11,13 @@ PFUNIT_SOURCE = $(abspath ../pfunit)
 PFUNIT_BUILD = $(BUILD_DIR)/pfunit
 export PFUNIT_INSTALL = $(BUILD_DIR)/pfunit-install
 
-ifeq '$(COMPILER)' 'ifort'
+ifeq '$(FC)' 'ifort'
   PFUNIT_COMPILER_ID = Intel
-else ifeq '$(COMPILER)' 'gfortran'
+else ifeq '$(FC)' 'gfortran'
   PFUNIT_COMPILER_ID = GNU
-else ifeq '$(COMPILER)' 'nag'
+else ifeq '$(FC)' 'nagfor'
   PFUNIT_COMPILER_ID = NAG
-else ifeq '$(COMPILER)' 'xlf'
+else ifeq '$(FC)' 'xlf'
   PFUNIT_COMPILER_ID = XL
 endif
 

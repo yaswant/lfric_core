@@ -168,11 +168,13 @@ class SourceTree:
         if moduleName in self._ignoreModules :
             print( ' - Ignored 3rd party module' )
         else :
-            print()
             if leafname not in self._filenameToDependencies:
                 self._filenameToDependencies[leafname] = []
             if moduleName not in self._filenameToDependencies[leafname]:
                 self._filenameToDependencies[leafname].append(moduleName)
+                print()
+            else:
+                print( ' - Ignoring duplicate module' )
 
     ###########################################################################
     # Write the dependancy information to file handle.

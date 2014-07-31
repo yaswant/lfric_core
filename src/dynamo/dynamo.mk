@@ -33,12 +33,12 @@ $(OBJ_DIR)/%.mod: $(OBJ_DIR)/%.o
 
 $(OBJ_DIR)/%.o: %.F90 | $(OBJ_DIR)
 	@echo "Compile $<"
-	$(FC) $(CPPFLAGS) $(FFLAGS) $(FWARNINGFLAGS) $(F_MOD_DESTINATION_ARG) \
+	$(FC) $(CPPFLAGS) $(FFLAGS) $(F_MOD_DESTINATION_ARG) \
 	      -I $(OBJ_DIR) -c -o $@ $<
 
 $(OBJ_DIR)/%.o: %.f90 | $(OBJ_DIR)
 	@echo "Compile $<"
-	$(FC) $(CPPFLAGS) $(FFLAGS) $(FWARNINGFLAGS) $(F_MOD_DESTINATION_ARG) \
+	$(FC) $(CPPFLAGS) $(FFLAGS) $(F_MOD_DESTINATION_ARG) \
 	      -I $(OBJ_DIR) -c -o $@ $<
 
 $(OBJ_DIR)/$(EXE): $($(shell echo $(EXE) | tr a-z A-Z)_OBJS)
@@ -48,5 +48,6 @@ $(OBJ_DIR)/$(EXE): $($(shell echo $(EXE) | tr a-z A-Z)_OBJS)
 .PHONY: clean
 clean:
 	-rm -rf $(OBJ_DIR)
+	-rm -f $(BIN_DIR)/$(EXE)
 
 -include $(OBJ_DIR)/$(DEP_FILE)

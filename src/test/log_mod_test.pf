@@ -33,6 +33,8 @@ module log_mod_test
     integer        :: level
     character( 8 ) :: expected_tag
 
+    integer        :: dummy
+
     procedure( runMethod ), pointer ::userMethod => null()
 
   contains
@@ -50,23 +52,6 @@ module log_mod_test
   end interface log_test_type
 
 contains
-
-  !> Construct a level test parameter.
-  !>
-  !> @param level The level to test at.
-  !>
-  function new_level_parameter( level, expected_tag ) result( level_parameter )
-
-    implicit none
-
-    integer,        intent( in ) :: level
-    character( 8 ), intent( in ) :: expected_tag
-
-    type( level_parameter_type ) :: level_parameter
-    level_parameter%level        = level
-    level_parameter%expected_tag = expected_tag
-
-  end function new_level_parameter
 
   !> Construct the log module test case.
   !>
@@ -111,6 +96,8 @@ contains
           iostat=condition )
     @assertEqual( condition, 0 )
 
+    this%dummy = 0 ! There is no purpose to this, other than to use "this"
+
   end subroutine setUp
 
   !> Remove fixtures.
@@ -129,6 +116,8 @@ contains
     @assertEqual( condition, 0 )
     close( ALERT_UNIT, iostat=condition )
     @assertEqual( condition, 0 )
+
+    this%dummy = 0 ! There is no purpose to this, other than to use "this"
 
   end subroutine tearDown
 

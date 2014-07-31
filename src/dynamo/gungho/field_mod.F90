@@ -111,18 +111,21 @@ contains
   !>
   !> @param [in] vector_space the function space that the field lives on
   !> @param [in] gq the gaussian quadrature rule
-  !> @param [in] num_layers integer number of layers for the field
   !> @return self the field
   !>
   function field_constructor( vector_space, gq ) result(self)
 
     type(function_space_type), target, intent(in) :: vector_space
-    type(gaussian_quadrature_type), target, intent(in) :: gq
+    type(gaussian_quadrature_type), optional, target, intent(in) :: gq
 
     type(field_type), target :: self
 
     self%vspace => vector_space
-    self%gaussian_quadrature => gq
+    if ( present( gq ) ) then
+      self%gaussian_quadrature => gq
+    else
+      self%gaussian_quadrature => null()
+    end if
 
     ! allocate the array in memory
     allocate(self%data(self%vspace%get_undf()))

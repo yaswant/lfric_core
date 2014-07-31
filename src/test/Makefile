@@ -7,6 +7,7 @@
 
 ROOT = ../..
 include $(ROOT)/Makefile.inc
+FFLAGS := $(filter-out -Werror,$(FFLAGS)) # pFUnit isn't that well put together
 
 TARGET_OBJ_DIR = $(BUILD_DIR)/dynamo
 
@@ -48,7 +49,8 @@ $(DRIVER_OBJ): $(PFUNIT_INSTALL)/include/driver.F90 testSuites.inc
 
 $(TEST_OBJ_DIR)/%.o: $(TEST_OBJ_DIR)/%.F90
 	@echo Compiling $<
-	$(FC) $(FFLAGS) -c $(F_MOD_DESTINATION_ARG) -I$(PFUNIT_INSTALL)/mod \
+	$(FC) $(FFLAGS) -c $(F_MOD_DESTINATION_ARG) \
+	    -I$(OBJ_DIR) -I$(PFUNIT_INSTALL)/mod \
 	      -I$(TARGET_OBJ_DIR) -o $@ $<
 
 .PRECIOUS: $(TEST_OBJ_DIR)/%.F90

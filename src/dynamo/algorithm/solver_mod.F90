@@ -54,7 +54,6 @@ contains
     integer                            :: rhs_fs
     type(function_space_type)          :: fs
     type( gaussian_quadrature_type )   :: gq 
-    type( gaussian_quadrature_type ), pointer :: null_gq => null()
 
     tol = 1.0e-8_r_def
     ! compute the residual this is a global sum to the PSy ---
@@ -76,8 +75,7 @@ contains
     !PSY call invoke ( inner_prod(v,v,err))
     call invoke_inner_prod(v,v,err)
 
-    res = field_type(fs%get_instance(rhs_fs),                              &
-         null_gq )    
+    res = field_type(fs%get_instance(rhs_fs) )    
     !PSY call invoke ( minus_field_data(rhs,v,res))
     call invoke_minus_field_data(rhs,v,res)
 
@@ -90,20 +88,17 @@ contains
     omega  = 1.0_r_def
     norm   = 1.0_r_def
 
-    cr = field_type(fs%get_instance(rhs_fs),                               &
-         null_gq )
+    cr = field_type(fs%get_instance(rhs_fs) )
     !PSY call invoke ( copy_field_data(res,cr))
     call invoke_copy_field_data(res,cr)
 
-    p = field_type(fs%get_instance(rhs_fs),                                &
-         null_gq )
+    p = field_type(fs%get_instance(rhs_fs) )
     !PSY call invoke ( set_field_scalar(0.0_r_def, p))
     call invoke_set_field_scalar(0.0_r_def, p)
 
     t = field_type(fs%get_instance(rhs_fs),                                &
          gq%get_instance() )
-    s = field_type(fs%get_instance(rhs_fs),                                &
-         null_gq )
+    s = field_type(fs%get_instance(rhs_fs) )
     !PSY call invoke ( set_field_scalar(0.0_r_def, v))
     call invoke_set_field_scalar(0.0_r_def, v)
 

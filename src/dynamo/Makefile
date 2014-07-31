@@ -6,9 +6,7 @@
 ##############################################################################
 
 IGNORE_DEPENDENCIES = netcdf
-#IGNORE_DEPENDENCIES = 
 EXTERNAL_LIBRARIES = netcdff
-#EXTERNAL_LIBRARIES = 
 
 ROOT = ../..
 include $(ROOT)/Makefile.inc
@@ -16,7 +14,7 @@ include $(ROOT)/Makefile.inc
 SUBDIRS = $(shell find * -maxdepth 1 -type d)
 IGNORE_DEPENDENCIES := $(patsubst %,-ignore %,$(IGNORE_DEPENDENCIES))
 
-export SRC        = $(wildcard *.F90)
+export SRC        = $(wildcard *.[fF]90)
 export OBJ_DIR    = $(BUILD_DIR)/dynamo
 export DEP_FILE   = dependencies.mk
 
@@ -29,7 +27,7 @@ all: $(OBJ_DIR)/$(DEP_FILE)
 	$(MAKE) -f dynamo.mk EXE=dynamo all
 	$(MAKE) -f dynamo.mk EXE=generate_cubedsphere all
 
-$(OBJ_DIR)/$(DEP_FILE): $(SRC) $(OBJ_DIR) $(OBJ_SUBDIRS)
+$(OBJ_DIR)/$(DEP_FILE): $(SRC) | $(OBJ_DIR) $(OBJ_SUBDIRS)
 	@$(TOOL_DIR)/DependencyAnalyser $(IGNORE_DEPENDENCIES) \
 	                                $(OBJ_DIR) $(OBJ_DIR) $(OBJ_DIR) .
 
