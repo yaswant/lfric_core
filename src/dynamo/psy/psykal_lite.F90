@@ -181,7 +181,7 @@ contains
 !> Invoke_matrix_vector_w0: Invoke the A*x for x in W0 field
   subroutine invoke_matrix_vector_w0(Ax,x)
     use matrix_vector_w0_mod, only : matrix_vector_w0_code
-    type(field_type), intent(inout) :: x
+    type(field_type), intent(in)    :: x
     type(field_type), intent(inout) :: Ax
 
     integer                 :: cell
@@ -210,7 +210,7 @@ contains
 !> Invoke_matrix_vector_w1: Invoke the A*x for x in W1 field
   subroutine invoke_matrix_vector_w1(Ax,x)
     use matrix_vector_w1_mod, only : matrix_vector_w1_code
-    type(field_type), intent(inout) :: x
+    type(field_type), intent(in)    :: x
     type(field_type), intent(inout) :: Ax
 
     integer                 :: cell
@@ -239,7 +239,7 @@ contains
 !> Invoke_matrix_vector_w2: Invoke the A*x for x in W2 field
   subroutine invoke_matrix_vector_w2(Ax,x)
     use matrix_vector_w2_mod, only : matrix_vector_w2_code
-    type(field_type), intent(inout) :: x
+    type(field_type), intent(in)    :: x
     type(field_type), intent(inout) :: Ax
 
     integer                 :: cell
@@ -700,7 +700,7 @@ contains
 
     undf = x_p%vspace%get_undf()
     !sanity check
-    if(undf .ne. y_p%vspace%get_undf() ) then
+    if(undf /= y_p%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:inner_prod:x and y live on different w-spaces",LOG_LEVEL_ERROR)
       !abort
@@ -732,14 +732,14 @@ contains
 
     !sanity check
     undf = field1_proxy%vspace%get_undf()
-    if(undf .ne. field2_proxy%vspace%get_undf() ) then
+    if(undf /= field2_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:axpy:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf .ne. field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:axpy:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -770,14 +770,14 @@ contains
 
     !sanity check
     undf = field1_proxy%vspace%get_undf()
-    if(undf .ne. field2_proxy%vspace%get_undf() ) then
+    if(undf /= field2_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:axmy:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf .ne. field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:axmy:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -805,7 +805,7 @@ contains
 
     !sanity check
     undf = field1_proxy%vspace%get_undf()
-    if(undf .ne. field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:copy_field_data:field1 and field_res live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -836,14 +836,14 @@ contains
 
     !sanity check
     undf = field1_proxy%vspace%get_undf()
-    if(undf .ne. field2_proxy%vspace%get_undf() ) then
+    if(undf /= field2_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:minus_field_data:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf .ne. field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:minus_field_data:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -874,14 +874,14 @@ contains
 
     !sanity check
     undf = field1_proxy%vspace%get_undf()
-    if(undf .ne. field2_proxy%vspace%get_undf() ) then
+    if(undf /= field2_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:plus_field_data:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf .ne. field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
       ! they are not on the same function space
       call log_event("Psy:plus_field_data:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -912,6 +912,44 @@ contains
       field_res_proxy%data(i) = scalar
     end do
   end subroutine invoke_set_field_scalar
+!-------------------------------------------------------------------------------   
+!> invoke_divide_field: divide the values of field1 by field2 and put result in
+!>field_res
+!> c = a/b
+  subroutine invoke_divide_field(field1,field2,field_res)
+    use log_mod, only : log_event, LOG_LEVEL_ERROR
+    implicit none
+    type( field_type ), intent(in )    :: field1,field2
+    type( field_type ), intent(inout ) :: field_res
+    type( field_proxy_type)            :: field1_proxy,field2_proxy      &
+                                        , field_res_proxy
+    integer                            :: i,undf
+
+    field1_proxy = field1%get_proxy()
+    field2_proxy = field2%get_proxy()
+    field_res_proxy = field_res%get_proxy()
+
+    !sanity check
+    undf = field1_proxy%vspace%get_undf()
+    if(undf /= field2_proxy%vspace%get_undf() ) then
+      ! they are not on the same function space
+      call log_event("Psy:divide_field:field1 and field2 live on different w-spaces" &
+                    , LOG_LEVEL_ERROR)
+      !abort
+      stop
+    endif
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
+      ! they are not on the same function space
+      call log_event("Psy:divide_field:field1 and result_field live on different w-spaces" &
+                    , LOG_LEVEL_ERROR)
+      !abort
+      stop
+    endif
+
+    do i = 1,undf
+      field_res_proxy%data(i) = field1_proxy%data(i)/field2_proxy%data(i)
+    end do
+  end subroutine invoke_divide_field
 
 !-------------------------------------------------------------------------------   
 !> Invoke_gp_rhs: Invoke the scalar RHS for a Galerkin projection
@@ -1029,4 +1067,32 @@ contains
 
   end subroutine invoke_gp_vector_rhs
 
+!-------------------------------------------------------------------------------   
+!> invoke_copy_scaled_field_data: copy the scaled data from one field to another ( a = scaler*b )
+  subroutine invoke_copy_scaled_field_data(scaler,field1,field_res)
+    use log_mod, only : log_event, LOG_LEVEL_ERROR
+    implicit none
+    real( kind=r_def ), intent(in)     :: scaler
+    type( field_type ), intent(in )    :: field1
+    type( field_type ), intent(inout ) :: field_res
+    type( field_proxy_type)            :: field1_proxy , field_res_proxy
+    integer                            :: i,undf
+
+    field1_proxy = field1%get_proxy()
+    field_res_proxy = field_res%get_proxy()
+
+    !sanity check
+    undf = field1_proxy%vspace%get_undf()
+    if(undf /= field_res_proxy%vspace%get_undf() ) then
+      ! they are not on the same function space
+      call log_event("Psy:copy_scaled_field_data:field1 and field_res live on different w-spaces" &
+                    , LOG_LEVEL_ERROR)
+      !abort
+      stop
+    endif
+
+    do i = 1,undf
+      field_res_proxy%data(i) = scaler*field1_proxy%data(i)
+    end do
+  end subroutine invoke_copy_scaled_field_data
 end module psy

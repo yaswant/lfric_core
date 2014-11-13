@@ -12,7 +12,7 @@ module galerkin_projection_algorithm_mod
 
   use log_mod,                 only: log_event, log_scratch_space, LOG_LEVEL_INFO
   use solver_mod,              only: solver_algorithm
-  use constants_mod,           only: r_def  
+  use constants_mod,           only: r_def, solver_option  
   use psy,                     only: invoke_copy_field_data, invoke_set_field_scalar, &
                                      invoke_gp_rhs, invoke_gp_vector_rhs
   use field_mod,               only: field_type
@@ -78,7 +78,7 @@ contains
         call invoke_gp_vector_rhs( rhs, f_in, chi ) 
       end if
       do dir = 1,space_dimension
-        call solver_algorithm( f_out(dir), rhs(dir), chi, w0)
+        call solver_algorithm( f_out(dir), rhs(dir), chi, w0, solver_option)
       end do
     end if
 

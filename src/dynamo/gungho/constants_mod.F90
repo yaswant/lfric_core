@@ -58,7 +58,18 @@ real(kind=r_def), parameter :: large_real = huge(0.0_r_def)
 real(kind=r_def), parameter :: pi  = 3.141592654_r_def    !< pi value
 real(kind=r_def), parameter :: eps = 3.0e-15_r_def        !< relative precision
 
+! Linear solver constants
 integer (kind=i_def), parameter :: max_iter = 99 !< maximum iteration number for solver
+integer (kind=i_def), parameter :: cg_solver     = 1, &
+                                   bicg_solver   = 2, &
+                                   jacobi_solver = 3, &
+                                   gmres_solver  = 4, &
+                                   gcr_solver    = 5
+integer (kind=i_def), parameter :: solver_option = bicg_solver
+integer (kind=i_def), parameter :: no_pre_cond       = -1, &
+                                   diagonal_pre_cond = 1
+real(kind=r_def),     parameter :: solver_tol = 1.0e-4_r_def
+integer (kind=i_def), parameter :: gcrk  = 4
 
 ! physical constants
 real(kind=r_def), parameter :: gravity = 9.80665_r_def

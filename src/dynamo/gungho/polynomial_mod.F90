@@ -93,7 +93,7 @@ pure function poly1d_deriv(order,xi,x,i)
   do k = 1,i-1
     t = 1.0_r_def
     do j = 1,order+1
-      if (j .ne. i .and. j .ne. k ) then
+      if (j /= i .and. j /= k ) then
         t = t * (xi - x(j))
       end if
     end do
@@ -102,7 +102,7 @@ pure function poly1d_deriv(order,xi,x,i)
   do k = i+1,order+1
     t = 1.0_r_def
     do j = 1,order+1
-      if (j .ne. i .and. j .ne. k ) then
+      if (j /= i .and. j /= k ) then
         t = t * (xi - x(j))
       end if
     end do

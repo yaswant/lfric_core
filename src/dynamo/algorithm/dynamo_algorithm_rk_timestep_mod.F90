@@ -31,7 +31,7 @@ module dynamo_algorithm_rk_timestep_mod
                      only: function_space_type
   use solver_mod,    only: solver_algorithm
   use argument_mod,  only: w0, w1, w2, w3
-  use constants_mod, only: r_def
+  use constants_mod, only: r_def, solver_option
   use gaussian_quadrature_mod, &
                      only : gaussian_quadrature_type, GQ3
   use galerkin_projection_algorithm_mod, &
@@ -193,9 +193,9 @@ contains
         end do
 
 ! Invert mass matrices
-        call solver_algorithm( theta_inc, r_theta, chi, w0)
-        call solver_algorithm( u_inc,     r_u,     chi, w2)
-        call solver_algorithm( rho_inc,   r_rho,   chi, w3)
+        call solver_algorithm( theta_inc, r_theta, chi, w0, solver_option)
+        call solver_algorithm( u_inc,     r_u,     chi, w2, solver_option)
+        call solver_algorithm( rho_inc,   r_rho,   chi, w3, solver_option)
 
 ! add increments
         !PSY call invoke ( axpy(dt, theta_inc, theta_n, theta))
