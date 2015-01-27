@@ -19,44 +19,75 @@ use constants_mod,         only : r_def
 
 implicit none
 
-private get_lid_from_gid
+private get_lid_from_gid, binary_search
 
 ! Local parameters to describe the faces of the cube
-integer, parameter :: W=1     ! south
-integer, parameter :: S=2     ! east
-integer, parameter :: E=3     ! north
-integer, parameter :: N=4     ! west
-integer, parameter :: B=5     ! bottom
-integer, parameter :: T=6     ! top
+!> Describes the face on the west side of the cell
+integer, parameter :: W=1     
+!> Describes the face on the south side of the cell
+integer, parameter :: S=2
+!> Describes the face on the east side of the cell
+integer, parameter :: E=3
+!> Describes the face on the north side of the cell
+integer, parameter :: N=4
+!> Describes the face on the bottom of the cell
+integer, parameter :: B=5
+!> Describes the face on the top of the cell
+integer, parameter :: T=6
 
-!Local parameters to describe the vertices of the cube
-integer, parameter :: SWB=1   ! south west bottom
-integer, parameter :: SEB=2   ! south east bottom
-integer, parameter :: NEB=3   ! north east bottom
-integer, parameter :: NWB=4   ! north west bottom
-integer, parameter :: SWT=5   ! south west top
-integer, parameter :: SET=6   ! south west top
-integer, parameter :: NET=7   ! north east top
-integer, parameter :: NWT=8   ! north west top
+!> Describes the vertex at the south west bottom corner of the cell
+integer, parameter :: SWB=1
+!> Describes the vertex at the south east bottom corner of the cell
+integer, parameter :: SEB=2
+!> Describes the vertex at the north east bottom corner of the cell
+integer, parameter :: NEB=3
+!> Describes the vertex at the north west bottom corner of the cell
+integer, parameter :: NWB=4
+!> Describes the vertex at the south west top corner of the cell
+integer, parameter :: SWT=5
+!> Describes the vertex at the south east top corner of the cell
+integer, parameter :: SET=6
+!> Describes the vertex at the north east top corner of the cell
+integer, parameter :: NET=7
+!> Describes the vertex at the north west top corner of the cell
+integer, parameter :: NWT=8
 
-!Local parameters to describe the edges of the cube
-integer, parameter :: WB=1    ! south bottom
-integer, parameter :: SB=2    ! east bottom
-integer, parameter :: EB=3    ! north bottom
-integer, parameter :: NB=4    ! west bottom
-integer, parameter :: SW=5    ! south west
-integer, parameter :: SE=6    ! south east
-integer, parameter :: NE=7    ! north east
-integer, parameter :: NW=8    ! north west
-integer, parameter :: WT=9    ! south top
-integer, parameter :: ST=10   ! east top
-integer, parameter :: ET=11   ! north top
-integer, parameter :: NT=12   ! west top
+!> Describes the west bottom edge of the cell 
+integer, parameter :: WB=1
+!> Describes the south bottom edge of the cell 
+integer, parameter :: SB=2
+!> Describes the east bottom edge of the cell 
+integer, parameter :: EB=3
+!> Describes the north bottom edge of the cell 
+integer, parameter :: NB=4
+!> Describes the south west edge of the cell 
+integer, parameter :: SW=5
+!> Describes the south east edge of the cell 
+integer, parameter :: SE=6
+!> Describes the north east edge of the cell 
+integer, parameter :: NE=7
+!> Describes the north west edge of the cell 
+integer, parameter :: NW=8
+!> Describes the west top edge of the cell 
+integer, parameter :: WT=9
+!> Describes the south top edge of the cell 
+integer, parameter :: ST=10
+!> Describes the east top edge of the cell 
+integer, parameter :: ET=11
+!> Describes the north top edge of the cell 
+integer, parameter :: NT=12
 
-! global numbers of entities in a single 2D layer
-integer :: nedge_h_g, nvert_h_g
-! global numbers of entities in for full 3D domains
-integer :: nface_g, nedge_g, nvert_g
+!> Global number of edges in a single 2D layer
+integer :: nedge_h_g
+!> Global number of vertices in a single 2D layer
+integer :: nvert_h_g
+
+!> Global number of faces in the full 3D domain
+integer :: nface_g
+!> Global number of edges in the full 3D domain
+integer :: nedge_g
+!> Global number of vertices in the full 3D domain
+integer :: nvert_g
 
 ! In terminology of Logg 08 these are:
 ! cell_next    => MeshConnectivity(3,3) ( cells incident to cells )
@@ -65,15 +96,22 @@ integer :: nface_g, nedge_g, nvert_g
 
 ! This is the minimal set of information, from which all other connectivity can be computed
 
+!> Lookup table of the local indices of all the cells next to a given cell 
 integer,          allocatable :: cell_next(:,:)
+!> Lookup table of the local indices of all the vertices on a given cell 
 integer,          allocatable :: vert_on_cell(:,:)
+!> The x-, y- and z-coordinates of all the vertices on the local partition
 real(kind=r_def), allocatable :: mesh_vertex(:,:)
 
 ! Extra connectivity for easy dofmap computation
 ! In terminology of Logg 08 these are:
 ! face_on_cell => MeshConnectivity(3,2) ( faces incident to cells )
 ! edge_on_cell => MeshConnectivity(3,1) ( edges incident to cells )
-integer, allocatable ::  face_on_cell(:,:), edge_on_cell(:,:)
+
+!> Lookup table of the local indices of all the faces on a given cell 
+integer, allocatable ::  face_on_cell(:,:)
+!> Lookup table of the local indices of all the edges on a given cell 
+integer, allocatable ::  edge_on_cell(:,:)
 
 ! together this gives all the cell -> d connectivity (3,d), d=0,1,2
 
@@ -86,8 +124,10 @@ integer, allocatable ::  face_on_cell(:,:), edge_on_cell(:,:)
     type(coordinate) :: minimum, maximum
   end type
 
+!> The domain limits (x,y,z) for Cartesian domains
   type(domain_limits) :: domain_size
 
+!> The z-coordinate of the top of the domain 
   real(kind=r_def) :: domain_top
 
 !-------------------------------------------------------------------------------
@@ -124,7 +164,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
   use constants_mod, only: earth_radius
   use log_mod,       only: log_event, log_scratch_space, &
                            LOG_LEVEL_DEBUG, LOG_LEVEL_ERROR
-  use mesh_mod, only : partitioned_cells, num_owned, num_halo
+  use mesh_mod, only : partitioned_cells, num_cells
 
   integer,              intent( in ) :: nx, ny
   integer,              intent( in ) :: nlayers
@@ -137,13 +177,13 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 ! List of edges horizontally around base of cell
   integer, allocatable :: edge_on_cell_h(:,:)
 
-  allocate ( edge_on_cell_h(nedges_h,num_owned+num_halo) )
+  allocate ( edge_on_cell_h(nedges_h,num_cells) )
 
 ! reset earth radius to 1 to avoid problems with routines 
 ! multiplying position by earth_radius
   earth_radius = 1.0_r_def
 
-  do lid=1,num_owned+num_halo
+  do lid=1,num_cells
 
     gid=partitioned_cells(lid)
 
@@ -187,9 +227,9 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
   
   ! perform vertical extrusion for connectivity 
   do k=1,nlayers-1
-    do i=1,num_owned+num_halo
-      lid = i + k*(num_owned+num_halo)
-      jd = lid - (num_owned+num_halo)        
+    do i=1,num_cells
+      lid = i + k*(num_cells)
+      jd = lid - (num_cells)        
       do j=1,nfaces
         cell_next(j,lid) = cell_next(j,jd) + nx*ny
       end do
@@ -198,8 +238,8 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
   
   ! cell_next(lid) still contains global ids so convert to local ids
   do k=0,nlayers-1
-    do i=1,num_owned+num_halo
-      lid = i + k*(num_owned+num_halo)
+    do i=1,num_cells
+      lid = i + k*(num_cells)
       do j=1,nfaces
         cell_next(j,lid)=get_lid_from_gid(cell_next(j,lid))
       end do
@@ -207,9 +247,9 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
   end do
 
   ! Set connectivity at lower/upper boundary to some dummy cell
-  do i=1,num_owned+num_halo
+  do i=1,num_cells
     cell_next(B,i) = 0
-    cell_next(T,i+(nlayers-1)*(num_owned+num_halo)) = 0
+    cell_next(T,i+(nlayers-1)*(num_cells)) = 0
   end do
 
 ! compute vertices on cells
@@ -217,7 +257,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 ! vertices around bottom face of cube
   nvert_h_g=0
   vert_on_cell(:,:) = 0
-  do lid=1,num_owned+num_halo
+  do lid=1,num_cells
 ! 1. south west corner of cell
     if(vert_on_cell(SWB,lid)==0)then 
       nvert_h_g=nvert_h_g+1
@@ -288,7 +328,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
     end if
   end do
 ! vertices around top face of cube
-  do lid=1,num_owned+num_halo
+  do lid=1,num_cells
     vert_on_cell(SWT,lid)=vert_on_cell(SWB,lid)+nvert_h_g
     vert_on_cell(SET,lid)=vert_on_cell(SEB,lid)+nvert_h_g
     vert_on_cell(NET,lid)=vert_on_cell(NEB,lid)+nvert_h_g
@@ -297,9 +337,9 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 
 ! perform vertical extrusion for connectivity 
   do k=1,nlayers-1
-    do i=1,num_owned+num_halo
-      lid = i + k*(num_owned+num_halo)
-      jd = lid - (num_owned+num_halo)
+    do i=1,num_cells
+      lid = i + k*(num_cells)
+      jd = lid - (num_cells)
       vert_on_cell(SWB,lid)=vert_on_cell(SWT,jd)
       vert_on_cell(SEB,lid)=vert_on_cell(SET,jd)
       vert_on_cell(NEB,lid)=vert_on_cell(NET,jd)
@@ -314,7 +354,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 ! compute edges horizontally on cell
   nedge_h_g=0
   edge_on_cell_h(:,:)=0
-  do lid=1,num_owned+num_halo
+  do lid=1,num_cells
 ! 1. south edge of cell
     if(edge_on_cell_h(SB,lid)==0)then
       nedge_h_g=nedge_h_g+1
@@ -351,7 +391,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 
   deallocate ( edge_on_cell_h )
 
-  nface_g = nedge_h_g*nlayers + (num_owned+num_halo)*(nlayers + 1)
+  nface_g = nedge_h_g*nlayers + (num_cells)*(nlayers + 1)
   nedge_g = nedge_h_g*(nlayers + 1) + nlayers*nvert_h_g
   nvert_g = nvert_h_g*(nlayers + 1)
   
@@ -359,7 +399,7 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
   allocate ( mesh_vertex(3,nvert_g) )
 
 ! Compute vertices
-  do lid=1,num_owned+num_halo
+  do lid=1,num_cells
 
     gid=partitioned_cells(lid)
 
@@ -368,11 +408,11 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
     gidx=gid-nx*(gidy-1)
 
     do k=1,nlayers+1
-      mesh_vertex(1,vert_on_cell(SWB,lid)+(k-1)*(num_owned+num_halo)) = &
+      mesh_vertex(1,vert_on_cell(SWB,lid)+(k-1)*(num_cells)) = &
                                                      real(gidx-1 - nx/2)*dx 
-      mesh_vertex(2,vert_on_cell(SWB,lid)+(k-1)*(num_owned+num_halo)) = &
+      mesh_vertex(2,vert_on_cell(SWB,lid)+(k-1)*(num_cells)) = &
                                                      real(gidy-1 - ny/2)*dy 
-      mesh_vertex(3,vert_on_cell(SWB,lid)+(k-1)*(num_owned+num_halo)) = &
+      mesh_vertex(3,vert_on_cell(SWB,lid)+(k-1)*(num_cells)) = &
                                                      real(k-1)*dz
     end do
 
@@ -383,14 +423,14 @@ subroutine mesh_generator_biperiodic( nx, ny, nlayers, dx, dy, dz )
 
 ! Diagnostic information  
   call log_event( 'grid connectivity', LOG_LEVEL_DEBUG )
-  do i = 1, (num_owned+num_halo) * nlayers
+  do i = 1, (num_cells) * nlayers
     write( log_scratch_space,'(7i6)' ) i, &
                             cell_next(S,i), cell_next(E,i), cell_next(N,i), &
                             cell_next(W,i), cell_next(B,i), cell_next(T,i)
     call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
   end do
   call log_event( 'verts on cells', LOG_LEVEL_DEBUG )
-  do i = 1, (num_owned+num_halo) * nlayers
+  do i = 1, (num_cells) * nlayers
     write( log_scratch_space, '(9i6)' ) i, &
                              vert_on_cell(SWB,i), vert_on_cell(SEB,i), &
                              vert_on_cell(NEB,i), vert_on_cell(NWB,i), &
@@ -974,23 +1014,30 @@ function sphere2cart_vector( dlambda, llr ) result ( dx )
 
 end function sphere2cart_vector
 
-
+!> @brief Returns the local index of the cell on the local
+!> partition that corresponds to the given global index.
+!> @param[in] gid The global index to search for on the local partition
+!> @param[return] lid The local index that corresponds to the given global index
+!> or -1 if the cell with the given global index is not present of the local partition
 pure function get_lid_from_gid(gid) result (lid)
-
-! Given a global index (gid), return the local index of that cell on this
-! partition. If the global index is not available on this partition then
-! return -1
-
-  use mesh_mod, only : partitioned_cells, num_owned, num_halo, &
+!
+! Perform a search through the global cell lookup table looking for the
+! required global index.
+!
+! The partitioned_cells array holds global indices in three groups: core cells,
+! followed by owned cells and finally, the indices of the halo cells. The
+! cells are numerically ordered within the different groups so a binary search
+! can be used, but not between groups, so need to do separate binary searches
+! through the core, owned and halo cells and exit if a match is found
+!
+  use mesh_mod, only : partitioned_cells, num_core, num_owned, num_halo, &
                        num_cells_x, num_cells_y
   implicit none
 
-  integer, intent(in) :: gid          ! global index
-  integer             :: lid          ! local index
-  integer             :: nlayer       ! layer of supplied gid
-  integer             :: gid_in_layer ! supplied gid projected to bottom layer
-  integer             :: bot_index, top_index, new_index  ! indices used to narrow the binary search 
-  integer             :: i            ! loop over owned, then halo cells
+  integer, intent(in) :: gid           ! global index
+  integer             :: lid           ! local index
+  integer             :: nlayer        ! layer of supplied gid
+  integer             :: gid_in_layer  ! supplied gid projected to bottom layer
 
   ! Set the default return code
   lid=-1
@@ -1003,37 +1050,69 @@ pure function get_lid_from_gid(gid) result (lid)
   gid_in_layer=modulo(gid-1,(num_cells_x*num_cells_y))+1
   nlayer=(gid-1)/(num_cells_x*num_cells_y)
 
-  ! Perform a binary search through the global cell lookup table looking for
-  ! the required global index. The array holds global indices in numerical
-  ! order for owned cells, followed by the indices for halo cells (for which
-  ! the numbering starts again, but they are in numerical order, again)
-  ! - so we need to binary search through owned and halo cells separately
+  ! Search though core cells - partitioned_cells(1:num_core) - looking for the gid
+  lid=binary_search(partitioned_cells( 1:num_core ), gid)
+  if(lid /= -1)then
+    lid=lid+nlayer*(num_core+num_owned+num_halo)  !convert back to 3d lid
+    return
+  end if
 
-  ! For the first time through the i loop do a binary search though owned
-  ! cells - partitioned_cells(1:num_owned) - looking for the gid
-  bot_index=1
-  top_index=num_owned
-  do i=1,2
-    do
-      if(top_index < bot_index) exit
-      new_index=(bot_index+top_index)/2
-      if(partitioned_cells(new_index) == gid_in_layer)then
-        lid=new_index+nlayer*(num_owned+num_halo)
-        return
-      else if(partitioned_cells(new_index) < gid_in_layer)then
-        bot_index = new_index + 1
-      else
-        top_index = new_index - 1
-      endif
-    end do
-    ! For the second time through the i loop do a binary search though halo 
-    ! cells - partitioned_cells(num_owned+1:num_owned+num_halo) - looking for the gid
-    bot_index=num_owned+1
-    top_index=num_owned+num_halo
-  end do
+  ! Search though owned cells - partitioned_cells(num_core+1:num_core+num_owned) - looking for the gid
+  lid=binary_search(partitioned_cells( num_core+1:num_core+num_owned ), gid)
+  if(lid /= -1)then
+    lid=lid+num_core+nlayer*(num_core+num_owned+num_halo)  !convert back to 3d lid
+    return
+  end if
 
+  ! Search though halo cells - partitioned_cells(num_core+num_owned+1:num_core+num_owned+num_halo) - looking for the gid
+  lid=binary_search(partitioned_cells( num_core+num_owned+1:num_core+num_owned+num_halo ), gid)
+  if(lid /= -1)then
+    lid=lid+num_core+num_owned+nlayer*(num_core+num_owned+num_halo)  !convert back to 3d lid
+    return
+  end if
+
+  ! No lid has been found in either the core, owned or halo cells on this partition, so return with lid=-1
   return
   
 end function get_lid_from_gid
+
+!> @brief Performs a binary search through the given array looking for
+!> a particular entry and returns the index of the entry found
+!> or -1 if no matching entry can be found. The values held in "array_to_be_searched"
+!> must be in numerically increasing order
+!> @param[in] array_to_be_searched The array that will be searched for the given entry
+!> @param[in] value_to_find The entry that is to be searched for
+pure function binary_search(array_to_be_searched, value_to_find) result (id)
+
+  implicit none
+
+  integer, intent(in) :: array_to_be_searched( : )
+  integer, intent(in) :: value_to_find
+  integer :: bot, top  ! Lower and upper index limits between which to search for the value
+  integer :: id        ! Next index for refining the search. If an entry is found this will
+                       ! contain the index of the matching entry
+
+  ! Set bot and top to be the whole array to begin with
+  bot=1
+  top=size(array_to_be_searched)
+
+  search: do
+    ! If top is lower than bot then there is no more array to be searched
+    if(top < bot) exit search
+    ! Refine the search
+    id=(bot+top)/2
+    if(array_to_be_searched(id) == value_to_find)then  ! found matching entry
+      return
+    else if(array_to_be_searched(id) < value_to_find)then ! entry has to be between id and top
+      bot = id + 1
+    else ! entry has to be between bot and id
+      top = id - 1
+    endif
+  end do search
+
+  ! Didn't find a match - return failure code
+  id=-1
+
+end function binary_search
 
 end module mesh_generator_mod

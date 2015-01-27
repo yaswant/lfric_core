@@ -42,7 +42,8 @@ contains
                          w_unique_dofs, w_dof_entity, dx, dy, dz,           &
                          num_cells_x, num_cells_y, &
                          xproc, yproc, &
-                         num_owned, num_halo
+                         partitioned_cells, num_core, num_owned, num_halo, &
+                         local_rank
     use partition_mod, only : partition_cubedsphere, partition_biperiodic
 
     implicit none
@@ -72,14 +73,20 @@ contains
     filename = 'ugrid_quads_2d.nc' 
     call log_event( "set_up: generating/reading the mesh", LOG_LEVEL_INFO )
 
-    ! Partition the mesh and calculate the total number of horizontal cells
-    !on this partition ( num_cells is currently cells along one edge )   
-    if ( l_spherical ) then 
-      call partition_cubedsphere( )  
+    ! Partition the mesh and calculate the total number of horizontal
+    ! cells on this partition
+    if ( l_spherical ) then
+      call partition_cubedsphere( num_cells_x, &
+                                  local_rank, &
+                                  partitioned_cells, &
+                                  num_core, num_owned, num_halo )
     else
-      call partition_biperiodic( )  
+      call partition_biperiodic( num_cells_x, num_cells_y, &
+                                 xproc, yproc, local_rank, &
+                                 partitioned_cells, &
+                                 num_core, num_owned, num_halo ) 
     end if
-    num_cells = num_owned + num_halo
+    num_cells = num_core + num_owned + num_halo
 
 !  ----------------------------------------------------------
 !  Mesh generation, really a preprocessor step for reading

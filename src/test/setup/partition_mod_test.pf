@@ -20,10 +20,14 @@ contains
   !>
   @test
   subroutine test_partition( )
-    use mesh_mod, only : num_cells_x, num_cells_y, &
-                         local_rank, xproc, yproc, &
-                         partitioned_cells, num_owned, num_halo
+    use mesh_mod, only : partitioned_cells, num_core, num_owned, num_halo
   implicit none
+
+  integer :: num_cells_x
+  integer :: num_cells_y
+  integer :: xproc
+  integer :: yproc
+  integer :: local_rank
 
   ! Test partition_biperiodic in sequential model
   num_cells_x = 3
@@ -32,15 +36,21 @@ contains
   yproc = 1
   local_rank=0
 
-  call partition_biperiodic( ) 
+  call partition_biperiodic( num_cells_x, num_cells_y, &
+                             xproc, yproc, local_rank, &
+                             partitioned_cells, &
+                             num_core, num_owned, num_halo ) 
+  !Test number of cells in the partition's core
+  @assertEqual( 1, num_core )
   !Test number of cells owned by partition
-  @assertEqual( 9, num_owned )
+  @assertEqual( 8, num_owned )
   !Test number of cells in halos
   @assertEqual( 0, num_halo )
   !Test that some of the cells in the partition are correct
-  @assertEqual( 1, partitioned_cells(1) )
-  @assertEqual( 5, partitioned_cells(5) )
-  @assertEqual( num_owned, partitioned_cells(num_owned) )
+  @assertEqual( 5, partitioned_cells(1) )
+  @assertEqual( 1, partitioned_cells(2) )
+  @assertEqual( 4, partitioned_cells(5) )
+  @assertEqual( 9, partitioned_cells(num_core+num_owned+num_halo) )
   deallocate(partitioned_cells)
 
   !Test partition_biperiodic in parallel mode - pretend to to PE2 of 4
@@ -50,15 +60,20 @@ contains
   yproc = 2
   local_rank=2
 
-  call partition_biperiodic( ) 
-  !Test number of cells owned by partition (5x5)
-  @assertEqual( 25, num_owned )
+  call partition_biperiodic( num_cells_x, num_cells_y, &
+                             xproc, yproc, local_rank, &
+                             partitioned_cells, &
+                             num_core, num_owned, num_halo ) 
+  !Test number of cells in the partition's core
+  @assertEqual( 9, num_core )
+  !Test number of cells in the core or owned by partition (5x5)
+  @assertEqual( 25, num_core+num_owned )
   !Test number of cells in halos (4 sets of 5 + 4 corners = 24)
   @assertEqual( 24, num_halo )
   !Test that some of the cells in the partition are correct
-  @assertEqual( 51, partitioned_cells(1) )
-  @assertEqual( 73, partitioned_cells(13) )
-  @assertEqual( 100, partitioned_cells(num_owned+num_halo) )
+  @assertEqual( 62, partitioned_cells(1) )
+  @assertEqual( 51, partitioned_cells(10) )
+  @assertEqual( 100, partitioned_cells(num_core+num_owned+num_halo) )
   deallocate(partitioned_cells)
 
   !Test partition_cubedsphere - currently a sequential only stub
@@ -68,15 +83,20 @@ contains
   yproc = 1
   local_rank=0
 
-  call partition_cubedsphere( ) 
-  !Test number of cells owned by partition 6 x (4x4)
-  @assertEqual( 96, num_owned )
+  call partition_cubedsphere( num_cells_x, &
+                              local_rank, &
+                              partitioned_cells,&
+                              num_core, num_owned, num_halo ) 
+  !Test number of cells in the partition's core 6 x (4x4)
+  @assertEqual( 96, num_core )
+  !Test number of cells owned by the partition
+  @assertEqual( 0, num_owned )
   !Test number of cells in halos
   @assertEqual( 0, num_halo )
   !Test that some of the cells in the partition are correct
   @assertEqual( 1, partitioned_cells(1) )
   @assertEqual( 50, partitioned_cells(50) )
-  @assertEqual( num_owned, partitioned_cells(num_owned) )
+  @assertEqual( num_core+num_owned+num_halo, partitioned_cells(num_core+num_owned+num_halo) )
   deallocate(partitioned_cells)
 
   end subroutine test_partition
