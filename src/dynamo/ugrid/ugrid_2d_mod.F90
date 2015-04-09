@@ -30,14 +30,15 @@ type, public :: ugrid_2d_type
   private
 
   !Numbers of different entities
-  integer :: num_cells            !< Number of cells
-  integer :: num_nodes            !< Number of nodes
-  integer :: num_edges            !< Number of edges
-  integer :: num_faces            !< Number of faces
+  integer :: num_cells                !< Number of cells
+  integer :: num_nodes                !< Number of nodes
+  integer :: num_edges                !< Number of edges
+  integer :: num_faces                !< Number of faces
 
-  integer :: num_nodes_per_face   !< Number of nodes surrounding each face
-  integer :: num_nodes_per_edge   !< Number of nodes defining each edge
-  integer :: num_edges_per_face   !< Number of edges bordering each face
+  integer :: num_nodes_per_face       !< Number of nodes surrounding each face
+  integer :: num_nodes_per_edge       !< Number of nodes defining each edge
+  integer :: num_edges_per_face       !< Number of edges bordering each face
+  integer :: max_num_faces_per_node   !< Maximum number of faces surrounding each node
 
   !Coordinates
   real(kind=r_def), allocatable :: node_coordinates(:,:) !< Coordinates of nodes
@@ -63,6 +64,8 @@ contains
   procedure :: get_node_coords_xyz_transpose
   procedure :: get_face_node_connectivity
   procedure :: get_face_node_connectivity_transpose
+  procedure :: get_face_edge_connectivity
+  procedure :: get_face_edge_connectivity_transpose
   procedure :: get_face_face_connectivity
   procedure :: get_face_face_connectivity_transpose
   procedure :: write_coordinates
@@ -76,19 +79,20 @@ contains
 !-------------------------------------------------------------------------------
 !>  @brief Gets number of nodes, edges, faces etc.
 !!
-!!  @param[in]      self                Calling ugrid object.
-!!  @param[out]     num_nodes           Number of nodes
-!!  @param[out]     num_edges           Number of edges
-!!  @param[out]     num_faces           Number of faces
-!!  @param[out]     num_nodes_per_face  Number of nodes around each face.
-!!  @param[out]     num_edges_per_face  Number of edges around each face.
-!!  @param[out]     num_nodes_per_edge  Number of nodes defining each edge.
+!!  @param[in]      self                    Calling ugrid object.
+!!  @param[out]     num_nodes               Number of nodes
+!!  @param[out]     num_edges               Number of edges
+!!  @param[out]     num_faces               Number of faces
+!!  @param[out]     num_nodes_per_face      Number of nodes around each face.
+!!  @param[out]     num_edges_per_face      Number of edges around each face.
+!!  @param[out]     num_nodes_per_edge      Number of nodes defining each edge.
+!!  @param[out]     max_num_faces_per_node  Maximum number of faces surrounding each node.
 !-------------------------------------------------------------------------------
 
 subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
-                           num_nodes_per_face,  num_edges_per_face, &
-                           num_nodes_per_edge)
-                           
+                          num_nodes_per_face, num_edges_per_face, &
+                          num_nodes_per_edge, max_num_faces_per_node )
+
   implicit none
 
   !Arguments
@@ -100,6 +104,7 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
   integer, intent(out) :: num_nodes_per_face
   integer, intent(out) :: num_edges_per_face
   integer, intent(out) :: num_nodes_per_edge
+  integer, intent(out) :: max_num_faces_per_node
 
   num_nodes = self%num_nodes
   num_edges = self%num_edges
@@ -108,6 +113,7 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
   num_nodes_per_face = self%num_nodes_per_face 
   num_edges_per_face = self%num_edges_per_face 
   num_nodes_per_edge = self%num_nodes_per_edge 
+  max_num_faces_per_node = self%max_num_faces_per_node
 
   return
 end subroutine get_dimensions
@@ -250,13 +256,14 @@ subroutine read_from_file(self, filename)
 
   call self%file_handler%file_open(trim(filename))
 
-  call self%file_handler%get_dimensions(                 &
-         num_nodes          = self%num_nodes,            &
-         num_edges          = self%num_edges,            &
-         num_faces          = self%num_faces,            &
-         num_nodes_per_face = self%num_nodes_per_face,   &
-         num_edges_per_face = self%num_edges_per_face,   &
-         num_nodes_per_edge = self%num_nodes_per_edge)
+  call self%file_handler%get_dimensions(                     &
+         num_nodes              = self%num_nodes,            &
+         num_edges              = self%num_edges,            &
+         num_faces              = self%num_faces,            &
+         num_nodes_per_face     = self%num_nodes_per_face,   &
+         num_edges_per_face     = self%num_edges_per_face,   &
+         num_nodes_per_edge     = self%num_nodes_per_edge,   &
+         max_num_faces_per_node = self%max_num_faces_per_node )
 
   call allocate_arrays_for_file(self)
 
@@ -490,6 +497,64 @@ subroutine get_face_node_connectivity_transpose(self, face_node_connectivity)
 
   return
 end subroutine get_face_node_connectivity_transpose
+
+!-------------------------------------------------------------------------------
+!> @brief        Gets an array of edge indices surrounding each face.
+!!
+!! @details  Returns a rank-two array of edges surrounding each face, with
+!!           the edges surrounding any single face being contiguous.
+!!
+!! @param[in]   self                   Calling ugrid object
+!! @param[out]  face_edge_connectivity Indices of edges adjacent to faces.
+!-------------------------------------------------------------------------------
+
+subroutine get_face_edge_connectivity(self, face_edge_connectivity)
+  implicit none
+
+  class(ugrid_2d_type), intent(in)   :: self
+  integer,              intent(out)  :: face_edge_connectivity(:,:)
+
+  integer :: i,j
+
+  do j = 1, self%num_faces
+    do i = 1, self%num_edges_per_face
+      face_edge_connectivity(i,j) = self%face_edge_connectivity(i,j)
+    end do
+  end do
+
+  return
+end subroutine get_face_edge_connectivity
+
+!-------------------------------------------------------------------------------
+!> @brief  Gets an array of edge indices surrounding each face with transposed
+!!         ugrid index ordering.
+!!               
+!! @details  Returns a rank-two array of edges surrounding each face, with the
+!!           face indices being contiguous and the edges surrounding any single
+!!           face being non-contiguous. This is the transpose of the ugrid
+!!           index ordering. This transpose routine is needed to interface
+!!           with the current Dynamo index ordering.
+!!
+!! @param[in]    self                   Calling ugrid object
+!! @param[out]   face_edge_connectivity Indices of edges adjacent to faces.
+!-------------------------------------------------------------------------------
+
+subroutine get_face_edge_connectivity_transpose(self, face_edge_connectivity)
+  implicit none
+
+  class(ugrid_2d_type), intent(in)   :: self
+  integer,              intent(out)  :: face_edge_connectivity(:,:)
+
+  integer :: i,j
+
+  do j = 1, self%num_faces
+    do i = 1, self%num_edges_per_face
+      face_edge_connectivity(j,i) = self%face_edge_connectivity(i,j)
+    end do
+  end do
+
+  return
+end subroutine get_face_edge_connectivity_transpose
 
 !-------------------------------------------------------------------------------
 !> @brief  Gets an array of face indices surrounding each face.

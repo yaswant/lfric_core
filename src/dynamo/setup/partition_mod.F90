@@ -21,6 +21,8 @@ module partition_mod
 
 use global_mesh_mod, only : global_mesh_type
 
+use ESMF
+
 implicit none
 
 private
@@ -37,9 +39,12 @@ type, public :: partition_type
 !> Total number of MPI ranks in this execution
   integer              :: total_ranks
 !> A List of global cell ids known to this partition ordered with core cells
-!> first followed by the owned cells and finally the halo cells oprdered by
+!> first followed by the owned cells and finally the halo cells ordered by
 !> depth of halo
   integer, allocatable :: global_cell_id( : )
+!> A list of the ranks that own all the cells known to this partition
+!> held in the order of cells in the <code>global_cell_id</code> array
+  integer, pointer     :: cell_owner( : )
 !> The number of "core" cells in the <code>global_cell_id</code> list
   integer              :: num_core
 !> The number of "owned" cells in the <code>global_cell_id</code> list
@@ -69,6 +74,10 @@ contains
 !> @return core_cells The total number of halo cells of the particular depth 
 !> on the local partition
   procedure, public :: get_num_cells_halo
+!> Returns the owner of a cell on the local partition
+!> @param[in] cell_number The local id of of the cell being queried 
+!> @return cell_owner The owner of the given cell
+  procedure, public :: get_cell_owner
 !> Returns the global index of the cell that corresponds to the given
 !! local index on the local partition
 !> @param[in] lid The id of a cell in local index space
@@ -146,6 +155,12 @@ integer, intent(in) :: total_ranks
 
 type(partition_type) :: self
 
+type(ESMF_DistGrid) :: distgrid
+integer :: rc
+type(ESMF_Array) :: temporary_esmf_array
+type(ESMF_RouteHandle) :: haloHandle
+integer :: cell
+
 self%local_rank = local_rank
 self%total_ranks = total_ranks
 self%halo_depth = halo_depth
@@ -162,6 +177,50 @@ call partitioner( global_mesh, &
                   self%num_core, &
                   self%num_owned, &
                   self%num_halo )
+
+! Calculate ownership of cells known to the local partition
+! by filling the locally owned cells with the local rank and performing
+! a halo-swap to fill in the owners of all the halo cells.
+!
+! Set up the ESMF structures required to perform a halo swap 
+!
+! Create an ESMF DistGrid, which describes which partition owns which cells
+distgrid = ESMF_DistGridCreate( arbSeqIndexList=self%global_cell_id(1:self%num_core+self%num_owned), &
+                                rc=rc )
+if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+! Can only halo-swap an ESMF array so set one up that's big enough to hold all
+! the owned cells and all the halos
+temporary_esmf_array = ESMF_ArrayCreate( distgrid=distgrid, &
+                                         typekind=ESMF_TYPEKIND_I4, &
+                                         haloSeqIndexList=self%global_cell_id(self%num_core+self%num_owned+1 &
+                                                                              :self%get_num_cells_in_layer()), &
+                                         rc=rc )
+if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+! Point our Fortran array at the space we've set up in the ESMF array
+call ESMF_ArrayGet( array=temporary_esmf_array, &
+                    farrayPtr=self%cell_owner, &
+                    rc=rc )
+if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+! Calculate the routing table required to perform the halo-swap, so the
+! code knows where to find the values it needs to fill in the halos
+call ESMF_ArrayHaloStore( array=temporary_esmf_array, &
+                          routehandle=haloHandle, &
+                          rc=rc )
+if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+! Set ownership of all core + owned cells to the local rank id - halo cells are unset
+do cell = 1,self%num_core+self%num_owned
+  self%cell_owner(cell)=local_rank
+end do
+
+! Do the halo swap to fill in the halo cell ownership
+call ESMF_ArrayHalo( temporary_esmf_array, &
+                     routehandle=haloHandle, &
+                     rc=rc )
+if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
 end function partition_constructor
 
@@ -723,22 +782,16 @@ end function partition_constructor
   integer              :: num_added ! number of cells added to the linked list 
   integer, allocatable :: verts(:)
   integer, allocatable :: cells(:)
-  integer              :: max_cells_per_vertex
 
-!> @todo max_cells_per_vertex is a hard-coded magic number and will only work
-!>       for biperiodic and cubedsphere meshes. It needs to be incorporated
-!>       into the mesh UGRID file and read then read in - but that's too big
-!>       a task and too unrelated to this ticket.
-  max_cells_per_vertex = 4
-  allocate( cells(max_cells_per_vertex) )
+  allocate( cells( global_mesh%get_max_cells_per_vertex() ) )
   allocate( verts(nverts_h) )
 
   do i = 1,number_of_cells
     cell_id = input_cells%dat
-    call global_mesh%get_vertex_on_cell( cell_id, verts )
+    call global_mesh%get_vert_on_cell( cell_id, verts )
     do j = 1,nverts_h
-      call global_mesh%get_cell_on_vertex( verts(j), cells )
-      do k = 1,max_cells_per_vertex
+      call global_mesh%get_cell_on_vert( verts(j), cells )
+      do k = 1,global_mesh%get_max_cells_per_vertex()
         if(cells(k) > 0)then
           call add_unique_item( start,curr,cells(k), num_added )
           num_in_list = num_in_list + num_added
@@ -752,6 +805,20 @@ end function partition_constructor
   deallocate(cells)
 
   end subroutine apply_stencil
+
+function get_cell_owner( self, cell_number ) result ( cell_owner )
+
+  implicit none
+
+  class(partition_type), intent(in) :: self
+
+  integer, intent(in) :: cell_number
+
+  integer :: cell_owner
+
+  cell_owner=self%cell_owner(cell_number)
+
+end function get_cell_owner
 
 
 function get_num_cells_in_layer( self ) result ( num_cells )

@@ -30,10 +30,12 @@ contains
   integer :: num_cells_y
   integer :: cell_id
   integer :: verts(4)
+  integer :: edges(4)
   integer :: cells(4)
   integer :: ncells
   integer :: ncells_x
   integer :: ncells_y
+  integer :: max_cells_on_vert
 
   character(len = str_def) :: filename
 
@@ -45,26 +47,39 @@ contains
   !
   ! Set up stuff that the global_mesh object needs
   call reference_cube()
+  !
+  ! Generate the global_mesh
   global_mesh = global_mesh_type( num_cells_x, &
                                   num_cells_y )
-
+  !
+  ! Test functionality of the global_mesh object we've just created
   cell_id=global_mesh%get_cell_id( 1, 0, 0 )
   @assertEqual( 1, cell_id )
 
   cell_id=global_mesh%get_cell_id( 1, 2, 2 )
   @assertEqual( 9, cell_id )
 
-  call global_mesh%get_vertex_on_cell( 2, verts )
+  call global_mesh%get_vert_on_cell( 2, verts )
   @assertEqual( 2, verts(1) )
   @assertEqual( 5, verts(2) )
   @assertEqual( 6, verts(3) )
   @assertEqual( 3, verts(4) )
 
-  call global_mesh%get_cell_on_vertex( 3, cells )
+  call global_mesh%get_cell_on_vert( 3, cells )
   @assertEqual( 1, cells(1) )
   @assertEqual( 2, cells(2) )
   @assertEqual( 4, cells(3) )
   @assertEqual( 5, cells(4) )
+
+  call global_mesh%get_edge_on_cell( 2, edges )
+  @assertEqual( 2, edges(1) )
+  @assertEqual( 5, edges(2) )
+  @assertEqual( 6, edges(3) )
+  @assertEqual( 7, edges(4) )
+
+  call global_mesh%get_cell_on_edge( 6, cells(1:2) )
+  @assertEqual( 2, cells(1) )
+  @assertEqual( 3, cells(2) )
 
   ncells = global_mesh%get_ncells()
   @assertEqual( 9, ncells )
@@ -75,30 +90,44 @@ contains
   ncells_y = global_mesh%get_num_cells_y()
   @assertEqual( num_cells_y, ncells_y )
 
+  max_cells_on_vert=global_mesh%get_max_cells_per_vertex()
+  @assertEqual( 4, max_cells_on_vert )
 
   !---------------------------------------
   ! Test generation of a cubed-sphere mesh
   !---------------------------------------
   filename = 'data/ugrid_quads_2d.nc' 
   global_mesh = global_mesh_type( filename )
-
+  !
+  ! Generate the global_mesh
   cell_id = global_mesh%get_cell_id( 1, 0, 0 )
   @assertEqual( 1, cell_id )
-
+  !
+  ! Test functionality of the global_mesh object we've just created
   cell_id = global_mesh%get_cell_id( 1, 2, 2 )
   @assertEqual( 11, cell_id )
 
-  call global_mesh%get_vertex_on_cell( 6, verts )
+  call global_mesh%get_vert_on_cell( 6, verts )
   @assertEqual(  6, verts(1) )
   @assertEqual(  7, verts(2) )
   @assertEqual( 11, verts(3) )
   @assertEqual( 10, verts(4) )
 
-  call global_mesh%get_cell_on_vertex( 16, cells )
+  call global_mesh%get_cell_on_vert( 16, cells )
   @assertEqual( 11, cells(1) )
   @assertEqual( 12, cells(2) )
   @assertEqual( 15, cells(3) )
   @assertEqual( 16, cells(4) )
+
+  call global_mesh%get_edge_on_cell( 6, edges )
+  @assertEqual( 11, edges(1) )
+  @assertEqual( 12, edges(2) )
+  @assertEqual( 13, edges(3) )
+  @assertEqual( 20, edges(4) )
+
+  call global_mesh%get_cell_on_edge( 13, cells(1:2) )
+  @assertEqual(  6, cells(1) )
+  @assertEqual(  7, cells(2) )
 
   ncells = global_mesh%get_ncells()
   @assertEqual( 96, ncells )
@@ -108,6 +137,9 @@ contains
 
   ncells_y=global_mesh%get_num_cells_y()
   @assertEqual( 4, ncells_y )
+
+  max_cells_on_vert=global_mesh%get_max_cells_per_vertex()
+  @assertEqual( 4, max_cells_on_vert )
 
   ! clean up the reference_cube we created at the start of the test
   call deallocate_reference()

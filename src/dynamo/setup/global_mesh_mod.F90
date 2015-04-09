@@ -7,8 +7,8 @@
 
 !> @brief A module that describes the cell ordering within the global mesh
 
-!> @details This object holds the 2D cell to cell connectivities that fully
-!>          describe the cell number ordering for the global mesh 
+!> @details This object holds the connectivities that fully
+!>          describe the 2D topology of the global mesh 
 
 module global_mesh_mod
 
@@ -23,7 +23,11 @@ type, public :: global_mesh_type
 !> Full domain vertices on a cell
   integer, allocatable :: vert_on_cell_2d(:,:)
 !> Full domain cells that surround a vertex
-  integer, allocatable :: cell_on_vertex_2d(:,:)
+  integer, allocatable :: cell_on_vert_2d(:,:)
+!> Full domain edges on a cell
+  integer, allocatable :: edge_on_cell_2d(:,:)
+!> Full domain cells either side of an edge
+  integer, allocatable :: cell_on_edge_2d(:,:)
 !> no of cells across a face (or across full domain in x-dirn for biperiodic)
   integer              :: num_cells_x
 !> no of cells across a face, perpendicular to num_cells_x (or across full domain in y-dirn for biperiodic)
@@ -32,6 +36,10 @@ type, public :: global_mesh_type
   integer              :: ncells
 !> number of vertices on each cell
   integer              :: nverts_per_cell
+!> number of edges on each cell
+  integer              :: nedges_per_cell
+!> maximum number of cells around a vertex
+  integer              :: max_cells_per_vertex
 contains
 !> Get the cell id that is x_cells across (E is +ve) and
 !> y_cells up/down (N is +ve) from given cell_number.
@@ -45,11 +53,19 @@ contains
 !> Get the vertices that are incident with a particular cell
 !> @param[in] cell_number The number of the cell being queried 
 !> @param[out] verts The vertices around the given cell
-  procedure, public :: get_vertex_on_cell
+  procedure, public :: get_vert_on_cell
 !> Get the cells that are incident on a particular vertex
 !> @param[in] vertex_number The number of the vertex being queried 
 !> @param[out] cells The cells around the given vertex
-  procedure, public :: get_cell_on_vertex 
+  procedure, public :: get_cell_on_vert 
+!> Get the edges that are incident with a particular cell
+!> @param[in] cell_number The number of the cell being queried 
+!> @param[out] edges The edges around the given cell
+  procedure, public :: get_edge_on_cell
+!> Get the cells that are incident on a particular edge
+!> @param[in] edge_number The number of the edge being queried 
+!> @param[out] cells The cells either side of the given edge
+  procedure, public :: get_cell_on_edge 
 !> Get the total number of cells in the global domain
 !> @return The total number of cells in the global domain
   procedure, public :: get_ncells
@@ -62,6 +78,12 @@ contains
 !> @return The number of cells across a face (or across full domain in y-dirn
 !> for biperiodic meshes)
   procedure, public :: get_num_cells_y
+!> Get the maximum number of cells that can be incident with a vertex (the
+!> actual number of cells at a particular vertex could be less (eg. in a cubed
+!> sphere mesh, there are generally four cells incident with a vertex except
+!> for the "corner" vertices where there are three.
+!> @return The maximum number of cells that can be incident with a vertex
+  procedure, public :: get_max_cells_per_vertex
 end type global_mesh_type
 
 interface global_mesh_type
@@ -77,7 +99,8 @@ function global_mesh_constructor_biperiodic( num_cells_x, num_cells_y ) result(s
 
 use reference_element_mod, only : nfaces_h, &
                                   W, S, E, N, &
-                                  SWB, SEB, NEB, NWB, SWT, SET, NET, NWT
+                                  SWB, SEB, NEB, NWB, SWT, SET, NET, NWT, &
+                                  WB, SB, EB, NB
 implicit none
 
 integer, intent(in) :: num_cells_x
@@ -88,12 +111,15 @@ type(global_mesh_type) :: self
 integer :: i,j
 integer :: id
 integer :: vert_no
-integer :: max_cells_per_vertex
+integer :: edge_no
 
+! Defaults for a biperiodic mesh
 self%ncells = num_cells_x*num_cells_y
 self%num_cells_x = num_cells_x
 self%num_cells_y = num_cells_y
 self%nverts_per_cell = 4
+self%nedges_per_cell=4
+self%max_cells_per_vertex=4
 
 ! Populate cell to cell connectivity
 allocate( self%cell_next_2d( nfaces_h, self%ncells ) )
@@ -208,19 +234,61 @@ do i = 1,self%ncells
   end if
 end do
 
+! Populate edges around each cell
+allocate( self%edge_on_cell_2d( self%nedges_per_cell, self%ncells ))
+edge_no = 0
+self%edge_on_cell_2d = 0
+do i = 1,self%ncells
+! 1. south edge of cell
+  if(self%edge_on_cell_2d(SB,i) == 0)then
+    edge_no = edge_no + 1
+    self%edge_on_cell_2d(SB,i) = edge_no
+    if(self%cell_next_2d(S,i) > 0)then             ! and north edge of cell to south
+      self%edge_on_cell_2d(NB,self%cell_next_2d(S,i)) = edge_no
+    end if
+  end if
+! 2. east edge of cell
+  if(self%edge_on_cell_2d(EB,i) == 0)then
+    edge_no = edge_no + 1
+    self%edge_on_cell_2d(EB,i) = edge_no
+    if(self%cell_next_2d(E,i) > 0)then             ! and west edge of cell to east
+      self%edge_on_cell_2d(WB,self%cell_next_2d(E,i)) = edge_no
+    end if
+  end if
+! 3. north edge of cell
+  if(self%edge_on_cell_2d(NB,i) == 0)then
+    edge_no = edge_no + 1
+    self%edge_on_cell_2d(NB,i) = edge_no
+    if(self%cell_next_2d(N,i) > 0)then             ! and south edge of cell to north
+      self%edge_on_cell_2d(SB,self%cell_next_2d(N,i)) = edge_no
+    end if
+  end if
+! 4. west edge of cell
+  if(self%edge_on_cell_2d(WB,i) == 0)then
+    edge_no = edge_no + 1
+    self%edge_on_cell_2d(WB,i) = edge_no
+    if(self%cell_next_2d(W,i) > 0)then             ! and east edge of cell to west
+      self%edge_on_cell_2d(EB,self%cell_next_2d(W,i)) = edge_no
+    end if
+  end if
+end do
+
 ! Populate cells around each vertex
-!> @todo max_cells_per_vertex is a hard-coded magic number and will only work
-!>       for biperiodic and cubedsphere meshes. It needs to be incorporated
-!>       into the mesh UGRID file and read then read in - but that's too big
-!>       a task and too unrelated to this ticket.
-max_cells_per_vertex = 4
-allocate(self%cell_on_vertex_2d( max_cells_per_vertex, vert_no ))
+allocate(self%cell_on_vert_2d( self%max_cells_per_vertex, vert_no ))
 call calc_cell_on_vertex( self%vert_on_cell_2d, &
                           self%nverts_per_cell, &
                           self%ncells, &
-                          self%cell_on_vertex_2d, &
-                          max_cells_per_vertex, &
+                          self%cell_on_vert_2d, &
+                          self%max_cells_per_vertex, &
                           vert_no)
+
+! Populate cells either side of each edge
+allocate(self%cell_on_edge_2d( 2, edge_no ))  ! There can only ever be 2 cells incident on an edge (whatever the topography!)
+call calc_cell_on_edge(self%edge_on_cell_2d, &
+                       self%nedges_per_cell, &
+                       self%ncells, &
+                       self%cell_on_edge_2d, &
+                       edge_no)
 
 end function global_mesh_constructor_biperiodic
 
@@ -245,25 +313,32 @@ type(ugrid_2d_type) :: ugrid_2d
 class(ugrid_file_type), allocatable :: file_handler
 
 ! dimensions from file
-integer :: nvert_in, nface_in, nedge_in
-integer :: num_nodes_per_face, num_nodes_per_edge, num_edges_per_face
-integer :: max_cells_per_vertex
+integer :: nvert_in
+integer :: nface_in
+integer :: nedge_in
+integer :: num_nodes_per_face
+integer :: num_nodes_per_edge
+integer :: num_edges_per_face
+integer :: max_num_faces_per_node
 
 allocate( ncdf_quad_type :: file_handler )
 call ugrid_2d%set_file_handler( file_handler )
 call ugrid_2d%read_from_file( trim(filename) )
 
-call ugrid_2d%get_dimensions( num_nodes          = nvert_in,            &
-                              num_edges          = nedge_in,            &
-                              num_faces          = nface_in,            &
-                              num_nodes_per_face = num_nodes_per_face,  &
-                              num_edges_per_face = num_edges_per_face,  &
-                              num_nodes_per_edge = num_nodes_per_edge )
+call ugrid_2d%get_dimensions( num_nodes              = nvert_in, &
+                              num_edges              = nedge_in, &
+                              num_faces              = nface_in, &
+                              num_nodes_per_face     = num_nodes_per_face, &
+                              num_edges_per_face     = num_edges_per_face, &
+                              num_nodes_per_edge     = num_nodes_per_edge, &
+                              max_num_faces_per_node = max_num_faces_per_node )
 
 self%ncells = nface_in
 self%nverts_per_cell = num_nodes_per_face
 self%num_cells_x = nint(sqrt(float(nface_in)/6.0))
 self%num_cells_y = self%num_cells_x
+self%nedges_per_cell=num_edges_per_face
+self%max_cells_per_vertex=max_num_faces_per_node
 
 allocate( self%cell_next_2d( num_edges_per_face, nface_in ) )
 call ugrid_2d%get_face_face_connectivity( self%cell_next_2d )
@@ -271,14 +346,24 @@ call ugrid_2d%get_face_face_connectivity( self%cell_next_2d )
 allocate( self%vert_on_cell_2d( num_nodes_per_face, nface_in ) )
 call ugrid_2d%get_face_node_connectivity( self%vert_on_cell_2d )
 
-max_cells_per_vertex = 4
-allocate( self%cell_on_vertex_2d( max_cells_per_vertex, nvert_in ) )
+allocate( self%cell_on_vert_2d( self%max_cells_per_vertex, nvert_in ) )
 call calc_cell_on_vertex( self%vert_on_cell_2d, &
                           num_nodes_per_face, &
                           nface_in, &
-                          self%cell_on_vertex_2d, &
-                          max_cells_per_vertex, &
+                          self%cell_on_vert_2d, &
+                          self%max_cells_per_vertex, &
                           nvert_in)
+
+allocate(self%edge_on_cell_2d( num_edges_per_face, nface_in ))
+call ugrid_2d%get_face_edge_connectivity( self%edge_on_cell_2d )
+
+! Populate cells either side of each edge
+allocate( self%cell_on_edge_2d(2,nedge_in) )  ! There can only ever be 2 cells incident on an edge (whatever the topography!)
+call calc_cell_on_edge( self%edge_on_cell_2d, &
+                        num_edges_per_face, &
+                        nface_in, &
+                        self%cell_on_edge_2d, &
+                        nedge_in )
 
 end function global_mesh_constructor_cubedsphere
 
@@ -300,6 +385,10 @@ integer :: vertno
 integer :: cellno
 integer :: vert
 
+! Calculate the cells that are incident on a vertex by looping through the
+! vertices on all cells (which we store) and filling an array based on vertex
+! number with the cells around it  
+
 cell_on_vert = 0
 
 do cell = 1,ncell
@@ -318,6 +407,46 @@ do cell = 1,ncell
 end do
 
 end subroutine calc_cell_on_vertex
+
+subroutine calc_cell_on_edge( edge_on_cell, &
+                              edges_per_cell, &
+                              ncell, &
+                              cell_on_edge, &
+                              nedge)
+implicit none
+
+integer, intent(in)  :: edges_per_cell, ncell
+integer, intent(in)  :: edge_on_cell(edges_per_cell, ncell)
+integer, intent(in)  :: nedge
+integer, intent(out) :: cell_on_edge(2, nedge)
+
+integer :: cell
+integer :: edgeno
+integer :: cellno
+integer :: edge
+
+! Calculate the cells that are either side of an edge by looping through the
+! edges on all cells (which we store) and filling an array based on edge
+! number with the cells around it  
+
+cell_on_edge=0
+
+do cell=1,ncell
+  do edgeno=1,edges_per_cell
+
+    edge=edge_on_cell(edgeno,cell)
+
+    do cellno=1, 2
+      if(cell_on_edge(cellno,edge) == cell)exit
+      if(cell_on_edge(cellno,edge) == 0)then
+        cell_on_edge(cellno,edge)=cell
+        exit
+      end if
+    end do
+  end do
+end do
+
+end subroutine calc_cell_on_edge
 
 function get_cell_id( self, cell_number, x_cells, y_cells ) result ( cell_id )
 
@@ -368,7 +497,7 @@ end function get_cell_id
 
 
 
-subroutine get_vertex_on_cell( self, cell_number, verts )
+subroutine get_vert_on_cell( self, cell_number, verts )
 
 implicit none
 
@@ -379,11 +508,11 @@ integer, intent(out) :: verts(:)
 
 verts = self%vert_on_cell_2d(:,cell_number)
 
-end subroutine get_vertex_on_cell
+end subroutine get_vert_on_cell
 
 
 
-subroutine get_cell_on_vertex( self, vertex_number, cells)
+subroutine get_cell_on_vert( self, vertex_number, cells)
 
 implicit none
 
@@ -392,9 +521,36 @@ class(global_mesh_type), intent(in) :: self
 integer, intent(in)  :: vertex_number
 integer, intent(out) :: cells(:)
 
-cells = self%cell_on_vertex_2d(:,vertex_number)
+cells = self%cell_on_vert_2d(:,vertex_number)
 
-end subroutine get_cell_on_vertex
+end subroutine get_cell_on_vert
+
+
+subroutine get_edge_on_cell( self, cell_number, edges)
+
+implicit none
+
+class(global_mesh_type), intent(in) :: self
+integer, intent(in) :: cell_number
+integer, intent(out) :: edges(:)
+
+edges=self%edge_on_cell_2d(:,cell_number)
+
+end subroutine get_edge_on_cell
+
+
+
+subroutine get_cell_on_edge( self, edge_number, cells)
+
+implicit none
+
+class(global_mesh_type), intent(in) :: self
+integer, intent(in) :: edge_number
+integer, intent(out) :: cells(:)
+
+cells=self%cell_on_edge_2d(:,edge_number)
+
+end subroutine get_cell_on_edge
 
 
 
@@ -431,6 +587,18 @@ integer :: num_cells_y
 num_cells_y = self%num_cells_y
 
 end function get_num_cells_y
+
+
+
+function get_max_cells_per_vertex( self ) result (max_cells_per_vertex)
+
+class(global_mesh_type), intent(in) :: self
+
+integer :: max_cells_per_vertex
+
+max_cells_per_vertex = self%max_cells_per_vertex
+
+end function get_max_cells_per_vertex
 
 
 end module global_mesh_mod

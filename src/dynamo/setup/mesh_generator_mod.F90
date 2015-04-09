@@ -446,8 +446,13 @@ subroutine mesh_generator_cubedsphere( filename, nlayers, dz, partition )
 ! Loop indices
   integer :: i, j, k, vert, id, jd
 ! data from file
-  integer :: nvert_in, nface_in, nedge_in
-  integer :: num_nodes_per_face, num_nodes_per_edge, num_edges_per_face
+  integer :: nvert_in
+  integer :: nface_in
+  integer :: nedge_in
+  integer :: num_nodes_per_face
+  integer :: num_nodes_per_edge
+  integer :: num_edges_per_face
+  integer :: max_num_faces_per_node
 
 ! lat/long coordinates
   !2D ugrid and generator strategy
@@ -473,12 +478,13 @@ subroutine mesh_generator_cubedsphere( filename, nlayers, dz, partition )
   call ugrid_2d%set_file_handler( file_handler )
   call ugrid_2d%read_from_file( trim(filename) )
 
-  call ugrid_2d%get_dimensions(num_nodes          = nvert_in,            &
-                               num_edges          = nedge_in,            &
-                               num_faces          = nface_in,            &
-                               num_nodes_per_face = num_nodes_per_face,  &
-                               num_edges_per_face = num_edges_per_face,  &
-                               num_nodes_per_edge = num_nodes_per_edge)
+  call ugrid_2d%get_dimensions(num_nodes              = nvert_in,            &
+                               num_edges              = nedge_in,            &
+                               num_faces              = nface_in,            &
+                               num_nodes_per_face     = num_nodes_per_face,  &
+                               num_edges_per_face     = num_edges_per_face,  &
+                               num_nodes_per_edge     = num_nodes_per_edge,  &
+                               max_num_faces_per_node = max_num_faces_per_node )
 
   if ( nface_in /= ncells ) then
     write( log_scratch_space, '(A, I0, A, I0)' ) &

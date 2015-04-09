@@ -48,7 +48,7 @@ $(OBJ_DIR)/%.o: $(OBJ_DIR)/%.F90 $(SUPPORT_OBJECTS)
 	          $(SUBJECT_MODINC) $(SUPPORT_MODINC) \
 	          -I$(PFUNIT_INSTALL_DIR)/mod -c -o $@ $<
 
-$(OBJ_DIR)/test: $(DRIVER_OBJ) $(SUPPORT_OBJECTS) $(TEST_OBJECTS)
+$(OBJ_DIR)/test: $(DRIVER_OBJ) $(SUPPORT_OBJECTS) $(TEST_OBJECTS) $(SUBJECT_DIR)/modules.a
 	@echo Linking $@
 	$(Q)$(FLINK) $(FLDFLAGS) -o $@ \
 	             $^ \

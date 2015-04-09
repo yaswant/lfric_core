@@ -510,10 +510,17 @@ end subroutine check_err
 !!  @param[out]      num_nodes_per_face     The number of nodes per face.
 !!  @param[out]      num_edges_per_face     The number of edges per face.
 !!  @param[out]      num_nodes_per_face     The number of nodes per face.
+!!  @param[out]      max_num_faces_per_node The maximum number of faces surrounding a node.
 !-------------------------------------------------------------------------------
 
-subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
-           num_nodes_per_face, num_edges_per_face, num_nodes_per_edge)
+subroutine get_dimensions(self, &
+                          num_nodes, &
+                          num_edges, &
+                          num_faces, &
+                          num_nodes_per_face, &
+                          num_edges_per_face, &
+                          num_nodes_per_edge, &
+                          max_num_faces_per_node )
   implicit none
 
   !Arguments
@@ -524,6 +531,7 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
   integer,                intent(out)   :: num_nodes_per_face
   integer,                intent(out)   :: num_edges_per_face
   integer,                intent(out)   :: num_nodes_per_edge
+  integer,                intent(out)   :: max_num_faces_per_node
 
   integer :: ierr
 
@@ -545,6 +553,7 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
   num_nodes_per_face = 4
   num_edges_per_face = 4
   num_nodes_per_edge = 2
+  max_num_faces_per_node = 4
 
   return
 end subroutine get_dimensions

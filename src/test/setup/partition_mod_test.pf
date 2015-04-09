@@ -9,28 +9,87 @@
 !>
 module partition_mod_test
 
+  use ESMF
   use pFUnit_Mod
+  use partition_mod
 
   implicit none 
 
+  private
+  public test_partition, setUp, tearDown
+
+  @testCase
+  type, public, extends( TestCase ) :: partition_test_type
+    integer :: dummy ! This is here only so procedures which do not use "this"
+                     ! have something they can hit.
+    integer :: total_ranks
+    integer :: local_rank
+  contains
+    procedure :: setUp
+    procedure :: tearDown
+    procedure :: test_partition
+  end type partition_test_type
+
 contains
+
+  subroutine setUp( this )
+
+  implicit none
+
+  class( partition_test_type ), intent( inout ) :: this
+
+  type(ESMF_VM) :: vm
+  integer       :: rc
+  integer       :: petCount, localPET  
+
+  ! Initialise ESMF
+  call ESMF_Initialize( vm=vm, &
+                        defaultlogfilename="dynamo.Log", &
+                        logkindflag=ESMF_LOGKIND_MULTI, &
+                        rc=rc )
+  if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+  call ESMF_VMGet(vm, &
+                  localPet=localPET, &
+                  petCount=petCount, &
+                  rc=rc)
+  if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+
+  this%total_ranks = petCount
+  this%local_rank  = localPET
+
+  end subroutine setUp
+
+
+  subroutine tearDown( this )
+
+  implicit none
+
+  class( partition_test_type ), intent( inout ) :: this
+
+  integer :: rc
+
+  ! Close down ESMF
+  call ESMF_Finalize( rc=rc )
+
+  this%dummy = 0 ! There is no purpose to this, other than to use "this"
+
+  end subroutine tearDown
 
   !> Test partition module functionality
   !>
   @test
-  subroutine test_partition( )
+  subroutine test_partition( this )
   use constants_mod,         only : str_def
   use reference_element_mod, only : reference_cube, deallocate_reference
   use global_mesh_mod,       only : global_mesh_type
-  use partition_mod,         only : partition_type, &
-                                    partitioner_interface, &
-                                    partitioner_cubedsphere_serial, &
-                                    partitioner_cubedsphere, &
-                                    partitioner_biperiodic
+
   implicit none
 
+  class( partition_test_type ), intent( inout ) :: this
+
   type(global_mesh_type) :: global_mesh
-  type(partition_type)   :: partition
+  type(partition_type) :: partition
 
   procedure (partitioner_interface), pointer :: partitioner_ptr => null ()
 
@@ -41,10 +100,12 @@ contains
   integer :: local_rank
   integer :: total_ranks
   integer :: halo_depth
+
   integer :: num_cells_in_layer
   integer :: num_cells_core
   integer :: num_cells_owned
   integer :: num_cells_halo
+  integer :: cell_owner
   integer :: lid
   integer :: gid
 
@@ -57,25 +118,25 @@ contains
   num_cells_y = 3
   xproc = 1
   yproc = 1
-  local_rank = 0
-  total_ranks = 1
-  halo_depth = 1
+  local_rank = this%local_rank
+  total_ranks = this%total_ranks
+  halo_depth=1
   !
   ! Set up stuff that the partition object needs
   call reference_cube()
-  global_mesh = global_mesh_type( num_cells_x , &
-                                  num_cells_y )
+  global_mesh=global_mesh_type( num_cells_x ,num_cells_y )
   partitioner_ptr => partitioner_biperiodic
   !
   ! Generate the partition
-  partition = partition_type( global_mesh, &
-                              partitioner_ptr, &
-                              halo_depth, &
-                              xproc, &
-                              yproc, &
-                              local_rank, &
-                              total_ranks )
-
+  partition=partition_type( global_mesh, &
+                            partitioner_ptr, &
+                            halo_depth, &
+                            xproc, &
+                            yproc, &
+                            local_rank, &
+                            total_ranks)
+  !
+  ! Test functionality of the partition object we've just created
   num_cells_in_layer = partition%get_num_cells_in_layer()
   @assertEqual( 9, num_cells_in_layer )
 
@@ -85,8 +146,11 @@ contains
   num_cells_owned = partition%get_num_cells_owned()
   @assertEqual( 8, num_cells_owned )
 
-  num_cells_halo = partition%get_num_cells_halo( 1 )
+  num_cells_halo = partition%get_num_cells_halo(1)
   @assertEqual( 0, num_cells_halo )
+
+  cell_owner = partition%get_cell_owner( 1 )
+  @assertEqual( 0, cell_owner )
 
   lid = 1
   gid = partition%get_gid_from_lid( lid )
@@ -96,53 +160,59 @@ contains
   lid = partition%get_lid_from_gid( gid )
   @assertEqual( 5, lid )
 
-
-  !----------------------------------------------------------------
-  !Test partition_biperiodic (in parallel). Pretend to to PE 2 of 4
-  !----------------------------------------------------------------
-  num_cells_x = 10
-  num_cells_y = 10
-  xproc = 2
-  yproc = 2
-  local_rank = 2
-  total_ranks = 4
-  halo_depth = 2
-  !
-  ! Set a new global mesh - everything else is the same as previous test
-  global_mesh = global_mesh_type( num_cells_x , &
-                                  num_cells_y )
-  !
-  ! Generate the partition
-  partition = partition_type( global_mesh, &
-                              partitioner_ptr, &
-                              halo_depth, &
-                              xproc, &
-                              yproc, &
-                              local_rank, &
-                              total_ranks )
-
-  num_cells_in_layer = partition%get_num_cells_in_layer()
-  @assertEqual( 81, num_cells_in_layer )
-
-  num_cells_core = partition%get_num_cells_core()
-  @assertEqual( 9, num_cells_core )
-
-  num_cells_owned = partition%get_num_cells_owned()
-  @assertEqual( 16, num_cells_owned )
-
-  num_cells_halo = partition%get_num_cells_halo( 1 )
-  @assertEqual( 24, num_cells_halo )
-
-  num_cells_halo = partition%get_num_cells_halo( 2 )
-  @assertEqual( 32, num_cells_halo )
-
-  lid = 1
-  gid = partition%get_gid_from_lid( lid )
-  @assertEqual( 62, gid )
-
-  gid = 4
-  lid = partition%get_lid_from_gid( gid )
-  @assertEqual( 29, lid )
+!> @todo  Can't test a parallel biperiodic partition until the unit tests can
+!>        be run in parallel - but that will be another ticket
+!
+!  !---------------------------------------
+!  !Test partition_biperiodic (in parallel)
+!  !---------------------------------------
+!  num_cells_x = 10
+!  num_cells_y = 10
+!  xproc = 2
+!  yproc = 2
+!  local_rank = 2
+!  total_ranks = 4
+!  halo_depth = 2
+!  !
+!  ! Set a new global mesh - everything else is the same as previous test
+!  global_mesh = global_mesh_type( num_cells_x , &
+!                                  num_cells_y )
+!  !
+!  ! Generate the partition
+!  partition = partition_type( global_mesh, &
+!                              partitioner_ptr, &
+!                              halo_depth, &
+!                              xproc, &
+!                              yproc, &
+!                              local_rank, &
+!                              total_ranks )
+!  !
+!  ! Test functionality of the partition object we've just created
+!  num_cells_in_layer = partition%get_num_cells_in_layer()
+!  @assertEqual( 81, num_cells_in_layer )
+!
+!  num_cells_core = partition%get_num_cells_core()
+!  @assertEqual( 9, num_cells_core )
+!
+!  num_cells_owned = partition%get_num_cells_owned()
+!  @assertEqual( 16, num_cells_owned )
+!
+!  num_cells_halo = partition%get_num_cells_halo( 1 )
+!  @assertEqual( 24, num_cells_halo )
+!
+!  num_cells_halo = partition%get_num_cells_halo( 2 )
+!  @assertEqual( 32, num_cells_halo )
+!
+!  cell_owner = partition%get_cell_owner( 26 )
+!  @assertEqual( 1, cell_owner )
+!
+!  lid = 1
+!  gid = partition%get_gid_from_lid( lid )
+!  @assertEqual( 62, gid )
+!
+!  gid = 4
+!  lid = partition%get_lid_from_gid( gid )
+!  @assertEqual( 29, lid )
 
 
   !-------------------------------------------------------
@@ -150,11 +220,11 @@ contains
   !-------------------------------------------------------
   xproc = 1
   yproc = 1
-  local_rank = 0
-  total_ranks = 1
+  local_rank = this%local_rank
+  total_ranks = this%total_ranks
   halo_depth = 1
 
-  filename = 'data/ugrid_quads_2d.nc'
+  filename = 'data/ugrid_quads_2d.nc' 
   global_mesh = global_mesh_type( filename )
   partitioner_ptr => partitioner_cubedsphere_serial
 
@@ -165,7 +235,8 @@ contains
                               yproc, &
                               local_rank, &
                               total_ranks )
-
+  !
+  ! Test functionality of the partition object we've just created
   num_cells_in_layer = partition%get_num_cells_in_layer()
   @assertEqual( 96, num_cells_in_layer )
 
@@ -178,6 +249,9 @@ contains
   num_cells_halo = partition%get_num_cells_halo( 1 )
   @assertEqual( 0, num_cells_halo )
 
+  cell_owner = partition%get_cell_owner( 1 )
+  @assertEqual( 0, cell_owner )
+
   lid = 1
   gid = partition%get_gid_from_lid( lid )
   @assertEqual( 1, gid )
@@ -186,50 +260,56 @@ contains
   lid = partition%get_lid_from_gid( gid )
   @assertEqual( 96, lid )
 
-
-  !-----------------------------------------------------------------
-  !Test partition_cubedsphere (in parallel) Pretend to to PE 5 of 24
-  !-----------------------------------------------------------------
-  xproc = 2
-  yproc = 2
-  local_rank = 5
-  total_ranks = 24
-  halo_depth = 2
-
-  filename = 'data/ugrid_quads_2d.nc' 
-  global_mesh = global_mesh_type( filename )
-  partitioner_ptr => partitioner_cubedsphere
-
-  partition = partition_type( global_mesh, &
-                              partitioner_ptr, &
-                              halo_depth, &
-                              xproc, &
-                              yproc, &
-                              local_rank, &
-                              total_ranks )
-
-  num_cells_in_layer = partition%get_num_cells_in_layer()
-  @assertEqual( 32, num_cells_in_layer )
-
-  num_cells_core = partition%get_num_cells_core()
-  @assertEqual( 0, num_cells_core )
-
-  num_cells_owned = partition%get_num_cells_owned()
-  @assertEqual( 4, num_cells_owned )
-
-  num_cells_halo = partition%get_num_cells_halo( 1 )
-  @assertEqual( 11, num_cells_halo )
-
-  num_cells_halo = partition%get_num_cells_halo( 2 )
-  @assertEqual( 17, num_cells_halo )
-
-  lid = 3
-  gid = partition%get_gid_from_lid( lid )
-  @assertEqual( 23, gid )
-
-  gid = 88
-  lid = partition%get_lid_from_gid( gid )
-  @assertEqual( 14, lid )
+!> @todo  Can't test a parallel cubed-sphere partition until the unit tests can
+!>        be run in parallel - but that will be another ticket
+!
+!  !----------------------------------------
+!  !Test partition_cubedsphere (in parallel)
+!  !----------------------------------------
+!  xproc = 2
+!  yproc = 2
+!  local_rank = this%local_rank
+!  total_ranks = this%total_ranks
+!  halo_depth = 2
+!
+!  filename = 'data/ugrid_quads_2d.nc' 
+!  global_mesh = global_mesh_type( filename )
+!  partitioner_ptr => partitioner_cubedsphere
+!
+!  partition = partition_type( global_mesh, &
+!                              partitioner_ptr, &
+!                              halo_depth, &
+!                              xproc, &
+!                              yproc, &
+!                              local_rank, &
+!                              total_ranks )
+!  !
+!  ! Test functionality of the partition object we've just created
+!  num_cells_in_layer = partition%get_num_cells_in_layer()
+!  @assertEqual( 32, num_cells_in_layer )
+!
+!  num_cells_core = partition%get_num_cells_core()
+!  @assertEqual( 0, num_cells_core )
+!
+!  num_cells_owned = partition%get_num_cells_owned()
+!  @assertEqual( 4, num_cells_owned )
+!
+!  num_cells_halo = partition%get_num_cells_halo( 1 )
+!  @assertEqual( 11, num_cells_halo )
+!
+!  num_cells_halo = partition%get_num_cells_halo( 2 )
+!  @assertEqual( 17, num_cells_halo )
+!
+!  cell_owner = partition%get_cell_owner( 5 )
+!  @assertEqual( 1, cell_owner )
+!
+!  lid = 3
+!  gid = partition%get_gid_from_lid( lid )
+!  @assertEqual( 23, gid )
+!
+!  gid = 88
+!  lid = partition%get_lid_from_gid( gid )
+!  @assertEqual( 14, lid )
 
   ! clean up the reference_cube we created at the start of the test
   call deallocate_reference()
