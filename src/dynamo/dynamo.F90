@@ -62,11 +62,24 @@ program dynamo
                                       argument_status
   character( 6 )                   :: argument
 
-  call log_event( 'Dynamo running...', LOG_LEVEL_INFO )
-
-  ! Code is not set up to run in parallel - so hardcore rank information
+  ! Set defaults for the rank information to be for a serial run
   total_ranks = 1
   local_rank  = 0
+
+  ! Initialise ESMF and get the true rank information from the virtual machine
+  ! (although, for now, don't use it - only serial runs are allowed)
+  CALL ESMF_Initialize(vm=vm, defaultlogfilename="dynamo.Log", &
+                  logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
+  if (rc /= ESMF_SUCCESS) call log_event( 'Failed to initialise ESMF.', LOG_LEVEL_ERROR )
+
+  call ESMF_VMGet(vm, localPet=localPET, petCount=petCount, rc=rc)
+  if (rc /= ESMF_SUCCESS) call log_event( 'Failed to get the ESMF virtual machine.', LOG_LEVEL_ERROR )
+
+  if (petCount /= 1 .OR. localPet /= 0)then
+    call log_event( 'Currently, Dynamo can only run on a single process.', LOG_LEVEL_ERROR )
+  endif
+
+  call log_event( 'Dynamo running...', LOG_LEVEL_INFO )
 
   ! Process command line arguments
   cli_argument_loop: do argument_index = 1, command_argument_count()
@@ -96,21 +109,7 @@ program dynamo
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
 
-  end do cli_argument_loop
-
-! Initialise ESMF
-  CALL ESMF_Initialize(vm=vm, defaultlogfilename="dynamo.Log", &
-                  logkindflag=ESMF_LOGKIND_MULTI, rc=rc)
-  if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-  call ESMF_VMGet(vm, localPet=localPET, petCount=petCount, rc=rc)
-  if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
-
-  if (petCount /= 1 .OR. localPet /= 0)then
-    call log_event( 'Currently, Dynamo can only run on a single process.', LOG_LEVEL_ERROR )
-  endif
- 
-  call log_event( 'Dynamo running...', LOG_LEVEL_INFO )
+  end do cli_argument_loop 
 
   call set_up( )
 

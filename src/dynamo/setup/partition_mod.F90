@@ -20,7 +20,9 @@
 module partition_mod
 
 use global_mesh_mod, only : global_mesh_type
-use constants_mod,   only : r_def, i_def
+use log_mod,         only : log_event,         &
+                            LOG_LEVEL_ERROR
+
 use ESMF
 
 implicit none
@@ -186,43 +188,47 @@ call partitioner( global_mesh, &
 !
 ! Set up the ESMF structures required to perform a halo swap
 !
+rc = ESMF_SUCCESS
 ! Create an ESMF DistGrid, which describes which partition owns which cells
 distgrid = ESMF_DistGridCreate( arbSeqIndexList=self%global_cell_id(1:self%num_core+self%num_owned), &
                                 rc=rc )
-if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
 
 ! Can only halo-swap an ESMF array so set one up that's big enough to hold all
 ! the owned cells and all the halos
-temporary_esmf_array = ESMF_ArrayCreate( distgrid=distgrid, &
-                                         typekind=ESMF_TYPEKIND_I4, &
-                                         haloSeqIndexList=self%global_cell_id(self%num_core+self%num_owned+1 &
-                                                                              :self%get_num_cells_in_layer()), &
-                                         rc=rc )
-if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+if (rc == ESMF_SUCCESS) &
+  temporary_esmf_array = ESMF_ArrayCreate( distgrid=distgrid, &
+                                           typekind=ESMF_TYPEKIND_I4, &
+                                           haloSeqIndexList=self%global_cell_id(self%num_core+self%num_owned+1 &
+                                                                                :self%get_num_cells_in_layer()), &
+                                           rc=rc )
 
 ! Point our Fortran array at the space we've set up in the ESMF array
-call ESMF_ArrayGet( array=temporary_esmf_array, &
-                    farrayPtr=self%cell_owner, &
-                    rc=rc )
-if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+if (rc == ESMF_SUCCESS) &
+  call ESMF_ArrayGet( array=temporary_esmf_array, &
+                      farrayPtr=self%cell_owner, &
+                      rc=rc )
 
 ! Calculate the routing table required to perform the halo-swap, so the
 ! code knows where to find the values it needs to fill in the halos
-call ESMF_ArrayHaloStore( array=temporary_esmf_array, &
-                          routehandle=haloHandle, &
-                          rc=rc )
-if (rc /= ESMF_SUCCESS) call ESMF_Finalize( endflag=ESMF_END_ABORT )
+if (rc == ESMF_SUCCESS) then
+  call ESMF_ArrayHaloStore( array=temporary_esmf_array, &
+                            routehandle=haloHandle, &
+                            rc=rc )
 
-! Set ownership of all core + owned cells to the local rank id - halo cells are unset
-do cell = 1,self%num_core+self%num_owned
-  self%cell_owner(cell)=local_rank
-end do
+  ! Set ownership of all core + owned cells to the local rank id - halo cells are unset
+  do cell = 1,self%num_core+self%num_owned
+    self%cell_owner(cell)=local_rank
+  end do
+end if
 
 ! Do the halo swap to fill in the halo cell ownership
-call ESMF_ArrayHalo( temporary_esmf_array, &
-                     routehandle=haloHandle, &
-                     rc=rc )
-if (rc /= ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
+if (rc == ESMF_SUCCESS) &
+  call ESMF_ArrayHalo( temporary_esmf_array, &
+                       routehandle=haloHandle, &
+                       rc=rc )
+
+! Return code indicates something went wrong in the above, so log an error
+if (rc /= ESMF_SUCCESS) call log_event( 'Failed to ascertain the ownership of halos in the partitioner.', LOG_LEVEL_ERROR )
 
 end function partition_constructor
 

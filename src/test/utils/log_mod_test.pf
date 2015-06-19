@@ -96,11 +96,20 @@ contains
   !>
   subroutine setUp( this )
 
+  use mesh_mod, only : total_ranks
+
     implicit none
 
     class( log_test_type ), intent( inout ) :: this
 
     integer :: condition
+
+    ! Set total_ranks so that the log object logs to stdout
+    total_ranks=1
+    !> @todo When we can run unit tests in more than one parallel configuration
+    !>       (we only run on one process at the moment), we need to add tests
+    !>       for logging using ESMF (which will only happen if we are running
+    !>       more than 1 process)
 
     open( INFO_UNIT, status='scratch', action='readwrite', &
           iostat=condition )

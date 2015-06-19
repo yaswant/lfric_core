@@ -6,16 +6,20 @@
 !-------------------------------------------------------------------------------
 !> @brief A simple logging facility.
 !>
-!> @deprecated This is a minimal implementation which will be replaced when
-!>             the project adopts the ESMF.
+!> If the code is being run serially, the logging information will be written
+!> to the terminal. For parallel execution, the ESMF logging functionality will
+!> be used as this can cope with parallel logging.
 !>
+!> @todo  At some point the serial version of Dynamo should also log using the
+!>        ESMF logging functionality, but for now it is easier for developers
+!>        if the code logs to stdout.
+
+! All calls to the ESMF logging routines are encapsulated in here in case we ever
+! wish to change the logging method
+
 module log_mod
 
-  ! This is implemented as a simple Fortran90 module rather than a singleton
-  ! class as was originally intended. While it may be possible to imlpement
-  ! singletons in Fortran it will fight you every step of the way and it
-  ! wasn't worth the effort.
-
+  use ESMF
   use, intrinsic :: iso_fortran_env, only : output_unit, error_unit
 
   implicit none
@@ -104,10 +108,12 @@ contains
 
   end subroutine log_set_level
 
-  !> Log an event to the terminal.
+  !> Log an event
   !>
-  !> The event description is sent to the terminal along with timestamp and
-  !> level information. For the most serious events (a severity level equal to
+  !> If the code is running on multiple MPI ranks, the event description will
+  !> be sent to the ESMF log. For serial exucutions, the event description is
+  !> sent to the terminal along with timestamp and level information. 
+  !> For the most serious events (a severity level equal to
   !> or greater than LOG_LEVEL_ERROR), execution of the code will be aborted.
   !>
   !> @param message A description of the event.
@@ -116,11 +122,15 @@ contains
   subroutine log_event(message, level)
 
     use, intrinsic :: iso_fortran_env, only : output_unit, error_unit
+    use mesh_mod, only : total_ranks
 
     implicit none
 
     character (*), intent( in ) :: message
     integer,       intent( in ) :: level
+
+    type(ESMF_LogMsg_Flag) :: log_flag
+    integer :: rc
 
     integer        :: unit
     character (5)  :: tag
@@ -129,28 +139,45 @@ contains
     character (5)  :: zone_string
 
     if (level >= log_level) then
-      call date_and_time( date=date_string, time=time_string, zone=zone_string)
 
       select case (level)
         case ( : LOG_LEVEL_DEBUG - 1)
           unit = info_unit
           tag  = 'TRACE'
+          log_flag=ESMF_LOGMSG_TRACE
         case (LOG_LEVEL_DEBUG : LOG_LEVEL_INFO - 1 )
           unit = info_unit
           tag  = 'DEBUG'
+          log_flag=ESMF_LOGMSG_TRACE
         case ( LOG_LEVEL_INFO : LOG_LEVEL_WARNING - 1 )
           unit = info_unit
           tag  = 'INFO '
+          log_flag=ESMF_LOGMSG_INFO
         case ( LOG_LEVEL_WARNING : LOG_LEVEL_ERROR - 1)
           unit = alert_unit
           tag  = 'WARN '
+          log_flag=ESMF_LOGMSG_WARNING
         case ( LOG_LEVEL_ERROR : )
           unit = alert_unit
           tag  = 'ERROR'
+          log_flag=ESMF_LOGMSG_ERROR
       end select
 
-      write (unit, '(A,A,A,A,A,A,A)') date_string, time_string, zone_string, &
+      if(total_ranks > 1)then
+        call ESMF_LogWrite(trim( message ), log_flag, rc=rc)
+      else
+        call date_and_time( date=date_string, time=time_string, zone=zone_string)
+
+        write (unit, '(A,A,A,A,A,A,A)') date_string, time_string, zone_string, &
                                       ':', tag, ': ', trim( message )
+      end if
+
+!> @todo  The ESMF logging functionality should automatically stop the code
+!>        if the log level is beyond the set threshold, so this code should
+!>        be superfluous. However, that functionality in ESMF is not working
+!>        correctly. The bug has been reported to the ESMF developers and 
+!>        fixed, but we are waiting for it to make its way through to the
+!>        released version - so this code will have to remain for now.
 
       ! If the severity level of the event is serious enough, stop the code.
       if ( level >= LOG_LEVEL_ERROR )then
