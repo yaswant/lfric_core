@@ -127,13 +127,13 @@
     [[api_documentation]]
         inherit = DOCUMENTATION, DOCUMENTATION_ENVIRONMENT, LOCAL
         command scripting = """
-                            make -C $SOURCE_DIRECTORY/Docs api
+                            make -C $SOURCE_DIRECTORY/documentation api
                             """
 
     [[design_documentation]]
         inherit = DOCUMENTATION, DOCUMENTATION_ENVIRONMENT, LOCAL
         command scripting = """
-                            make -C $SOURCE_DIRECTORY/Docs design
+                            make -C $SOURCE_DIRECTORY/documentation design
                             """
 
 {#############################################################################}
