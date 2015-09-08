@@ -137,13 +137,18 @@ module constants_mod
  logical, parameter :: L_NONLINEAR     = .true. !< Solve the full nonlinear equation set
  logical, parameter :: L_SEMI_IMPLICIT = .true. !< Use the iterative timestepping method or runge kutta method
  logical, parameter :: L_ROTATING      = .true. !< Turn on/off Coriolis terms
- !> @}
+ logical, parameter :: L_SUPG          = .false. !< Use Streamline-Upwind-Petrov-Galerkin method for stabilisation of CG advection
+!> @}
 
  !> @}
  !> @name Runtime options
  real(kind=r_def),    parameter :: DT = 1.0_r_def !< Timestep in seconds
  integer(kind=i_def), parameter :: NT = 30        !< Number of timesteps to run for
  !> @}
-
+ !> @}
+ !> @name Idealised test switches
+ logical, parameter :: L_COLD_BUBBLE  = .false. ! Straka density current test (planer domain only)
+ logical, parameter :: L_GRAVITY_WAVE = .true.  ! Gravity wave test (either planer or spherical)
+ !> @}
 end module constants_mod
 

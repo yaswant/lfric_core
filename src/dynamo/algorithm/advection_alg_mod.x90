@@ -17,11 +17,12 @@ module advection_alg_mod
   use rrho_kernel_mod,                   only: rrho_kernel_type
   use vorticity_advection_kernel_mod,    only: vorticity_advection_kernel_type
   use vorticity_rhs_kernel_mod,          only: vorticity_rhs_kernel_type
+  use rtheta_supg_kernel_mod,            only: rtheta_supg_kernel_type
 
   use mesh_mod,                          only: mesh_type
   use field_mod,                         only: field_type
   use solver_mod,                        only: solver_algorithm
-  use constants_mod,                     only: r_def, SOLVER_OPTION, DT
+  use constants_mod,                     only: r_def, SOLVER_OPTION, DT, L_SUPG
   use quadrature_mod,                    only: quadrature_type, QR3
   use operator_mod,                      only: operator_type
   use function_space_mod,                only: function_space_type
@@ -49,12 +50,16 @@ contains
 !>               fields
   subroutine advection_alg( advection, &
                             state, &
+                            state_np1, &
+                            state_n,   &
                             xi, &
                             runtime_constants )
   
   implicit none
   ! Form of state and advection is [u,theta,rho] & [r_u,r_theta,r_rho]
   type(field_type), intent(in),    target  :: state(3)
+  type(field_type), intent(in),    target  :: state_np1(3)
+  type(field_type), intent(in),    target  :: state_n(3)
   type(field_type), intent(inout)          :: advection(3)
   type(field_type), intent(inout)          :: xi
   type(runtime_constants_type), intent(in) :: runtime_constants
@@ -65,7 +70,7 @@ contains
 
   type(function_space_type) :: fs
   type( quadrature_type ), pointer :: qr => null()
-  type(field_type), pointer :: u ,theta, rho
+  type(field_type), pointer :: u ,theta, rho, theta_np1, theta_n => null()
   type(field_type)          :: r_xi, mass_flux, r_rho 
   integer                   :: xi_fs, u_fs, rho_fs, theta_fs
  
@@ -77,6 +82,9 @@ contains
   u     => state(1)
   theta => state(2)
   rho   => state(3)
+
+  theta_np1 => state_np1(2)
+  theta_n => state_n(2)
  
   u_fs   = u%which_function_space() 
   xi_fs  = xi%which_function_space()
@@ -108,6 +116,9 @@ contains
   ! 3) theta_advection dt*( F/rho . grad(theta) )
   call invoke_set_field_scalar( 0.0_r_def, advection(2) )
   call invoke( rtheta_kernel_type( advection(2), theta, mass_flux, rho, qr) )
+  if ( L_SUPG ) &
+    call invoke( rtheta_supg_kernel_type( advection(2),     &
+                                theta_np1, theta_n, mass_flux, rho, chi, qr) )
 
   ! 4) divergence of mass flux: dt * M3^-1(div(F))
   call invoke( rrho_kernel_type( r_rho, mass_flux, qr ) )

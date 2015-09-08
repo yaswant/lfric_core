@@ -32,7 +32,7 @@ module iter_timestep_alg_mod
   use field_mod,                         only: field_type
   use function_space_mod,                only: function_space_type, W0, W1, W2, W3
   use solver_mod,                        only: solver_algorithm
-  use constants_mod,                     only: r_def, SOLVER_OPTION, DT, NT, L_ROTATING
+  use constants_mod,                     only: r_def, SOLVER_OPTION, DT, NT
   use quadrature_mod,                    only: quadrature_type, QR3
   use operator_mod,                      only: operator_type
   use runtime_constants_mod,             only: runtime_constants_type
@@ -181,7 +181,8 @@ contains
         call invoke_axpby( ALPHA, u,     BETA, state_n(1), state_adv(1) ) 
         call invoke_axpby( ALPHA, theta, BETA, state_n(2), state_adv(2) ) 
         call invoke_axpby( ALPHA, rho,   BETA, state_n(3), state_adv(3) )
-        call advection_alg(rhs_adv, state_adv, xi, runtime_constants)
+        call advection_alg(rhs_adv, state_adv, (/u,theta,rho/), state_n,  &
+                                                  xi, runtime_constants)
 
         !=== Section 3.2: Inner (nonlinear, coriolis loop) ===================!
         do inner = 1,N_INNER_ITER

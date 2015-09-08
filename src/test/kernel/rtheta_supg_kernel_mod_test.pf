@@ -1,0 +1,201 @@
+!-----------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-----------------------------------------------------------------------------
+
+!> Test the rtheta computation
+!>
+module rtheta_supg_kernel_mod_test
+
+  implicit none 
+
+
+contains
+
+  @test
+  subroutine rtheta_supg_kernel_test()
+
+    use pFUnit_Mod
+    use function_space_build_mod,   only : fs_build, fs_destroy
+    use field_mod,                  only : field_type,      &
+                                           field_proxy_type
+    use function_space_mod,         only : function_space_type, W0, W2, W3
+    use rtheta_supg_kernel_mod, &
+                                    only : rtheta_supg_code
+    use constants_mod,              only : r_def, PLANE_BI_PERIODIC
+    use quadrature_mod,             only : quadrature_type, QR3
+    use mesh_mod,                   only : mesh_type
+
+   implicit none
+    type(function_space_type) :: fs
+    type( quadrature_type), pointer :: qr => null()
+    type(mesh_type)  :: mesh
+    real(kind=r_def) :: tol
+    real(kind=r_def), allocatable, dimension(:) :: answer
+
+    integer :: i, j, k, cell
+    real(kind=r_def), parameter :: dx = 6000.0_r_def, &
+                                   dy = 1000.0_r_def, &
+                                   dz = 2000.0_r_def
+! Required for calling kernel 
+    type( field_type )  :: r_theta, theta, f, rho, theta_n, chi(3)
+
+    integer                 :: nlayers, nqp_h, nqp_v
+    integer                 :: ndf_w0, undf_w0, dim_w0, dim_diff_w0
+    integer                 :: ndf_w2, undf_w2, dim_w2
+    integer                 :: ndf_w3, undf_w3, dim_w3
+
+    integer, pointer        :: map_w2(:), map_w0(:), map_w3(:), orientation_w2(:) => null()
+
+    type( field_proxy_type )        :: r_theta_proxy, theta_proxy, &
+                                       theta_n_proxy, &
+                                       f_proxy, rho_proxy, &
+                                       chi_proxy(3)
+    
+    real(kind=r_def), allocatable  :: basis_w2(:,:,:,:), &
+                                      basis_w0(:,:,:,:), &
+                                      basis_w3(:,:,:,:), &
+                                      diff_basis_w0(:,:,:,:)
+
+    real(kind=r_def), pointer :: xp(:,:) => null()
+    real(kind=r_def), pointer :: zp(:)   => null()
+    real(kind=r_def), pointer :: wh(:)   => null(), &
+                                 wv(:)   => null()
+
+   
+    tol = 1.0e-6_r_def  
+    qr => qr%get_instance(QR3,9,3)
+
+    ! Dummy mesh mod has 9 cells, 3 layers
+    mesh = mesh_type(PLANE_BI_PERIODIC)
+
+    ! build some function spaces ...
+    call fs_build(mesh)
+
+    ! make a coordinate field with a function space
+    do i = 1,3
+      chi(i) = field_type( vector_space = fs%get_instance( mesh, W0 ) )
+      chi_proxy(i) = chi(i)%get_proxy()
+    end do
+    ! Compute coordinates
+    cell = 1
+    do j = 1,3
+      do i = 1,3
+        map_w0 => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+        do k = 0,3          
+          chi_proxy(1)%data(map_w0(1) + k) = real(i-1)*dx
+          chi_proxy(2)%data(map_w0(1) + k) = real(j-1)*dy
+          chi_proxy(3)%data(map_w0(1) + k) = real(k)  *dz
+        end do
+        cell = cell + 1
+      end do
+    end do
+
+    ! Test kernel
+    r_theta = field_type( vector_space = fs%get_instance( mesh, W0 ) )
+    theta   = field_type( vector_space = fs%get_instance( mesh, W0 ) )
+    theta_n = field_type( vector_space = fs%get_instance( mesh, W0 ) )
+    f       = field_type( vector_space = fs%get_instance( mesh, W2 ) )
+    rho     = field_type( vector_space = fs%get_instance( mesh, W3 ) )
+
+    r_theta_proxy   = r_theta%get_proxy()
+    theta_proxy     = theta%get_proxy()
+    theta_n_proxy   = theta_n%get_proxy()
+    f_proxy         = f%get_proxy()
+    rho_proxy       = rho%get_proxy()
+
+    nlayers = r_theta_proxy%vspace%get_nlayers()
+
+    nqp_h=qr%get_nqp_h()
+    nqp_v=qr%get_nqp_v()
+    zp=>qr%get_xqp_v()
+    xp=>qr%get_xqp_h()
+    wh=>qr%get_wqp_h()
+    wv=>qr%get_wqp_v()
+
+    ndf_w2      = f_proxy%vspace%get_ndf( )
+    dim_w2      = f_proxy%vspace%get_dim_space( )
+    undf_w2     = f_proxy%vspace%get_undf()
+    allocate(basis_w2(dim_w2,ndf_w2,nqp_h,nqp_v))
+
+    ndf_w0      = r_theta_proxy%vspace%get_ndf( )
+    dim_w0      = r_theta_proxy%vspace%get_dim_space( )
+    dim_diff_w0 = r_theta_proxy%vspace%get_dim_space_diff( )
+    undf_w0     = r_theta_proxy%vspace%get_undf()
+    allocate(basis_w0(dim_w0,ndf_w0,nqp_h,nqp_v))
+    allocate(diff_basis_w0(dim_diff_w0,ndf_w0,nqp_h,nqp_v))
+
+    ndf_w3      = rho_proxy%vspace%get_ndf( )
+    dim_w3      = rho_proxy%vspace%get_dim_space( )
+    undf_w3     = rho_proxy%vspace%get_undf()
+    allocate(basis_w3(dim_w3,ndf_w3,nqp_h,nqp_v))
+
+
+    call f_proxy%vspace%compute_basis_function(                     &
+        basis_w2, ndf_w2, nqp_h, nqp_v, xp, zp)    
+
+    call r_theta_proxy%vspace%compute_basis_function(basis_w0, ndf_w0,      & 
+         nqp_h, nqp_v, xp, zp)
+
+    call r_theta_proxy%vspace%compute_diff_basis_function(                  &
+         diff_basis_w0, ndf_w0, nqp_h, nqp_v, xp, zp)
+
+    call rho_proxy%vspace%compute_basis_function(                     &
+        basis_w3, ndf_w3, nqp_h, nqp_v, xp, zp)    
+
+
+!   Create the data
+    r_theta_proxy%data(:) = 0.0_r_def
+    theta_proxy%data(:)   = 300.0_r_def
+    theta_n_proxy%data(:) = 300.0_r_def
+    f_proxy%data(:)       = 2.0_r_def
+    rho_proxy%data(:)     = 0.5_r_def
+
+
+    do cell = 1, r_theta_proxy%vspace%get_ncell()
+       map_w0 => r_theta_proxy%vspace%get_cell_dofmap( cell )
+       map_w2 => f_proxy%vspace%get_cell_dofmap( cell )
+       map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
+
+
+       orientation_w2 => f_proxy%vspace%get_cell_orientation ( cell )
+       call rtheta_supg_code( nlayers, &
+                              r_theta_proxy%data, &
+                              theta_proxy%data, &
+                              theta_n_proxy%data, &
+                              f_proxy%data, &
+                              rho_proxy%data, &
+                              chi_proxy(1)%data, &
+                              chi_proxy(2)%data, &
+                              chi_proxy(3)%data, &
+                              ndf_w0, undf_w0, &
+                              map_w0, &
+                              basis_w0, &
+                              diff_basis_w0, &
+                              ndf_w2, undf_w2, &
+                              map_w2, &
+                              basis_w2, &
+                              orientation_w2, &
+                              ndf_w3, undf_w3, &
+                              map_w3, &
+                              basis_w3, &
+                              nqp_h, nqp_v, wh, wv &
+                              )
+    end do 
+
+    deallocate(basis_w2, basis_w0, diff_basis_w0, basis_w3)
+    allocate( answer(undf_w0) )
+
+! Simple test, check that when theta=const, f/rho.grad(theta) = 0    
+    answer(:) = 0.0_r_def
+    @assertEqual(answer, r_theta_proxy%data(:), tol)
+
+    deallocate( answer )
+    !tear down ...
+    call fs_destroy()
+  
+  end subroutine rtheta_supg_kernel_test
+
+end module rtheta_supg_kernel_mod_test

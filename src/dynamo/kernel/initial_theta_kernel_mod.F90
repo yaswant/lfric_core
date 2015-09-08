@@ -18,7 +18,8 @@ use argument_mod,            only: arg_type,                  &
                                    GH_FIELD, GH_WRITE, GH_READ, &
                                    W0,                        &
                                    CELLS
-use constants_mod,           only: PI, r_def, earth_radius, L_NONLINEAR
+use constants_mod,           only: PI, r_def, earth_radius, L_NONLINEAR, &
+                                   L_COLD_BUBBLE, L_GRAVITY_WAVE
 use coord_transform_mod,     only: xyz2llr
 use slush_mod,               only: l_spherical
 use generate_global_gw_fields_mod, only: generate_global_gw_pert
@@ -92,7 +93,11 @@ subroutine initial_theta_code(nlayers, &
   real(kind=r_def)            :: theta_ref, exner_ref, rho_ref
   real(kind=r_def)            :: lat, lon, r
   real(kind=r_def)            :: theta_pert, nl
-   
+   real(kind=r_def)            :: l, dt
+  real(kind=r_def), parameter :: XR = 4000.0_r_def, &
+                                 ZC_cold = 3000.0_r_def, &
+                                 ZC_hot = 260.0_r_def, &
+                                 ZR = 2000.0_r_def     
   ! compute the pointwise theta profile
   if ( L_NONLINEAR ) then 
     nl = 1.0
@@ -119,9 +124,30 @@ subroutine initial_theta_code(nlayers, &
          x(2) = chi_2(map(df) + k)
          x(3) = chi_3(map(df) + k)
          call reference_profile(exner_ref, rho_ref, theta_ref, x)
+        if ( L_GRAVITY_WAVE ) then
+          theta(map(df) + k) = THETA0 * sin ( PI * x(3) / H )                        &
+                             / ( 1.0_r_def + ( x(1) - XC )**2/A**2 ) + nl*theta_ref
+        else
+          theta(map(df) + k) = theta_ref
 
-         theta(map(df) + k) = THETA0 * sin ( PI * x(3) / H )                        &
-                            / ( 1.0_r_def + ( x(1) - XC )**2/A**2 ) + nl*theta_ref 
+          ! Density current test   
+          if ( L_COLD_BUBBLE ) then     
+            l = sqrt( ((x(1)-XC)/XR)**2 + ((x(3)-ZC_cold)/ZR)**2 )
+            if ( l <= 1.0_r_def ) then
+              dt =  15.0_r_def/2.0_r_def*(cos(PI*l)+1.0_r_def)
+              theta(map(df) + k) = theta_ref - dt/exner_ref
+            end if 
+          else
+          ! Warm bubble test        
+            l = sqrt( ((x(1)-XC))**2 + ((x(3)-ZC_hot))**2 )
+            if ( l <= 50.0_r_def ) then
+              dt = 0.5_r_def
+            else
+              dt = 0.5_r_def*exp(-(l-50.0_r_def)**2/(100.0_r_def)**2)
+            end if 
+            theta(map(df) + k) = theta_ref + dt
+          end if
+        end if
       end do
     end do
   end if

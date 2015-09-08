@@ -11,7 +11,8 @@
 
 module initial_rho_kernel_mod
 use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def
+use constants_mod,           only : r_def, L_COLD_BUBBLE, &
+                                    P_ZERO, Rd, KAPPA, PI
 use argument_mod,            only : arg_type, func_type,                     &
                                     GH_FIELD, GH_READ, GH_WRITE,             &
                                     W0, W3,                                  &
@@ -107,7 +108,11 @@ subroutine initial_rho_code(nlayers, rho, chi_1, chi_2, chi_3, &
   real(kind=r_def)                             :: exner_ref, rho_ref, theta_ref, &
                                                   integrand
   real(kind=r_def)                             :: x(3)
-
+  real(kind=r_def)            :: l, dt
+  real(kind=r_def), parameter :: XC = 0.0_r_def, &
+                                 XR = 4000.0_r_def, &
+                                 ZC_cold = 3000.0_r_def, &
+                                 ZR = 2000.0_r_def   
   ! compute the RHS & LHS integrated over one cell and solve
   do k = 0, nlayers-1
     do df1 = 1, ndf_w0
@@ -129,6 +134,14 @@ subroutine initial_rho_code(nlayers, rho, chi_1, chi_2, chi_3, &
             x(3) = x(3) + chi_3_e(df2)*w0_basis(1,df2,qp1,qp2)
           end do
           call reference_profile(exner_ref, rho_ref, theta_ref, x)
+          if ( L_COLD_BUBBLE ) then
+            l = sqrt( ((x(1)-XC)/XR)**2 + ((x(3)-ZC_cold)/ZR)**2 )
+            if ( l <= 1.0_r_def ) then
+              dt =  15.0_r_def/2.0_r_def*(cos(PI*l)+1.0_r_def)
+              theta_ref = theta_ref - dt/exner_ref
+              rho_ref = P_ZERO/(Rd*theta_ref) * exner_ref**( (1.0_r_def - KAPPA )/ KAPPA )
+            end if             
+          end if     
           integrand =  w3_basis(1,df1,qp1,qp2) * rho_ref * dj(qp1,qp2)
           rhs_e(df1) = rhs_e(df1) + wqp_h(qp1)*wqp_v(qp2)*integrand
         end do

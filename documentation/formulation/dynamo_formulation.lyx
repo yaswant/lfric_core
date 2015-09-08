@@ -2294,6 +2294,197 @@ reference "eq:si_thermodynamic_operator"
  are zero and the scheme corresponds to the standard Crank-Nicolson method
 \end_layout
 
+\begin_layout Subsection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Advection"
+
+\end_inset
+
+Advection
+\end_layout
+
+\begin_layout Standard
+The Eulerian advection scheme need to compute 3 terms:
+\begin_inset Formula 
+\begin{equation}
+\widetilde{\mathbf{F}}=\rho\mathbf{\overline{u}},\label{eq:adv_mass_flux_def}
+\end{equation}
+
+\end_inset
+
+for the continuity equation
+\begin_inset Formula 
+\begin{eqnarray}
+\bm{\xi} & = & \nabla\times\mathbf{u}\label{eq:adv_vorticity_def}\\
+\left(\frac{\bm{\xi}}{\rho}\right)\times\widetilde{\mathbf{F}}\label{eq:adv_momentum_advection}
+\end{eqnarray}
+
+\end_inset
+
+ for the momentum equation, and
+\begin_inset Formula 
+\begin{equation}
+\frac{\widetilde{\mathbf{F}}}{\rho}.\nabla\theta\label{eq:adv_p_temperature_advection}
+\end{equation}
+
+\end_inset
+
+ for the potential temperature equation.
+ All for a given advecting wind field 
+\begin_inset Formula $\overline{\mathbf{u}}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Subsubsection
+Finite-Element Advection
+\begin_inset CommandInset label
+LatexCommand label
+name "sub:Finite-Element-Advection"
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+The finite element advection scheme simply uses the finite element machinery
+ to project the deisred terms in to the correct spaces.
+ This means that is inherently limited by the order of the finite element
+ spaces so that for the lowest order spaces the advection terms would only
+ be formally 
+\begin_inset Formula $1^{{\rm st}}$
+\end_inset
+
+ order.
+ The mass flux 
+\begin_inset Formula $\widetilde{\mathbf{F}}$
+\end_inset
+
+ is defined as being the projection of 
+\begin_inset Formula $\rho\overline{\mathbf{u}}$
+\end_inset
+
+ into the mass flux space
+\begin_inset Formula 
+\begin{equation}
+\left\langle \mathbf{v},\widetilde{\mathbf{F}}\right\rangle =\left\langle \mathbf{v},\rho\overline{\mathbf{u}}\right\rangle .\label{eq:fem_mass_flux}
+\end{equation}
+
+\end_inset
+
+ The vortcity is defined as the projection of the weak curl of the velocity
+ into the 
+\begin_inset Formula $\mathbb{W}_{1}$
+\end_inset
+
+ space.
+ 
+\begin_inset Formula 
+\begin{equation}
+\left\langle \mathbf{c},\bm{\xi}\right\rangle =-\left\langle \nabla\times\mathbf{c},\overline{\mathbf{u}}\right\rangle ,\label{eq:fem_vorticity}
+\end{equation}
+
+\end_inset
+
+ and the vorticity advection terms is defined as the projection into 
+\begin_inset Formula $\mathbb{W}_{2}$
+\end_inset
+
+ of the cross product of the vorticity and the mass flux 
+\begin_inset Formula 
+\begin{equation}
+\left\langle \mathbf{v},\left(\frac{\bm{\xi}}{\rho}\right)\times\widetilde{\mathbf{F}}\right\rangle .\label{eq:fem_momentum_adv}
+\end{equation}
+
+\end_inset
+
+ Finally the potential temperature advection term defined as the is the
+ projection into the potential temperature space, which for 
+\begin_inset Formula $\theta\in\mathbb{W}_{0}$
+\end_inset
+
+ is 
+\begin_inset Formula 
+\begin{equation}
+\left\langle \gamma,\frac{\widetilde{\mathbf{F}}}{\rho}.\nabla\theta\right\rangle .\label{eq:fem_p_temperature_advection}
+\end{equation}
+
+\end_inset
+
+ In all cases the mass flux is used as the advecting field for consistency.
+ Where this is normalised by the density, the same density as in the mass
+ flux computation 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "eq:fem_mass_flux"
+
+\end_inset
+
+ is used.
+ If 
+\begin_inset Formula $\theta$
+\end_inset
+
+ is continuous then this method can lead to a noisy advection scheme.
+ A common method to combat this is to use the Streamline-Upwind-Petrov-Galerkin
+ method, where the test function for the space is modified to include an
+ upwinding, i.e 
+\begin_inset Formula 
+\begin{equation}
+\gamma\longrightarrow\gamma^{*}\equiv\gamma+\frac{\mu}{\Delta}\frac{\widetilde{\mathbf{F}}}{\left|\widetilde{\mathbf{F}}\right|}.\nabla\gamma\label{eq:supg}
+\end{equation}
+
+\end_inset
+
+where 
+\begin_inset Formula $\mu$
+\end_inset
+
+ is a user defined parameter and 
+\begin_inset Formula $\Delta$
+\end_inset
+
+ is some measure of the average grid spacing.
+ Applying 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "eq:supg"
+
+\end_inset
+
+ to 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "eq:nonlinear_thermo-1-1"
+
+\end_inset
+
+ and rearranging gives
+\begin_inset Formula 
+\begin{equation}
+\left\langle \gamma,\frac{\partial\theta}{\partial t}\right\rangle =-\left\langle \gamma,\mathbf{u}.\nabla\theta\right\rangle -R_{\theta}^{supg}.\label{eq:theta_supg}
+\end{equation}
+
+\end_inset
+
+with 
+\begin_inset Formula 
+\begin{equation}
+R_{\theta}^{supg}=\frac{\mu}{\Delta}\left\langle \frac{\widetilde{\mathbf{F}}}{\left|\widetilde{\mathbf{F}}\right|}.\nabla\gamma,\frac{\partial\theta}{\partial t}+\mathbf{u}.\nabla\theta\right\rangle \label{eq:Rtheta_supg}
+\end{equation}
+
+\end_inset
+
+which is the residual error in the 
+\begin_inset Formula $\theta$
+\end_inset
+
+ equation tested by the upwind component of the test function.
+\end_layout
+
 \begin_layout Section
 Conservation
 \begin_inset CommandInset label
@@ -2446,6 +2637,10 @@ This section gives some indicative results obtained using Dynamo.
 \end_layout
 
 \begin_layout Subsection
+linear Results
+\end_layout
+
+\begin_layout Subsubsection
 Vertical Slice Tests
 \end_layout
 
@@ -3066,6 +3261,178 @@ Results for the 2D gravity wave test simulated using the linear equations
 
 \begin_layout Subsection
 Nonlinear Results
+\end_layout
+
+\begin_layout Subsubsection
+Vertical Slice Tests
+\end_layout
+
+\begin_layout Standard
+Figure 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "fig:Density-current-test"
+
+\end_inset
+
+ shows the results after 
+\begin_inset Formula $900$
+\end_inset
+
+s for the Density current test 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "straka93"
+
+\end_inset
+
+ at 
+\begin_inset Formula $200$
+\end_inset
+
+m resolution for both dynamo and ENDGame 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "meldubwsz09"
+
+\end_inset
+
+.
+ Compared to the standard test set up detailed in 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "straka93"
+
+\end_inset
+
+ the viscosity terms are ignored.
+ The dynamo results use the SUPG stabilsation of the 
+\begin_inset Formula $\theta$
+\end_inset
+
+ advection with 
+\begin_inset Formula $\mu=5$
+\end_inset
+
+ and 
+\begin_inset Formula $\Delta=1$
+\end_inset
+
+.
+ 
+\end_layout
+
+\begin_layout Standard
+\begin_inset Float figure
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\align center
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/DC_EG_dx200.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\begin_inset Float figure
+wide false
+sideways false
+status collapsed
+
+\begin_layout Plain Layout
+\begin_inset Graphics
+	filename figures/DC_dynamo_dx200_supg.eps
+	scale 50
+
+\end_inset
+
+
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+\begin_inset CommandInset label
+LatexCommand label
+name "fig:Density-current-test"
+
+\end_inset
+
+Density current test, showing 
+\begin_inset Formula $\theta$
+\end_inset
+
+ perturbation after 
+\begin_inset Formula $900$
+\end_inset
+
+s for (a) ENDGame and (b) dynamo with lowest order elements and explicit-iterati
+ve timestepping.
+ Both models use 
+\begin_inset Formula $\Delta t=1/8$
+\end_inset
+
+s.
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Subsubsection
