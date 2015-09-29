@@ -1177,13 +1177,28 @@ contains
   !============================================================================
   ! This routine is only available when setting data for unit testing.
   !============================================================================
-  !> @brief   Stucture-Constructor (for unit testing)
-  !> @param [in] mesh_cfg  Horizontal mesh configuration
-  !> @returns A 3D-Mesh object based on a 9-cell global mesh with one
-  !>          partition (non-periodic) which has 5 3D-cell layers
+  !> @brief      Stucture-Constructor (for unit testing)
+  !> @returns    A 3D-Mesh object based on a 3x3-cell global mesh with one
+  !>             partition.
+  !> @param[in]  mesh_cfg Sets the type of test mesh returned. 
+  !>             [PLANE|PLANE_BI_PERIODIC]. 
+  !>             PLANE - returns a 5-layer non-biperiodic mesh
+  !>             PLANE_BI_PERIODIC - returns a 3-layer bi-periodic mesh
   !============================================================================
 
   function mesh_constructor_unit_test_data(mesh_cfg) result (self)
+
+    ! Mesh returned is based on a 3x3 partition with the following
+    ! cell numbering.
+    !
+    !    +-----------+
+    !    | 7 | 8 | 9 |
+    !    |---+---+---|
+    !    | 4 | 5 | 6 |
+    !    |---+---+---|
+    !    | 1 | 2 | 3 |
+    !    +---+---+---+
+    !
 
     use constants_mod, only: PI
 
@@ -1222,7 +1237,7 @@ contains
       self%nlayers = 3
       self%ncells  = 27
       self%nverts  = 36
-      self%nfaces  = 80
+      self%nfaces  = 90
       self%nedges  = 99
     end if
 
@@ -1720,9 +1735,8 @@ contains
       self%vert_on_cell(:, 5) = [ 3,  6,  9,  7, 12, 15, 18, 16]
       self%vert_on_cell(:, 6) = [ 6,  4,  8,  9, 15, 13, 17, 18]
       self%vert_on_cell(:, 7) = [ 8,  7,  2,  1, 17, 16, 11, 10]
-      self%vert_on_cell(:, 8) = [ 7,  9,  3,  2, 16, 18, 12, 11]
-      self%vert_on_cell(:, 9) = [ 9,  8,  4,  3, 18, 17, 13, 12]
-
+      self%vert_on_cell(:, 8) = [ 7,  9,  5,  2, 16, 18, 14, 11]
+      self%vert_on_cell(:, 9) = [ 9,  8,  1,  5, 18, 17, 10, 14]
 
 
       ! Layer 2
@@ -1733,9 +1747,8 @@ contains
       self%vert_on_cell(:,14) = [12, 15, 18, 16, 21, 24, 27, 25]
       self%vert_on_cell(:,15) = [15, 13, 17, 18, 24, 22, 26, 27]
       self%vert_on_cell(:,16) = [17, 16, 11, 10, 26, 25, 20, 19]
-      self%vert_on_cell(:,17) = [16, 18, 12, 11, 25, 27, 21, 20]
-      self%vert_on_cell(:,18) = [18, 17, 13, 12, 27, 26, 22, 21]
-
+      self%vert_on_cell(:,17) = [16, 18, 14, 11, 25, 27, 23, 20]
+      self%vert_on_cell(:,18) = [18, 17, 10, 14, 27, 26, 19, 23]
 
       ! Layer 3
       self%vert_on_cell(:,19) = [19, 20, 21, 22, 28, 29, 30, 31]
@@ -1745,9 +1758,8 @@ contains
       self%vert_on_cell(:,23) = [21, 24, 27, 25, 30, 33, 36, 34]
       self%vert_on_cell(:,24) = [24, 22, 26, 27, 33, 31, 35, 36]
       self%vert_on_cell(:,25) = [26, 25, 20, 19, 35, 34, 29, 28]
-      self%vert_on_cell(:,26) = [25, 27, 21, 20, 34, 36, 30, 29]
-      self%vert_on_cell(:,27) = [27, 26, 22, 21, 36, 35, 31, 30]
-
+      self%vert_on_cell(:,26) = [25, 27, 23, 20, 34, 36, 32, 29]
+      self%vert_on_cell(:,27) = [27, 26, 19, 23, 36, 35, 28, 32]
 
       !=========================================================
       ! Assign edge local ids on cell edges

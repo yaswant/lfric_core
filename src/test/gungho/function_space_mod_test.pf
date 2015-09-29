@@ -37,9 +37,11 @@ contains
 
     type(quadrature_type), pointer :: qr => null()
     type(mesh_type)  :: mesh
+    type(mesh_type)  :: mesh_out
     integer          :: test_fs
     integer          :: scalar, vector
     integer          :: nqp_h, nqp_v
+
     real(kind=r_def), pointer :: xp(:,:) => null()
     real(kind=r_def), pointer :: zp(:) => null()
     integer, pointer :: testmap(:,:)
@@ -51,6 +53,7 @@ contains
     integer                            :: cell
 
     integer :: ndf
+    integer :: iface, iedge, lid, test_integer
 
     scalar=1
     vector=3
@@ -325,6 +328,45 @@ contains
          basis, ndf, nqp_h, nqp_v, xp, zp )
     @assertEqual(test_basis, basis, epsilon)
     deallocate(basis, test_basis)
+
+
+    ! Test if the function space returns the correct mesh
+    ! Use a subset of the tests from mesh_mod_test.pf
+    mesh_out = w1_func_space%get_mesh()
+
+    !-------------------------------------------------------------------
+    ! Test get_face_on_cell()
+    iface=3
+    lid=9
+    test_integer = mesh_out%get_face_on_cell(iface, lid)
+    @assertEqual ( 28, test_integer )
+
+    !-------------------------------------------------------------------
+    ! Test get_edge_on_cell()
+    iedge=1
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 27, test_integer )
+
+    iedge=5
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 11, test_integer )
+
+    iedge=9
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 28, test_integer )
+
+    iedge=12
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 36, test_integer )
+
+    iedge=6
+    lid=9
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 32, test_integer )
 
 
     ! Tear down that which we have build, 'cos there are some module scope

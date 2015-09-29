@@ -14,8 +14,9 @@
 
 module field_mod
 
-  use constants_mod,            only : r_def, i_def
-  use function_space_mod,       only : function_space_type
+  use constants_mod,      only: r_def, i_def
+  use function_space_mod, only: function_space_type
+  use mesh_mod,           only: mesh_type
 
   implicit none
 
@@ -62,6 +63,9 @@ module field_mod
     !> Routine to write field
     procedure         :: write_field
 
+    !> Routine to return the mesh used by this field
+    procedure :: get_mesh
+
   end type field_type
 
   interface field_type
@@ -104,6 +108,22 @@ contains
     get_proxy %  data                  => self % data
 
   end function get_proxy
+
+
+  !> Function to get mesh information from the field.
+  !>
+  !> @return Mesh object
+  function get_mesh(self) result(mesh)
+
+    implicit none
+
+    class (field_type) :: self
+    type (mesh_type)   :: mesh
+
+    mesh = self%vspace%get_mesh()
+
+    return
+  end function get_mesh
 
   !> Construct a <code>field_type</code> object.
   !>

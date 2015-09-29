@@ -39,6 +39,11 @@ type, public :: function_space_type
   !> Currently only a single generic dofmap is created, later this will be a
   !> linked list of dofmaps
   type(stencil_dofmap_type) :: stencil_dofmap
+
+  !> Mesh object used to create this function space, later this will be a
+  !> pointer to a mesh in a linked list of mesh objects
+  type(mesh_type) :: mesh
+
   !> A two dimensional, allocatable array of reals which holds the coordinates
   !! of the function_space degrees of freedom
   real(kind=r_def), allocatable :: nodal_coords(:,:)
@@ -187,6 +192,10 @@ contains
   !> @param[in] self The calling get_dim_space_diff
   !> @return dim The size of the differential space
   procedure get_dim_space_diff
+
+  !> @brief Access the mesh object used to create this function space
+  !> @return mesh Mesh object
+  procedure get_mesh
 
 end type function_space_type
 !-------------------------------------------------------------------------------
@@ -475,6 +484,7 @@ subroutine init_function_space(self, &
   integer (i_def),  intent(inout), allocatable  :: last_dof_halo(:)
 
 
+  self%mesh            =  mesh
   self%order           =  order
   self%ncell           =  mesh%get_ncells_2d()
   self%nlayers         =  mesh%get_nlayers()
@@ -816,5 +826,24 @@ integer function get_order(self)
 
   return
 end function get_order
+
+
+!-----------------------------------------------------------------------------
+! Gets mesh object for this space
+!-----------------------------------------------------------------------------
+!> @brief Gets the mesh object for this space
+!> @param[in] self the calling function space
+!> @return mesh Mesh Object
+!-----------------------------------------------------------------------------
+function get_mesh(self) result (mesh)
+
+  implicit none
+  class(function_space_type) :: self
+  type(mesh_type) :: mesh
+
+  mesh = self%mesh
+
+  return
+end function get_mesh
 
 end module function_space_mod

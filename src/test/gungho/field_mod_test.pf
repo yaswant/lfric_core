@@ -29,7 +29,9 @@ contains
     type(field_proxy_type)    :: f1_p
     type(function_space_type) :: fs
     type(mesh_type)           :: mesh
+    type(mesh_type)           :: mesh_out
 
+    integer :: iface, iedge, lid, test_integer
 
     ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
     mesh = mesh_type(PLANE_BI_PERIODIC)
@@ -49,6 +51,46 @@ contains
     
     ! Operations on field data are part of the PSy and Kernel layers so
     ! that is all.
+
+
+    ! Test if the function space returns the correct mesh
+    ! Use a subset of the tests from mesh_mod_test.pf
+    mesh_out = f1%get_mesh()
+
+    !-------------------------------------------------------------------
+    ! Test get_face_on_cell()
+    iface=3
+    lid=9
+    test_integer = mesh_out%get_face_on_cell(iface, lid)
+    @assertEqual ( 28, test_integer )
+
+    !-------------------------------------------------------------------
+    ! Test get_edge_on_cell()
+    iedge=1
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 27, test_integer )
+
+    iedge=5
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 11, test_integer )
+
+    iedge=9
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 28, test_integer )
+
+    iedge=12
+    lid=5
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 36, test_integer )
+
+    iedge=6
+    lid=9
+    test_integer = mesh_out%get_edge_on_cell(iedge, lid)
+    @assertEqual ( 32, test_integer )
+
 
     ! Tear down ...
     call fs_destroy()
