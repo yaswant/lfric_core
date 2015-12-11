@@ -1,5 +1,5 @@
 #!jinja2
-{% set targets = ['full-debug', 'fast-debug'] %}
+{% set targets = ['fast-debug'] %}
 {% set module_setup_script = "/data/cr1/mhambley/modules/setup" %}
 
 {% set environment_commands = "source " + module_setup_script + "; module load environment/dynamo/base" %}
