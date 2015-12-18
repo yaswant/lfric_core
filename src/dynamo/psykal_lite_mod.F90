@@ -12,7 +12,7 @@
 !> @details Contains hand-rolled versions of the Psy layer that can be used for
 !> simple testing and development of the scientific code
 
-module psy
+module psykal_lite_mod
 
   use field_mod,      only : field_type, field_proxy_type 
   use operator_mod,   only : operator_type, operator_proxy_type
@@ -716,4 +716,4 @@ contains
   end subroutine invoke_linear_ru_kernel
  
 
-end module psy
+end module psykal_lite_mod

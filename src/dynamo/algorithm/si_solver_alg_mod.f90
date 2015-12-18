@@ -54,7 +54,7 @@ contains
 !>@param[in]    runtime_constants Container for various constant objects
   subroutine si_solver_alg(x0, rhs0, x_ref, runtime_constants)
     use rhs_alg_mod,            only: rhs_alg
-    use psy,                    only: invoke_compute_delta, &
+    use psykal_lite_mod,        only: invoke_compute_delta, &
                                       invoke_set_field_scalar
     use mm_diagonal_kernel_mod, only: mm_diagonal_kernel_type
     implicit none
@@ -105,7 +105,7 @@ contains
 !>@param[in]    mm_diagonal fields containing a diagonal approxiamtion to the
 !!                          mass matrices
 subroutine mixed_gmres_alg(x0, rhs0, rhs, x_ref, delta, tau_dt, runtime_constants)
-    use psy, only: invoke_inner_prod
+    use psykal_lite_mod, only: invoke_inner_prod
     implicit none
 
     type(field_type),             intent(inout) :: x0(bundle_size),   &
@@ -321,7 +321,7 @@ end subroutine mixed_gmres_alg
 !>@param[in]    mm Arrays containing diagonal approximation to mass matrices
 !>@param[in]    bundle_size Number of fields the state arrays
   subroutine bundle_preconditioner(y, x, option, mm, bundle_size)
-    use psy, only: invoke_copy_field_data
+    use psykal_lite_mod, only: invoke_copy_field_data
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(inout) :: y(bundle_size)

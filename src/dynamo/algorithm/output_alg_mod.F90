@@ -18,7 +18,7 @@ module output_alg_mod
   use restart_control_mod,               only: restart_type
   use configuration_mod,                 only: element_order
  
-  use psy,                               only: invoke_set_field_scalar
+  use psykal_lite_mod,                   only: invoke_set_field_scalar
   implicit none
 
   private

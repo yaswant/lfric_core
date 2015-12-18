@@ -8,7 +8,7 @@
 !>@brief wrapper algorithm to compute the advection of the prognostic
 !>       equations
 module advection_alg_mod
-  use psy,                               only: invoke_set_field_scalar, &
+  use psykal_lite_mod,                   only: invoke_set_field_scalar, &
                                                invoke_flux_rhs, &
                                                invoke_multiply_field
  
@@ -30,6 +30,7 @@ module advection_alg_mod
   use function_space_mod,                only: function_space_type
   use runtime_constants_mod,             only: runtime_constants_type
   use field_bundle_mod,                  only: bundle_ax
+
   implicit none
 
   private

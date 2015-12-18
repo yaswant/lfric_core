@@ -21,7 +21,7 @@ module init_prognostic_fields_alg_mod
   use field_io_mod,                    only: read_state_netcdf                                                 
 
   ! PsyKAl-lite kernels
-  use psy,                             only: invoke_set_field_scalar
+  use psykal_lite_mod,                 only: invoke_set_field_scalar
 
   ! PsyKAl PSYClone kernels
   use initial_theta_kernel_mod,        only: initial_theta_kernel_type

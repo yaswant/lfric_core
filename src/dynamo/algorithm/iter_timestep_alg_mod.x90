@@ -24,10 +24,10 @@ module iter_timestep_alg_mod
   use restart_control_mod,               only: restart_type
 
   ! PsyKAl-lite kernels
-  use psy,                               only: invoke_axpby,                   &
-                                               invoke_plus_field_data,         &
-                                               invoke_minus_field_data,        &
-                                               invoke_copy_field_data,         &
+  use psykal_lite_mod,                   only: invoke_axpby,                  &
+                                               invoke_plus_field_data,        &
+                                               invoke_minus_field_data,       &
+                                               invoke_copy_field_data,        &
                                                invoke_set_field_scalar
   use field_bundle_mod,                  only: clone_bundle, & 
                                                bundle_axpy, & 

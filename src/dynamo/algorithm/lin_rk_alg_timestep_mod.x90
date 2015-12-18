@@ -24,7 +24,7 @@ module lin_rk_alg_timestep_mod
   use restart_control_mod, only: restart_type
 
   ! PsyKAl-lite kernels
-  use psy,               only: invoke_copy_field_data,                          &
+  use psykal_lite_mod,     only: invoke_copy_field_data,                          &
                                invoke_set_field_scalar,                         &
                                invoke_linear_ru_kernel,                         &
                                invoke_axpy

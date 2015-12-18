@@ -26,13 +26,13 @@ module solver_mod
                                       LOG_LEVEL_TRACE
   use field_mod,               only : field_type
   use function_space_mod,      only : function_space_type, W0, W1, W2, W3, Wtheta, W2V, W2H
-  use psy,             only : invoke_inner_prod,              &
-                              invoke_axpy,                    &
-                              invoke_minus_field_data,        &
-                              invoke_copy_field_data,         &
-                              invoke_set_field_scalar,        &
-                              invoke_divide_field,            &
-                              invoke_copy_scaled_field_data
+  use psykal_lite_mod,         only : invoke_inner_prod,              &
+                                      invoke_axpy,                    &
+                                      invoke_minus_field_data,        &
+                                      invoke_copy_field_data,         &
+                                      invoke_set_field_scalar,        &
+                                      invoke_divide_field,            &
+                                      invoke_copy_scaled_field_data
   use w3_solver_kernel_mod, only: w3_solver_kernel_type
   use matrix_vector_mm_mod, only: matrix_vector_kernel_mm_type
 
@@ -720,7 +720,7 @@ end subroutine gcr_solver_algorithm
 !! routine to use
   subroutine preconditioner(y, x, pre_cond_type, diagonal)
     use configuration_mod, only: DIAGONAL_PRE_COND
-    use psy,           only: invoke_divide_field
+    use psykal_lite_mod,   only: invoke_divide_field
     implicit none
     type(field_type), intent(inout) :: y
     type(field_type), intent(in)    :: x

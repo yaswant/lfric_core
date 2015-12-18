@@ -23,11 +23,10 @@ module rk_alg_timestep_mod
   use restart_control_mod, only: restart_type
 
   ! PsyKAl-lite kernels
-  use psy,           only: &
-                           invoke_axpy,                        &
-                           invoke_copy_field_data,             &
-                           invoke_set_field_scalar,            &
-                           invoke_flux_rhs
+  use psykal_lite_mod, only: invoke_axpy,             &
+                             invoke_copy_field_data,  &
+                             invoke_set_field_scalar, &
+                             invoke_flux_rhs
 
   ! PsyKAl PSYClone kernels
   use compute_mass_matrix_kernel_w0_mod, only: compute_mass_matrix_kernel_w0_type

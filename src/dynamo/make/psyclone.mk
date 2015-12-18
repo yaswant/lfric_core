@@ -17,14 +17,14 @@ PSYCLONE = python2.7 $(PSYCLONE_DIR)/src/generator.py
 include $(ROOT)/make/include.mk
 
 AUTO_FILES   := $(patsubst $(ALGORITHM_PATH)/%.x90, \
-                           $(AUTO_PSY_PATH)/%.f90, \
+                           $(AUTO_PSY_PATH)/psy_%.f90, \
                            $(wildcard $(ALGORITHM_PATH)/*.x90) )
 MANUAL_FILES := $(wildcard $(PSY_PATH)/*.[Ff]90 )
 AUTO_FILES   := $(filter-out $(patsubst $(PSY_PATH)/%, \
                                         $(AUTO_PSY_PATH)/%, \
                                         $(MANUAL_FILES) ), \
                              $(AUTO_FILES) )
-MANUAL_FILES := $(patsubst $(PSY_PATH)/%, \
+MANUAL_FILES := $(patsubst $(PSY_PATH)/psy_%, \
                            $(AUTO_ALGORITHM_PATH)/%, \
                            $(MANUAL_FILES) )
 
@@ -43,11 +43,13 @@ $(AUTO_ALGORITHM_PATH)/%.f90:$(ALGORITHM_PATH)/%.x90 | $(AUTO_ALGORITHM_PATH)
 	            -oalg $(patsubst $(ALGORITHM_PATH)/%.x90, $(AUTO_ALGORITHM_PATH)/%.f90, $< ) \
 	            $<
 
-$(AUTO_PSY_PATH)/%.f90: $(ALGORITHM_PATH)/%.x90 | $(AUTO_PSY_PATH) $(AUTO_ALGORITHM_PATH)
+$(AUTO_PSY_PATH)/psy_%.f90: $(ALGORITHM_PATH)/%.x90 | $(AUTO_PSY_PATH) $(AUTO_ALGORITHM_PATH)
 	@echo -e $(VT_BOLD)PSycloning$(VT_RESET) $<
 	$(PSYCLONE) -api dynamo0.3 -d $(KERNEL_PATH) \
-	            -opsy $(patsubst $(ALGORITHM_PATH)/%.x90, $(AUTO_PSY_PATH)/%.f90, $< ) \
-	            -oalg $(patsubst $(ALGORITHM_PATH)/%.x90, $(AUTO_ALGORITHM_PATH)/%.f90, $< ) \
+	            -opsy $(patsubst $(ALGORITHM_PATH)/%.x90, \
+	                             $(AUTO_PSY_PATH)/psy_%.f90, $< ) \
+	            -oalg $(patsubst $(ALGORITHM_PATH)/%.x90, \
+	                             $(AUTO_ALGORITHM_PATH)/%.f90, $< ) \
 	            $<
 
 $(AUTO_PSY_PATH) $(AUTO_ALGORITHM_PATH):

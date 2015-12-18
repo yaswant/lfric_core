@@ -22,7 +22,7 @@ module conservation_algorithm_mod
   use quadrature_mod,  only: quadrature_type, GAUSSIAN
   use function_space_mod, &
                          only: function_space_type, W3
-  use psy,               only: invoke_sum_field
+  use psykal_lite_mod,   only: invoke_sum_field
   use mesh_mod,          only: mesh_type
   use configuration_mod, only: element_order
 

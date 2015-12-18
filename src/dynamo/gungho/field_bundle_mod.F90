@@ -38,7 +38,7 @@ module field_bundle_mod
 !> @param [inout] x The field bundle
 !> @param [in] bundle_size the number of fields in the bundle x
   subroutine set_bundle_scalar(a, x, bundle_size)
-    use psy, only: invoke_set_field_scalar
+    use psykal_lite_mod, only: invoke_set_field_scalar
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(inout) :: x(bundle_size)
@@ -57,7 +57,7 @@ module field_bundle_mod
 !> @param [in] y The second field bundle
 !> @param [in] bundle_size the number of fields in the bundle x
   function bundle_inner_product(x, y, bundle_size) result(a)
-    use psy, only: invoke_inner_prod
+    use psykal_lite_mod, only: invoke_inner_prod
     implicit none
     integer,          intent(in) :: bundle_size
     type(field_type), intent(in) :: x(bundle_size), y(bundle_size)
@@ -80,7 +80,7 @@ module field_bundle_mod
 !> @param [inout] z The result field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine bundle_axpy(a, x, y, z, bundle_size)
-    use psy, only: invoke_axpy
+    use psykal_lite_mod, only: invoke_axpy
     implicit none
     integer,          intent(in)    :: bundle_size
     real(kind=r_def), intent(in)    :: a
@@ -99,7 +99,7 @@ module field_bundle_mod
 !> @param [inout] y The second field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine copy_bundle(x, y, bundle_size)
-    use psy, only: invoke_copy_field_data
+    use psykal_lite_mod, only: invoke_copy_field_data
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(in)    :: x(bundle_size)
@@ -117,7 +117,7 @@ module field_bundle_mod
 !> @param [inout] z The result field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine minus_bundle(x, y, z, bundle_size)
-    use psy, only: invoke_minus_field_data
+    use psykal_lite_mod, only: invoke_minus_field_data
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(in)    :: x(bundle_size), y(bundle_size)
@@ -135,7 +135,7 @@ module field_bundle_mod
 !> @param [inout] y The second field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine bundle_ax(a, x, y, bundle_size)
-    use psy, only: invoke_copy_scaled_field_data
+    use psykal_lite_mod, only: invoke_copy_scaled_field_data
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(inout) :: y(bundle_size)
@@ -153,7 +153,7 @@ module field_bundle_mod
 !> @param [inout] y The second field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine bundle_divide(x, y, bundle_size)
-    use psy, only: invoke_divide_field
+    use psykal_lite_mod, only: invoke_divide_field
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(inout) :: x(bundle_size), y(bundle_size)
@@ -171,7 +171,7 @@ module field_bundle_mod
   subroutine bundle_minmax(x, mesh, bundle_size)
     use function_space_mod, only: function_space_type
     use mesh_mod,           only: mesh_type
-    use psy,                only: invoke_copy_field_data
+    use psykal_lite_mod,                only: invoke_copy_field_data
     use log_mod,            only: lOG_LEVEL_INFO   
     implicit none
     integer,          intent(in)    :: bundle_size
@@ -180,7 +180,7 @@ module field_bundle_mod
     type(field_type) :: x(bundle_size)
     type(field_type) :: y
     integer :: i
-! This has strange syntax as psyclone doesnt like calls to type bound
+! This has strange syntax as psykal_lite_modclone doesnt like calls to type bound
 ! procedures of field arrays
     do i = 1,bundle_size
       y = field_type( vector_space = &
@@ -199,7 +199,7 @@ module field_bundle_mod
 !> @param [inout] z The result field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine bundle_axpby(a, x, b, y, z, bundle_size)
-    use psy, only: invoke_axpby
+    use psykal_lite_mod, only: invoke_axpby
     implicit none
     integer,          intent(in)    :: bundle_size
     real(kind=r_def), intent(in)    :: a, b
@@ -218,7 +218,7 @@ module field_bundle_mod
 !> @param [inout] z The result field bundle
 !> @param [in] bundle_size the number of fields in the bundle
   subroutine add_bundle(x, y, z, bundle_size)
-    use psy, only: invoke_axpy
+    use psykal_lite_mod, only: invoke_axpy
     implicit none
     integer,          intent(in)    :: bundle_size
     type(field_type), intent(in)    :: x(bundle_size), y(bundle_size)
