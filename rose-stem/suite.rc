@@ -155,6 +155,20 @@
                             make -C $SOURCE_DIRECTORY/src/dynamo unused-check
                             """
 {#############################################################################}
+
+    [[FULL-DEBUG]]
+        [[[environment]]]
+            OPTIMISATION = NONE
+            SYMBOLS      = YES
+            CHECKS       = YES
+
+    [[FAST-DEBUG]]
+        [[[environment]]]
+            OPTIMISATION = SAFE
+            SYMBOLS      = YES
+            CHECKS       = NO
+
+{#############################################################################}
 {% macro pipeline_tasks( compiler, version, target ) %}
 {#   A set of tasks for an "extract, compile, unit test, run, check" pipeline #}
 {%   set family = compiler | upper + '_' + target | upper %}
@@ -163,7 +177,7 @@
 {{ prepare_pipeline( label ) }}
 
     [[{{family}}_COMPILER]]
-        inherit = {{family}}_ENVIRONMENT
+        inherit = {{family}}_ENVIRONMENT, {{ target | upper }}
         pre-command scripting = """
                                 {{ environment_commands }}
                                 module load environment/dynamo/compiler/{{compiler}}/{{version}}
@@ -178,7 +192,7 @@
         command scripting = """
                             (
                             mkdir -p {{database_directory}}
-                            make -C $SOURCE_DIRECTORY {{target}}
+                            make -C $SOURCE_DIRECTORY build
                             RC=$?
                             rm -rf $DYNAMO_DEPENDENCY_DB
                             exit $RC

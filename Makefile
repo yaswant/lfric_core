@@ -15,36 +15,40 @@ LINK ?= DYNAMIC
 .PHONY: fast-debug
 fast-debug: OPTIMISATION?=SAFE
 fast-debug: SYMBOLS?=YES
-fast-debug: build
+fast-debug: test
 
 .PHONY: full-debug
 full-debug: OPTIMISATION?=NONE
 full-debug: SYMBOLS?=YES
 full-debug: CHECKS?=YES
-full-debug: build
+full-debug: test
 
 .PHONY: production
 production: OPTIMISATION?=RISKY
 production: SYMBOLS?=YES
-production: build
+production: test
 
+# The 'build' target has some default behaviour with regard to build
+# type. This is to support the situation where 'test' is called on
+# its own. It also allows 'build' to be called on its own.
+#
 .PHONY: build
+build: OPTIMISATION?=SAFE
+build: SYMBOLS?=YES
 build: tools
 	$(MAKE) -C src/dynamo LINK=$(LINK) OPTIMISATION=$(OPTIMISATION) \
 	                      SYMBOLS=$(SYMBOLS) CHECKS=$(CHECKS)
-	$(MAKE) -C src/test
 
 .PHONY: tools
 tools:
 	$(MAKE) -C tools
 
-# The test target allows tests to be run on their own. Since there is no way
-# to know which of the above builds is desired this target does not list a
-# build as a prerequisite. If you try to run it without building first it will
-# fail.
+# The 'test' target allows tests to be run on their own. When it is used in
+# this sense there is no way to know which (if any) build target was used.
+# In this case the build default will be used.
 #
 .PHONY: test
-test:
+test: build
 	$(MAKE) -C src/test
 
 # Build the projects documentation. This includes both API and design documents.
