@@ -13,7 +13,7 @@
 !------------------------------------------------------------------------------
 module mesh_colouring_mod
 !------------------------------------------------------------------------------
-  use reference_element_mod,   only : W, S, E, N
+  use reference_element_mod,   only : W, S, E, N, nfaces_h
   use log_mod,                 only : log_event, LOG_LEVEL_ERROR, &
                                                  LOG_LEVEL_INFO
   use constants_mod,           only : i_def
@@ -60,12 +60,14 @@ subroutine set_colours(num_cells,              &
   integer(kind=i_def)                     :: free_colour
   ! Loop and status variables
   integer                                 :: i, astat
-  integer(kind=i_def)                     :: colour, test_cell, cell
+  integer(kind=i_def)                     :: colour, test_cell, cell, maxcell
   ! Prefix for allocation error messages
   character(len=*), parameter :: prefix="[Compute Colours] Failure to allocate "
 
+  ! Determine largest neighbour element that will be a subscript to cell_next
+  maxcell = maxval(cell_next(:nfaces_h, :num_cells))
 
-  allocate(colour_map(0:num_cells), stat=astat)
+  allocate(colour_map(0:maxcell), stat=astat)
   if(astat/=0) then
     call log_event(prefix//"colour_map.", LOG_LEVEL_ERROR)
     ! Although the logger will call "stop" for errors GFortran is unable to
@@ -80,42 +82,48 @@ subroutine set_colours(num_cells,              &
     !>       "production" target.
   end if
 
-  colour_map = 0
-  cells_per_colour = 0
+  colour_map = 0_i_def
+  cells_per_colour = 0_i_def
 
   do cell = 1, num_cells
-    used_colours = 0
+    do i=0, MAXCOLS
+      used_colours(i) = 0_i_def
+    end do
 
     test_cell = cell_next(N, cell)
-    used_colours(colour_map(test_cell)) = 1
+    if(test_cell > 0) then
+      used_colours(colour_map(test_cell)) = 1
 
-    ! Cardinal point orientation may vary when crossing a panel boundary
-    ! for cubed-sphere mesh types.
-    if(cell == cell_next(S, test_cell)) then
-      used_colours(colour_map(cell_next(E, test_cell))) = 1
-      used_colours(colour_map(cell_next(W, test_cell))) = 1
-    else
-      used_colours(colour_map(cell_next(N, test_cell))) = 1
-      used_colours(colour_map(cell_next(S, test_cell))) = 1
+      ! Cardinal point orientation may vary when crossing a panel boundary
+      ! for cubed-sphere mesh types.
+      if(cell == cell_next(S, test_cell)) then
+        used_colours(colour_map(cell_next(E, test_cell))) = 1
+        used_colours(colour_map(cell_next(W, test_cell))) = 1
+      else
+        used_colours(colour_map(cell_next(N, test_cell))) = 1
+        used_colours(colour_map(cell_next(S, test_cell))) = 1
+      end if
     end if
 
     test_cell = cell_next(E, cell)
-    used_colours(colour_map(test_cell)) = 1
+    if(test_cell > 0) used_colours(colour_map(test_cell)) = 1
 
     test_cell = cell_next(W, cell)
-    used_colours(colour_map(test_cell)) = 1
+    if(test_cell > 0) used_colours(colour_map(test_cell)) = 1
 
     test_cell = cell_next(S, cell)
-    used_colours(colour_map(test_cell)) = 1
+    if(test_cell > 0) then
+      used_colours(colour_map(test_cell)) = 1
 
-    ! Cardinal point orientation may vary when crossing a panel boundary
-    ! for cubed-sphere mesh types.
-    if(cell == cell_next(N, test_cell)) then
-      used_colours(colour_map(cell_next(E, test_cell))) = 1
-      used_colours(colour_map(cell_next(W, test_cell))) = 1
-    else
-      used_colours(colour_map(cell_next(N, test_cell))) = 1
-      used_colours(colour_map(cell_next(S, test_cell))) = 1
+      ! Cardinal point orientation may vary when crossing a panel boundary
+      ! for cubed-sphere mesh types.
+      if(cell == cell_next(N, test_cell)) then
+        used_colours(colour_map(cell_next(E, test_cell))) = 1
+        used_colours(colour_map(cell_next(W, test_cell))) = 1
+      else
+        used_colours(colour_map(cell_next(N, test_cell))) = 1
+        used_colours(colour_map(cell_next(S, test_cell))) = 1
+      end if
     end if
 
     free_colour = choose_colour_greedy(used_colours)
@@ -159,6 +167,7 @@ subroutine set_colours(num_cells,              &
       end if
     end do
   end do
+
 
 end subroutine set_colours
 !-----------------------------------------------------------------------------
