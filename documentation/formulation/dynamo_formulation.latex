@@ -948,7 +948,8 @@ wave test of Figure \ref{fig:Spherical-Gravity-wave-test} but for
 $C12L5K0$ resolution. Note this test is on an unrotating planet.}
 \end{figure}
 The gravity wave test is then repeated, but on rotating planet and
-the results are shown in Figure \ref{fig:Spherical-Rotating-Gravity-wave-test}.
+the results are shown in Figure \ref{fig:Spherical-Rotating-Gravity-wave-test} 
+and in Figure \ref{fig:Spherical-Rotating-Gravity-wave-test_p1} for higher order elements.
 
 \begin{figure}
 \begin{centering}
@@ -970,6 +971,15 @@ cells), and (c) \& (d) using the RK3 timstepping with $\Delta t=1$s,
 (e) \& (f) using semi-implicit timestepping with $\Delta t=10$ s.
 All with 10 vertical levels. Plots show the $\theta$ perturbation
 on the background balanced state.}
+\end{figure}
+
+\begin{figure}
+\begin{centering}
+\subfloat[]{\includegraphics[scale=0.5]{GW_C12L5K1_theta_rotating_RK_dt1}}\subfloat[]{\includegraphics[scale=0.5]{GW_C12L5K1_theta_rotating_RK_dt1_xz}}
+\par\end{centering}
+
+\centering{}\protect\caption{\label{fig:Spherical-Rotating-Gravity-wave-test_p1}Rotating gravity
+wave test with order $k=1$ elements and $C12$ grid with $10$ levels. Using explicit timestepping with $\Delta t = 1$s}
 \end{figure}
 
 \newpage\resetcounters

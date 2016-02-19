@@ -241,7 +241,7 @@ end subroutine ndof_setup
 !> @details Setup arrays to for basis function generation. This subroutine
 !>          computes the arrays required for "on-the-fly" basis function
 !>          generation. This is a private routine used in the construction
-!>          of function spaces.
+!>          of function spaces. This routine is only valid for cube elements
 !> @param[inout] self The function space object being constructed
 
 subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
@@ -277,7 +277,16 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
   real(r_def) :: x1(element_order+2)
   real(r_def) :: x2(element_order+2)
 
-
+  ! To uniquely specify a 3D tensor product basis function the folling is needed:
+  ! basis_order(3): The polynomial order in the x,y,z directions
+  ! basis_x(3,basis_order+1): The nodal points of the polynomials in each direction
+  ! basis_index(3): The index of the nodal points array at which the basis function is unity
+  ! basis_vector(3): Additionally if the function space is a vectro then a unit vector is needed.
+  
+  ! Although not strictly needed the nodal coordinates at which each basis
+  ! function equals 1 is stored as nodal_coords
+  ! A flag is also set to 0 if a basis function is associated with an entity on
+  ! the top or bottom of the cell, i.e has nodal_coord(3) = 0 or 1
 
   k = element_order
 
@@ -308,17 +317,39 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
   x2(k+2) = 0.0_r_def
 
   ! Some look arrays based upon reference cube topology
+  ! index of nodal points for dofs located on faces.
+  ! Faces are defined as having one coodinate fixed, 
+  ! i.e. for face 1 x = 0 for all points on the face
+  ! and for face 4 y = 1 for all points on the face
+  ! This array give the index for the fixed coordinate for each face.
+  ! If a face has fixed coordinate = 0 the index is 1
+  ! If a face has fixed coordinate = 1 the index is k+2
   face_idx = (/ 1, 1, k+2, k+2, 1, k+2 /)
 
+  ! index of nodal points for dofs located on edges
+  ! edges are defined as having two coodinates fixed, 
+  ! i.e. for edge 1 x = 0 & z = 0 for all points on the edge
+  ! and for edge 6 x = 1 y = 0 for all points on the edge
+  ! These arrays give the index for the two fixed coordinates for each edge.
+  ! If an edge has fixed coordinate = 0 the index is 1
+  ! If an edge has fixed coordinate = 1 the index is k+2
   edge_idx(:,1) = (/ 1, 1, k+2, k+2, 1, k+2, k+2, 1,   1,   1,   k+2, k+2 /)
   edge_idx(:,2) = (/ 1, 1, 1,   1,   1, 1,   k+2, k+2, k+2, k+2, k+2, k+2 /)
 
+  ! Each dof living on a face or edge will have its index defined by three
+  ! integers (j1, j2, j3) where:
+  !  for faces one j will be the face index and the other two can vary 
+  !  for edges two j's will be the edge indices and the final one can vary
+  ! These j's need to be converted to the indices lx ,ly, lz
+  ! For faces the first value of j2l is the l that corresponds to the 
+  ! constant coordinate, so for face 1 lx = j3, ly = j2 and lz = j1/
+  ! for edge 1: lx = j2, ly = j1, and lz = j3  
   j2l_face(1,:) = (/ 3, 2, 1 /)
   j2l_face(2,:) = (/ 2, 3, 1 /)
   j2l_face(3,:) = (/ 3, 2, 1 /)
   j2l_face(4,:) = (/ 2, 3, 1 /)
-  j2l_face(5,:) = (/ 2, 1, 3 /)
-  j2l_face(6,:) = (/ 2, 1, 3 /)
+  j2l_face(5,:) = (/ 1, 2, 3 /)
+  j2l_face(6,:) = (/ 1, 2, 3 /)
 
   j2l_edge(1 ,:) = (/ 2, 1, 3 /)
   j2l_edge(2 ,:) = (/ 1, 2, 3 /)
@@ -333,6 +364,9 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
   j2l_edge(11,:) = (/ 2, 1, 3 /)
   j2l_edge(12,:) = (/ 1, 2, 3 /)
 
+  ! Array to flag vertices on the top or bottom boundaries
+  ! If dof j is on the bottom boundary then  dof_on_vert_boundary(j,1) = 0
+  ! If dof j is on the top boundary then  dof_on_vert_boundary(j,2) = 0
   dof_on_vert_boundary(:,:) = 1
 
   ! Allocate arrays to allow on the fly evaluation of basis functions
@@ -396,12 +430,12 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
         ly(idx) = j(j2l_edge(i,2))
         lz(idx) = j(j2l_edge(i,3))
         idx     = idx + 1
-      end do
+      end do 
     end do
 
     ! ===============================
     ! dofs on vertices
-    ! ===============================
+    ! ===============================    
     do i=1, nverts
       do j1=1, ndof_vert
         lx(idx) = 1+(k+1)*int(x_vert(i,1))
@@ -488,8 +522,8 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
 
     ! dofs on faces
     do i=1, nfaces
-      do j1=1, k+1
-        do j2=2, k+1
+      do j1=2, k+1
+        do j2=1, k+1
           j(1) = j1
           j(2) = j2
           j(3) = face_idx(i)
@@ -502,8 +536,8 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
           idx = idx + 1
         end do
       end do
-      do j1=2, k+1
-        do j2=1, k+1
+      do j1=1, k+1
+        do j2=2, k+1
           j(1) = j1
           j(2) = j2
           j(3) = face_idx(i)
@@ -649,11 +683,11 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
 
       nodal_coords(3,i) = abs(unit_vec(i,3))*x1(lz(i))                         &
                         + (1.0_r_def - abs(unit_vec(i,3)))*x2(lz(i))
-	
+
       basis_order(1,i)  = poly_order - int(1 - abs(unit_vec(i,1)))
       basis_order(2,i)  = poly_order - int(1 - abs(unit_vec(i,2)))
       basis_order(3,i)  = poly_order - int(1 - abs(unit_vec(i,3)))
-	
+
       basis_x(:,1,i)    = abs(unit_vec(i,1))*x1(:)                             &
                         + (1.0_r_def - abs(unit_vec(i,1)))*x2(:)
 
@@ -826,11 +860,11 @@ subroutine basis_setup( element_order, dynamo_fs, ndof_vert,  ndof_cell        &
 
       nodal_coords(3,i) = abs(unit_vec(i,3))*x1(lz(i))                         &
                         + (1.0_r_def - abs(unit_vec(i,3)))*x2(lz(i))
-	
+
       basis_order(1,i)  = poly_order - int(1 - abs(unit_vec(i,1)))
       basis_order(2,i)  = poly_order - int(1 - abs(unit_vec(i,2)))
       basis_order(3,i)  = poly_order - int(1 - abs(unit_vec(i,3)))
-	
+
       basis_x(:,1,i)    = abs(unit_vec(i,1))*x1(:)                             &
                         + (1.0_r_def - abs(unit_vec(i,1)))*x2(:)
 
