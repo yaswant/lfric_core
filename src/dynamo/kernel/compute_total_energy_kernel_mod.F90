@@ -13,14 +13,15 @@
 !> @detail The kernel computes the cell integrated energy,
 !> int( rho * [ 1/2*u.u + Phi + Cv*T])dV
 module compute_total_energy_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_WRITE, GH_READ,             &
-                                    W0, W2, W3,                              &
-                                    GH_BASIS, GH_DIFF_BASIS,                 &
-                                    CELLS 
-use constants_mod,           only : r_def, Cv
-use configuration_mod,       only : earth_radius
+
+use argument_mod,      only : arg_type, func_type,         &
+                              GH_FIELD, GH_WRITE, GH_READ, &
+                              W0, W2, W3,                  &
+                              GH_BASIS, GH_DIFF_BASIS,     &
+                              CELLS
+use constants_mod,     only : r_def
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : scaled_radius, cv
 
 implicit none
 
@@ -103,7 +104,7 @@ subroutine compute_total_energy_code(                                          &
                                      ndf_w0, undf_w0, map_w0, w0_basis,        &
                                      w0_diff_basis,                            &
                                      nqp_h, nqp_v, wqp_h, wqp_v                &
-                                     )                     
+                                     )
   use coordinate_jacobian_mod,  only: coordinate_jacobian
   use calc_exner_pointwise_mod, only: calc_exner_pointwise
 
@@ -115,10 +116,10 @@ subroutine compute_total_energy_code(                                          &
   integer, dimension(ndf_w2), intent(in) :: map_w2
   integer, dimension(ndf_w3), intent(in) :: map_w3
   
-  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis  
-  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis 
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis   
+  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis
+  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis
+  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis
+  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis
 
   real(kind=r_def), dimension(undf_w3), intent(out)   :: energy
   real(kind=r_def), dimension(undf_w2), intent(in)    :: u
@@ -129,9 +130,9 @@ subroutine compute_total_energy_code(                                          &
   real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
 
   !Internal variables
-  integer               :: df, k, loc 
+  integer               :: df, k, loc
   integer               :: qp1, qp2
-  
+
   real(kind=r_def), dimension(ndf_w0)          :: chi_1_e, chi_2_e, chi_3_e
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
@@ -142,7 +143,7 @@ subroutine compute_total_energy_code(                                          &
   real(kind=r_def) :: u_at_quad(3), &
                       phi_at_quad
   real(kind=r_def) :: exner_at_quad, rho_at_quad, theta_at_quad, &
-                      ke_term, temperature_term                  
+                      ke_term, temperature_term
 
   do k = 0, nlayers-1
   ! Extract element arrays of chi
@@ -160,14 +161,14 @@ subroutine compute_total_energy_code(                                          &
     do df = 1, ndf_w3
       rho_e(df) = rho( map_w3(df) + k )
       energy_e(df) = 0.0_r_def
-    end do    
+    end do
     do df = 1, ndf_w2
       u_e(df) = u( map_w2(df) + k )
-    end do    
-  ! compute the energy integrated over one cell        
+    end do
+  ! compute the energy integrated over one cell
     do qp2 = 1, nqp_v
       do qp1 = 1, nqp_h
-        rho_at_quad = 0.0_r_def 
+        rho_at_quad = 0.0_r_def
         do df = 1, ndf_w3
           rho_at_quad  = rho_at_quad + rho_e(df)*w3_basis(1,df,qp1,qp2) 
         end do
@@ -182,7 +183,7 @@ subroutine compute_total_energy_code(                                          &
 ! Temperature term
         temperature_term = Cv*exner_at_quad*theta_at_quad
 ! k.e term
-        u_at_quad(:) = 0.0_r_def    
+        u_at_quad(:) = 0.0_r_def
         do df = 1, ndf_w2
           u_at_quad(:) = u_at_quad(:) &
                        + u_e(df)*w2_basis(:,df,qp1,qp2)
@@ -191,7 +192,7 @@ subroutine compute_total_energy_code(                                          &
                                         matmul(jac(:,:,qp1,qp2),u_at_quad))/(dj(qp1,qp2)**2)
         do df = 1, ndf_w3
           energy_e(df) = energy_e(df) + wqp_h(qp1)*wqp_v(qp2)*rho_at_quad &
-                  *(ke_term + phi_at_quad + temperature_term)*dj(qp1,qp2)/earth_radius**2
+                  *(ke_term + phi_at_quad + temperature_term)*dj(qp1,qp2)/scaled_radius**2
         end do
       end do
     end do

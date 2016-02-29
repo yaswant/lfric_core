@@ -8,16 +8,18 @@
 !-------------------------------------------------------------------------------
 
 module compute_div_operator_kernel_mod
-use constants_mod,           only: r_def
-use kernel_mod,              only: kernel_type
-use argument_mod,            only: arg_type, func_type,            &
-                                   GH_OPERATOR, GH_FIELD,          &
-                                   GH_READ, GH_WRITE,              &
-                                   W2, W3, ANY_SPACE_1,            &
-                                   GH_BASIS,GH_DIFF_BASIS,         &
-                                   CELLS
-use coordinate_jacobian_mod, only: coordinate_jacobian
-use configuration_mod,       only: rehabilitate
+
+use argument_mod,              only: arg_type, func_type,            &
+                                     GH_OPERATOR, GH_FIELD,          &
+                                     GH_READ, GH_WRITE,              &
+                                     W2, W3, ANY_SPACE_1,            &
+                                     GH_BASIS,GH_DIFF_BASIS,         &
+                                     CELLS
+use constants_mod,             only: r_def
+use coordinate_jacobian_mod,   only: coordinate_jacobian
+use finite_element_config_mod, only: rehabilitate
+use kernel_mod,                only: kernel_type
+
 implicit none
 
 !-------------------------------------------------------------------------------

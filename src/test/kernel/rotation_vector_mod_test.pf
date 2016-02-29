@@ -24,14 +24,26 @@ module rotation_vector_mod_test
     procedure test_fplane
   end type rotation_vector_test_type
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
+    use frig_config_mod, only : frig_planet_config
+
     implicit none
 
     class(rotation_vector_test_type), intent(inout) :: this
+
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
   end subroutine setUp
 
@@ -41,7 +53,7 @@ contains
   @test
   subroutine test_fplane( this )
 
-    use constants_mod,       only : PI, OMEGA_UNSCALED
+    use constants_mod,       only : PI
     use rotation_vector_mod, only : rotation_vector_fplane
 
     implicit none
@@ -54,10 +66,8 @@ contains
     integer :: ngp = 1
     real(kind=r_def) :: rot_y, rot_z
     real(kind=r_def) :: rotation_vec(3,1,1), err
-    real(kind=r_def) :: latitude, earthscaling, omega
+    real(kind=r_def) :: latitude
 
-    earthscaling = 1.0_r_def
-    omega = OMEGA_UNSCALED*earthscaling
     latitude = PI/3.0_r_def
     rot_y = omega
     rot_z = omega*sqrt(3.0_r_def)
@@ -66,7 +76,6 @@ contains
 
     call rotation_vector_fplane(ngp, ngp, omega, latitude, rotation_vec)
 
-    @assertEqual( OMEGA_UNSCALED, omega, tol )
     @assertEqual( zero, rotation_vec(1,1,1), tol )
     @assertEqual( rot_y, rotation_vec(2,1,1), tol )
     @assertEqual( rot_z, rotation_vec(3,1,1), tol )

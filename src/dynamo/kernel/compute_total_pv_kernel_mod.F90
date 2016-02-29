@@ -10,14 +10,15 @@
 !> @brief The kernel computes the cell integrated potential vorticity
 !> int( xi . grad(theta) dV )
 module compute_total_pv_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_WRITE, GH_READ,             &
-                                    W0, W1, W3,                              &
-                                    GH_BASIS, GH_DIFF_BASIS,                 &
-                                    CELLS
-use constants_mod,           only : r_def
-use configuration_mod,       only : earth_radius
+
+use argument_mod,      only : arg_type, func_type,                     &
+                              GH_FIELD, GH_WRITE, GH_READ,             &
+                              W0, W1, W3,                              &
+                              GH_BASIS, GH_DIFF_BASIS,                 &
+                              CELLS
+use constants_mod,     only : r_def
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : scaled_radius
 
 implicit none
 
@@ -91,7 +92,7 @@ subroutine compute_total_pv_code(                                               
                                  ndf_w1, undf_w1, map_w1, w1_basis,                      &
                                  ndf_w0, undf_w0, map_w0, w0_diff_basis,                 &
                                  nqp_h, nqp_v, wqp_h, wqp_v )
-                               
+
   use coordinate_jacobian_mod, only: coordinate_jacobian, &
                                      coordinate_jacobian_inverse
 
@@ -103,8 +104,8 @@ subroutine compute_total_pv_code(                                               
   integer, dimension(ndf_w0), intent(in) :: map_w0
   integer, dimension(ndf_w1), intent(in) :: map_w1
 
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis  
-  real(kind=r_def), dimension(3,ndf_w1,nqp_h,nqp_v), intent(in) :: w1_basis 
+  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis
+  real(kind=r_def), dimension(3,ndf_w1,nqp_h,nqp_v), intent(in) :: w1_basis
 
   real(kind=r_def), dimension(undf_w3), intent(out)   :: pv
   real(kind=r_def), dimension(undf_w0), intent(in)    :: theta
@@ -115,9 +116,9 @@ subroutine compute_total_pv_code(                                               
   real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
 
   !Internal variables
-  integer               :: df, k 
+  integer               :: df, k
   integer               :: qp1, qp2
-  
+
   real(kind=r_def), dimension(ndf_w0)          :: chi1_e, chi2_e, chi3_e, theta_e
   real(kind=r_def), dimension(ndf_w1)          :: xi_e
   real(kind=r_def), dimension(ndf_w3)          :: pv_e
@@ -125,7 +126,7 @@ subroutine compute_total_pv_code(                                               
                                                   grad_theta_at_quad
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac, jac_inv
- 
+
   do k = 0, nlayers-1
   ! Extract element arrays of chi and theta    
     do df = 1, ndf_w0
@@ -157,15 +158,15 @@ subroutine compute_total_pv_code(                                               
           pv_e(df) = pv_e(df) + wqp_h(qp1)*wqp_v(qp2)*dj(qp1,qp2) &
                     * dot_product(matmul(transpose(jac_inv(:,:,qp1,qp2)),xi_at_quad), &
                                   matmul(transpose(jac_inv(:,:,qp1,qp2)),grad_theta_at_quad)) &
-                    /earth_radius**2 
-        end do             
+                    /scaled_radius**2
+        end do
       end do
     end do
     do df = 1, ndf_w3
       pv(map_w3(df)+k) = pv_e(df)
     end do
   end do
-  
+
 end subroutine compute_total_pv_code
 
 end module compute_total_pv_kernel_mod

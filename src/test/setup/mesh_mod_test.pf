@@ -9,18 +9,12 @@
 !>
 module mesh_mod_test
 
-  use configuration_mod,     only: l_spherical, earth_scaling,          &
-                                   EARTH_RADIUS_UNSCALED, earth_radius, &
-                                   QUAD,                                &
-                                   VGRID_UNIFORM,                       &
-                                   VGRID_QUADRATIC,                     &
-                                   VGRID_GEOMETRIC,                     &
-                                   VGRID_DCMIP
-  use constants_mod,         only: r_def, i_def, PI
-  use coord_transform_mod,   only: llr2xyz
-  use global_mesh_mod,       only: global_mesh_type
-  use partition_mod,         only: partition_type
-  use mesh_mod,              only: mesh_type, domain_limits
+  use constants_mod,        only: r_def, i_def, PI
+  use coord_transform_mod,  only: llr2xyz
+  use extrusion_config_mod, only: extrusion_method_uniform
+  use global_mesh_mod,      only: global_mesh_type
+  use partition_mod,        only: partition_type
+  use mesh_mod,             only: mesh_type, domain_limits
   use pFUnit_Mod
 
   implicit none
@@ -50,22 +44,38 @@ module mesh_mod_test
   integer(i_def), parameter :: nlayers    = 5_i_def
   real(r_def),    parameter :: domain_top = 10000.0_r_def
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6371229.0_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 125.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use reference_element_mod, only : reference_cube, reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_spherical, &
+                                          base_mesh_partitioner_cubedsphere
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config, &
+                                          frig_planet_config,    &
+                                          frig_extrusion_config
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
     class( mesh_test_type ), intent( inout ) :: this
 
-    l_spherical   = .true.
-    earth_scaling = 125.0_r_def
-    earth_radius  = EARTH_RADIUS_UNSCALED/earth_scaling
+    call frig_base_mesh_config( 'foo',                             &
+                                base_mesh_geometry_spherical,      &
+                                base_mesh_partitioner_cubedsphere, &
+                                0.0_r_def )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     this%global_mesh = global_mesh_type()
@@ -103,7 +113,7 @@ contains
                         this%global_mesh, &
                         nlayers,     &
                         domain_top,  &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_nlayers
@@ -226,7 +236,7 @@ contains
                         this%global_mesh, &
                         nlayers,     &
                         domain_top,  &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_vert_coords
@@ -283,7 +293,7 @@ contains
                         this%global_mesh, &
                         nlayers,     &
                         domain_top,  &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_cell_coords
@@ -333,7 +343,7 @@ contains
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_column_coords
@@ -397,6 +407,11 @@ contains
   @test
   subroutine test_dz_array( this )
 
+    use extrusion_config_mod, &
+                             only: extrusion_method_quadratic, &
+                                   extrusion_method_geometric, &
+                                   extrusion_method_dcmip
+
     implicit none
 
     class( mesh_test_type ), intent( inout ) :: this
@@ -416,22 +431,22 @@ contains
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
     mesh_3 = mesh_type( this%partition,   &
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_QUADRATIC )
+                        extrusion_method_quadratic )
     mesh_4 = mesh_type( this%partition,   &
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_GEOMETRIC )
+                        extrusion_method_geometric )
     mesh_5 = mesh_type( this%partition,   &
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_DCMIP )
+                        extrusion_method_dcmip )
 
     !-------------------------------------------------------------------
     ! Test get_dz for different meshes
@@ -479,12 +494,12 @@ contains
                         this%global_mesh, &
                         nlayers,     &
                         domain_top,  &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
     mesh_2 = mesh_type( this%partition,   &
                         this%global_mesh, &
                         nlayers,     &
                         domain_top,  &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_vert_cell_owner
@@ -548,7 +563,7 @@ contains
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test is_vertex_owned
@@ -579,7 +594,7 @@ contains
                         this%global_mesh, &
                         nlayers,          &
                         domain_top,       &
-                        VGRID_UNIFORM )
+                        extrusion_method_uniform )
 
     !-------------------------------------------------------------------
     ! Test get_domain_size

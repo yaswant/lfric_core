@@ -9,16 +9,16 @@
 
 !> @brief The kernel applies supg to the thermodynamic equation for the nonlinear equations 
 module rtheta_supg_kernel_mod
-use kernel_mod,              only : kernel_type
+
 use argument_mod,            only : arg_type, func_type,                     &
                                     GH_FIELD, GH_READ, GH_INC,               &
                                     W0, W2, W3,                              &
                                     GH_BASIS, GH_DIFF_BASIS,                 &
                                     CELLS
 use constants_mod,           only : r_def, EPS
-use configuration_mod,       only : dt
 use coordinate_jacobian_mod, only : coordinate_jacobian
-
+use kernel_mod,              only : kernel_type
+use timestepping_config_mod, only : dt
 
 implicit none
 

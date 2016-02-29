@@ -1,0 +1,9 @@
+namelist initial_wind
+  profile        : enumeration[none,
+                               solid_body_rotation,
+                               constant_uv,
+                               constant_shear_uv]
+  u0             : real
+  v0             : real
+  rotation_angle : real
+end namelist initial_wind

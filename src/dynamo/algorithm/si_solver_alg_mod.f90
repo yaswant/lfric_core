@@ -7,33 +7,35 @@
 !>@brief Routines for solving the semi-implicit equation set
 module si_solver_alg_mod
 
-  use field_mod,             only: field_type
-  use runtime_constants_mod, only: runtime_constants_type
-  use operator_mod,          only: operator_type
-
-  use constants_mod,         only: r_def, str_def
-  use configuration_mod,     only: MAX_ITER, SOLVER_TOL, &
-                                   NO_PRE_COND, DIAGONAL_PRE_COND, SI_GCRK, &
-                                   l_newton_krylov, dt
-  use log_mod,               only: log_event,         &
-                                   log_scratch_space, &
-                                   LOG_LEVEL_ERROR,   &
-                                   LOG_LEVEL_DEBUG,   &
-                                   LOG_LEVEL_TRACE,   &
-                                   lOG_LEVEL_INFO   
-
-  use lhs_alg_mod,           only: lhs_alg
-  use rhs_alg_mod,           only: rhs_alg
-  use field_bundle_mod,      only: clone_bundle, &
-                                   set_bundle_scalar, &
-                                   bundle_axpy, &
-                                   copy_bundle, &
-                                   minus_bundle, &
-                                   bundle_ax, &
-                                   bundle_divide, &
-                                   bundle_minmax, &
-                                   bundle_inner_product
-
+  use constants_mod,           only: r_def, str_def
+  use field_bundle_mod,        only: clone_bundle, &
+                                     set_bundle_scalar, &
+                                     bundle_axpy, &
+                                     copy_bundle, &
+                                     minus_bundle, &
+                                     bundle_ax, &
+                                     bundle_divide, &
+                                     bundle_minmax, &
+                                     bundle_inner_product
+  use field_mod,               only: field_type
+  use formulation_config_mod,  only: newton_krylov
+  use lhs_alg_mod,             only: lhs_alg
+  use log_mod,                 only: log_event,         &
+                                     log_scratch_space, &
+                                     LOG_LEVEL_ERROR,   &
+                                     LOG_LEVEL_DEBUG,   &
+                                     LOG_LEVEL_TRACE,   &
+                                     lOG_LEVEL_INFO
+  use operator_mod,            only: operator_type
+  use rhs_alg_mod,             only: rhs_alg
+  use runtime_constants_mod,   only: runtime_constants_type
+  use solver_config_mod,       only: maximum_iterations, &
+                                     tolerance, &
+                                     preconditioner, &
+                                     solver_preconditioner_none, &
+                                     solver_preconditioner_diagonal, &
+                                     gcrk
+  use timestepping_config_mod, only: dt
 
   implicit none
   integer, parameter :: bundle_size = 3
@@ -72,7 +74,7 @@ contains
 
     call clone_bundle(x0, rhs, bundle_size)
 
-    if ( l_newton_krylov ) then
+    if ( newton_krylov ) then
       call rhs_alg(rhs, tau_dt, x0, runtime_constants, .true.)    
       do i = 1, bundle_size
         ! 1.0 should be norm(dx), but this would be 0, so give a 1/0!
@@ -116,18 +118,18 @@ contains
     type(field_type)         :: mm_diagonal(bundle_size)
     type(field_type)         :: dx(bundle_size), Ax(bundle_size), &
                                 residual(bundle_size), s(bundle_size), &
-                                w(bundle_size), v(bundle_size,SI_GCRK)
+                                w(bundle_size), v(bundle_size, gcrk)
 
     ! the scalars
-    real(kind=r_def)         :: h(SI_GCRK+1, SI_GCRK), u(SI_GCRK), g(SI_GCRK+1)
+    real(kind=r_def)         :: h(gcrk+1, gcrk), u(gcrk), g(gcrk+1)
     real(kind=r_def)         :: beta, si, ci, nrm, h1, h2, p, q
     ! others
     real(kind=r_def)         :: err, sc_err, init_err
     integer                  :: iter, i, j, k, m
     integer, parameter       :: MAX_GMRES_ITER = 20
-    
-    integer                  :: precon = NO_PRE_COND
-    integer                  :: postcon = DIAGONAL_PRE_COND
+
+    integer                  :: precon = solver_preconditioner_none
+    integer                  :: postcon = solver_preconditioner_diagonal
 
 
     mm_diagonal(1) = runtime_constants%get_mass_matrix_diagonal(2)
@@ -139,7 +141,7 @@ contains
     call clone_bundle(x0, s, bundle_size)
     call clone_bundle(x0, w, bundle_size)
     call clone_bundle(x0, residual, bundle_size)
-    do iter = 1,SI_GCRK
+    do iter = 1,gcrk
       call clone_bundle(x0, v(:,iter), bundle_size)
     end do
 
@@ -147,7 +149,7 @@ contains
     sc_err = max( sqrt(err), 1.0e-5_r_def )
     init_err = sc_err
 
-    if (err < SOLVER_TOL) then
+    if (err < tolerance) then
       write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
            "gmres solver_algorithm:converged in ", 0,           &
            " iters, init=", init_err,                           &
@@ -179,7 +181,7 @@ contains
 
     do iter = 1, MAX_GMRES_ITER
 
-      do j = 1, SI_GCRK
+      do j = 1, gcrk
 
         call bundle_preconditioner(w, v(:,j), postcon, mm_diagonal, bundle_size)
         call apply_lhs(s, w, rhs, x0, x_ref, delta, runtime_constants, tau_dt, bundle_size)
@@ -189,13 +191,13 @@ contains
           call bundle_axpy( -h(k,j), v(:,k), w, w, bundle_size )
         end do        
         h(j+1,j) = sqrt( bundle_inner_product( w, w, bundle_size ))
-        if( j < SI_GCRK ) then
+        if( j < gcrk ) then
           call bundle_ax(1.0_r_def/h(j+1,j), w, v(:,j+1), bundle_size)
         end if
       end do
 
       ! Solve (7.2bundle_size) of Wesseling (see Saad's book)
-      do m = 1, SI_GCRK
+      do m = 1, gcrk
         nrm    = sqrt( h(m,m)*h(m,m) + h(m+1,m)*h(m+1,m) )
         si     = h(m+1,m)/nrm
         ci     = h(m,m)/nrm
@@ -203,7 +205,7 @@ contains
         q      = -si*g(m) + ci*g(m+1)
         g(m)   = p
         g(m+1) = q
-        do j = m, SI_GCRK
+        do j = m, gcrk
           h1       = ci*h(m,j)   + si*h(m+1,j)
           h2       =-si*h(m,j)   + ci*h(m+1,j)
           h(m,j)   = h1
@@ -211,16 +213,16 @@ contains
         end do
       end do
 
-      u(SI_GCRK) = g(SI_GCRK)/h(SI_GCRK,SI_GCRK)
-      do i = SI_GCRK-1, 1, -1
+      u(gcrk) = g(gcrk)/h(gcrk,gcrk)
+      do i = gcrk-1, 1, -1
         u(i) = g(i)
-        do j = i+1, SI_GCRK
+        do j = i+1, gcrk
           u(i) = u(i) - h(i,j)*u(j)
         end do
         u(i) = u(i)/h(i,i)
       end do
 
-      do i = 1, SI_GCRK
+      do i = 1, gcrk
         call bundle_preconditioner(s, v(:,i), postcon, mm_diagonal, bundle_size)
         call bundle_axpy( u(i), s, dx, dx, bundle_size )
       end do
@@ -237,7 +239,7 @@ contains
                                                     "]: residual = ", err
       call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
 
-      if( err <  SOLVER_TOL ) then
+      if( err <  tolerance ) then
         write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
              "GMRES solver_algorithm:converged in ", iter,        &
              " iters, init=", init_err,                           &
@@ -254,7 +256,7 @@ contains
 
     end do
 
-    if( (iter >= MAX_GMRES_ITER .and. err >  SOLVER_TOL) .or. isnan(err) ) then
+    if( (iter >= MAX_GMRES_ITER .and. err >  tolerance) .or. isnan(err) ) then
       write( log_scratch_space, '(A, I3, A, E15.8)') &
            "GMRES solver_algorithm: NOT converged in", MAX_GMRES_ITER, " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
@@ -294,7 +296,7 @@ contains
     real(kind=r_def),             intent(in)    :: tau_dt
     type(field_type)                            :: x_new(bundle_size), rhs_new(bundle_size)
 
-    if ( l_newton_krylov ) then
+    if ( newton_krylov ) then
       call clone_bundle(x0, x_new, bundle_size)
       call clone_bundle(x0, rhs_new, bundle_size)
       call bundle_axpy(delta, x, x0, x_new, bundle_size)
@@ -323,11 +325,11 @@ contains
     integer :: i
 
     i = option
-    if ( option == NO_PRE_COND ) then
+    if ( option == solver_preconditioner_none ) then
       do i = 1,bundle_size
         call invoke_copy_field_data( x(i), y(i) )
       end do
-    elseif ( option == DIAGONAL_PRE_COND ) then
+    elseif ( option == solver_preconditioner_diagonal ) then
       do i = 1,bundle_size
         call invoke_copy_field_data( x(i), y(i) )
       end do

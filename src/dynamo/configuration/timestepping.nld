@@ -1,0 +1,10 @@
+namelist timestepping
+
+  method           : enumeration[ semi_implicit, rk_ssp3 ]
+  dt               : real        ! Timestep in seconds
+  alpha            : real        ! Time off-centering parameter
+  beta             : real[ '1.0_r_def - alpha' ]
+  outer_iterations : integer     ! Number of outer (advection) iterations to do
+  inner_iterations : integer     ! Number of inner (Newton) iterations to do
+
+end namelist timestepping

@@ -38,14 +38,26 @@ module geopotential_gradient_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only: l_spherical, QUAD
-    use reference_element_mod, only: reference_cube,  &
-                                     reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config, &
+                                          frig_planet_config
+    use reference_element_mod,     only : reference_cube,  &
+                                          reference_element
 
     implicit none
 
@@ -53,8 +65,8 @@ contains
 
     type(function_space_type) :: fs
     type(quadrature_type)     :: qr
-    type( field_proxy_type )        :: r_u_proxy, &
-                                       phi_proxy
+    type( field_proxy_type )  :: r_u_proxy, &
+                                 phi_proxy
 
     type(function_space_type), pointer :: w0_fs => null()
     type(function_space_type), pointer :: w2_fs => null()
@@ -64,9 +76,13 @@ contains
     integer(i_def) :: undf_w0, undf_w2
     integer(i_def) :: diff_dim_w0, dim_w2
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type(3, GAUSSIAN)
@@ -121,9 +137,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,              only : GRAVITY
-    use geopotential_gradient_kernel_mod, &
-                                    only : geopotential_gradient_code
+    use geopotential_gradient_kernel_mod, only : geopotential_gradient_code
 
     implicit none
 
@@ -213,7 +227,7 @@ contains
     map_w0 => phi_proxy%vspace%get_cell_dofmap( cell )
 
     ! Create the data
-    phi_proxy%data(:) = GRAVITY*chi_p(3)%data(:)
+    phi_proxy%data(:) = gravity*chi_p(3)%data(:)
     r_u_proxy%data(:) = 0.0_r_def
 
     call geopotential_gradient_code( nlayers,                    &
@@ -226,7 +240,7 @@ contains
                                      nqp_h, nqp_v, wh, wv        &
                                      )
 
-    answer = -GRAVITY*dz
+    answer = -gravity*dz
     k = 1
     @assertEqual(answer, r_u_proxy%data(map_w2(5)+k), tol)
     @assertEqual(answer, r_u_proxy%data(map_w2(6)+k), tol)

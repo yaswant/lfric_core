@@ -9,9 +9,10 @@
 !>
 module rotation_kernel_mod_test
 
-  use constants_mod,      only : i_def, r_def
+  use constants_mod,      only : i_def, r_def, PI
   use field_mod,          only : field_type, &
                                  field_proxy_type
+  use fs_continuity_mod,  only : W0, W2
   use function_space_mod, only : function_space_type
   use mesh_mod,           only : mesh_type
   use pFUnit_Mod
@@ -39,16 +40,28 @@ module rotation_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: f_lat = PI/4.0_r_def
+
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 7.292116E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,        only : omega, l_spherical, f_lat, QUAD
-    use constants_mod,            only : PI
-    use fs_continuity_mod,        only : W0, W2
-    use mesh_mod,                 only : PLANE_BI_PERIODIC
-    use reference_element_mod,    only : reference_cube, reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config, &
+                                          frig_planet_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -69,11 +82,13 @@ contains
 
     integer :: i
 
-    l_spherical = .false.
-    f_lat = PI/4.0_r_def
-    omega = 7.292116E-5_r_def
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                f_lat )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )
@@ -132,10 +147,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use configuration_mod,   only : omega, f_lat
-    use fs_continuity_mod,   only : W0, W2
     use rotation_kernel_mod, only : rotation_code
-    use quadrature_mod,      only : quadrature_type, GAUSSIAN
 
     implicit none
 

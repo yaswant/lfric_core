@@ -8,4 +8,5 @@
 .PHONY: test
 test:
 	python2.7 -m unittest discover -s dependencyanalysis/tests \
-	                               -p '*Test.py'
+	                               -s configurator/tests \
+	                               -p '*test.py'

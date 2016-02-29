@@ -45,8 +45,11 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : l_spherical, QUAD
-    use reference_element_mod, only : reference_cube, reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -67,9 +70,12 @@ contains
 
     integer :: i
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )

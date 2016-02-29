@@ -7,7 +7,7 @@
 !
 !-------------------------------------------------------------------------------
 
-module transpose_matrix_vector_mod
+module transpose_matrix_vector_kernel_mod
 use argument_mod,            only : arg_type,                               &
                                     GH_FIELD, GH_OPERATOR, GH_READ, GH_INC, &
                                     ANY_SPACE_1, ANY_SPACE_2,               &
@@ -102,4 +102,4 @@ subroutine transpose_matrix_vector_code(cell,        &
  
 end subroutine transpose_matrix_vector_code
 
-end module transpose_matrix_vector_mod
+end module transpose_matrix_vector_kernel_mod

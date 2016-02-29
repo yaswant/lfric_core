@@ -41,9 +41,9 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -60,7 +60,7 @@ contains
 
     qr = quadrature_type(3, GAUSSIAN)
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     this%mesh = mesh_type(PLANE_BI_PERIODIC)

@@ -13,40 +13,44 @@
 !! solve a number of iterative solver algorithms are possible or for
 !! discontinuous systems an exact solver can be used
 module solver_mod
-  use constants_mod,           only : r_def, str_def
-  use configuration_mod,       only : element_order, MAX_ITER, SOLVER_TOL,   &
-                                      CG_SOLVER, BICG_SOLVER, JACOBI_SOLVER, &
-                                      GMRES_SOLVER, GCR_SOLVER, NO_PRE_COND, &
-                                      DIAGONAL_PRE_COND
-  use log_mod,                 only : log_event,         &
-                                      log_scratch_space, &
-                                      LOG_LEVEL_ERROR,   &
-                                      LOG_LEVEL_INFO,    &
-                                      LOG_LEVEL_DEBUG,   &
-                                      LOG_LEVEL_TRACE
-  use field_mod,               only : field_type
 
-  use function_space_mod,  only: function_space_type
-  use fs_continuity_mod,   only: W3
-  use mesh_mod,            only: mesh_type
-
-  use psykal_lite_mod,         only : invoke_inner_prod,              &
-                                      invoke_axpy,                    &
-                                      invoke_minus_field_data,        &
-                                      invoke_copy_field_data,         &
-                                      invoke_set_field_scalar,        &
-                                      invoke_divide_field,            &
-                                      invoke_copy_scaled_field_data
-  use w3_solver_kernel_mod, only: w3_solver_kernel_type
-  use matrix_vector_mod,    only: matrix_vector_kernel_type
-
-  use quadrature_mod,  only : quadrature_type
-  use operator_mod,    only : operator_type
-
+  use constants_mod,             only : r_def, str_def
+  use field_mod,                 only : field_type
+  use finite_element_config_mod, only : element_order
+  use fs_continuity_mod,         only : W3
+  use function_space_mod,        only : function_space_type
+  use log_mod,                   only : log_event,         &
+                                        log_scratch_space, &
+                                        LOG_LEVEL_ERROR,   &
+                                        LOG_LEVEL_INFO,    &
+                                        LOG_LEVEL_DEBUG,   &
+                                        LOG_LEVEL_TRACE
+  use matrix_vector_kernel_mod,  only : matrix_vector_kernel_type
+  use mesh_mod,                  only : mesh_type
+  use operator_mod,              only : operator_type
+  use psykal_lite_mod,           only : invoke_inner_prod,              &
+                                        invoke_axpy,                    &
+                                        invoke_minus_field_data,        &
+                                        invoke_copy_field_data,         &
+                                        invoke_set_field_scalar,        &
+                                        invoke_divide_field,            &
+                                        invoke_copy_scaled_field_data
+  use quadrature_mod,            only : quadrature_type
+  use solver_config_mod,         only : solver_method_cg,               &
+                                        solver_method_bicgstab,         &
+                                        solver_method_jacobi,           &
+                                        solver_method_gmres,            &
+                                        solver_method_gcr,              &
+                                        tolerance,                      &
+                                        maximum_iterations,             &
+                                        solver_preconditioner_none,     &
+                                        solver_preconditioner_diagonal, &
+                                        gcrk
+  use w3_solver_kernel_mod,      only : w3_solver_kernel_type
 
   implicit none
-  private
 
+  private
   public :: solver_algorithm
 
 contains
@@ -63,39 +67,43 @@ contains
 !> @param[inout] lhs The field to be solved for (x)
 !> @param[inout] rhs The right hand side field (b)
 !> @param[in]    mesh The mesh object the model for fields
-!> @param[in]    chi The coordinate array fields
+!> @param[inout] chi The coordinate array fields
 !> @param[in]    solver_type (optional) The type of iterative solver to use for
 !>               continuous systems
-!> @param[in] mm Operator type, optional. This is the mass matrix
+!> @param[inout] mm Operator type, optional. This is the mass matrix
 !> @param[in] qr Quadrature type, optional. The quadrature rule.
 !! Either qr or mm are required, but not both.
 !> @param[in] preconditioner_choice optional coice of preconditioner type
 !> @param[in] mmd, optional Matrix diagonal
 
-  subroutine solver_algorithm(lhs, rhs, mesh, chi, solver_type, qr, mm, preconditioner_choice, mmd)
+  subroutine solver_algorithm( lhs, rhs, mesh, chi, solver_type, qr, mm, &
+                               preconditioner_choice, mmd )
+
     implicit none
+
     type(field_type), intent(inout) :: lhs
     type(field_type), intent(inout) :: rhs
     type(mesh_type),  intent(in)    :: mesh
 
     ! chi is really intent(in) but this currently causes
     ! problems because PSyclone makes everything (inout)
-    type(field_type), intent(inout)       :: chi(3)
+    type(field_type), intent(inout) :: chi(3)
 
-    integer, intent(in)                :: solver_type
-    type(quadrature_type), optional, intent(in) :: qr
+    integer,                         intent(in)    :: solver_type
+    type(quadrature_type), optional, intent(in)    :: qr
     type(operator_type),   optional, intent(inout) :: mm
-    integer,               optional, intent(in) :: preconditioner_choice
-    type(field_type),      optional, intent(in) :: mmd
+    integer,               optional, intent(in)    :: preconditioner_choice
+    type(field_type),      optional, intent(in)    :: mmd
 
-    integer, parameter                 :: NUM_JACOBI_ITERS = 5
+    integer, parameter :: NUM_JACOBI_ITERS = 5
+
     integer :: fs_l, fs_r
     integer :: prec
 
     if ( present(preconditioner_choice) ) then
       prec = preconditioner_choice
     else
-      prec = NO_PRE_COND
+      prec = solver_preconditioner_none
     end if
 
     fs_l = lhs%which_function_space()
@@ -107,7 +115,7 @@ contains
           ! we are on the right space
           call invoke( w3_solver_kernel_type(lhs,rhs,chi,qr) )
        else
-          write( log_scratch_space, '(A,I3,",",I3)' )  'quadrature required for w3 solver, stopping',fs_l,fs_r
+          write( log_scratch_space, '(A,I3,",",I3)' ) 'quadrature required for w3 solver, stopping',fs_l,fs_r
           call log_event( log_scratch_space, LOG_LEVEL_ERROR )
        end if
     else if( .not.present(qr) .and. present(mm) ) then
@@ -118,16 +126,17 @@ contains
          call invoke( matrix_vector_kernel_type(rhs,lhs,mm) )
        else
        select case ( solver_type )
-          case ( CG_SOLVER )
+          case ( solver_method_cg )
             call cg_solver_algorithm(lhs, rhs, mm, mesh, prec, mmd=mmd)
-          case ( BICG_SOLVER )
+          case ( solver_method_bicgstab )
             call bicg_solver_algorithm(lhs, rhs, mm, mesh, prec, mmd=mmd)
-          case ( JACOBI_SOLVER )
+          case ( solver_method_jacobi )
             call jacobi_solver_algorithm(lhs, rhs, mm, mesh, NUM_JACOBI_ITERS)
-          case ( GMRES_SOLVER )
-            call gmres_solver_algorithm(lhs, rhs, mm, mesh, NO_PRE_COND, prec,&
-                                        mmd)
-          case ( GCR_SOLVER )
+          case ( solver_method_gmres )
+            call gmres_solver_algorithm( lhs, rhs, mm, mesh,               &
+                                         solver_preconditioner_none, prec, &
+                                         mmd )
+          case ( solver_method_gcr )
             call gcr_solver_algorithm(lhs, rhs, mm, mesh, prec, mmd=mmd)
           case default
             write( log_scratch_space, '(A)' )  'Invalid linear solver choice, stopping'
@@ -141,6 +150,7 @@ contains
     else
        ! neither - bork
        write( log_scratch_space, '(A)' )  'quadrature OR mass matrix required for solver. Gimme something to work with, stopping'
+       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
 
   end subroutine solver_algorithm
@@ -178,7 +188,6 @@ contains
     real(kind=r_def)                   :: err,sc_err, init_err
     integer                            :: iter
 
-
     ! compute the residual this is a global sum to the PSy ---
     call invoke_inner_prod(rhs,rhs,sc_err)
     sc_err = max(sqrt(sc_err), 0.001_r_def)
@@ -206,7 +215,7 @@ contains
     call invoke_inner_prod(res,res,err)
     err = sqrt(err)/sc_err
     init_err=err
-    if (err < SOLVER_TOL) then
+    if (err < tolerance) then
       write( log_scratch_space, '(I4, A, I2,A,E12.4,A,E15.8)') &
            rhs_fs%which(),                                     &
            "-space solver_algorithm:converged in ", 0,         &
@@ -215,25 +224,25 @@ contains
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
       return
    end if
-    
+
     call invoke_set_field_scalar(0.0_r_def, v)
     call invoke_set_field_scalar(0.0_r_def, p)
 
-    do iter = 1, MAX_ITER
+    do iter = 1, maximum_iterations
 
       call invoke_inner_prod(res,rhs,rho)
       beta = (rho/norm) * (alpha/omega)
       ! p = r + beta*(p - omega*v)
       call invoke_axpy(beta,p,res,p)
       call invoke_axpy((-beta*omega),v,p,p)
-      call preconditioner( y, p, precond_option, diagonal=mmd )
+      call precondition( y, p, precond_option, diagonal=mmd )
       call invoke_set_field_scalar(0.0_r_def, v)
       call invoke( matrix_vector_kernel_type(v,y,mm) )
       
       call invoke_inner_prod(rhs,v,norm)
       alpha = rho/norm
       call invoke_axpy(-alpha,v,res,s)
-      call preconditioner( z, s, precond_option, diagonal=mmd )
+      call precondition( z, s, precond_option, diagonal=mmd )
       call invoke_set_field_scalar(0.0_r_def, t)
       call invoke( matrix_vector_kernel_type(t,z,mm) )
 
@@ -256,7 +265,7 @@ contains
                                                     "]: res = ", err
       call log_event(log_scratch_space, LOG_LEVEL_TRACE)
 
-      if (err < SOLVER_TOL) then
+      if (err < tolerance) then
         write( log_scratch_space, '(I4, A, I2, A, E12.4, A, E15.8)' ) &
              rhs_fs%which(),                                          &
              "-space solver_algorithm:converged in ", iter,           &
@@ -267,7 +276,7 @@ contains
       end if
     end do
 
-    if(iter >= MAX_ITER) then
+    if(iter >= maximum_iterations) then
       write(log_scratch_space, '(A, I3, A, E15.8)') &
            "solver_algorithm: NOT converged in", iter, " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
@@ -321,7 +330,7 @@ contains
 
     if ( present(mmd) ) then
     ! First guess: lhs = rhs/diag(M)
-      call invoke_divide_field(rhs,mmd,lhs)   
+      call invoke_divide_field(rhs,mmd,lhs)
     else
     ! First guess: lhs = 0
       call invoke_set_field_scalar(0.0_r_def, lhs)
@@ -329,7 +338,7 @@ contains
     call invoke( matrix_vector_kernel_type(Ap,lhs,mm) )
 
     call invoke_minus_field_data( rhs, Ap, res )
-    call preconditioner( z, res, precond_option, diagonal=mmd )   
+    call precondition( z, res, precond_option, diagonal=mmd )
     call invoke_copy_field_data( z, p )
 
     call invoke_inner_prod( res, z, rs_old )
@@ -339,7 +348,7 @@ contains
     write( log_scratch_space, '(A,E15.8)' ) &
          "cg solver_algorithm: starting ... ||b|| = ", sc_err
     call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-    if (err < SOLVER_TOL) then
+    if (err < tolerance) then
       write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
            "cg solver_algorithm:converged in ", 0,              &
            " iters, init=", init_err,                           &
@@ -348,7 +357,7 @@ contains
       return
     end if
 
-    do iter = 1, MAX_ITER
+    do iter = 1, maximum_iterations
        call invoke_set_field_scalar(0.0_r_def, Ap)
        call invoke( matrix_vector_kernel_type(Ap,p,mm) )
 
@@ -365,7 +374,7 @@ contains
       write( log_scratch_space, '(A, I2, A, E15.8)' ) &
            "cg solver_algorithm[", iter, "]: res = ", err
       call log_event( log_scratch_space, LOG_LEVEL_TRACE )
-      if (err < SOLVER_TOL) then
+      if (err < tolerance) then
         write( log_scratch_space, '(I4, A, I2, A, E12.4, A, E15.8)' ) &
              rhs_fs%which(),                                          &
              "-space cg solver_algorithm:converged in ", iter,        &
@@ -375,7 +384,7 @@ contains
         exit
       end if
 
-      call preconditioner( z, res, precond_option, diagonal=mmd )   
+      call precondition( z, res, precond_option, diagonal=mmd )
       call invoke_inner_prod(z,res,rs_new)
       beta = rs_new/rs_old
       rs_old = rs_new
@@ -383,7 +392,7 @@ contains
 
     end do
 
-    if(iter >= MAX_ITER) then
+    if(iter >= maximum_iterations) then
       write( log_scratch_space, '(A, I3, A, E15.8)' ) &
            "cg solver_algorithm: NOT converged in", iter, " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
@@ -456,15 +465,13 @@ contains
 !! after (n_iter) iterations
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answser, x
-!! @param[in] mm The mass matrix
+!! @param[inout] mm The mass matrix
 !! @param[in] mesh The mesh object the model for fields
 !! @param[in] precond_option The choice of preconditioner
 !! @param[in] pstcond_option The choice of postconditioner
 !! @param[in] mmd Optional diagonal mass matrix used for conditioning
   subroutine gmres_solver_algorithm(lhs, rhs, mm, mesh, &
                                     precond_option, pstcond_option, mmd)
-
-    use configuration_mod, only: GCRK
 
     implicit none
     type(field_type),    intent(inout) :: lhs
@@ -502,7 +509,7 @@ contains
     sc_err = max( sqrt(err), 0.01_r_def )
     init_err = sc_err
 
-    if (err < SOLVER_TOL) then
+    if (err < tolerance) then
       write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
            "gmres solver_algorithm:converged in ", 0,           &
            " iters, init=", init_err,                           &
@@ -515,7 +522,7 @@ contains
 
     call invoke_minus_field_data( rhs, Ax, r )
 
-    call preconditioner( s, r, precond_option, diagonal=mmd )   
+    call precondition( s, r, precond_option, diagonal=mmd )
 
     call invoke_inner_prod( s, s, err )
     beta = sqrt(err)
@@ -527,15 +534,15 @@ contains
     g(:)   = 0.0_r_def
     g(1)   = beta
 
-    do iter = 1, MAX_ITER
+    do iter = 1, maximum_iterations
 
       do j = 1, GCRk
-     
-        call preconditioner( w, v(j), pstcond_option, diagonal=mmd )   
+
+        call precondition( w, v(j), pstcond_option, diagonal=mmd )
         call invoke_set_field_scalar(0.0_r_def, s)
         call invoke( matrix_vector_kernel_type(s,w,mm) )
 
-        call preconditioner( w, s, precond_option, diagonal=mmd )   
+        call precondition( w, s, precond_option, diagonal=mmd )
 
         do k = 1, j
           call invoke_inner_prod( v(k), w, h(k,j)  )
@@ -575,7 +582,7 @@ contains
       end do
 
       do i = 1, GCRK
-        call preconditioner( s, v(i), pstcond_option, diagonal=mmd )   
+        call precondition( s, v(i), pstcond_option, diagonal=mmd )
         call invoke_axpy( u(i), s, lhs, lhs )
       end do
 
@@ -588,7 +595,7 @@ contains
       beta = sqrt(err)
 
       err = beta/sc_err
-      if( err <  SOLVER_TOL ) then
+      if( err <  tolerance ) then
         write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
              "GMRES solver_algorithm:converged in ", iter,        &
              " iters, init=", init_err,                           &
@@ -597,7 +604,7 @@ contains
         exit
       end if
 
-      call preconditioner( s, r, precond_option, diagonal=mmd )   
+      call precondition( s, r, precond_option, diagonal=mmd )
       call invoke_copy_scaled_field_data(1.0_r_def/beta, s, v(1))
 
       g(:) = 0.0_r_def
@@ -605,7 +612,7 @@ contains
 
     end do
 
-    if( iter >= MAX_ITER .and. err >  SOLVER_TOL ) then
+    if( iter >= maximum_iterations .and. err >  tolerance ) then
       write( log_scratch_space, '(A, I3, A, E15.8)') &
            "GMRES solver_algorithm: NOT converged in", iter, " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
@@ -623,15 +630,14 @@ contains
 !! after (n_iter) iterations
 !! @param[in] rhs_field The input b
 !! @param[inout] lhs_field The answser, x
-!! @param[in] mm operator type, the mass matrix
+!! @param[inout] mm operator type, the mass matrix
 !! @param[in] mesh The mesh object the model for fields
 !! @param[in] precond_option Choice of preconditioner
 !! @param[in] mmd optional, mass matrix diagonal
-  subroutine gcr_solver_algorithm(lhs, rhs, mm, mesh , precond_option, mmd)
-
-    use configuration_mod, only: GCRK
+  subroutine gcr_solver_algorithm( lhs, rhs, mm, mesh , precond_option, mmd )
 
     implicit none
+
     type(field_type),    intent(inout) :: lhs
     type(field_type),    intent(in)    :: rhs
     type(operator_type), intent(inout) :: mm
@@ -664,7 +670,7 @@ contains
     sc_err = max( sqrt(err), 0.01_r_def )
     init_err = sc_err
 
-    if (err < SOLVER_TOL) then
+    if (err < tolerance) then
       write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
            "gcr solver_algorithm:converged in ", 0,             &
            " iters, init=", init_err,                           &
@@ -677,10 +683,10 @@ contains
 
     call invoke_minus_field_data( rhs, Ax, r )
 
-    do iter = 1, MAX_ITER
+    do iter = 1, maximum_iterations
       do m = 1, GCRk
 ! This is the correct settings -> call Precon(s(:,:,m),r,prit,prec)
-        call preconditioner( s(m), r, precond_option, diagonal=mmd )
+        call precondition( s(m), r, precond_option, diagonal=mmd )
         call invoke_set_field_scalar(0.0_r_def, v(m))
         call invoke( matrix_vector_kernel_type(v(m),s(m),mm) )
 
@@ -702,7 +708,7 @@ contains
 
       call invoke_inner_prod( r, r, err )
       err = sqrt( err )/sc_err
-      if( err <  SOLVER_TOL ) then
+      if( err <  tolerance ) then
        write( log_scratch_space, '(I4, A, I2, A, E12.4, A, E15.8)' ) &
              rhs_fs%which(),                                         &
              "-space GCR solver_algorithm:converged in ", iter,      &
@@ -713,7 +719,7 @@ contains
       end if
     end do
 
-    if( iter >= MAX_ITER .and. err >  SOLVER_TOL ) then
+    if( iter >= maximum_iterations .and. err >  tolerance ) then
       write( log_scratch_space, '(A, I3, A, E15.8)' ) &
            "GCR solver_algorithm: NOT converged in", iter, " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
@@ -728,33 +734,30 @@ end subroutine gcr_solver_algorithm
 !! is applied and y = x.
 !! @param[in]    x The input field
 !! @param[inout] y The output field
-!! @param[in] pre_cond_type The type of preconditioner to be used
+!! @param[in] preconditioner The type of preconditioner to be used
 !! routine to use
-  subroutine preconditioner(y, x, pre_cond_type, diagonal)
-    use configuration_mod, only: DIAGONAL_PRE_COND
-    use psykal_lite_mod,   only: invoke_divide_field
+  subroutine precondition(y, x, preconditioner, diagonal)
+
+    use psykal_lite_mod, only: invoke_divide_field
+
     implicit none
+
     type(field_type), intent(inout) :: y
     type(field_type), intent(in)    :: x
-    integer,          intent(in)    :: pre_cond_type
+    integer,          intent(in)    :: preconditioner
     type(field_type), intent(in), optional :: diagonal
 
-
-    select case ( pre_cond_type )
-      case ( DIAGONAL_PRE_COND )
-! Diagonal preconditioner
+    select case ( preconditioner )
+      case ( solver_preconditioner_diagonal )
         if ( present(diagonal) ) then
           call invoke_divide_field(x, diagonal, y)
         else
-          write(6,*) 'No mass matrix diagonal present'
-          stop
+          call log_event( 'No mass matrix diagonal present', LOG_LEVEL_ERROR )
         end if
-      case default
-! Default - do nothing
+      case default ! Do nothing
         call invoke_copy_field_data( x, y )
     end select
 
-    return
-  end subroutine preconditioner
+  end subroutine precondition
 
 end module solver_mod

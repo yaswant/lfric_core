@@ -42,15 +42,28 @@ module linear_rrho_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: bvf_square = 0.0001_r_def
+
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use initialisation_mod,    only : n_sq
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_idealised_config,           &
+                                          frig_initial_temperature_config, &
+                                          frig_planet_config
+    use idealised_config_mod,      only : idealised_test_cold_bubble
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -72,9 +85,11 @@ contains
 
     integer :: i
 
-    n_sq = 0.0001_r_def
+    call frig_idealised_config( idealised_test_cold_bubble )
+    call frig_initial_temperature_config( bvf_square )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )
@@ -146,10 +161,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,          only : GRAVITY
-    use initialisation_mod,     only : n_sq
     use linear_rrho_kernel_mod, only : linear_rrho_code
-    use quadrature_mod,         only : quadrature_type, GAUSSIAN
 
     implicit none
 
@@ -205,7 +217,7 @@ contains
           chi_proxy(1)%data(map_w0(1) + k) = real(i-1)*dx
           chi_proxy(2)%data(map_w0(1) + k) = real(j-1)*dy
           chi_proxy(3)%data(map_w0(1) + k) = real(k)  *dz
-          phi_proxy%data(map_w0(1) + k) = real(k) *dz*GRAVITY
+          phi_proxy%data(map_w0(1) + k) = real(k) *dz*gravity
         end do
         cell = cell + 1
       end do

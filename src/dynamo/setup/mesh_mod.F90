@@ -17,13 +17,14 @@
 
 module mesh_mod
 
-  use global_mesh_mod,   only: global_mesh_type
-  use partition_mod,     only: partition_type
-  use constants_mod,     only: i_def, r_def, l_def, IMDI, PI
-  use configuration_mod, only: l_spherical, VGRID_UNIFORM, VGRID_QUADRATIC &
-                             , VGRID_GEOMETRIC, VGRID_DCMIP
-  use log_mod,           only: log_event, log_scratch_space, LOG_LEVEL_DEBUG   &
-                             , LOG_LEVEL_ERROR
+  use base_mesh_config_mod, only : geometry, &
+                                   base_mesh_geometry_spherical
+  use constants_mod,        only : i_def, i_native, r_def, l_def, pi, imdi
+  use extrusion_config_mod, only: extrusion_method_uniform
+  use global_mesh_mod,      only : global_mesh_type
+  use log_mod,              only : log_event, log_scratch_space, &
+                                   LOG_LEVEL_DEBUG, LOG_LEVEL_ERROR
+  use partition_mod,        only : partition_type
 
   implicit none
 
@@ -231,6 +232,8 @@ module mesh_mod
     procedure, public :: get_colours
     procedure, public :: is_coloured
 
+    procedure, private :: set_vertical_coordinate
+
     ! Overloaded assigment operator
     procedure         :: mesh_type_assign
 
@@ -332,7 +335,7 @@ contains
     allocate( self%dz  ( nlayers   ) )
 
     ! Calculate vertical coordinates eta[0,1] and dz in a separate subroutine
-    call set_vertical_coordinate(self, vgrid_option)
+    call self%set_vertical_coordinate(vgrid_option)
 
     ! Calculate next-to cells and vertices on cells
     allocate ( self % cell_next    ( nfaces, ncells ) )
@@ -1467,12 +1470,13 @@ contains
   !> @param self The mesh_object being constructed on the partition
   subroutine mesh_extruder(self)
 
-    use coord_transform_mod,   only: llr2xyz
-    use reference_element_mod, only: W, S, E, N, B, T,                        &
-                                     nverts_h, nedges_h, nfaces_h,            &
-                                     nverts,   nedges,   nfaces,              &
-                                     SWB, SEB, NEB, NWB, SWT, SET, NET, NWT
-    use configuration_mod,     only: l_spherical, earth_radius
+    use coord_transform_mod,   only : llr2xyz
+    use planet_config_mod,     only : scaled_radius
+    use reference_element_mod, only : W, S, E, N, B, T,                       &
+                                      nverts_h, nedges_h, nfaces_h,           &
+                                      nverts,   nedges,   nfaces,             &
+                                      SWB, SEB, NEB, NWB, SWT, SET, NET, NWT
+
     implicit none
 
     class(mesh_type) :: self
@@ -1562,11 +1566,11 @@ contains
     ! [longitude, latitude, radius] (long/lat in rads)
 
     ! perform vertical extrusion for vertices
-    if( l_spherical )then
+    if( geometry == base_mesh_geometry_spherical )then
       !> @todo We shouldn't be using earth_radius here - it should be
       !!       some form of scaled planet radius - but that is a much
       !!       bigger change for a different ticket.
-      base_z = earth_radius
+      base_z = scaled_radius
     else
       base_z = 0.0_r_def
     end if
@@ -1585,7 +1589,7 @@ contains
 
     deallocate(vertex_coords_2d)
 
-    if( l_spherical )then
+    if( geometry == base_mesh_geometry_spherical )then
       ! Convert (long,lat,r) -> (x,y,z)
       do j=1, nverts_2d
         do k=0, nlayers
@@ -1856,7 +1860,7 @@ contains
 
     class(mesh_type) :: self
 
-    if ( l_spherical ) then
+    if ( geometry == base_mesh_geometry_spherical ) then
       self % domain_size%minimum%x =  0.0_r_def
       self % domain_size%maximum%x =  2.0_r_def*PI
       self % domain_size%minimum%y = -0.5_r_def*PI
@@ -1885,12 +1889,17 @@ contains
   !> @param [inout] self          The mesh_object with set up vertical
   !>                              coordinate eta and layer spacing dz
   !> @param [in]    vgrid_option  Choice of vertical grid
-  subroutine set_vertical_coordinate(self, vgrid_option)
+  subroutine set_vertical_coordinate( self, vgrid_option )
+
+    use extrusion_config_mod, only: extrusion_method_uniform,   &
+                                    extrusion_method_quadratic, &
+                                    extrusion_method_geometric, &
+                                    extrusion_method_dcmip
 
     implicit none
 
-    type(mesh_type), intent(inout) :: self
-    integer(i_def),  intent(in)    :: vgrid_option
+    class(mesh_type),  intent(inout) :: self
+    integer(i_native), intent(in)    :: vgrid_option
 
     integer(i_def) :: k, nlayers
     real   (r_def) :: stretching_factor, phi_flatten, delta_eta, eta_uni
@@ -1902,13 +1911,13 @@ contains
     select case (vgrid_option)
 
       ! UNIFORM GRID (constant delta_eta)
-      case (VGRID_UNIFORM)
+      case (extrusion_method_uniform)
         do k = 0, nlayers
           self%eta(k) = real(k,r_def)/real(nlayers,r_def)
         end do
 
       ! QUADRATIC GRID: eta(k) = (k/numlayers)^2
-      case (VGRID_QUADRATIC)
+      case (extrusion_method_quadratic)
         do k = 0, nlayers
           self%eta(k) = ( real(k,r_def)/real(nlayers,r_def) )**2_i_def
         end do
@@ -1918,7 +1927,7 @@ contains
       !         deta = (stretch - 1.0d0)/(stretch**(2*nz) - 1.0d0)
       ! Here:   The grid is non-staggered grid so it must be
       !         deta = (stretch - 1.0d0)/(stretch**(nz) - 1.0d0)
-      case (VGRID_GEOMETRIC)
+      case (extrusion_method_geometric)
         stretching_factor = 1.03_r_def
         self%eta(0) = 0.0_r_def
         delta_eta = ( stretching_factor - 1.0_r_def ) / &
@@ -1931,7 +1940,7 @@ contains
       ! DCMIP GRID
       ! Source: DCMIP-TestCaseDocument_v1.7.pdf, Appendix F.2. - Eq. 229)
       ! phi_flatten is a flattening parameter (usually phi_flatten = 15)
-      case (VGRID_DCMIP)
+      case (EXTRUSION_METHOD_DCMIP)
         phi_flatten = 15.0_r_def
         do k = 0, nlayers
           eta_uni = real(k,r_def)/real(nlayers,r_def)
@@ -2192,7 +2201,7 @@ contains
     ! Calculate vertical coordinates eta[0,1] and dz in a separate subroutine
     ! for the unit tests.
     ! Uniform vertical grid is used for pFunit tests (hard-wired).
-    call set_vertical_coordinate(self, VGRID_UNIFORM)
+    call self%set_vertical_coordinate(extrusion_method_uniform)
 
     self%vert_cell_owner (:,:) = reshape( [ &
          9, 8, 5, 6, &  ! Cell 1
@@ -2778,6 +2787,5 @@ contains
     end if
 
   end function mesh_constructor_unit_test_data
-
 
 end module mesh_mod

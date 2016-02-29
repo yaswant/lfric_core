@@ -1,0 +1,3 @@
+namelist initial_temperature
+  bvf_square : real ! The square of Brunt-Vaisala frequency [1/s^2]
+end namelist initial_temperature

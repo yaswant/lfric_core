@@ -15,14 +15,29 @@
 
 module set_up_mod
 
-  use constants_mod,          only: i_def, r_def, str_def, PI
-  use configuration_mod,      only: TRI, QUAD,                                 &
-                                    VGRID_UNIFORM, VGRID_QUADRATIC,            &
-                                    VGRID_GEOMETRIC, VGRID_DCMIP,              &
-                                    mesh_filename
-  use reference_element_mod,  only: reference_cube, reference_element          &
-                                  , nfaces, nedges, nverts
-  use mesh_mod,               only: mesh_type
+  use base_mesh_config_mod,      only : filename, &
+                                        geometry, &
+                                        base_mesh_geometry_spherical
+  use constants_mod,             only : i_def, r_def, str_def, PI
+  use extrusion_config_mod,      only : number_of_layers,           &
+                                        domain_top,                 &
+                                        method,                     &
+                                        extrusion_method_uniform,   &
+                                        extrusion_method_quadratic, &
+                                        extrusion_method_geometric, &
+                                        extrusion_method_dcmip
+  use finite_element_config_mod, only : finite_element_shape_triangle, &
+                                        finite_element_shape_quadrilateral
+  use global_mesh_mod,           only : global_mesh_type
+  use reference_element_mod,     only : reference_cube, reference_element, &
+                                        nfaces, nedges, nverts
+  use mesh_mod,                  only : mesh_type
+  use log_mod,                   only : log_event, LOG_LEVEL_INFO
+  use partition_mod,             only : partition_type,                   &
+                                        partitioner_interface,            &
+                                        partitioner_cubedsphere_serial,   &
+                                        partitioner_cubedsphere,          &
+                                        partitioner_biperiodic
 
   implicit none
 
@@ -34,16 +49,6 @@ contains
 !> @param[in] local_rank Number of the MPI rank of this process
 !> @param[in] total_ranks Total number of MPI ranks in this job
   subroutine set_up(mesh, local_rank, total_ranks)
-
-    use log_mod,           only: log_event, LOG_LEVEL_INFO
-    use configuration_mod, only: l_spherical, nlayers, domain_top, vgrid_option
-    use partition_mod,     only: partition_type,                   &
-                                 partitioner_interface,            &
-                                 partitioner_cubedsphere_serial,   &
-                                 partitioner_cubedsphere,          &
-                                 partitioner_biperiodic
-    use global_mesh_mod,   only: global_mesh_type
-
 
     implicit none
 
@@ -74,7 +79,7 @@ contains
     call log_event( "set_up: Generating/reading the mesh", LOG_LEVEL_INFO )
 
     ! Currently only quad elements are fully functional
-    if ( reference_element /= QUAD ) then
+    if ( reference_element /= finite_element_shape_quadrilateral ) then
       call log_event( "set_up: Reference_element must be QUAD for now...", LOG_LEVEL_INFO )
     end if
     ! Setup reference cube
@@ -82,8 +87,8 @@ contains
 
     ! Generate the global mesh and choose a partitioning strategy by setting
     ! a function pointer to point at the appropriate partitioning routine
-    global_mesh = global_mesh_type( mesh_filename )
-    if ( l_spherical ) then
+    global_mesh = global_mesh_type( filename )
+    if ( geometry == base_mesh_geometry_spherical ) then
       partitioner_ptr => partitioner_cubedsphere_serial
       call log_event( "set_up: Setting up cubed sphere partitioner ", LOG_LEVEL_INFO )
     else
@@ -103,7 +108,8 @@ contains
 
 
     ! Generate the mesh
-    mesh =  mesh_type ( partition, global_mesh, nlayers, domain_top, vgrid_option)
+    mesh =  mesh_type ( partition, global_mesh, &
+                        number_of_layers, domain_top, method )
     call mesh%set_colours()
 
 

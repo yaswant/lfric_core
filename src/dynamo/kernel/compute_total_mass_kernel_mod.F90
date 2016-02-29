@@ -10,13 +10,14 @@
 !> @brief Kernel which computes the cell integrated mass
 
 module compute_total_mass_kernel_mod
-use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def
-use configuration_mod,       only : earth_radius
-use argument_mod,            only : arg_type, func_type,             &
-                                    GH_FIELD, GH_WRITE, GH_READ,     &
-                                    W0, W3, GH_BASIS, GH_DIFF_BASIS, &
-                                    CELLS 
+
+use argument_mod,      only : arg_type, func_type,             &
+                              GH_FIELD, GH_WRITE, GH_READ,     &
+                              W0, W3, GH_BASIS, GH_DIFF_BASIS, &
+                              CELLS
+use constants_mod,     only : r_def
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : scaled_radius
 
 implicit none
 
@@ -80,7 +81,7 @@ subroutine compute_total_mass_code(                                            &
                                    ndf_w0, undf_w0, map_w0, w0_diff_basis,     &
                                    nqp_h, nqp_v, wqp_h, wqp_v                  &
                                  )
-                         
+
   use coordinate_jacobian_mod, only : coordinate_jacobian 
 
   !Arguments
@@ -89,7 +90,7 @@ subroutine compute_total_mass_code(                                            &
   integer, dimension(ndf_w3), intent(in) :: map_w3
   integer, dimension(ndf_w0), intent(in) :: map_w0
   real(kind=r_def), intent(in), dimension(1,ndf_w3,nqp_h,nqp_v) :: w3_basis
-  real(kind=r_def), intent(in), dimension(3,ndf_w0,nqp_h,nqp_v) :: w0_diff_basis  
+  real(kind=r_def), intent(in), dimension(3,ndf_w0,nqp_h,nqp_v) :: w0_diff_basis
   real(kind=r_def), dimension(undf_w3), intent(in)    :: rho
   real(kind=r_def), dimension(undf_w3), intent(out)   :: mass
   real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3
@@ -100,7 +101,7 @@ subroutine compute_total_mass_code(                                            &
   !Internal variables
   integer               :: df1, df2, k
   integer               :: qp1, qp2
-  
+
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
@@ -125,14 +126,14 @@ subroutine compute_total_mass_code(                                            &
              do qp1 = 1, nqp_h
                 integrand =  w3_basis(1,df1,qp1,qp2) * &
                              w3_basis(1,df2,qp1,qp2) * rho_e(df2) * dj(qp1,qp2)
-                 mass_e(df1) = mass_e(df1) + wqp_h(qp1)*wqp_v(qp2)*integrand/earth_radius**2
+                 mass_e(df1) = mass_e(df1) + wqp_h(qp1)*wqp_v(qp2)*integrand/scaled_radius**2
              end do
           end do
        end do
        mass( map_w3(df1) + k ) = mass_e(df1)
     end do
   end do
-  
+
 end subroutine compute_total_mass_code
 
 end module compute_total_mass_kernel_mod

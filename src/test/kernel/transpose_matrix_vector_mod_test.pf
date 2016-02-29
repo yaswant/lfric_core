@@ -7,15 +7,19 @@
 !
 !-------------------------------------------------------------------------------
 module transpose_matrix_vector_mod_test
+
+  use constants_mod, only : r_def
+  use pFUnit_Mod
+
   implicit none 
 
 contains
 
   @test
   subroutine test_of_transpose_matrix_vector()
-    use pFUnit_Mod
-    use transpose_matrix_vector_mod, only : transpose_matrix_vector_code
-    use constants_mod,     only : r_def
+
+    use transpose_matrix_vector_kernel_mod, only : transpose_matrix_vector_code
+
     implicit none
 
     real(kind=r_def) :: d(4,2), x(4), y(2), answer(2)

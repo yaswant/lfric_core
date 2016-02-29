@@ -13,20 +13,25 @@
 !>         nonhydrostatic gravity wave test
 
 module initial_theta_kernel_mod
-use kernel_mod,                    only: kernel_type
+
 use argument_mod,                  only: arg_type,                          &
                                          GH_FIELD, GH_WRITE, GH_READ,       &
                                          W0,                                &
                                          CELLS
+use base_mesh_config_mod,          only: geometry, &
+                                         base_mesh_geometry_spherical
 use constants_mod,                 only: r_def, PI
-use configuration_mod,             only: l_spherical, earth_radius, l_nonlinear                                
-use initialisation_mod,            only: ITEST_GRAVITY_WAVE,                &
-                                         ITEST_COLD_BUBBLE,                 &
-                                         ITEST_WARM_BUBBLE,                 &
-                                         itest_option
 use coord_transform_mod,           only: xyz2llr
+use formulation_config_mod,        only: nonlinear
 use generate_global_gw_fields_mod, only: generate_global_gw_pert
+use idealised_config_mod,          only: test,              &
+                                         idealised_test_gravity_wave, &
+                                         idealised_test_cold_bubble,  &
+                                         idealised_test_warm_bubble
+use kernel_mod,                    only: kernel_type
+use planet_config_mod,             only: scaled_radius
 use reference_profile_mod,         only: reference_profile
+
 implicit none
 
 !-------------------------------------------------------------------------------
@@ -101,17 +106,17 @@ subroutine initial_theta_code(nlayers, &
                                  ZC_cold = 3000.0_r_def, &
                                  ZC_hot = 260.0_r_def, &
                                  ZR = 2000.0_r_def  
-   
+
   ! Compute the pointwise theta profile
   ! Set up use of nonlinear terms
-  if ( l_nonlinear ) then 
+  if ( nonlinear ) then 
     nl = 1.0
   else
     nl = 0.0
   end if
 
   ! Set up theta depending on domain shape and choice of idealised test 
-  if ( l_spherical ) then   ! SPHERICAL DOMAIN  
+  if ( geometry == base_mesh_geometry_spherical ) then   ! SPHERICAL DOMAIN
 
     ! Gravity wave test only for now
     do k = 0, nlayers-1
@@ -120,9 +125,9 @@ subroutine initial_theta_code(nlayers, &
         x(2) = chi_2(map(df) + k)
         x(3) = chi_3(map(df) + k)
         ! Calculate reference profile for a chosen idealised test option
-        call reference_profile(exner_ref, rho_ref, theta_ref, x, itest_option)         
+        call reference_profile(exner_ref, rho_ref, theta_ref, x, test)
         call xyz2llr(x(1), x(2), x(3), lon, lat, r)
-        theta_pert = generate_global_gw_pert(lon,lat,r-earth_radius)
+        theta_pert = generate_global_gw_pert(lon,lat,r-scaled_radius)
         theta(map(df) + k) =  theta_pert + nl*theta_ref
       end do
     end do
@@ -135,22 +140,22 @@ subroutine initial_theta_code(nlayers, &
         x(2) = chi_2(map(df) + k)
         x(3) = chi_3(map(df) + k)
         ! Calculate reference profile for a chosen idealised test option
-        call reference_profile(exner_ref, rho_ref, theta_ref, x, itest_option)
+        call reference_profile(exner_ref, rho_ref, theta_ref, x, test)
         ! Calculate theta a chosen idealised test option
-        select case( itest_option )
-          case( ITEST_GRAVITY_WAVE )  ! Gravity wave test
+        select case( test )
+          case( idealised_test_gravity_wave )  ! Gravity wave test
             theta(map(df) + k) = THETA0 * sin ( PI * x(3) / H )             &
                                  / ( 1.0_r_def + ( x(1) - XC )**2/A**2 ) +  &
                                  nl*theta_ref 
-          case( ITEST_COLD_BUBBLE )   ! Density current test
+          case( idealised_test_cold_bubble )   ! Density current test
             theta(map(df) + k) = theta_ref     
             l = sqrt( ((x(1)-XC)/XR)**2 + ((x(3)-ZC_cold)/ZR)**2 )
             if ( l <= 1.0_r_def ) then
               dt =  15.0_r_def/2.0_r_def*(cos(PI*l)+1.0_r_def)
               theta(map(df) + k) = theta_ref - dt/exner_ref
             end if 
-          case( ITEST_WARM_BUBBLE )   ! Warm bubble test
-            theta(map(df) + k) = theta_ref       
+          case( idealised_test_warm_bubble )   ! Warm bubble test
+            theta(map(df) + k) = theta_ref
             l = sqrt( ((x(1)-XC))**2 + ((x(3)-ZC_hot))**2 )
             if ( l <= 50.0_r_def ) then
               dt = 0.5_r_def
@@ -163,7 +168,7 @@ subroutine initial_theta_code(nlayers, &
     end do
 
   end if
-  
+
 end subroutine initial_theta_code
 
 end module initial_theta_kernel_mod

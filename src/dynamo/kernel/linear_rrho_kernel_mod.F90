@@ -17,15 +17,18 @@
 !>@deprecated The Usefulness of the linear model is to be revaluated at 
 !>            the end of the Gung-Ho project and removied if possible
 module linear_rrho_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_READ, GH_WRITE,             &
-                                    W0, W2, W3,                              &
-                                    GH_BASIS, GH_DIFF_BASIS,                 &
-                                    CELLS 
-use constants_mod,           only : GRAVITY, r_def
-use initialisation_mod,      only : itest_option, n_sq 
-use reference_profile_mod,   only : reference_profile
+
+use argument_mod,                   only : arg_type, func_type,         &
+                                           GH_FIELD, GH_READ, GH_WRITE, &
+                                           W0, W2, W3,                  &
+                                           GH_BASIS, GH_DIFF_BASIS,     &
+                                           CELLS
+use constants_mod,                  only : r_def
+use idealised_config_mod,           only : test
+use initial_temperature_config_mod, only : bvf_square
+use kernel_mod,                     only : kernel_type
+use planet_config_mod,              only : gravity
+use reference_profile_mod,          only : reference_profile
 
 implicit none
 
@@ -102,9 +105,9 @@ subroutine linear_rrho_code(nlayers,                                            
                             ndf_w2, undf_w2, map_w2, w2_basis, w2_diff_basis,         &
                             ndf_w0, undf_w0, map_w0, w0_basis, w0_diff_basis,         &
                             nqp_h, nqp_v, wqp_h, wqp_v         )
-                             
-  use coordinate_jacobian_mod, only: coordinate_jacobian                    
-  
+
+  use coordinate_jacobian_mod, only: coordinate_jacobian
+
   !Arguments
   integer, intent(in) :: nlayers, nqp_h, nqp_v
   integer, intent(in) :: ndf_w0, ndf_w2, ndf_w3
@@ -113,11 +116,11 @@ subroutine linear_rrho_code(nlayers,                                            
   integer, dimension(ndf_w2), intent(in) :: map_w2
   integer, dimension(ndf_w0), intent(in) :: map_w0
 
-  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis  
-  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis 
+  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v), intent(in) :: w3_basis
+  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis
+  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis
   real(kind=r_def), dimension(1,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_diff_basis
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis 
+  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis
 
   real(kind=r_def), dimension(undf_w3), intent(inout) :: r_rho
   real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3, phi
@@ -129,7 +132,7 @@ subroutine linear_rrho_code(nlayers,                                            
   !Internal variables
   integer               :: df, k, loc 
   integer               :: qp1, qp2
-  
+
   real(kind=r_def), dimension(ndf_w0)           :: chi_1_e, chi_2_e, chi_3_e, phi_e
   real(kind=r_def), dimension(ndf_w2)           :: u_e
   real(kind=r_def), dimension(nqp_h,nqp_v)        :: dj
@@ -171,17 +174,17 @@ subroutine linear_rrho_code(nlayers,                                            
                               + phi_e(df)*w0_diff_basis(:,df,qp1,qp2)
         end do
         call reference_profile(exner_s_at_quad, rho_s_at_quad, & 
-                               theta_s_at_quad, x_at_quad, itest_option)
+                               theta_s_at_quad, x_at_quad, test)
         u_at_quad(:) = 0.0_r_def
         div_u_at_quad = 0.0_r_def
         do df = 1, ndf_w2
           u_at_quad(:)  = u_at_quad(:)  + u_e(df)*w2_basis(:,df,qp1,qp2)
           div_u_at_quad = div_u_at_quad + u_e(df)*w2_diff_basis(1,df,qp1,qp2)
         end do
-       
+
         div_term  =  - rho_s_at_quad*div_u_at_quad 
-        vec_term = dot_product(u_at_quad,grad_phi_at_quad)/GRAVITY
-        buoy_term = n_sq/GRAVITY*rho_s_at_quad*vec_term
+        vec_term = dot_product(u_at_quad,grad_phi_at_quad)/gravity
+        buoy_term = bvf_square/gravity*rho_s_at_quad*vec_term
 
         do df = 1, ndf_w3
           rrho_e(df) = rrho_e(df) + wqp_h(qp1)*wqp_v(qp2)*w3_basis(1,df,qp1,qp2)*( buoy_term + div_term )
@@ -192,7 +195,7 @@ subroutine linear_rrho_code(nlayers,                                            
       r_rho( map_w3(df) + k ) =  rrho_e(df)
     end do 
   end do
-  
+
 end subroutine linear_rrho_code
 
 end module linear_rrho_kernel_mod

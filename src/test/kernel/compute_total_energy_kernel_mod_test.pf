@@ -40,14 +40,23 @@ module compute_total_energy_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only: reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_planet_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -66,7 +75,9 @@ contains
     integer(i_def) :: undf_w0, undf_w2, undf_w3
     integer(i_def) :: dim_w0, diff_dim_w0, dim_w2, dim_w3
 
-    reference_element = QUAD
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type(3, GAUSSIAN)
@@ -133,9 +144,6 @@ contains
 
     use calc_exner_pointwise_mod,        only : calc_exner_pointwise
     use compute_total_energy_kernel_mod, only : compute_total_energy_code
-    use configuration_mod,               only : earth_radius
-    use constants_mod,                   only : GRAVITY, Cv
-    use quadrature_mod,             only : quadrature_type, GAUSSIAN
 
     implicit none
 
@@ -177,6 +185,7 @@ contains
     real(kind=r_def), pointer :: zp(:) => null()
     real(kind=r_def), pointer :: wh(:), wv(:) => null()
     real(kind=r_def) :: exner
+    real(r_def) :: cv
 
     qr  = quadrature_type(3,GAUSSIAN)
 
@@ -248,7 +257,7 @@ contains
     rho_proxy%data(:)   = 1.0_r_def
     theta_proxy%data(:) = 300.0_r_def
     energy_proxy%data(:) = 0.0_r_def
-    phi_proxy%data(:)   = GRAVITY*chi_proxy(3)%data(:)
+    phi_proxy%data(:)   = gravity*chi_proxy(3)%data(:)
 
     map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
     map_w2 => u_proxy%vspace%get_cell_dofmap( cell )
@@ -275,9 +284,10 @@ contains
 
     ! This is only testing the vertical component of vorticity
     exner =  calc_exner_pointwise(rho_proxy%data(1), theta_proxy%data(1))
+    cv = cp - rd
     answer = rho_proxy%data(1)                                       &
-             * (GRAVITY*0.5_r_def*dz + Cv*theta_proxy%data(1)*exner) &
-             * dx*dy*dz/earth_radius**2
+             * (gravity*0.5_r_def*dz + Cv*theta_proxy%data(1)*exner) &
+             * dx*dy*dz/radius**2
     @assertEqual(answer, energy_proxy%data(map_w3(1)), tol)
 
   end subroutine test_all

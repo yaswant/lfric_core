@@ -21,22 +21,43 @@ module analytic_wind_profiles_mod_test
   type, extends(TestCase) :: analytic_wind_profiles_test_type
     private
   contains
+    procedure setUp
     procedure test_all
   end type analytic_wind_profiles_test_type
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    use frig_config_mod, only : frig_planet_config
+
+    implicit none
+
+    class(analytic_wind_profiles_test_type), intent(inout) :: this
+
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+  end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   @test
   subroutine test_all( this )
 
-    use constants_mod,              only: PI
-    use configuration_mod,          only: earth_radius
     use analytic_wind_profiles_mod, only: analytic_wind
-    use initialisation_mod,         only: ZERO_WIND,                &
-                                          SOLID_BODY_ROTATION_WIND, &
-                                          CONSTANT_UV_WIND,         &
-                                          CONSTANT_SHEAR_UV_WIND
+    use constants_mod,              only: PI
+    use initial_wind_config_mod, &
+                         only: initial_wind_profile_solid_body_rotation, &
+                               initial_wind_profile_constant_shear_uv
+
     implicit none
 
     class(analytic_wind_profiles_test_type), intent(inout) :: this
@@ -44,12 +65,12 @@ contains
     real(kind=r_def) :: u(3), v(3), llr(3), xyz(3)
     real(kind=r_def) :: u0, v0, a, h
 
-    llr = (/ PI, PI/4.0_r_def, earth_radius + 10000.0_r_def /)
+    llr = (/ PI, PI/4.0_r_def, radius + 10000.0_r_def /)
     xyz = (/ 1000.0_r_def, 75000.0_r_def, 5000.0_r_def /)
     u0 = 20.0_r_def
     a = PI/8.0_r_def
 
-    u = analytic_wind(llr, SOLID_BODY_ROTATION_WIND, 2, (/ u0, a /))
+    u = analytic_wind(llr, initial_wind_profile_solid_body_rotation, 2, (/ u0, a /))
 
     v(1) = u0 * ( cos(llr(2))*cos(a) &
                 + sin(llr(1))*sin(llr(2))*sin(a) )
@@ -60,7 +81,7 @@ contains
 
     v0 = 5.0_r_def
     h = 30000.0_r_def
-    u = analytic_wind(xyz, CONSTANT_SHEAR_UV_WIND, 3, (/ u0, v0, h /))
+    u = analytic_wind(xyz, initial_wind_profile_constant_shear_uv, 3, (/ u0, v0, h /))
     v(1) = u0*xyz(3)/h
     v(2) = v0*xyz(3)/h
     v(3) = 0.0_r_def 

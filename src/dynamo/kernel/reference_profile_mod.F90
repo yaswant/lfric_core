@@ -8,15 +8,18 @@
 !-------------------------------------------------------------------------------
 !> @brief Module for computing a linear hydrostatially balanced reference state
 module reference_profile_mod
-use constants_mod,                 only: r_def, i_def, GRAVITY, Cp, Rd, &
-                                         KAPPA, P_ZERO  
-use configuration_mod,             only: earth_radius, l_spherical          
-use initialisation_mod,            only: ITEST_GRAVITY_WAVE, &
-                                         ITEST_COLD_BUBBLE, &
-                                         ITEST_WARM_BUBBLE, &
-                                         n_sq
-use coord_transform_mod,           only: xyz2llr 
-use generate_global_gw_fields_mod, only: generate_global_gw_fields
+
+use base_mesh_config_mod,           only : geometry, &
+                                           base_mesh_geometry_spherical
+use constants_mod,                  only : r_def, i_def
+use coord_transform_mod,            only : xyz2llr
+use generate_global_gw_fields_mod,  only : generate_global_gw_fields
+use idealised_config_mod,           only : idealised_test_gravity_wave, &
+                                           idealised_test_cold_bubble,  &
+                                           idealised_test_warm_bubble
+use initial_temperature_config_mod, only : bvf_square
+use planet_config_mod,              only : scaled_radius, gravity, Cp, Rd, &
+                                           kappa, p_zero
 
 implicit none
 
@@ -42,11 +45,11 @@ real(kind=r_def), parameter :: EXNER_SURF = 1.0_r_def
 real(kind=r_def)            :: nsq_over_g, z, u_s(3), lat, lon, r
 
 
-if ( l_spherical ) then  ! SPHERICAL DOMAIN  
+if ( geometry == base_mesh_geometry_spherical ) then  ! SPHERICAL DOMAIN
 
   ! Gravity wave test only for now
   call xyz2llr(x(1),x(2),x(3),lon,lat,r)
-  z = r - earth_radius
+  z = r - scaled_radius
   call generate_global_gw_fields (lat, z, exner_s, u_s, theta_s, rho_s)
 
 else                     ! BIPERIODIC PLANE DOMAIN
@@ -54,20 +57,20 @@ else                     ! BIPERIODIC PLANE DOMAIN
   z = x(3)
   ! Calculate theta and exner for each biperiodic test
   select case( itest_option )
-    case( ITEST_GRAVITY_WAVE )  ! Gravity wave test
-      nsq_over_g = n_sq/GRAVITY
+    case( idealised_test_gravity_wave )  ! Gravity wave test
+      nsq_over_g = bvf_square/gravity
       theta_s = THETA_SURF * exp ( nsq_over_g * z )
-      exner_s = EXNER_SURF - GRAVITY**2/(Cp*THETA_SURF*n_sq)   &
+      exner_s = EXNER_SURF - gravity**2/(Cp*THETA_SURF*bvf_square)   &
                 * (1.0_r_def - exp ( - nsq_over_g * z ))
-    case( ITEST_COLD_BUBBLE )   ! Density current test
+    case( idealised_test_cold_bubble )   ! Density current test
       theta_s = theta_surf
-      exner_s = exner_surf - GRAVITY/(Cp*THETA_SURF)*z
-    case( ITEST_WARM_BUBBLE )   ! Warm bubble test
+      exner_s = exner_surf - gravity/(Cp*THETA_SURF)*z
+    case( idealised_test_warm_bubble )   ! Warm bubble test
       theta_s = theta_surf
-      exner_s = exner_surf - GRAVITY/(Cp*THETA_SURF_HOT)*z
+      exner_s = exner_surf - gravity/(Cp*THETA_SURF_HOT)*z
   end select
   ! Calculate rho for all biperiodic tests
-  rho_s   = P_ZERO/(Rd*theta_s) * exner_s ** ((1.0_r_def - KAPPA)/KAPPA)
+  rho_s   = p_zero/(Rd*theta_s) * exner_s ** ((1.0_r_def - kappa)/kappa)
 
 end if
 

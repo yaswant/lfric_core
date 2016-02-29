@@ -45,9 +45,10 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_finite_element_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -67,7 +68,11 @@ contains
 
     integer :: i
 
-    reference_element = QUAD
+    call frig_finite_element_config( finite_element_shape_quadrilateral, &
+                                     0,                                  &
+                                     .true. )
+
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr  = quadrature_type(3, GAUSSIAN)
@@ -126,8 +131,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use compute_div_operator_kernel_mod, &
-                                    only : compute_div_operator_code
+    use compute_div_operator_kernel_mod, only : compute_div_operator_code
 
     implicit none
 
@@ -171,7 +175,7 @@ contains
     do j = 1,3
       do i = 1,3
         map_chi => chi_p(1)%vspace%get_cell_dofmap( cell )
-        do k = 0,3          
+        do k = 0,3
           chi_p(1)%data(map_chi(1) + k) = real(i-1)*dx
           chi_p(2)%data(map_chi(1) + k) = real(j-1)*dy
           chi_p(3)%data(map_chi(1) + k) = real(k)  *dz
@@ -227,7 +231,7 @@ contains
                                     wh,                                &
                                     wv                                 &
                                     )
-    
+
     call div_operator(answer)
     @assertEqual(answer, div_p%local_stencil(:, :, 1 ), tol)
 

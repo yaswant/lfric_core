@@ -9,12 +9,14 @@
 
 !> @brief Kernel which computes the perturbation pressure gradient for lhs of the momentum equation
 module pert_pressure_gradient_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                 &
-                                    GH_FIELD, GH_READ, GH_INC,           &
-                                    W0, W2, W3, GH_BASIS, GH_DIFF_BASIS, &
-                                    CELLS 
-use constants_mod,           only : Cp, r_def, KAPPA
+
+use argument_mod,      only : arg_type, func_type,                 &
+                              GH_FIELD, GH_READ, GH_INC,           &
+                              W0, W2, W3, GH_BASIS, GH_DIFF_BASIS, &
+                              CELLS
+use constants_mod,     only : r_def
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : Cp, kappa
 
 implicit none
 
@@ -167,7 +169,7 @@ subroutine pert_pressure_gradient_code(nlayers,                                 
 
         exner_ref_at_quad = calc_exner_pointwise(rho_ref_at_quad, &
                                                  theta_ref_at_quad)
-        exner_at_quad = (KAPPA/(1.0_r_def - KAPPA))*exner_ref_at_quad &
+        exner_at_quad = (kappa/(1.0_r_def - kappa))*exner_ref_at_quad &
                       *(theta_at_quad/theta_ref_at_quad &
                       + rho_at_quad/rho_ref_at_quad)
 
@@ -175,12 +177,12 @@ subroutine pert_pressure_gradient_code(nlayers,                                 
           v  = w2_basis(:,df,qp1,qp2)
           dv = w2_diff_basis(1,df,qp1,qp2)
           ! theta_prime * grad(exner_ref) term
-          grad_term = cp*exner_ref_at_quad * (                       &
+          grad_term = Cp*exner_ref_at_quad * (                       &
                       theta_at_quad * dv                             &
                     + dot_product( grad_theta_at_quad(:),v)          &
                                          )
           ! theta_ref * grad(exner_prime) term
-          grad_term = grad_term + cp*exner_at_quad * (               &
+          grad_term = grad_term + Cp*exner_at_quad * (               &
                       theta_ref_at_quad * dv                         &
                     + dot_product( grad_theta_ref_at_quad(:),v)      &
                                          )

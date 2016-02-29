@@ -44,9 +44,10 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_finite_element_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -66,7 +67,10 @@ contains
 
     integer :: i
 
-    reference_element = QUAD
+    call frig_finite_element_config( finite_element_shape_quadrilateral, &
+                                     0, .true. )
+
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr  = quadrature_type(3,GAUSSIAN)

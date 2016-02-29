@@ -30,14 +30,14 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use reference_element_mod, only: reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
     class(multiplicity_test_type), intent(inout) :: this
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
   end subroutine setUp

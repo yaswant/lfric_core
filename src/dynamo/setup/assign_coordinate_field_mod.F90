@@ -8,9 +8,12 @@
 !-------------------------------------------------------------------------------
 !> @brief Module to assign the values of the coordinates of the mesh to a field
 module assign_coordinate_field_mod
-  use constants_mod,     only: r_def
-  use configuration_mod, only: l_spherical, earth_radius 
-  use log_mod,           only: log_event, LOG_LEVEL_ERROR
+
+  use base_mesh_config_mod, only : geometry, &
+                                   base_mesh_geometry_spherical
+  use constants_mod,        only : r_def
+  use log_mod,              only : log_event, LOG_LEVEL_ERROR
+  use planet_config_mod,    only : scaled_radius
 
 contains
 !> @brief Subroutine which assigns the values of the coordinates of the mesh
@@ -33,7 +36,7 @@ contains
 
     type( mesh_type),   intent( in    ) :: mesh
     type( field_type ), intent( inout ) :: chi(3)
-    
+
     type( field_proxy_type )      :: chi_proxy(3)
     real(kind=r_def), pointer     :: dof_coords(:,:) => null()
     real(kind=r_def), allocatable :: vert_coords(:,:,:)
@@ -41,8 +44,8 @@ contains
     integer     :: cell
     integer     :: undf, ndf, nlayers
     integer     :: alloc_error
-    integer, pointer :: map(:) => null()    
- 
+    integer, pointer :: map(:) => null()
+
     ! Break encapsulation and get the proxy.
     chi_proxy(1) = chi(1)%get_proxy()
     chi_proxy(2) = chi(2)%get_proxy()
@@ -78,8 +81,8 @@ contains
                                vert_coords, &  
                                dof_coords, &
                                x_vert &
-                                        )                                     
-    end do       
+                                        )
+    end do
     ! Loop over all the cells
 
     deallocate ( dz, vert_coords )
@@ -101,7 +104,7 @@ contains
 !! @param[in]  chi_hat_vert  real array: (nverts,3)
   subroutine assign_coordinate(nlayers,ndf,nverts,undf,map,dz, & 
              chi_1,chi_2,chi_3,vertex_coords,chi_hat_node,chi_hat_vert)
-    
+
     ! Arguments
     integer, intent(in) :: nlayers, ndf, nverts, undf
     integer, intent(in) :: map(ndf)
@@ -113,14 +116,14 @@ contains
 
     ! Internal variables
     integer          :: k, df, dfk, vert
-    
+
     real(kind=r_def) :: interp_weight, x, y, z, radius_correction
 
     radius_correction = 1.0_r_def
-    
+
     ! Compute the representation of the coordinate field
     do k = 0, nlayers-1
-       do df = 1, ndf 
+       do df = 1, ndf
           ! Compute interpolation weights
           x = 0.0_r_def
           y = 0.0_r_def
@@ -130,15 +133,15 @@ contains
                    (1.0_r_def - abs(chi_hat_vert(vert,1) - chi_hat_node(1,df))) &
                   *(1.0_r_def - abs(chi_hat_vert(vert,2) - chi_hat_node(2,df))) &
                   *(1.0_r_def - abs(chi_hat_vert(vert,3) - chi_hat_node(3,df)))
-             
+
              x = x + interp_weight*vertex_coords(1,vert,k+1)
              y = y + interp_weight*vertex_coords(2,vert,k+1)
              z = z + interp_weight*vertex_coords(3,vert,k+1)
           end do
           ! For spherical domains we need to project x,y,z back onto 
           ! spherical shells
-          if ( l_spherical ) then
-             radius_correction = earth_radius + &
+          if ( geometry == base_mesh_geometry_spherical ) then
+             radius_correction = scaled_radius + &
                                  (real(k) + chi_hat_node(3,df))*dz(k+1)
              radius_correction = radius_correction/sqrt(x*x + y*y + z*z)
           end if
@@ -148,8 +151,7 @@ contains
           chi_3(dfk) = z*radius_correction
        end do
     end do
-  
+
   end subroutine assign_coordinate
-  
 
 end module assign_coordinate_field_mod

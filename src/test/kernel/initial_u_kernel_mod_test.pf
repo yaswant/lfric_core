@@ -37,14 +37,23 @@ module initial_u_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: u0             = 0.0_r_def
+  real(r_def), parameter :: v0             = 0.0_r_def
+  real(r_def), parameter :: rotation_angle = 0.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : l_spherical, QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config, &
+                                          frig_initial_wind_config
+    use initial_wind_config_mod,   only : initial_wind_profile_none
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -65,9 +74,14 @@ contains
 
     integer :: i
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
+    call frig_initial_wind_config( initial_wind_profile_none, &
+                                   u0, v0, rotation_angle )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )

@@ -17,15 +17,18 @@
 !>@deprecated The Usefulness of the linear model is to be revaluated at 
 !>            the end of the Gung-Ho project and removied if possible
 module linear_rtheta_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_READ, GH_INC,               &
-                                    W0, W2,                                  &
-                                    GH_BASIS, GH_DIFF_BASIS,                 &
-                                    CELLS
-use constants_mod,           only : r_def, GRAVITY
-use initialisation_mod,      only : itest_option, n_sq
-use reference_profile_mod,   only : reference_profile
+
+use argument_mod,                   only : arg_type, func_type,       &
+                                           GH_FIELD, GH_READ, GH_INC, &
+                                           W0, W2,                    &
+                                           GH_BASIS, GH_DIFF_BASIS,   &
+                                           CELLS
+use constants_mod,                  only : r_def
+use idealised_config_mod,           only : test
+use initial_temperature_config_mod, only : bvf_square
+use kernel_mod,                     only : kernel_type
+use planet_config_mod,              only : gravity
+use reference_profile_mod,          only : reference_profile
 
 implicit none
 
@@ -87,9 +90,9 @@ subroutine linear_rtheta_code(nlayers,                                         &
                               ndf_w0, undf_w0, map_w0, w0_basis, w0_diff_basis,&
                               ndf_w2, undf_w2, map_w2, w2_basis,               &
                               nqp_h, nqp_v, wqp_h, wqp_v )
-                               
-  use coordinate_jacobian_mod, only: coordinate_jacobian                             
-  
+
+  use coordinate_jacobian_mod, only: coordinate_jacobian
+
   !Arguments
   integer, intent(in) :: nlayers, nqp_h, nqp_v
   integer, intent(in) :: ndf_w0, ndf_w2, undf_w0, undf_w2
@@ -97,9 +100,9 @@ subroutine linear_rtheta_code(nlayers,                                         &
   integer, dimension(ndf_w0), intent(in) :: map_w0
   integer, dimension(ndf_w2), intent(in) :: map_w2
 
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis  
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis  
-  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
+  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis
+  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis
+  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis
 
   real(kind=r_def), dimension(undf_w0), intent(inout) :: r_theta
   real(kind=r_def), dimension(undf_w0), intent(in)    :: chi_1, chi_2, chi_3, phi
@@ -111,15 +114,15 @@ subroutine linear_rtheta_code(nlayers,                                         &
   !Internal variables
   integer               :: df, k, loc 
   integer               :: qp1, qp2
-  
+
   real(kind=r_def), dimension(ndf_w0) :: chi_1_e, chi_2_e, chi_3_e
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
   real(kind=r_def) :: rtheta_e(ndf_w0),  u_e(ndf_w2), phi_e(ndf_w0)
   real(kind=r_def) :: u_at_quad(3), x_at_quad(3), grad_phi_at_quad(3)
-  real(kind=r_def) :: theta_s_at_quad, exner_s_at_quad, rho_s_at_quad                    
+  real(kind=r_def) :: theta_s_at_quad, exner_s_at_quad, rho_s_at_quad
   real(kind=r_def) :: buoy_term, vec_term
-  
+
   do k = 0, nlayers-1
   ! Extract element arrays of chi
     do df = 1, ndf_w0
@@ -152,10 +155,10 @@ subroutine linear_rtheta_code(nlayers,                                         &
                               + phi_e(df)*w0_diff_basis(:,df,qp1,qp2)
         end do
         call reference_profile(exner_s_at_quad, rho_s_at_quad, &
-                               theta_s_at_quad, x_at_quad, itest_option)
+                               theta_s_at_quad, x_at_quad, test)
 
-        vec_term = dot_product(u_at_quad,grad_phi_at_quad)/GRAVITY
-        buoy_term = -n_sq/GRAVITY*theta_s_at_quad*vec_term
+        vec_term = dot_product(u_at_quad,grad_phi_at_quad)/gravity
+        buoy_term = -bvf_square/gravity*theta_s_at_quad*vec_term
 
         do df = 1, ndf_w0
           rtheta_e(df) = rtheta_e(df) + wqp_h(qp1)*wqp_v(qp2)*w0_basis(1,df,qp1,qp2)*buoy_term
@@ -164,9 +167,9 @@ subroutine linear_rtheta_code(nlayers,                                         &
     end do
     do df = 1, ndf_w0
       r_theta( map_w0(df) + k ) =  r_theta( map_w0(df) + k ) + rtheta_e(df)
-    end do 
+    end do
   end do
-  
+
 end subroutine linear_rtheta_code
 
 end module linear_rtheta_kernel_mod

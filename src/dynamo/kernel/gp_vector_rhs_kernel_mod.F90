@@ -8,14 +8,20 @@
 !> @brief Kernel which projects the components of a vector field into a scalar space 
 
 module gp_vector_rhs_kernel_mod
-use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def
+
 use argument_mod,            only : arg_type, func_type,           &
                                     GH_FIELD, GH_INC, GH_READ,     &
                                     W0, W2, ANY_SPACE_1,           &
                                     ANY_SPACE_2,                   &
                                     GH_BASIS, GH_DIFF_BASIS,       &
                                     CELLS
+use base_mesh_config_mod,    only : geometry, &
+                                    base_mesh_geometry_spherical
+use constants_mod,           only : r_def
+use coordinate_jacobian_mod, only : coordinate_jacobian, &
+                                    coordinate_jacobian_inverse
+use coord_transform_mod,     only : cart2sphere_vector
+use kernel_mod,              only : kernel_type
 
 implicit none
 
@@ -97,12 +103,6 @@ subroutine gp_vector_rhs_code(nlayers, &
                               ndf_w2, undf_w2, map_w2, &
                               nqp_h, nqp_v, wqp_h, wqp_v &
                              )
-                       
-  use coordinate_jacobian_mod, only: coordinate_jacobian, &
-                                     coordinate_jacobian_inverse
-  use configuration_mod,       only: l_spherical
-  use coord_transform_mod,     only: cart2sphere_vector
-                         
 
   !Arguments
   integer, intent(in) :: nlayers, ndf, ndf_f, ndf_chi, ndf_w2
@@ -128,7 +128,7 @@ subroutine gp_vector_rhs_code(nlayers, &
 
   real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
-  
+
   !Internal variables
   integer                                      :: df, df2, k, qp1, qp2
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
@@ -162,8 +162,8 @@ subroutine gp_vector_rhs_code(nlayers, &
                              dj)
     if ( .not. hdiv) call coordinate_jacobian_inverse(nqp_h, nqp_v, &
                                                       jacobian, dj, &
-                                                      jacobian_inv)  
- 
+                                                      jacobian_inv)
+
     do df = 1, ndf
       do qp2 = 1, nqp_v
         do qp1 = 1, nqp_h
@@ -171,17 +171,17 @@ subroutine gp_vector_rhs_code(nlayers, &
           u_at_quad(:) = 0.0_r_def
           do df2 = 1,ndf_f
             u_at_quad(:) = u_at_quad(:) &
-                         + f_basis(:,df2,qp1,qp2)*field(map_f(df2) + k) 
+                         + f_basis(:,df2,qp1,qp2)*field(map_f(df2) + k)
           end do
-          if ( hdiv ) then           
-            ! For W2 space 
+          if ( hdiv ) then
+            ! For W2 space
             u_at_quad(:) = matmul(jacobian(:,:,qp1,qp2),u_at_quad(:))/dj(qp1,qp2)
           else
             ! For W1 space
             u_at_quad(:) = matmul(transpose(jacobian_inv(:,:,qp1,qp2)),u_at_quad(:))
           end if
-          ! Compute physical coordinate of quadrature point   
-          if ( l_spherical ) then
+          ! Compute physical coordinate of quadrature point
+          if ( geometry == base_mesh_geometry_spherical ) then
             x_at_quad(:) = 0.0_r_def
             do df2 = 1,ndf_chi
               x_at_quad(1) = x_at_quad(1) + chi_1_cell(df2)*chi_basis(1,df2,qp1,qp2)
@@ -191,16 +191,16 @@ subroutine gp_vector_rhs_code(nlayers, &
             u_physical(:) = cart2sphere_vector(x_at_quad, u_at_quad)
           else
             u_physical(:) = u_at_quad(:)
-          end if   
+          end if
           integrand = wqp_h(qp1)*wqp_v(qp2)*basis(1,df,qp1,qp2)*dj(qp1,qp2)
-          rhs1(map(df) + k) = rhs1(map(df) + k) + integrand * u_physical(1) 
+          rhs1(map(df) + k) = rhs1(map(df) + k) + integrand * u_physical(1)
           rhs2(map(df) + k) = rhs2(map(df) + k) + integrand * u_physical(2)
           rhs3(map(df) + k) = rhs3(map(df) + k) + integrand * u_physical(3)
         end do
       end do
     end do
   end do
-  
+
 end subroutine gp_vector_rhs_code
 
 end module gp_vector_rhs_kernel_mod

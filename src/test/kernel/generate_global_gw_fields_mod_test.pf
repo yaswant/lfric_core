@@ -25,18 +25,30 @@ module generate_global_gw_fields_mod_test
     procedure test_all
   end type generate_global_gw_fields_test_type
 
+  real(r_def), parameter :: bvf_square = 0.0001_r_def
+
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use initialisation_mod, only : n_sq
+    use frig_config_mod, only : frig_initial_temperature_config, &
+                                frig_planet_config
 
     implicit none
 
     class(generate_global_gw_fields_test_type), intent(inout) :: this
 
-    n_sq = 0.0001_r_def
+    call frig_initial_temperature_config( bvf_square )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
   end subroutine setUp
 
@@ -44,7 +56,6 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,                 only: Rd, P_ZERO
     use generate_global_gw_fields_mod, only: generate_global_gw_fields
 
     class(generate_global_gw_fields_test_type), intent(inout) :: this
@@ -61,7 +72,7 @@ contains
     call generate_global_gw_fields(lat, z, exner, u, theta, rho)
 
     exner_ans = 1.0_r_def
-    rho_ans   = P_ZERO/(Rd*300.0_r_def)
+    rho_ans   = p_zero/(Rd*300.0_r_def)
     theta_ans = 300.0_r_def
     u_ans(:)  = 0.0_r_def
 

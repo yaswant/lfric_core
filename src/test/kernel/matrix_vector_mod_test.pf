@@ -7,15 +7,19 @@
 !
 !-------------------------------------------------------------------------------
 module matrix_vector_mod_test
-  implicit none 
+
+  use constants_mod, only : r_def
+  use pFUnit_Mod
+
+  implicit none
 
 contains
 
   @test
   subroutine test_of_matrix_vector()
-    use pFUnit_Mod
-    use matrix_vector_mod, only : matrix_vector_code
-    use constants_mod,     only : r_def
+
+    use matrix_vector_kernel_mod, only : matrix_vector_code
+
     implicit none
 
     real(kind=r_def) :: d(4,2), x(2), y(4), answer(4)
@@ -32,7 +36,7 @@ contains
     ! lhs vector
     y(:) = 0.0_r_def
     answer = matmul(d,x)
-    
+
     call matrix_vector_code(1, &
                             1, &
                             y, &

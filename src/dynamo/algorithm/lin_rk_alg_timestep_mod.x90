@@ -19,9 +19,11 @@ module lin_rk_alg_timestep_mod
                                LOG_LEVEL_INFO, LOG_LEVEL_TRACE
   use constants_mod,     only: r_def, str_max_filename
 
-  ! Configuration and restart/checkpoint options 
-  use configuration_mod,   only: solver_option, dt, element_order
-  use restart_control_mod, only: restart_type
+  ! Configuration and restart/checkpoint options
+  use finite_element_config_mod, only : element_order
+  use restart_control_mod,       only : restart_type
+  use solver_config_mod,         only : method
+  use timestepping_config_mod,   only : dt
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,     only: invoke_copy_field_data,                          &
@@ -247,11 +249,11 @@ contains
 
         ! Invert mass matrices
         call solver_algorithm(theta_inc, r_theta, mesh, chi, &
-                              solver_option, mm=mm_w0)
+                              method, mm=mm_w0)
         call solver_algorithm(u_inc,     r_u,     mesh, chi, &
-                              solver_option, mm=mm_w2)
+                              method, mm=mm_w2)
         call solver_algorithm(rho_inc,   r_rho,   mesh, chi, &
-                              solver_option, qr=qr)
+                              method, qr=qr)
 
         ! Add increments
         ! PSY call invoke ( axpy(dt, theta_inc, theta_n, theta))

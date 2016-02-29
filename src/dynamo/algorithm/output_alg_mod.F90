@@ -6,24 +6,22 @@
 !-------------------------------------------------------------------------------
 !> @brief Algorithm to process and dump fields to file
 module output_alg_mod
-  
+
   use constants_mod,                     only: r_def, str_max_filename
-  use mesh_mod,                          only: mesh_type
-  use field_mod,                         only: field_type
-  use function_space_mod,                only: function_space_type
-  use operator_mod,                      only: operator_type
-  use restart_control_mod,               only: restart_type
-
-  use galerkin_projection_algorithm_mod, only: galerkin_projection_algorithm
   use driver_layer,                      only: interpolated_output
-  use configuration_mod,                 only: write_nodal_output,        &
-                                               write_interpolated_output, &
-                                               element_order
-  use nodal_output_alg_mod,              only: nodal_output_alg
-
-  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
-  use psykal_lite_mod,                   only: invoke_set_field_scalar
+  use field_mod,                         only: field_type
+  use finite_element_config_mod,         only: element_order
   use fs_continuity_mod,                 only: W0, W3
+  use function_space_mod,                only: function_space_type
+  use galerkin_projection_algorithm_mod, only: galerkin_projection_algorithm
+  use mesh_mod,                          only: mesh_type
+  use nodal_output_alg_mod,              only: nodal_output_alg
+  use operator_mod,                      only: operator_type
+  use output_config_mod,                 only: write_nodal_output,        &
+                                               write_interpolated_output
+  use psykal_lite_mod,                   only: invoke_set_field_scalar
+  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
+  use restart_control_mod,               only: restart_type
 
   implicit none
 

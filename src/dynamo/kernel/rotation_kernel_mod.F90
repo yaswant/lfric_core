@@ -14,14 +14,15 @@
 !>         2\Omega \cross u
 !>         \Omega is the rotation vector of the domain and u is the fluid velocity
 module rotation_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_READ, GH_INC,               &
-                                    W0, W2, GH_BASIS, GH_DIFF_BASIS,         &
-                                    CELLS
-use constants_mod,           only : cp, r_def
-use configuration_mod,       only : omega
-use cross_product_mod,       only : cross_product
+
+use argument_mod,      only : arg_type, func_type,                     &
+                              GH_FIELD, GH_READ, GH_INC,               &
+                              W0, W2, GH_BASIS, GH_DIFF_BASIS,         &
+                              CELLS
+use constants_mod,     only : r_def
+use cross_product_mod, only : cross_product
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : scaled_omega
 
 implicit none
 
@@ -51,7 +52,7 @@ end type
 
 ! overload the default strotationcture constrotationctor for function space
 interface rotation_kernel_type
-   module procedure rotation_kernel_constrotationctor
+   module procedure rotation_kernel_constructor
 end interface
 
 !-------------------------------------------------------------------------------
@@ -60,9 +61,9 @@ end interface
 public rotation_code
 contains
 
-type(rotation_kernel_type) function rotation_kernel_constrotationctor() result(self)
+type(rotation_kernel_type) function rotation_kernel_constructor() result(self)
   return
-end function rotation_kernel_constrotationctor
+end function rotation_kernel_constructor
 
 !> @brief The subroutine which is called directly by the Psy layer
 !! @param[in] nlayers Integer the number of layers
@@ -93,10 +94,12 @@ subroutine rotation_code(nlayers,                                              &
                          nqp_h, nqp_v, wqp_h, wqp_v                            &
                          )
 
-  use coordinate_jacobian_mod,  only: coordinate_jacobian
-  use configuration_mod,        only: l_spherical, f_lat
-  use rotation_vector_mod,      only: rotation_vector_fplane,  &
-                                      rotation_vector_sphere
+  use base_mesh_config_mod,    only: geometry,                     &
+                                     base_mesh_geometry_spherical, &
+                                     f_lat
+  use coordinate_jacobian_mod, only: coordinate_jacobian
+  use rotation_vector_mod,     only: rotation_vector_fplane,  &
+                                     rotation_vector_sphere
 
   !Arguments
   integer, intent(in) :: nlayers, nqp_h, nqp_v
@@ -141,11 +144,11 @@ subroutine rotation_code(nlayers,                                              &
     end do
 
     ! Calculate rotation vector Omega = (0, 2*cos(lat), 2*sin(lat)) and Jacobian
-    if ( l_spherical ) then
+    if ( geometry == base_mesh_geometry_spherical ) then
       call rotation_vector_sphere(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e,      &
                               chi_3_e, w0_basis, rotation_vector)
     else
-      call rotation_vector_fplane(nqp_h, nqp_v, omega, f_lat, rotation_vector)
+      call rotation_vector_fplane(nqp_h, nqp_v, scaled_omega, f_lat, rotation_vector)
     end if
     call coordinate_jacobian(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e,  &
                              w0_diff_basis, jac, dj)

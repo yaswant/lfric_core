@@ -20,37 +20,37 @@
 
 program dynamo
 
+  use assign_coordinate_field_mod,    only : assign_coordinate_field
+  use constants_mod,                  only : i_def, str_max_filename
+  use dynamo_mod,                     only : load_configuration, &
+                                             process_commandline
   use ESMF
-  use constants_mod,           only : i_def, str_max_filename
-  use configuration_mod,       only : configure_dynamo,           &
-                                      l_nonlinear, element_order, &
-                                      ITIMESTEP_SEMI_IMPLICIT,    &
-                                      ITIMESTEP_RK_SSP3,          &     
-                                      itimestep_option   
-  use init_prognostic_fields_alg_mod, &
-                               only : init_prognostic_fields_alg
-  use iter_timestep_alg_mod,   only : iter_timestep_alg
-  use rk_alg_timestep_mod,     only : rk_alg_timestep
-  use lin_rk_alg_timestep_mod, only : lin_rk_alg_timestep
-  use field_mod,               only : field_type
-  use set_up_mod,              only : set_up
-  use assign_coordinate_field_mod, only : assign_coordinate_field
-  use field_io_mod,            only : write_state_netcdf                      &
-                                    , write_state_plain_text                  &
-                                    , read_state_netcdf
-  use restart_control_mod,     only : restart_type
-  
-  use log_mod,                 only : log_event,         &
-                                      log_set_level,     &
-                                      log_scratch_space, &
-                                      LOG_LEVEL_ERROR,   &
-                                      LOG_LEVEL_INFO,    &
-                                      LOG_LEVEL_DEBUG,   &
-                                      LOG_LEVEL_TRACE
-
-  use mesh_mod,                only: mesh_type
-  use function_space_mod,      only: function_space_type
-  use fs_continuity_mod,       only: W0, W1, W2, W3, Wtheta, W2V, W2H
+  use field_io_mod,                   only : write_state_netcdf,     &
+                                             write_state_plain_text, &
+                                             read_state_netcdf
+  use field_mod,                      only : field_type
+  use finite_element_config_mod,      only : element_order
+  use formulation_config_mod,         only : nonlinear
+  use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta, W2V, W2H
+  use function_space_mod,             only : function_space_type
+  use init_prognostic_fields_alg_mod, only : init_prognostic_fields_alg
+  use iter_timestep_alg_mod,          only : iter_timestep_alg
+  use lin_rk_alg_timestep_mod,        only : lin_rk_alg_timestep
+  use log_mod,                        only : log_event,         &
+                                             log_set_level,     &
+                                             log_scratch_space, &
+                                             LOG_LEVEL_ERROR,   &
+                                             LOG_LEVEL_INFO,    &
+                                             LOG_LEVEL_DEBUG,   &
+                                             LOG_LEVEL_TRACE
+  use mesh_mod,                       only : mesh_type
+  use restart_config_mod,             only : filename
+  use restart_control_mod,            only : restart_type
+  use rk_alg_timestep_mod,            only : rk_alg_timestep
+  use set_up_mod,                     only : set_up
+  use timestepping_config_mod,        only : method,                          &
+                                           timestepping_method_semi_implicit, &
+                                           timestepping_method_rk_ssp3
 
   implicit none
 
@@ -70,10 +70,6 @@ program dynamo
   integer :: rc
   integer :: total_ranks, local_rank
   integer :: petCount, localPET
-  integer( i_def )                 :: argument_index,  &
-                                      argument_length, &
-                                      argument_status
-  character( 6 )                   :: argument
   type(restart_type)               :: restart
 
   ! Initialise ESMF and get the rank information from the virtual machine
@@ -89,39 +85,10 @@ program dynamo
 
   call log_event( 'Dynamo running...', LOG_LEVEL_INFO )
 
-  ! Process command line arguments
-  cli_argument_loop: do argument_index = 1, command_argument_count()
+  call process_commandline()
+  call load_configuration()
 
-    call get_command_argument( argument_index,  &
-                               argument,        &
-                               argument_length, &
-                               argument_status )
-
-    if ( argument_status > 0 ) then
-      call log_event( 'Unable to retrieve command line argument', &
-                      LOG_LEVEL_ERROR )
-    else if ( argument_status < 0 ) then
-      write( log_scratch_space, '( A, A, A )' ) "Argument starting >", &
-                                                argument,              &
-                                                "< is too long"
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-    end if
-
-    if ( argument == '-debug' ) then
-      call log_set_level( LOG_LEVEL_TRACE )
-      call log_event( 'Switching to full debug output', LOG_LEVEL_DEBUG )
-    else
-      write( log_scratch_space, '( A, A, A )' ) "Unrecognised argument >", &
-                                                trim( argument ), &
-                                                "<"
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-    end if
-
-  end do cli_argument_loop 
-
-  ! Configure Dynamo
-  call log_event( "Dynamo: Calling configure_dynamo(restart)", LOG_LEVEL_INFO )
-  call configure_dynamo( restart, local_rank, total_ranks )
+  restart = restart_type( filename, local_rank, total_ranks )
 
   ! Set up mesh and element order
   call set_up(mesh, local_rank, total_ranks)
@@ -146,12 +113,12 @@ program dynamo
   call init_prognostic_fields_alg( mesh, chi, u, rho, theta, xi, restart)
 
   ! Run timestepping algorithms
-  if ( l_nonlinear ) then    ! Nonlinear timestepping options
+  if ( nonlinear ) then    ! Nonlinear timestepping options
 
-    select case( itimestep_option )
-      case( ITIMESTEP_SEMI_IMPLICIT )  ! Semi-Implicit 
+    select case( method )
+      case( timestepping_method_semi_implicit )  ! Semi-Implicit 
         call iter_timestep_alg( mesh, chi, u, rho, theta, xi, restart)
-      case( ITIMESTEP_RK_SSP3 )        ! RK SSP3
+      case( timestepping_method_rk_ssp3 )        ! RK SSP3
         call rk_alg_timestep( mesh, chi, u, rho, theta, xi, restart)
       case default
         call log_event("Dynamo: Incorrect time stepping option chosen, "// &
@@ -161,8 +128,8 @@ program dynamo
 
   else                       ! Linear timestepping options
 
-    select case( itimestep_option )
-      case( ITIMESTEP_RK_SSP3 )        ! RK SSP3
+    select case( method )
+      case( timestepping_method_rk_ssp3 )        ! RK SSP3
         call lin_rk_alg_timestep( mesh, chi, u, rho, theta, restart)
       case default
         call log_event("Dynamo: Only RK SSP3 available for linear equations. ", &
@@ -171,7 +138,7 @@ program dynamo
                        "stopping program! ",LOG_LEVEL_ERROR)
         stop
     end select
-        
+
   end if
 
   ! Do some i/o

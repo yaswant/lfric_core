@@ -17,9 +17,9 @@ import argparse
 import os.path
 import sys
 
-from dependencyanalysis import __version__
-import dependencyanalysis.database as database
-import dependencyanalysis.logging  as logging
+from dependerator import __version__
+import dependerator.database as database
+import utilities.logging  as logging
 
 ###############################################################################
 # Entry point
@@ -44,7 +44,8 @@ if __name__ == '__main__':
     else:
         logger = logging.NoLogger()
 
-    dependencyStore = database.Dependencies( args.database )
+    dependencyStore = database.SQLiteDatabase( args.database )
+    fortranDependencies = database.FortranDependencies( dependencyStore )
 
     sourceFiles = set()
     for key in args.sourceFiles:
@@ -54,10 +55,12 @@ if __name__ == '__main__':
                                                                     filename ) )
 
     usedSources = set()
-    for program, sourceBundle in dependencyStore.getProgramSourceList():
-        for sourceFile in sourceBundle:
-            usedSources.add( sourceFile )
-            logger.logEvent( 'Found usage of file {}'.format( sourceFile ) )
+    for unit, unitFilename, prerequisite, prerequisiteFilename \
+                                   in fortranDependencies.getAllDependencies():
+        usedSources.add( unitFilename )
+        usedSources.add( prerequisiteFilename )
+        logger.logEvent( 'Found usage of files {} and {}' \
+                                .format( unitFilename, prerequisiteFilename ) )
 
     sourceFiles = sourceFiles - usedSources
 

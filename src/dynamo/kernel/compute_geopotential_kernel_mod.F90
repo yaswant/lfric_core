@@ -13,14 +13,17 @@
 !!         domains
 
 module compute_geopotential_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                     &
-                                    GH_FIELD, GH_READ, GH_WRITE,             &
-                                    W0, GH_BASIS,                            &
-                                    CELLS
-use constants_mod,           only: r_def, GRAVITY 
-use coord_transform_mod,     only: xyz2llr
-use configuration_mod,       only: l_spherical
+
+use argument_mod,         only : arg_type, func_type,                     &
+                                 GH_FIELD, GH_READ, GH_WRITE,             &
+                                 W0, GH_BASIS,                            &
+                                 CELLS
+use base_mesh_config_mod, only : geometry, &
+                                 base_mesh_geometry_spherical
+use constants_mod,        only : r_def
+use coord_transform_mod,  only : xyz2llr
+use kernel_mod,           only : kernel_type
+use planet_config_mod,    only : gravity
 
 implicit none
 
@@ -69,7 +72,7 @@ end function compute_geopotential_kernel_constructor
 subroutine compute_geopotential_code(nlayers,phi, &
                                      chi_1,chi_2,chi_3, &
                                      ndf,undf,map)
-  
+
   !Arguments
   integer, intent(in) :: nlayers, ndf, undf
   integer, dimension(ndf), intent(in) :: map
@@ -82,8 +85,8 @@ subroutine compute_geopotential_code(nlayers,phi, &
   integer          :: df, k
   real(kind=r_def) :: x(3)
   real(kind=r_def) :: lat, lon, r
-   
-  if ( l_spherical ) then
+
+  if ( geometry == base_mesh_geometry_spherical ) then
     do k = 0, nlayers-1
       do df = 1, ndf
          x(1) = chi_1(map(df) + k)
@@ -91,17 +94,17 @@ subroutine compute_geopotential_code(nlayers,phi, &
          x(3) = chi_3(map(df) + k)
          call xyz2llr(x(1), x(2), x(3), lon, lat, r)
 
-         phi(map(df) + k) =  GRAVITY*r
+         phi(map(df) + k) =  gravity*r
        end do
     end do
   else
     do k = 0, nlayers-1
       do df = 1, ndf
-         phi(map(df) + k) = GRAVITY*chi_3(map(df) + k)         
+         phi(map(df) + k) = gravity*chi_3(map(df) + k)
       end do
     end do
   end if
-  
+
 end subroutine compute_geopotential_code
 
 end module compute_geopotential_kernel_mod

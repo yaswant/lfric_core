@@ -31,14 +31,26 @@ module compute_geopotential_kernel_mod_test
                        ndf     = 1, &
                        undf    = 1
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
+    use frig_config_mod, only : frig_planet_config
+
     implicit none
 
     class(compute_geopotential_kernel_test_type), intent(inout) :: this
+
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
     allocate( this%map(ndf), &
               this%x(undf),  &
@@ -63,9 +75,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,                   only : GRAVITY
     use compute_geopotential_kernel_mod, only : compute_geopotential_code
-    use configuration_mod,               only : earth_radius
 
     implicit none
 
@@ -73,19 +83,19 @@ contains
 
     real(r_def), parameter :: tol = 1.0e-12_r_def
 
-    real(r_def)          :: answer
+    real(r_def) :: answer
 
     this%map(1) = 1
     this%x(1) = 0.0_r_def
     this%y(1) = 0.0_r_def
-    this%z(1) = earth_radius
+    this%z(1) = radius
 
     call compute_geopotential_code( nlayers,                         &
                                    this%phi, this%x, this%y, this%z, &
                                    ndf, undf,                        &
                                    this%map )
 
-    answer = earth_radius*GRAVITY
+    answer = radius * gravity
 
     @assertEqual( answer, this%phi(1), tol )
 

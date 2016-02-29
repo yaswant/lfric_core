@@ -37,7 +37,9 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod, only : l_spherical
+    use base_mesh_config_mod, only : base_mesh_geometry_planar, &
+                                     base_mesh_partitioner_planar
+    use frig_config_mod,      only : frig_base_mesh_config
 
     implicit none
 
@@ -47,7 +49,10 @@ contains
 
     integer(i_def) :: nqp_h, nqp_v
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
 
     qr = quadrature_type(3, GAUSSIAN)
 

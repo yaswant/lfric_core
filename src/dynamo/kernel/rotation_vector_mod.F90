@@ -13,8 +13,9 @@
 !> the RHS of momentum equation on both F-PLANE and the SPHERE
 
 module rotation_vector_mod
+
 use constants_mod,     only: r_def
-use configuration_mod, only: omega
+use planet_config_mod, only: scaled_omega
 
 implicit none
 
@@ -96,8 +97,8 @@ do j = 1, ngp_v
     end do 
     call xyz2llr(x,y,z,long,lat,r)
     rotation_vec(1,i,j) = 0.0_r_def
-    rotation_vec(2,i,j) = 2.0_r_def*omega*cos(lat)
-    rotation_vec(3,i,j) = 2.0_r_def*omega*sin(lat)
+    rotation_vec(2,i,j) = 2.0_r_def*scaled_omega*cos(lat)
+    rotation_vec(3,i,j) = 2.0_r_def*scaled_omega*sin(lat)
 
     rotation_vec(:,i,j) = sphere2cart_vector( rotation_vec(:,i,j),(/long, lat, r/) )
   end do

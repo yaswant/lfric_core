@@ -6,15 +6,16 @@
 !-------------------------------------------------------------------------------
 module evaluate_output_field_mod
 
+use base_mesh_config_mod,    only: geometry, &
+                                   base_mesh_geometry_spherical
 use constants_mod,           only: r_def
-use configuration_mod,       only: l_spherical, earth_radius
-use field_mod,               only: field_type, field_proxy_type
 use coordinate_jacobian_mod, only: coordinate_jacobian, &
                                    coordinate_jacobian_inverse
-use mesh_mod,                only: mesh_type
 use coord_transform_mod,     only: cartesian_distance, llr2xyz
+use field_mod,               only: field_type, field_proxy_type
 use log_mod,                 only: log_event, LOG_LEVEL_ERROR
-
+use mesh_mod,                only: mesh_type
+use planet_config_mod,       only: scaled_radius
 
 implicit none
 
@@ -62,7 +63,7 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
 
   offset = 0.0_r_def
 
-  if ( l_spherical ) offset = earth_radius
+  if ( geometry == base_mesh_geometry_spherical ) offset = scaled_radius
 
   chi_proxy(1) = chi(1)%get_proxy()
   chi_proxy(2) = chi(2)%get_proxy()
@@ -106,14 +107,14 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
 ! First guess of out point in reference element
   x_out(:) = (/ 0.5_r_def, 0.5_r_def, 0.0_r_def /)
   x_loc(:) = x_in(:,1)
-  if ( l_spherical ) call llr2xyz( x_in(1,1), &
+  if ( geometry == base_mesh_geometry_spherical ) call llr2xyz( x_in(1,1), &
                                    x_in(2,1), &
                                    x_in(3,1) + offset, &
                                    x_loc(1),  &
                                    x_loc(2),  &
                                    x_loc(3))
 
-! Find location in computational space of point to evaluate field at  
+! Find location in computational space of point to evaluate field at
   do iter = 1,NEWTON_ITERS
     do df = 1,ndf
       dgamma(:,df) = chi_proxy(1)%vspace%evaluate_diff_basis(df, x_out)
@@ -138,8 +139,8 @@ subroutine evaluate_output_field( mesh, field, chi, x_in, cell, nz, field_out )
     end do
     x_out(:) = x_out(:) - matmul(jac_inv, g_func)
     x_out(3) = 0.0_r_def ! fixed to surface
-  end do    
-! Evaluate field at xi 
+  end do
+! Evaluate field at xi
   do k = 1,nz
   ! Find vertical xi point between 0 and 1 
     kk = out_layer(k)

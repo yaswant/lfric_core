@@ -22,10 +22,10 @@ import os
 import sys
 import traceback
 
-from dependencyanalysis import __version__
-import dependencyanalysis.database as database
-import dependencyanalysis.logging  as logging
-import dependencyanalysis.process  as process
+from dependerator import __version__
+import dependerator.database as database
+import dependerator.process  as process
+import utilities.logging  as logging
 
 ###############################################################################
 # Entry point
@@ -64,13 +64,28 @@ if __name__ == '__main__':
                                                         dependencies.db )
     if not args.objectdir: args.objectdir = outputDirectory
 
-    dependencyStore = database.Dependencies( args.database )
-    processor = process.Processor( logger, dependencyStore, \
-                                   args.objectdir, None )
+    dependencyBackend = database.SQLiteDatabase( args.database )
+    dependencyStore = database.FortranDependencies( dependencyBackend )
+    processor = process.FortranProcessor( logger, dependencyStore, \
+                                          args.objectdir, None )
 
     try:
         with open( args.output, 'w' ) as listFile:
-            processor.programObjects( listFile )
+            print('# Program objects', file=listFile)
+            programs = []
+            for program, objects in processor.determineProgramDependencies():
+                programs.append( program + '.o' )
+                text = '{program}_OBJS = {objects}'
+                objectFiles = [os.path.join( args.objectdir, leaf) for leaf in objects]
+                print( text.format( program=program.upper(),         \
+                                    objects=' '.join(objectFiles) ), \
+                       file=listFile )
+                print( file=listFile )
+
+            text = 'PROG_OBJS = {objects}'
+            objectFiles = [os.path.join( args.objectdir, leaf) for leaf in programs ]
+            print( text.format( objects = ' '.join(objectFiles) ), \
+                                file=listFile )
     except:
         os.unlink( args.output )
         traceback.print_exc(file=sys.stdout)

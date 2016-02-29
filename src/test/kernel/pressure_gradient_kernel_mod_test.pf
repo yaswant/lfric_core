@@ -41,15 +41,29 @@ module pressure_gradient_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: bvf_square = 0.0001_r_def
+
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : l_spherical, QUAD
-    use initialisation_mod,    only : n_sq
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config,           &
+                                          frig_initial_temperature_config, &
+                                          frig_planet_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -68,10 +82,14 @@ contains
     integer(i_def) :: undf_w0, undf_w2, undf_w3
     integer(i_def) :: dim_w0, diff_dim_w0, dim_w2, diff_dim_w2, dim_w3
 
-    l_spherical = .false.
-    n_sq        = 0.0001_r_def
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
+    call frig_initial_temperature_config( bvf_square )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )
@@ -139,7 +157,6 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,                only : GRAVITY
     use pressure_gradient_kernel_mod, only : pressure_gradient_code
 
     implicit none

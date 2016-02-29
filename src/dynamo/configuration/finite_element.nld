@@ -1,0 +1,12 @@
+namelist finite_element
+
+  shape         : enumeration[ triangle, quadrilateral ]
+  element_order : integer ! Order of the function space
+  rehabilitate  : logical ! Rehabilitation is the modification of mapping for
+                          ! the W3 space and the divergence mapping so that
+                          ! the correct order of accuracy is maintained on
+                          ! non-affine elements. For affine elements it is not
+                          ! required. This is included here as in the future
+                          ! we wish to move to not rehabiliating
+
+end namelist finite_element

@@ -1,0 +1,17 @@
+namelist initial_density
+    tracer_max        : real ! Maximum value of tracer
+    tracer_background : real ! Background value of tracer
+    PI : constant
+    r1 : real['PI/8.0_r_def'] ! Radius for one of the pair of initial tracer functions
+                            ! Biperiodic domain: in metres.
+                            ! Cubed sphere domain: in radians.
+    x1 : real['PI-PI/4.0_r_def'] ! Position for one of the pair of initial tracer functions
+                               ! Biperiodic domain: centre of the function given in terms of metres in the chi1 direction.
+                               ! Cubed sphere domain: longitudinal position of the centre of the function (a value between 0 and \f$2\pi\f$).
+    y1 : real ! Position for one of the pair of initial tracer functions
+              ! Biperiodic domain: centre of the function given in terms of metres in the chi2 direction.
+              ! Cubed sphere domain: latitudinal position of the centre of the function (a value between \f$-\pi/2\f$ and \f$\pi/2\f$).
+    r2 : real['PI/8.0_r_def'] ! Radius parameter for the second of the pair of initial tracer functions (see r1)
+    x2 : real['PI+PI/4.0_r_def'] ! Position parameter for the second of the pair of initial tracer functions (see x1)
+    y2 : real ! Position parameter for the second of the pair of initial tracer functions (see y1)
+end namelist initial_density

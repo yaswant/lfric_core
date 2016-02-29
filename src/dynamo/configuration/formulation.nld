@@ -1,0 +1,9 @@
+namelist formulation
+
+  nonlinear     : logical ! Solve the full nonlinear equation set
+  rotating      : logical ! Turn on/off Coriolis terms
+  newton_krylov : logical ! Use Newton-Krylov method to compute lhs
+  supg          : logical ! Use Streamline-Upwind-Petrov-Galerkin method for
+                          ! stabilisation of CG advection
+
+end namelist formulation

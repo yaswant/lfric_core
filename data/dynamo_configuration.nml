@@ -1,0 +1,89 @@
+&base_mesh
+  filename    = 'ugrid_quads_2d.nc'
+  geometry    = 'spherical'
+  partitioner = 'cubedsphere'
+  fplane      = .false.
+  f_lat_deg   = 45.0
+/
+
+&extrusion
+  method           = 'uniform'
+  domain_top       = 10000.0
+  number_of_layers = 5
+/
+
+&finite_element
+  shape         = 'quadrilateral'
+  element_order = 0
+  rehabilitate  = .true.
+/
+
+&formulation
+  nonlinear     = .toad.
+  rotating      = .toad.
+  newton_krylov = .frog.
+  supg          = .frog.
+/
+
+&idealised
+  test = 'gravity_wave'
+/
+
+&initial_density
+  tracer_max = 2.0
+  tracer_background = 0.1
+  y1 = 0.0
+  y2 = 0.0
+/
+
+&initial_temperature
+  bvf_square = 0.0001
+/
+
+&initial_wind
+  profile        = 'none'
+  u0             = 0.0
+  v0             = 0.0
+  rotation_angle = 0.0
+/
+
+&output
+  write_interpolated_output = .true
+  write_nodal_output        = .true
+/
+
+&planet
+  gravity        = 9.80665
+  radius         = 6371229.0
+  omega          = 7.292116E-5
+  rd             = 287.05
+  cp             = 1005.0
+  p_zero         = 100000.0
+  scaling_factor = 125.0
+/
+
+&restart
+  filename = 'dynamo_restart.nml'
+/
+
+&solver
+  method             = 'gmres'
+  maximum_iterations = 99
+  tolerance          = 1.0e-4
+  preconditioner     = 'diagonal'
+  gcrk               = 32
+/
+
+&subgrid
+  rho_approximation = 'ppm_no_limiter'
+  transport_stencil_length = 7
+  rho_stencil_length = 5
+/
+
+&timestepping
+  method           = 'semi_implicit'
+  dt               = 10.0
+  alpha            = 0.5
+  outer_iterations = 2
+  inner_iterations = 2
+/

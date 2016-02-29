@@ -46,10 +46,13 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,        only : l_spherical, QUAD
-    use mesh_mod,                 only : PLANE_BI_PERIODIC
-    use reference_element_mod,    only : reference_cube, reference_element
-    use reference_profile_mod,    only : reference_profile
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
+    use reference_profile_mod,     only : reference_profile
 
     implicit none
 
@@ -72,9 +75,12 @@ contains
 
     integer :: i
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )
@@ -152,7 +158,6 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,                  only : GRAVITY
     use vorticity_advection_kernel_mod, only : vorticity_advection_code
 
     implicit none

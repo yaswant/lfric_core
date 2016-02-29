@@ -8,7 +8,6 @@
 !-------------------------------------------------------------------------------
 module assign_coordinate_field_mod_test
 
-  use configuration_mod, only : l_spherical
   use constants_mod,     only : r_def
   use pFUnit_Mod
 
@@ -30,11 +29,18 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
+    use base_mesh_config_mod, only : base_mesh_geometry_planar, &
+                                     base_mesh_partitioner_planar
+    use frig_config_mod,      only : frig_base_mesh_config
+
     implicit none
 
     class(assign_coordinate_file_test_type), intent(inout) :: this
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
 
   end subroutine setUp
 

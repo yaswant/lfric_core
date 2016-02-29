@@ -21,10 +21,10 @@ import argparse
 import os
 import sys
 
-from dependencyanalysis import __version__
-import dependencyanalysis.analyser as backend
-import dependencyanalysis.database as database
-import dependencyanalysis.logging  as logging
+from dependerator import __version__
+import dependerator.analyser as analyser
+import dependerator.database as database
+import utilities.logging  as logging
 
 ###############################################################################
 # Entry point
@@ -53,6 +53,15 @@ if __name__ == '__main__':
         logger = logging.NoLogger()
     if args.ignore is None: args.ignore = []
 
-    dependencyStore = database.Dependencies( args.database )
-    analyser = backend.Analyser( logger, args.ignore, dependencyStore )
-    analyser.processSource( args.source )
+    backend = database.SQLiteDatabase( args.database )
+    namelistStore = database.FileDependencies( backend )
+    namelistAnalyser = analyser.NamelistDescriptionAnalyser( logger, \
+                                                             namelistStore )
+    fortranStore = database.FortranDependencies( backend )
+    fortranAnalyser = analyser.FortranAnalyser( logger,      \
+                                                args.ignore, \
+                                                fortranStore )
+    if args.source.endswith('.nld'):
+        namelistAnalyser.analyse( args.source )
+    else:
+        fortranAnalyser.analyse( args.source )

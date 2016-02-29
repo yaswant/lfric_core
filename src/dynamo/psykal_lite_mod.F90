@@ -1022,14 +1022,12 @@ end subroutine invoke_write_fields
 !> invoke_subgrid_coeffs: Invoke the calculation of subgrid rho coefficients
 subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,direction,rho_stencil_length)
 
-    use subgrid_coeffs_kernel_mod,  only: subgrid_coeffs_code
-    use configuration_mod,          only: subgridrho_option, &
-                                          x_direction,          &
-                                          y_direction
-
-    use stencil_dofmap_mod,         only: stencil_dofmap_type, &
-                                          STENCIL_1DX, &
-                                          STENCIL_1DY
+    use flux_direction_mod,        only: x_direction, y_direction
+    use stencil_dofmap_mod,        only: stencil_dofmap_type, &
+                                         STENCIL_1DX,         &
+                                         STENCIL_1DY
+    use subgrid_coeffs_kernel_mod, only: subgrid_coeffs_code
+    use subgrid_config_mod,        only: rho_approximation
 
     implicit none
 
@@ -1078,7 +1076,7 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,direction,rho_stencil_length)
       stencil_map => map%get_dofmap(cell)
 
       call subgrid_coeffs_code( nlayers,                                  &
-                                subgridrho_option,                        &
+                                rho_approximation,                        &
                                 undf_w3,                                  &
                                 rho_proxy%data,                           &
                                 ndf_w3,                                   &
@@ -1105,9 +1103,10 @@ subroutine invoke_conservative_fluxes(    rho,          &
                                           stencil_size )
 
   use conservative_flux_kernel_mod, only: conservative_flux_code
-  use configuration_mod,            only: dt, x_direction, y_direction
+  use flux_direction_mod,           only: x_direction, y_direction
   use stencil_dofmap_mod,           only: stencil_dofmap_type, &
                                           STENCIL_1DX, STENCIL_1DY
+  use timestepping_config_mod,      only: dt
 
   implicit none
 

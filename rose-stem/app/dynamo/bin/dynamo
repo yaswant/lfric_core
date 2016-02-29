@@ -1,0 +1,11 @@
+#!/bin/sh
+##############################################################################
+# Run Dynamo
+#
+# Environment:
+#   SOURCE_DIRECTORY - Contains the "bin" directory containing the dynamo exe.
+#   DESTINATION_DIRECTORY - Where to place the stdout file
+#
+$SOURCE_DIRECTORY/bin/dynamo | tee $DESTINATION_DIRECTORY/dynamo.out.txt
+
+exit `expr ${PIPESTATUS[0]} + ${PIPESTATUS[1]}`

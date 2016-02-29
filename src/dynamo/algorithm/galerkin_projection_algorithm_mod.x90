@@ -10,20 +10,20 @@
 
 module galerkin_projection_algorithm_mod
 
-  use log_mod,                 only: log_event, log_scratch_space, LOG_LEVEL_INFO
-  use solver_mod,              only: solver_algorithm
-  use constants_mod,           only: r_def 
-  use configuration_mod,       only: solver_option, element_order
-  use psykal_lite_mod,         only: invoke_copy_field_data, invoke_set_field_scalar
-  use gp_rhs_kernel_mod,       only: gp_rhs_kernel_type
-  use gp_vector_rhs_kernel_mod,only: gp_vector_rhs_kernel_type
-  use field_mod,               only: field_type
-  use quadrature_mod,          only: quadrature_type
-  use function_space_mod,      only: function_space_type
-  use operator_mod,            only: operator_type
-  use mesh_mod,                only: mesh_type
-
-  use fs_continuity_mod,       only: W2, W3
+  use constants_mod,             only: r_def
+  use field_mod,                 only: field_type
+  use finite_element_config_mod, only: element_order
+  use fs_continuity_mod,         only: W2, W3
+  use function_space_mod,        only: function_space_type
+  use gp_rhs_kernel_mod,         only: gp_rhs_kernel_type
+  use gp_vector_rhs_kernel_mod,  only: gp_vector_rhs_kernel_type
+  use log_mod,                   only: log_event, log_scratch_space, LOG_LEVEL_INFO
+  use mesh_mod,                  only: mesh_type
+  use operator_mod,              only: operator_type
+  use psykal_lite_mod,           only: invoke_copy_field_data, invoke_set_field_scalar
+  use quadrature_mod,            only: quadrature_type
+  use solver_config_mod,         only: method
+  use solver_mod,                only: solver_algorithm
 
   implicit none
 
@@ -108,14 +108,14 @@ contains
                                   , rhs(dir)      &
                                   , mesh          &
                                   , chi           &
-                                  , solver_option &
+                                  , method &
                                   , mm=mm )
           else
              call solver_algorithm( f_out(dir)    & 
                                   , rhs(dir)      &
                                   , mesh          &
                                   , chi           &
-                                  , solver_option &
+                                  , method &
                                   , qr=qr )
           end if
        end do

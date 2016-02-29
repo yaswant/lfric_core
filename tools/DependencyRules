@@ -17,11 +17,14 @@ from __future__ import print_function;
 
 import argparse
 import os
+import sys
+import traceback
 
-from dependencyanalysis import __version__
-import dependencyanalysis.database as database
-import dependencyanalysis.logging  as logging
-import dependencyanalysis.process  as process
+from dependerator import __version__
+import dependerator.database as database
+import dependerator.process  as process
+import utilities.logging  as logging
+from utilities.path import replaceExtension
 
 ###############################################################################
 # Entry point
@@ -64,9 +67,24 @@ if __name__ == '__main__':
     if not args.moduledir: args.moduledir = outputDirectory
     if not args.objectdir: args.objectdir = outputDirectory
 
-    dependencyStore = database.Dependencies( args.database )
-    processor = process.Processor( logger, dependencyStore, \
-                                   args.objectdir, args.moduledir )
+    backend = database.SQLiteDatabase( args.database )
+    fortranStore = database.FortranDependencies( backend )
+    processor = process.FortranProcessor( logger, fortranStore, \
+                                          args.objectdir, args.moduledir )
 
-    with open( args.output, 'w' ) as listFile:
-        processor.dependencyRules( listFile )
+    fileStore = database.FileDependencies( backend )
+    processor.determineFileDependencies( fileStore )
+
+    try:
+        with open( args.output, 'w' ) as listFile:
+            print( '# Source dependendencies', file=listFile )
+
+            for filename, prerequisites in fileStore.getDependencies():
+                modulename = replaceExtension( filename, 'mod' )
+                print( '{} {} : {}'.format( filename, modulename, \
+                                         ' '.join( prerequisites ) ), \
+                    file=listFile )
+    except:
+        os.unlink( args.output )
+        traceback.print_exc( file=sys.stdout )
+        sys.exit(1)

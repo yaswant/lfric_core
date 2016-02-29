@@ -8,15 +8,16 @@
 !> @brief Kernel which projects the components of a vector field into a scalar space 
 
 module initial_u_kernel_mod
-use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def, PI
-use configuration_mod,       only : earth_radius
+
 use argument_mod,            only : arg_type, func_type,           &
                                     GH_FIELD, GH_INC, GH_READ,     &
                                     W0, W2,                        &
                                     GH_BASIS, GH_DIFF_BASIS,       &
                                     CELLS
-use initialisation_mod,      only : INITIAL_U_PROFILE, U0, V0, ROTATION_ANGLE
+use constants_mod,           only : r_def, PI
+use kernel_mod,              only : kernel_type
+use initial_wind_config_mod, only : profile, rotation_angle, u0, v0
+
 implicit none
 
 !-------------------------------------------------------------------------------
@@ -88,12 +89,13 @@ subroutine initial_u_code(nlayers, &
                           map_chi, chi_basis, chi_diff_basis, &
                           nqp_h, nqp_v, wqp_h, wqp_v &
                           )
-                       
-  use coordinate_jacobian_mod, only: coordinate_jacobian
-  use configuration_mod,       only: l_spherical
-  use coord_transform_mod,     only: sphere2cart_vector, xyz2llr
-  use analytic_wind_profiles_mod,   only: analytic_wind
-  
+
+  use analytic_wind_profiles_mod, only : analytic_wind
+  use base_mesh_config_mod,       only : geometry, &
+                                         base_mesh_geometry_spherical
+  use coordinate_jacobian_mod,    only : coordinate_jacobian
+  use coord_transform_mod,        only : sphere2cart_vector, xyz2llr
+
   !Arguments
   integer, intent(in) :: nlayers, ndf, ndf_chi
   integer, intent(in) :: undf, undf_chi
@@ -111,7 +113,7 @@ subroutine initial_u_code(nlayers, &
 
   real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
-  
+
   !Internal variables
   integer               :: df, k, qp1, qp2
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
@@ -138,19 +140,19 @@ subroutine initial_u_code(nlayers, &
     do qp2 = 1, nqp_v
       do qp1 = 1, nqp_h
         ! Compute analytical vector wind in physical space
-        if ( l_spherical ) then
+        if ( geometry == base_mesh_geometry_spherical ) then
           xyz(:) = 0.0_r_def
           do df = 1, ndf_chi
             xyz(1) = xyz(1) + chi_1_cell(df)*chi_basis(1,df,qp1,qp2)
             xyz(2) = xyz(2) + chi_2_cell(df)*chi_basis(1,df,qp1,qp2)
-            xyz(3) = xyz(3) + chi_3_cell(df)*chi_basis(1,df,qp1,qp2)          
+            xyz(3) = xyz(3) + chi_3_cell(df)*chi_basis(1,df,qp1,qp2)
           end do
           call xyz2llr(xyz(1), xyz(2), xyz(3), llr(1), llr(2), llr(3))
-          u_spherical = analytic_wind(llr, initial_u_profile, &
+          u_spherical = analytic_wind(llr, profile, &
                                       2, (/U0, rotation_angle/))
           u_physical = sphere2cart_vector(u_spherical,llr) 
         else
-          u_physical = analytic_wind(xyz, initial_u_profile, &
+          u_physical = analytic_wind(xyz, profile, &
                                      2, (/U0, V0/))
         end if
         do df = 1, ndf 
@@ -162,7 +164,7 @@ subroutine initial_u_code(nlayers, &
       end do
     end do
   end do
-  
+
 end subroutine initial_u_code
 
 end module initial_u_kernel_mod

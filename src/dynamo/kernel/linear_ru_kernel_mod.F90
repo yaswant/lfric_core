@@ -12,19 +12,24 @@
 
 
 !> @detail The kernel computes thr rhs of the momentum equation
-!>         That is: ru = -cp * theta_s * grad(exner) + theta/theta_s * g
+!>         That is: ru = -Cp * theta_s * grad(exner) + theta/theta_s * g
 
 !>@deprecated The Usefulness of the linear model is to be revaluated at 
 !>            the end of the Gung-Ho project and removied if possible
 module linear_ru_kernel_mod
-use kernel_mod,         only : kernel_type
-use argument_mod,       only : arg_type, func_type,                     &
-                               GH_FIELD, GH_READ, GH_INC,               &
-                               W0, W2, W3,                              &
-                               GH_BASIS, GH_DIFF_BASIS, CELLS
-use constants_mod,      only : GRAVITY, Cp, r_def
-use configuration_mod,  only : omega
-use initialisation_mod, only : itest_option, n_sq
+
+use base_mesh_config_mod,           only : f_lat,    &
+                                           geometry, &
+                                           base_mesh_geometry_spherical
+use argument_mod,                   only : arg_type, func_type,              &
+                                           GH_FIELD, GH_READ, GH_INC,        &
+                                           W0, W2, W3,                       &
+                                           GH_BASIS, GH_DIFF_BASIS, CELLS
+use constants_mod,                  only : r_def
+use idealised_config_mod,           only : test
+use initial_temperature_config_mod, only : bvf_square
+use kernel_mod,                     only : kernel_type
+use planet_config_mod,              only : gravity, scaled_omega, Cp
 
 implicit none
 
@@ -115,7 +120,6 @@ subroutine linear_ru_code(nlayers,                                             &
   use enforce_bc_kernel_mod,    only: enforce_bc_code
   use calc_exner_pointwise_mod, only: linear_calc_exner_pointwise
   use coord_transform_mod,      only: xyz2llr, sphere2cart_vector
-  use configuration_mod,        only: l_spherical, f_lat
   use rotation_vector_mod,      only: rotation_vector_fplane,  &
                                       rotation_vector_sphere
   use cross_product_mod,        only: cross_product
@@ -172,11 +176,11 @@ subroutine linear_ru_code(nlayers,                                             &
       phi_e(df)   = phi( loc )
     end do
 ! Calculate rotation and Jacobian
-    if ( l_spherical ) then
+    if ( geometry == base_mesh_GEOMETRY_SPHERICAL ) then
       call rotation_vector_sphere(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e, &
                                   w0_basis, rotation_vector)
     else
-      call rotation_vector_fplane(nqp_h, nqp_v, omega, f_lat, rotation_vector)
+      call rotation_vector_fplane(nqp_h, nqp_v, scaled_omega, f_lat, rotation_vector)
     end if
     call coordinate_jacobian(ndf_w0, nqp_h, nqp_v, chi_1_e, chi_2_e, chi_3_e,  &
                              w0_diff_basis, jac, dj)
@@ -202,7 +206,7 @@ subroutine linear_ru_code(nlayers,                                             &
           theta_at_quad   = theta_at_quad                                      &
                           + theta_e(df)*w0_basis(1,df,qp1,qp2)
           grad_phi_at_quad(:) = grad_phi_at_quad(:) &
-                              + phi_e(df)*w0_diff_basis(:,df,qp1,qp2)                                     
+                              + phi_e(df)*w0_diff_basis(:,df,qp1,qp2)
           x_at_quad(1) = x_at_quad(1) + chi_1_e(df)*w0_basis(1,df,qp1,qp2)
           x_at_quad(2) = x_at_quad(2) + chi_2_e(df)*w0_basis(1,df,qp1,qp2)
           x_at_quad(3) = x_at_quad(3) + chi_3_e(df)*w0_basis(1,df,qp1,qp2)
@@ -215,7 +219,7 @@ subroutine linear_ru_code(nlayers,                                             &
                                       matmul(jac(:,:,qp1,qp2),u_at_quad))
 
         call reference_profile(exner_s_at_quad, rho_s_at_quad, &
-                               theta_s_at_quad, x_at_quad, itest_option)
+                               theta_s_at_quad, x_at_quad, test)
 
         exner_at_quad = linear_calc_exner_pointwise( &
                                rho_at_quad, theta_at_quad,       & 
@@ -228,7 +232,7 @@ subroutine linear_ru_code(nlayers,                                             &
           buoy_term = dot_product( v, grad_phi_at_quad ) &
                     *(theta_at_quad/theta_s_at_quad)
           grad_term = Cp*exner_at_quad*theta_s_at_quad*( &
-                      n_sq/GRAVITY*dot_product( v, grad_phi_at_quad ) + &
+                      bvf_square/gravity*dot_product( v, grad_phi_at_quad ) + &
                       w2_diff_basis(1,df,qp1,qp2) )
 
           coriolis_term = dot_product(jac_v/dj(qp1,qp2),omega_cross_u)

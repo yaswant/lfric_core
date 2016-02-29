@@ -9,7 +9,6 @@ AR ?= ar
 
 ROOT     = ../..
 BIN_DIR  = $(ROOT)/bin
-DATABASE = $(OBJ_DIR)/dependencies.db
 
 include $(ROOT)/make/include.mk
 include $(OBJ_DIR)/programs.mk $(OBJ_DIR)/dependencies.mk
@@ -22,7 +21,7 @@ PROGRAMS = $(patsubst %.o,%,$(notdir $(PROG_OBJS)))
 ALL_OBJS = $(foreach proj, $(shell echo $(PROGRAMS) | tr a-z A-Z), $($(proj)_OBJS))
 
 # Remove the program objects from the list of all objects, leaving modules
-ALL_MODULES = $(filter-out $(PROG_OBJ),$(ALL_OBJS))
+ALL_MODULES = $(filter-out $(PROG_OBJS),$(ALL_OBJS))
 
 .SECONDEXPANSION:
 
@@ -39,12 +38,12 @@ $(BIN_DIR)/%: $(OBJ_DIR)/%.x | $(BIN_DIR)
 # Directories
 
 # Find all the subdirectories within the source directory:
-SUBDIRS = $(shell find * -type d -prune)
+SUBDIRS = $(shell find * -type d -prune -not -name make)
 
 # Mirror the source directory tree in the object directory:
 OBJ_SUBDIRS = $(patsubst %,$(OBJ_DIR)/%/,$(SUBDIRS))
 
-$(BIN_DIR) $(OBJ_DIR):
+$(BIN_DIR) $(OBJ_DIR) $(OBJ_SUBDIRS):
 	@echo -e $(VT_BOLD)Creating$(VT_RESET) $@
 	$(Q)mkdir -p $@
 
@@ -53,13 +52,13 @@ $(BIN_DIR) $(OBJ_DIR):
 # Build a set of "-I" arguments to seach the whole object tree:
 INCLUDE_ARGS = -I$(OBJ_DIR) $(patsubst %, -I$(OBJ_DIR)/%, $(SUBDIRS))
 
-$(OBJ_DIR)/%.o $(OBJ_DIR)/%.mod: %.F90 | $(OBJ_DIR)
+$(OBJ_DIR)/%.o $(OBJ_DIR)/%.mod: %.F90 | $(OBJ_DIR) $(dir $@)
 	@echo -e \$(VT_BOLD)Compile$(VT_RESET) $<
 	$(Q)$(FC) $(FPPFLAGS) $(FFLAGS) \
 	          $(F_MOD_DESTINATION_ARG)$(OBJ_DIR)/$(dir $@) \
 	          $(INCLUDE_ARGS) -c -o $(basename $@).o $<
 
-$(OBJ_DIR)/%.o $(OBJ_DIR)/%.mod: %.f90 | $(OBJ_DIR)
+$(OBJ_DIR)/%.o $(OBJ_DIR)/%.mod: %.f90 | $(OBJ_DIR) $(dir $@)
 	@echo -e \$(VT_BOLD)Compile$(VT_RESET) $<
 	$(Q)$(FC) $(FPPFLAGS) $(FFLAGS) \
 	          $(F_MOD_DESTINATION_ARG)$(OBJ_DIR)/$(dir $@) \
@@ -81,14 +80,13 @@ $(OBJ_DIR)/%.x: $$($$(shell echo $$* | tr a-z A-Z)_OBJS)
 # otherwise they will fight over the dependency database.
 #
 $(OBJ_DIR)/programs.mk: $(OBJ_DIR)/dependencies.mk | $(OBJ_DIR)
-	$(MAKE) -f make/examine.mk $(OBJ_DIR)/programs.mk OBJ_SUBDIRS="$(OBJ_SUBDIRS)"
+	$(MAKE) -f make/examine.mk $(OBJ_DIR)/programs.mk
 
-$(OBJ_DIR)/dependencies.mk: PSY | $(OBJ_DIR)
-	$(MAKE) -f make/examine.mk $(OBJ_DIR)/dependencies.mk OBJ_SUBDIRS="$(OBJ_SUBDIRS)"
+$(OBJ_DIR)/dependencies.mk: generate-psykal generate-configuration | $(OBJ_DIR)
+	$(MAKE) -f make/examine.mk $(OBJ_DIR)/dependencies.mk
 
-.PHONY: PSY
-PSY:
-	$(MAKE) -f make/psyclone.mk
+include make/psyclone.mk
+include make/configuration.mk
 
 .PHONY: ALWAYS
 ALWAYS:

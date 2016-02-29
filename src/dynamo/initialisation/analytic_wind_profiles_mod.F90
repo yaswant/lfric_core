@@ -11,16 +11,17 @@
 module analytic_wind_profiles_mod
 
 use constants_mod,      only : r_def
+use initial_wind_config_mod, only : &
+                               initial_wind_profile_none,                &
+                               initial_wind_profile_solid_body_rotation, &
+                               initial_wind_profile_constant_uv,         &
+                               initial_wind_profile_constant_shear_uv
 use log_mod,            only : log_event,                &
                                log_scratch_space,        &
                                LOG_LEVEL_ERROR
-use initialisation_mod, only : ZERO_WIND,                &
-                               SOLID_BODY_ROTATION_WIND, &
-                               CONSTANT_UV_WIND,         &
-                               CONSTANT_SHEAR_UV_WIND
 
 implicit none
-  
+
 contains
 
 !> @brief Compute an analytic wind field
@@ -42,18 +43,18 @@ function analytic_wind(chi, choice, num_options, option) result(u)
 
   select case ( choice )
 
-    case ( ZERO_WIND )
+    case ( initial_wind_profile_none )
       u(:) = 0.0_r_def
-    case ( SOLID_BODY_ROTATION_WIND )
+    case ( initial_wind_profile_solid_body_rotation )
       u(1) = option(1) * ( cos(chi(2))*cos(option(2)) &
                        + sin(chi(1))*sin(chi(2))*sin(option(2)) )
       u(2) = option(1) * cos(chi(1))*sin(option(2))
       u(3) = 0.0_r_def
-    case ( CONSTANT_UV_WIND )
+    case ( initial_wind_profile_constant_uv )
       u(1) = option(1)
       u(2) = option(2)
       u(3) = 0.0_r_def
-    case ( CONSTANT_SHEAR_UV_WIND )
+    case ( initial_wind_profile_constant_shear_uv )
       u(1) = option(1)*chi(3)/option(3)
       u(2) = option(2)*chi(3)/option(3)
       u(3) = 0.0_r_def 

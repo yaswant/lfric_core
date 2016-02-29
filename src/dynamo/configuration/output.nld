@@ -1,0 +1,6 @@
+namelist output
+
+    write_interpolated_output : logical
+    write_nodal_output        : logical
+
+end namelist output

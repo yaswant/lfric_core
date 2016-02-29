@@ -8,27 +8,29 @@
 !>@brief wrapper algorithm to compute the lhs of the prognostic
 !>       equations
 module lhs_alg_mod
-  use psykal_lite_mod,                   only: invoke_axpy,                   &
-                                               invoke_set_field_scalar,       &
-                                               invoke_sample_flux_kernel,     &
-                                               invoke_copy_field_data,        &
-                                               invoke_multiply_field
-  use rtheta_kernel_mod,                 only: rtheta_kernel_type
-  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
-  use rrho_kernel_mod,                   only: rrho_kernel_type
-  use pert_pressure_gradient_kernel_mod, only: pert_pressure_gradient_kernel_type
-  use matrix_vector_mod,                 only: matrix_vector_kernel_type
-  use multiplicity_kernel_mod,           only: multiplicity_kernel_type
 
-  use mesh_mod,                          only: mesh_type
-  use field_mod,                         only: field_type
   use constants_mod,                     only: r_def
-  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
-  use operator_mod,                      only: operator_type
-  use function_space_mod,                only: function_space_type
-  use runtime_constants_mod,             only: runtime_constants_type
+  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use field_bundle_mod,                  only: clone_bundle
-  use configuration_mod,                 only: element_order
+  use field_mod,                         only: field_type
+  use finite_element_config_mod,         only: element_order
+  use function_space_mod,                only: function_space_type
+  use rtheta_kernel_mod,                 only: rtheta_kernel_type
+  use pert_pressure_gradient_kernel_mod, only: pert_pressure_gradient_kernel_type
+  use psykal_lite_mod,                   only: invoke_axpy,               &
+                                               invoke_copy_field_data,    &
+                                               invoke_multiply_field,     &
+                                               invoke_sample_flux_kernel, &
+                                               invoke_set_field_scalar
+  use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
+  use mesh_mod,                          only: mesh_type
+  use multiplicity_kernel_mod,           only: multiplicity_kernel_type
+  use operator_mod,                      only: operator_type
+  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
+  use rrho_kernel_mod,                   only: rrho_kernel_type
+  use runtime_constants_mod,             only: runtime_constants_type
+  use w3_solver_kernel_mod,              only: w3_solver_kernel_type
+
   implicit none
 
   private
@@ -46,7 +48,7 @@ contains
 !>         \f[ L_\rho = \rho' 
 !>                    + \alpha\Delta t\nabla.\left(\rho^*\mathbf{u}'\right) \f]
 !>         \f[ L_\theta = \theta' + \alpha\Delta t\mathbf{u}'.\nabla\theta^*\f]
-!>       
+!>
 !>         Where primed terms are increments to the n+1 timelevel field and
 !>         star terms are a reference profile
 !> @param[inout] lhs The state vector to compute
@@ -55,7 +57,7 @@ contains
 !> @param[in]    runtime_constants Runtime constants for the model
 !> @param[in]    l_newton_krylov true if computing timelevel n+1 terms 
   subroutine lhs_alg(lhs, alpha_dt, state, ref_state, runtime_constants)
-  
+
   implicit none
 
   real(kind=r_def),             intent(in)    :: alpha_dt

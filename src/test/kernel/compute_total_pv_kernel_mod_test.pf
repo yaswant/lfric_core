@@ -37,14 +37,23 @@ module compute_total_pv_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : QUAD
-    use mesh_mod,              only : PLANE_BI_PERIODIC
-    use reference_element_mod, only : reference_cube, reference_element
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_planet_config
+    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use reference_element_mod,     only : reference_cube, reference_element
 
     implicit none
 
@@ -62,7 +71,9 @@ contains
                       ndf_pv, undf_pv, &
                       nqp_h, nqp_v
 
-    reference_element = QUAD
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type(3, GAUSSIAN)
@@ -107,8 +118,8 @@ contains
 
     deallocate( this%basis_xi, this%diff_basis_theta )
 
-    call deallocate_reference()
     call purge_function_spaces()
+    call deallocate_reference()
 
   end subroutine tearDown
 
@@ -117,7 +128,6 @@ contains
   subroutine test_all( this )
 
     use compute_total_pv_kernel_mod,only : compute_total_pv_code
-    use quadrature_mod,             only : quadrature_type, GAUSSIAN
 
     implicit none
 
@@ -161,6 +171,14 @@ contains
 
     qr  = quadrature_type(3, GAUSSIAN)
 
+    nqp_h=qr%get_nqp_h()
+    nqp_v=qr%get_nqp_v()
+
+    zp=>qr%get_xqp_v()
+    xp=>qr%get_xqp_h()
+    wh=>qr%get_wqp_h()
+    wv=>qr%get_wqp_v()
+
     w0_fs => fs%get_instance( this%mesh, element_order, W0 )
     w3_fs => fs%get_instance( this%mesh, element_order, W3 )
 
@@ -186,26 +204,20 @@ contains
 
     ! Test pv computation
     pv    = field_type( vector_space = w3_fs )
-
-    xi_p    = this%xi%get_proxy()
-    theta_p = this%theta%get_proxy()
-    pv_p    = pv%get_proxy()
+    pv_p  = pv%get_proxy()
 
     ndf_pv = pv_p%vspace%get_ndf( )
     undf_pv = pv_p%vspace%get_undf( )
 
+    xi_p    = this%xi%get_proxy()
+
     ndf_xi  = xi_p%vspace%get_ndf( )
     undf_xi = xi_p%vspace%get_undf( )
 
+    theta_p = this%theta%get_proxy()
+
     ndf_theta      = theta_p%vspace%get_ndf( )
     undf_theta     = theta_p%vspace%get_undf( )
-
-    nqp_h=qr%get_nqp_h()
-    nqp_v=qr%get_nqp_v()
-    zp=>qr%get_xqp_v()
-    xp=>qr%get_xqp_h()
-    wh=>qr%get_wqp_h()
-    wv=>qr%get_wqp_v()
 
     call xi_p%vspace%compute_basis_function( &
          this%basis_xi, ndf_xi, nqp_h, nqp_v, xp, zp)

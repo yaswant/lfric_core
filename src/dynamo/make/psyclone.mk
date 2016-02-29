@@ -5,28 +5,26 @@
 # https://puma.nerc.ac.uk/trac/GungHo/wiki
 ##############################################################################
 
-ALGORITHM_PATH = algorithm
-PSY_PATH       = psy
-KERNEL_PATH    = kernel
+PSYCLONE ?= python2.7 $(PSYCLONE_DIR)/src/generator.py
 
-AUTO_ALGORITHM_PATH = $(OBJ_DIR)/algorithm
-AUTO_PSY_PATH       = $(OBJ_DIR)/psy
+PSY_ALGORITHM_PATH = algorithm
+PSY_PSY_PATH       = psy
+PSY_KERNEL_PATH    = kernel
 
-PSYCLONE = python2.7 $(PSYCLONE_DIR)/src/generator.py
+PSY_AUTO_ALGORITHM_PATH = $(OBJ_DIR)/algorithm
+PSY_AUTO_PSY_PATH       = $(OBJ_DIR)/psy
 
-include $(ROOT)/make/include.mk
-
-AUTO_FILES   := $(patsubst $(ALGORITHM_PATH)/%.x90, \
-                           $(AUTO_PSY_PATH)/psy_%.f90, \
-                           $(wildcard $(ALGORITHM_PATH)/*.x90) )
-MANUAL_FILES := $(wildcard $(PSY_PATH)/*.[Ff]90 )
-AUTO_FILES   := $(filter-out $(patsubst $(PSY_PATH)/%, \
-                                        $(AUTO_PSY_PATH)/%, \
-                                        $(MANUAL_FILES) ), \
-                             $(AUTO_FILES) )
-MANUAL_FILES := $(patsubst $(PSY_PATH)/psy_%, \
-                           $(AUTO_ALGORITHM_PATH)/%, \
-                           $(MANUAL_FILES) )
+PSY_AUTO_FILES   := $(patsubst $(PSY_ALGORITHM_PATH)/%.x90, \
+                               $(PSY_AUTO_PSY_PATH)/psy_%.f90, \
+                               $(wildcard $(PSY_ALGORITHM_PATH)/*.x90) )
+PSY_MANUAL_FILES := $(wildcard $(PSY_PSY_PATH)/*.[Ff]90 )
+PSY_AUTO_FILES   := $(filter-out $(patsubst $(PSY_PSY_PATH)/%, \
+                                        $(PSY_AUTO_PSY_PATH)/%, \
+                                        $(PSY_MANUAL_FILES) ), \
+                             $(PSY_AUTO_FILES) )
+PSY_MANUAL_FILES := $(patsubst $(PSY_PSY_PATH)/psy_%, \
+                           $(PSY_AUTO_ALGORITHM_PATH)/%, \
+                           $(PSY_MANUAL_FILES) )
 
 # The appending operator (+=) is not used below as Cylc adds a space on the
 # end of the variable, thereby ruining anyone elses chance to append.
@@ -34,24 +32,25 @@ MANUAL_FILES := $(patsubst $(PSY_PATH)/psy_%, \
 #
 export PYTHONPATH := $(PSYCLONE_DIR)/f2py_93:$(PSYCLONE_DIR)/src:$(PYTHONPATH)
 
-.PHONY: all
-all: $(AUTO_FILES) $(MANUAL_FILES)
+.PHONY: generate-psykal
+generate-psykal: $(PSY_AUTO_FILES) $(PSY_MANUAL_FILES) $(PSY_ALGORITHM_FILES)
 
-$(AUTO_ALGORITHM_PATH)/%.f90:$(ALGORITHM_PATH)/%.x90 | $(AUTO_ALGORITHM_PATH)
+$(PSY_AUTO_ALGORITHM_PATH)/%.f90:$(PSY_ALGORITHM_PATH)/%.x90 | $(PSY_AUTO_ALGORITHM_PATH)
 	@echo -e $(VT_BOLD)PSycloning$(VT_RESET) $<
-	$(PSYCLONE) -api dynamo0.3 -d $(KERNEL_PATH) \
-	            -oalg $(patsubst $(ALGORITHM_PATH)/%.x90, $(AUTO_ALGORITHM_PATH)/%.f90, $< ) \
+	$(PSYCLONE) -api dynamo0.3 -d $(PSY_KERNEL_PATH)                    \
+	            -oalg $@ \
 	            $<
 
-$(AUTO_PSY_PATH)/psy_%.f90: $(ALGORITHM_PATH)/%.x90 | $(AUTO_PSY_PATH) $(AUTO_ALGORITHM_PATH)
+$(PSY_AUTO_PSY_PATH)/psy_%.f90: $(PSY_ALGORITHM_PATH)/%.x90 \
+                                | $(PSY_AUTO_PSY_PATH)      \
+                                  $(PSY_AUTO_ALGORITHM_PATH)
 	@echo -e $(VT_BOLD)PSycloning$(VT_RESET) $<
-	$(PSYCLONE) -api dynamo0.3 -d $(KERNEL_PATH) \
-	            -opsy $(patsubst $(ALGORITHM_PATH)/%.x90, \
-	                             $(AUTO_PSY_PATH)/psy_%.f90, $< ) \
-	            -oalg $(patsubst $(ALGORITHM_PATH)/%.x90, \
-	                             $(AUTO_ALGORITHM_PATH)/%.f90, $< ) \
+	$(PSYCLONE) -api dynamo0.3 -d $(PSY_KERNEL_PATH) \
+	            -opsy $@ \
+	            -oalg $(patsubst $(PSY_ALGORITHM_PATH)/%.x90, \
+	                             $(PSY_AUTO_ALGORITHM_PATH)/%.f90, $< ) \
 	            $<
 
-$(AUTO_PSY_PATH) $(AUTO_ALGORITHM_PATH):
+$(PSY_AUTO_PSY_PATH) $(PSY_AUTO_ALGORITHM_PATH):
 	@echo -e $(VT_BOLD)Creating$(VT_RESET) $@
 	$(Q)mkdir -p $@

@@ -8,8 +8,7 @@
 !-------------------------------------------------------------------------------
 module reference_profile_mod_test
 
-  use constants_mod,      only : r_def
-  use initialisation_mod, only : n_sq
+  use constants_mod, only : r_def
   use pFUnit_Mod
 
   implicit none
@@ -25,20 +24,38 @@ module reference_profile_mod_test
     procedure test_all
   end type reference_profile_test_type
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
+  real(r_def), parameter :: bvf_square = 0.0001_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use configuration_mod,     only : l_spherical
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use finite_element_config_mod, only : finite_element_shape_quadrilateral
+    use frig_config_mod,           only : frig_base_mesh_config,           &
+                                          frig_initial_temperature_config, &
+                                          frig_planet_config
 
     implicit none
 
     class(reference_profile_test_type), intent(inout) :: this
 
-    l_spherical = .false.
-
-    n_sq        = 0.0001_r_def
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
+    call frig_initial_temperature_config( bvf_square )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
   end subroutine setUp
 
@@ -46,8 +63,7 @@ contains
   @test
   subroutine test_all( this )
 
-    use constants_mod,         only : GRAVITY, P_ZERO, Rd, Cp, KAPPA
-    use initialisation_mod,    only : ITEST_GRAVITY_WAVE
+    use idealised_config_mod,  only : idealised_test_gravity_wave
     use reference_profile_mod, only : reference_profile
 
     implicit none
@@ -55,18 +71,19 @@ contains
     class(reference_profile_test_type), intent(inout) :: this
 
     real(r_def), parameter :: tol = 1.0e-14
+    real(r_def), parameter :: kappa = rd / cp
 
     real(kind=r_def) :: exner, theta, rho, x(3)
     real(kind=r_def) :: exner_exact, theta_exact, rho_exact
 
     x = (/ 0.0_r_def, 0.0_r_def, 1000.0_r_def /)
 
-    call reference_profile(exner,rho,theta,x,ITEST_GRAVITY_WAVE)
+    call reference_profile(exner,rho,theta,x, idealised_test_gravity_wave )
 
-    theta_exact = 300.0_r_def * exp (  n_sq/GRAVITY*x(3))
-    exner_exact = 1.0_r_def - GRAVITY**2/(Cp*300.0_r_def*n_sq)   &
-              * (1.0_r_def - exp ( - n_sq/GRAVITY * x(3) ))
-    rho_exact = P_ZERO/(Rd*theta_exact) * exner_exact ** ((1.0_r_def - KAPPA)/KAPPA) 
+    theta_exact = 300.0_r_def * exp ( bvf_square/gravity*x(3))
+    exner_exact = 1.0_r_def - gravity**2/(Cp*300.0_r_def*bvf_square)   &
+              * (1.0_r_def - exp ( - bvf_square/gravity * x(3) ))
+    rho_exact = p_zero/(Rd*theta_exact) * exner_exact ** ((1.0_r_def - kappa)/kappa)
 
     @assertEqual( theta_exact, theta, tol )
     @assertEqual( exner_exact, exner, tol )

@@ -6,10 +6,12 @@
 !-------------------------------------------------------------------------------
 module find_output_cell_mod
 
-use constants_mod,        only: i_def, r_def, LARGE_REAL
-use configuration_mod,    only: l_spherical, earth_radius
-use field_mod,            only: field_type, field_proxy_type 
-use coord_transform_mod,  only: cartesian_distance, llr2xyz
+use base_mesh_config_mod, only : geometry, &
+                                 base_mesh_geometry_spherical
+use constants_mod,        only : i_def, r_def, LARGE_REAL
+use coord_transform_mod,  only : cartesian_distance, llr2xyz
+use field_mod,            only : field_type, field_proxy_type
+use planet_config_mod,    only : scaled_radius
 
 implicit none
 
@@ -43,8 +45,8 @@ contains
   chi_proxy(3) = chi(3)%get_proxy()
 
   chi_in(:) = x_in(:)
-  if ( l_spherical ) then
-    call llr2xyz(x_in(1), x_in(2), x_in(3) + earth_radius, &
+  if ( geometry == base_mesh_geometry_spherical ) then
+    call llr2xyz(x_in(1), x_in(2), x_in(3) + scaled_radius, &
                  chi_in(1), chi_in(2), chi_in(3))
   end if
   min_distance = LARGE_REAL
@@ -67,7 +69,7 @@ contains
     end if
   end do
 
-  end function find_output_cell 
+  end function find_output_cell
 
 end module find_output_cell_mod
 

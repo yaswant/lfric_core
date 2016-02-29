@@ -26,20 +26,31 @@ module runtime_constants_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
   contains
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     subroutine setUp( this )
 
-      use configuration_mod,        only : QUAD
-      use reference_element_mod,    only : reference_cube,   &
-                                           reference_element
+      use finite_element_config_mod, only : finite_element_shape_quadrilateral
+      use frig_config_mod,           only : frig_planet_config
+      use reference_element_mod,     only : reference_cube,   &
+                                            reference_element
 
       implicit none
 
       class(runtime_constants_test_type), intent(inout) :: this
 
-      reference_element = QUAD
+      call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
+
+      reference_element = finite_element_shape_quadrilateral
       call reference_cube()
 
     end subroutine setup
@@ -63,7 +74,6 @@ module runtime_constants_mod_test
     @test
     subroutine test_all( this )
 
-      use constants_mod,         only : GRAVITY
       use field_mod,             only : field_type, field_proxy_type
       use fs_continuity_mod,     only : W0, W1, W2, W3
       use function_space_mod,    only : function_space_type
@@ -136,7 +146,7 @@ module runtime_constants_mod_test
             chi_p(1)%data(map_w0(1) + k) = real(i-1)*DX
             chi_p(2)%data(map_w0(1) + k) = real(j-1)*DY
             chi_p(3)%data(map_w0(1) + k) = real(k)  *DZ
-            geo_p   %data(map_w0(1) + k) = real(k)  *DZ*GRAVITY
+            geo_p   %data(map_w0(1) + k) = real(k)  *DZ*gravity
           end do
           cell = cell + 1
         end do

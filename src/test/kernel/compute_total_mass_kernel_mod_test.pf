@@ -39,13 +39,25 @@ module compute_total_mass_kernel_mod_test
 
   integer(i_def), parameter :: element_order = 0
 
+  real(r_def), parameter :: gravity = 10.0_r_def
+  real(r_def), parameter :: radius  = 6000000_r_def
+  real(r_def), parameter :: omega   = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero  = 100000.0_r_def
+  real(r_def), parameter :: rd      = 300.0_r_def
+  real(r_def), parameter :: cp      = 1000.0_r_def
+  real(r_def), parameter :: scaling = 1.0_r_def
+
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
+    use base_mesh_config_mod,          only : base_mesh_geometry_planar, &
+                                              base_mesh_partitioner_planar
     use compute_total_mass_kernel_mod, only : compute_total_mass_code
-    use configuration_mod,             only : l_spherical, QUAD
+    use finite_element_config_mod,     only : finite_element_shape_quadrilateral
+    use frig_config_mod,               only : frig_base_mesh_config, &
+                                              frig_planet_config
     use mesh_mod,                      only : PLANE_BI_PERIODIC
     use reference_element_mod,         only : reference_cube, reference_element
 
@@ -67,9 +79,13 @@ contains
 
     integer :: i
 
-    l_spherical = .false.
+    call frig_base_mesh_config( 'foo',                        &
+                                base_mesh_geometry_planar,    &
+                                base_mesh_partitioner_planar, &
+                                0.0_r_def )
+    call frig_planet_config( radius, gravity, omega, rd, cp, p_zero, scaling )
 
-    reference_element = QUAD
+    reference_element = finite_element_shape_quadrilateral
     call reference_cube()
 
     qr = quadrature_type( 3, GAUSSIAN )
@@ -127,7 +143,6 @@ contains
   subroutine test_all( this )
 
     use compute_total_mass_kernel_mod, only : compute_total_mass_code
-    use configuration_mod,             only : earth_radius
 
     implicit none
 
@@ -230,7 +245,7 @@ contains
                                  wh, wv)
 
 
-    answer = 6000_r_def*2000_r_def*2000_r_def*rho_p%data(1)/earth_radius**2
+    answer = 6000_r_def*2000_r_def*2000_r_def*rho_p%data(1)/radius**2
     @assertEqual(answer, mass_p%data(map_rho(1)), tol)
 
   end subroutine test_all

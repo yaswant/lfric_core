@@ -21,12 +21,14 @@
 !>         This results in:
 !>         pressure_gradient = -xi/rho x F - grad(Phi + 1/2*u.u) - cp*theta*grad(exner)
 module pressure_gradient_kernel_mod
-use kernel_mod,              only : kernel_type
-use argument_mod,            only : arg_type, func_type,                 &
-                                    GH_FIELD, GH_READ, GH_INC,           &
-                                    W0, W2, W3, GH_BASIS, GH_DIFF_BASIS, &
-                                    CELLS 
-use constants_mod,           only : cp, r_def
+
+use argument_mod,      only : arg_type, func_type,                 &
+                              GH_FIELD, GH_READ, GH_INC,           &
+                              W0, W2, W3, GH_BASIS, GH_DIFF_BASIS, &
+                              CELLS
+use constants_mod,     only : r_def
+use kernel_mod,        only : kernel_type
+use planet_config_mod, only : cp
 
 implicit none
 

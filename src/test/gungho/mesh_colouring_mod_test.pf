@@ -12,7 +12,7 @@
 !-------------------------------------------------------------------------------
 module mesh_colouring_mod_test
 !-------------------------------------------------------------------------------
-  use constants_mod, only         : i_def, r_def, str_def
+  use constants_mod,     only : i_def, r_def, str_def
   use pFUnit_Mod
   use suite_fixture_mod, only : get_esmf_handle
 
@@ -39,9 +39,9 @@ contains
 !-------------------------------------------------------------------------------
 subroutine setUp(this)
 
-  use configuration_mod,     only : QUAD
+  use finite_element_config_mod, only : finite_element_shape_quadrilateral
   use ESMF
-  use reference_element_mod, only : reference_cube, reference_element
+  use reference_element_mod,     only : reference_cube, reference_element
 
   implicit none
 
@@ -56,7 +56,7 @@ subroutine setUp(this)
                   rc=rc)
   if (rc  /=  ESMF_SUCCESS) call ESMF_Finalize(endflag=ESMF_END_ABORT)
 
-  reference_element = QUAD
+  reference_element = finite_element_shape_quadrilateral
   call reference_cube()
 
   this%total_ranks = 1
@@ -85,12 +85,12 @@ end subroutine tearDown
 @test
 subroutine test_compute_colours_cubedsphere(this)
 
-  use mesh_mod, only              : mesh_type
-  use partition_mod, only         : partition_type, &
-                                    partitioner_interface, &
-                                    partitioner_cubedsphere_serial
-  use global_mesh_mod, only       : global_mesh_type
-  use configuration_mod, only     : VGRID_UNIFORM
+  use mesh_mod,             only : mesh_type
+  use partition_mod,        only : partition_type, &
+                                   partitioner_interface, &
+                                   partitioner_cubedsphere_serial
+  use global_mesh_mod,      only : global_mesh_type
+  use extrusion_config_mod, only : extrusion_method_uniform
 
   implicit none
 
@@ -119,13 +119,17 @@ subroutine test_compute_colours_cubedsphere(this)
                             partitioner_ptr, &
                             this%xproc, &
                             this%yproc, &
-                            1, & 
+                            1, &
                             this%local_rank, &
                             this%total_ranks)
 
   ! Mesh is now constructed with num_layers and domain top instead of dz and
   ! is uniform in vertical for purpose of the test
-  mesh = mesh_type( partition, global_mesh, this%num_layers, 10000.0_r_def, VGRID_UNIFORM )
+  mesh = mesh_type( partition,       &
+                    global_mesh,     &
+                    this%num_layers, &
+                    10000.0_r_def,   &
+                    extrusion_method_uniform )
 
   ! Mesh is not yet coloured...
   @assertFalse(mesh%is_coloured(), "Mesh is unexpectedly coloured")
@@ -166,12 +170,12 @@ end subroutine test_compute_colours_cubedsphere
 @test
 subroutine test_compute_colours_biperiodic(this)
 
-  use mesh_mod, only              : mesh_type
-  use partition_mod, only         : partition_type, &
+  use extrusion_config_mod, only : extrusion_method_uniform
+  use global_mesh_mod,      only : global_mesh_type
+  use mesh_mod,             only : mesh_type
+  use partition_mod,        only : partition_type, &
                                     partitioner_interface, &
                                     partitioner_biperiodic
-  use global_mesh_mod, only       : global_mesh_type
-  use configuration_mod, only     : VGRID_UNIFORM
 
   implicit none
 
@@ -206,7 +210,11 @@ subroutine test_compute_colours_biperiodic(this)
 
   ! Mesh is now constructed with num_layers and domain top instead of dz and
   ! is uniform in vertical for purpose of the test
-  mesh = mesh_type( partition, global_mesh, this%num_layers, 10000.0_r_def, VGRID_UNIFORM )
+  mesh = mesh_type( partition,       &
+                    global_mesh,     &
+                    this%num_layers, &
+                    10000.0_r_def,   &
+                    extrusion_method_uniform )
 
   ! Mesh is not yet coloured...
   @assertFalse(mesh%is_coloured(), "Mesh is unexpectedly coloured")

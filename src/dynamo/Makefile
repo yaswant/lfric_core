@@ -9,6 +9,8 @@ export IGNORE_DEPENDENCIES = netcdf MPI ESMF
 export EXTERNAL_DYNAMIC_LIBRARIES = esmf netcdff netcdf
 export EXTERNAL_STATIC_LIBRARIES  =
 
+export DYNAMO_DEPENDENCY_DB ?= $(OBJ_DIR)/dependencies.db
+
 export ROOT = ../..
 export PSYCLONE_DIR = $(ROOT)/src/psyclone
 
@@ -67,9 +69,12 @@ applications:
 	$(MAKE) -f make/dynamo.mk applications
 
 .PHONY: unused-check
-unused-check:
+unused-check: | $(OBJ_DIR)
 	$(MAKE) -f make/examine.mk unused-check
 
 .PHONY: clean
 clean:
 	$(MAKE) -f make/dynamo.mk clean
+
+$(OBJ_DIR):
+	$(Q)mkdir -p $@

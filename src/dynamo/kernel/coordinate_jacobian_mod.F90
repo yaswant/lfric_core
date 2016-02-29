@@ -9,6 +9,7 @@
 !> @brief Module for computing the Jacobian matrix, its derterminant and
 !> inverse for a coordinate field
 module coordinate_jacobian_mod
+
 use constants_mod, only: r_def
 
 implicit none
@@ -50,21 +51,21 @@ integer :: i, j, df, dir
 
 do j = 1,ngp_v
   do i = 1,ngp_h
-    jac(:,:,i,j) = 0.0_r_def      
+    jac(:,:,i,j) = 0.0_r_def
     do df = 1,ndf
       do dir = 1,3
         jac(1,dir,i,j) = jac(1,dir,i,j) + chi_1(df)*diff_basis(dir,df,i,j)
         jac(2,dir,i,j) = jac(2,dir,i,j) + chi_2(df)*diff_basis(dir,df,i,j)
         jac(3,dir,i,j) = jac(3,dir,i,j) + chi_3(df)*diff_basis(dir,df,i,j)
-      end do              
-    end do 
+      end do
+    end do
 
 ! Hard wired values for cartesian biperiodic domain this needs correcting
 !    jac(:,:,i,j) = 0.0_r_def
 !    jac(1,1,i,j) = dx
 !    jac(2,2,i,j) = dy
 !    jac(3,3,i,j) = dz
-        
+
     dj(i,j) = jac(1,1,i,j)*(jac(2,2,i,j)*jac(3,3,i,j)        &
                           - jac(2,3,i,j)*jac(3,2,i,j))       &
             - jac(1,2,i,j)*(jac(2,1,i,j)*jac(3,3,i,j)        &

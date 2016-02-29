@@ -17,10 +17,12 @@ module rk_alg_timestep_mod
                            LOG_LEVEL_TRACE
   use constants_mod,       only: r_def
 
-  ! Configuration and restart/checkpoint options 
-  use configuration_mod,   only: solver_option, dt, &
-                                 l_rotating, element_order
-  use restart_control_mod, only: restart_type
+  ! Configuration and restart/checkpoint options
+  use finite_element_config_mod, only : element_order
+  use formulation_config_mod,    only : rotating
+  use restart_control_mod,       only : restart_type
+  use solver_config_mod,         only : method
+  use timestepping_config_mod,   only : dt
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod, only: invoke_axpy,             &
@@ -222,7 +224,7 @@ contains
                              , r_u           &
                              , mesh          &
                              , chi           &
-                             , solver_option &
+                             , method &
                              , mm=mm_w2 )
 
         ! Compute rrho = div(F)
@@ -231,14 +233,14 @@ contains
         call invoke_set_field_scalar(0.0_r_def, rhs_xi)
         call invoke( vorticity_rhs_kernel_type( rhs_xi, u, chi, qr ) )
         call invoke( enforce_bc_kernel_type( rhs_xi ) )
-        call solver_algorithm( xi, rhs_xi, mesh, chi, solver_option, mm=mm_w1)
+        call solver_algorithm( xi, rhs_xi, mesh, chi, method, mm=mm_w1)
 
         ! Compute new rhs
         call invoke_set_field_scalar(0.0_r_def, rt_prediction(stage))
         call invoke( rtheta_kernel_type( rt_prediction(stage), theta, &
              mass_flux, rho, qr) )
         call invoke_set_field_scalar(0.0_r_def, ru_prediction(stage))
-        if ( l_rotating ) &
+        if ( rotating ) &
           call invoke( rotation_kernel_type( ru_prediction(stage), u, chi, qr ) )
         call invoke( pressure_gradient_kernel_type       &
              ( ru_prediction(stage), rho, theta, qr ) )
@@ -265,19 +267,19 @@ contains
                              , r_theta       &
                              , mesh          &
                              , chi           &
-                             , solver_option &
+                             , method &
                              , mm=mm_w0 )
         call solver_algorithm( u_inc         &
                              , r_u           &
                              , mesh          &
                              , chi           &
-                             , solver_option &
+                             , method &
                              , mm=mm_w2 )
         call solver_algorithm( rho_inc       &
                              , r_rho         &
                              , mesh          &
                              , chi           &
-                             , solver_option &
+                             , method &
                              , qr=qr )
 
         ! Add increments

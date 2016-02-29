@@ -10,21 +10,22 @@
 !> accurately they have been conserved
 module conservation_algorithm_mod
 
-  use log_mod,        only: log_event,         &
-                            log_scratch_space, &
-                            LOG_LEVEL_INFO
-  use field_mod,      only: field_type 
-  use constants_mod,  only: r_def
-  use compute_total_mass_kernel_mod,   only: compute_total_mass_kernel_type
-  use compute_total_energy_kernel_mod, only: compute_total_energy_kernel_type
-  use compute_total_pv_kernel_mod,     only: compute_total_pv_kernel_type
   use compute_total_aam_kernel_mod,    only: compute_total_aam_kernel_type
-  use quadrature_mod,  only: quadrature_type, GAUSSIAN
-  use function_space_mod, only: function_space_type
-  use psykal_lite_mod,    only: invoke_sum_field
-  use configuration_mod,  only: element_order
-  use mesh_mod,           only: mesh_type
-  use fs_continuity_mod,  only: W3
+  use compute_total_energy_kernel_mod, only: compute_total_energy_kernel_type
+  use compute_total_mass_kernel_mod,   only: compute_total_mass_kernel_type
+  use compute_total_pv_kernel_mod,     only: compute_total_pv_kernel_type
+
+  use constants_mod,             only: r_def
+  use field_mod,                 only: field_type
+  use finite_element_config_mod, only: element_order
+  use fs_continuity_mod,         only: W3
+  use function_space_mod,        only: function_space_type
+  use log_mod,                   only: log_event,         &
+                                       log_scratch_space, &
+                                       LOG_LEVEL_INFO
+  use mesh_mod,                  only: mesh_type
+  use psykal_lite_mod,           only: invoke_sum_field
+  use quadrature_mod,            only: quadrature_type, GAUSSIAN
 
 implicit none
 

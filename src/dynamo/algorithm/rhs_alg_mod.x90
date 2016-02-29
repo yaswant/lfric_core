@@ -8,30 +8,32 @@
 !>@brief wrapper algorithm to compute the rhs of the prognostic
 !>       equations
 module rhs_alg_mod
-  use psykal_lite_mod,                   only: invoke_axpy,               &
-                                               invoke_set_field_scalar,   &
-                                               invoke_sample_flux_kernel, &
-                                               invoke_multiply_field
 
-  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
-  use rotation_kernel_mod,               only: rotation_kernel_type
-  use pressure_gradient_kernel_mod,      only: pressure_gradient_kernel_type
-  use kinetic_energy_gradient_kernel_mod,only: kinetic_energy_gradient_kernel_type
-  use geopotential_gradient_kernel_mod,  only: geopotential_gradient_kernel_type
-  use matrix_vector_mod,                 only: matrix_vector_kernel_type
-  use multiplicity_kernel_mod,           only: multiplicity_kernel_type
-  use rtheta_kernel_mod,                 only: rtheta_kernel_type
-  use mesh_mod,                          only: mesh_type
-  use field_mod,                         only: field_type
-  use solver_mod,                        only: solver_algorithm
   use constants_mod,                     only: r_def
-  use configuration_mod,                 only: solver_option, l_rotating, &
-                                               element_order
-  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
-  use operator_mod,                      only: operator_type
-  use function_space_mod,                only: function_space_type
-  use runtime_constants_mod,             only: runtime_constants_type
+  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use field_bundle_mod,                  only: clone_bundle
+  use field_mod,                         only: field_type
+  use finite_element_config_mod,         only: element_order
+  use formulation_config_mod,            only: rotating
+  use function_space_mod,                only: function_space_type
+  use geopotential_gradient_kernel_mod,  only: geopotential_gradient_kernel_type
+  use kinetic_energy_gradient_kernel_mod,only: kinetic_energy_gradient_kernel_type
+  use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
+  use mesh_mod,                          only: mesh_type
+  use multiplicity_kernel_mod,           only: multiplicity_kernel_type
+  use operator_mod,                      only: operator_type
+  use pressure_gradient_kernel_mod,      only: pressure_gradient_kernel_type
+  use psykal_lite_mod,                   only: invoke_axpy,               &
+                                               invoke_multiply_field,     &
+                                               invoke_sample_flux_kernel, &
+                                               invoke_set_field_scalar
+  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
+  use rotation_kernel_mod,               only: rotation_kernel_type
+  use rrho_kernel_mod,                   only: rrho_kernel_type
+  use rtheta_kernel_mod,                 only: rtheta_kernel_type
+  use runtime_constants_mod,             only: runtime_constants_type
+  use solver_config_mod,                 only: method
+  use solver_mod,                        only: solver_algorithm
 
   implicit none
 
@@ -123,7 +125,7 @@ contains
   if ( .not. l_from_solver ) &
     call invoke( geopotential_gradient_kernel_type( rhs_tmp(1), &
                                                     geopotential, qr ) )
-  if ( l_rotating ) &
+  if ( rotating ) &
     call invoke( rotation_kernel_type( rhs_tmp(1), u, chi, qr ) )
   call invoke(enforce_bc_kernel_type(rhs_tmp(1)) )
   call invoke_set_field_scalar( 0.0_r_def, rhs(1) )

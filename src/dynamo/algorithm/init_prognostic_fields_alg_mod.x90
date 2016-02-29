@@ -12,13 +12,14 @@ module init_prognostic_fields_alg_mod
                                              log_scratch_space, &
                                              LOG_LEVEL_INFO,    &
                                              LOG_LEVEL_TRACE
-  use constants_mod,                   only: r_def 
+  use constants_mod,                   only: r_def
 
-  ! Configuration and restart/checkpoint options  
-  use configuration_mod,               only: l_nonlinear, element_order  
-  use restart_control_mod,             only: restart_type    
+  ! Configuration and restart/checkpoint options
+  use finite_element_config_mod,       only: element_order
+  use formulation_config_mod,          only: nonlinear
+  use restart_control_mod,             only: restart_type
   ! I/O tools
-  use field_io_mod,                    only: read_state_netcdf                                                 
+  use field_io_mod,                    only: read_state_netcdf
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                 only: invoke_set_field_scalar
@@ -33,9 +34,6 @@ module init_prognostic_fields_alg_mod
   use field_mod,                       only: field_type
   use function_space_mod,              only: function_space_type
   use quadrature_mod,                  only: quadrature_type, GAUSSIAN
-
-  ! Initialisation tools
-  use initialisation_mod,              only : read_initialisation_namelist
 
   ! Handles
   use fs_continuity_mod,               only: W0, W1, W2, W3
@@ -63,21 +61,18 @@ contains
     type (mesh_type), intent(in) :: mesh
     ! Coordinate fields
     type( field_type ), intent( inout ) :: chi(3)
-    ! Prognostic fields    
+    ! Prognostic fields
     type( field_type ), intent( inout ) :: u, rho, theta, xi
     ! Control
-    type( restart_type ), intent(in)    :: restart
+    type( restart_type ), intent(in) :: restart
 
-    type( function_space_type )      :: fs
-    type( quadrature_type )          :: qr
-    type( field_type ), allocatable  :: state(:)
+    type( function_space_type )     :: fs
+    type( quadrature_type )         :: qr
+    type( field_type ), allocatable :: state(:)
 
-    integer                          :: n_fields
+    integer :: n_fields
 
-    qr = quadrature_type(element_order+3, GAUSSIAN)
-
-    ! Read intialisation namelist in Dynamo
-    call read_initialisation_namelist()
+    qr = quadrature_type( element_order + 3, GAUSSIAN )
 
     !=== Initialise global prognostic fields ==================================!
 
@@ -89,10 +84,10 @@ contains
       call invoke_set_field_scalar(0.0_r_def, u)
       call invoke_set_field_scalar(0.0_r_def, xi) 
       ! Initialise Rho (different for nonlinear or linear formulation)
-      if ( l_nonlinear ) then
+      if ( nonlinear ) then
         call invoke( initial_rho_kernel_type ( rho, chi, qr ) )
       else
-        call invoke_set_field_scalar(0.0_r_def, rho)                        
+        call invoke_set_field_scalar(0.0_r_def, rho)
       end if
       call log_event( "Dynamo: Initialised prognostic fields", LOG_LEVEL_INFO )
 

@@ -12,14 +12,16 @@
 !> @details Accessor functions for the w3_kernel class are defined in this module.
 
 module compute_mass_matrix_kernel_w3_mod
-use constants_mod,           only: r_def
-use kernel_mod,              only: kernel_type
-use argument_mod,            only: arg_type, func_type,                      &
-                                   GH_OPERATOR, GH_FIELD, GH_READ, GH_WRITE, &
-                                   W0, W3, GH_BASIS, GH_DIFF_BASIS, &
-                                   CELLS
-use coordinate_jacobian_mod, only: coordinate_jacobian
-use configuration_mod,       only: rehabilitate
+
+use argument_mod,              only: arg_type, func_type,                      &
+                                     GH_OPERATOR, GH_FIELD, GH_READ, GH_WRITE, &
+                                     W0, W3, GH_BASIS, GH_DIFF_BASIS,          &
+                                     CELLS
+use coordinate_jacobian_mod,   only: coordinate_jacobian
+use constants_mod,             only: r_def
+use finite_element_config_mod, only: rehabilitate
+use kernel_mod,                only: kernel_type
+
 implicit none
 
 !-------------------------------------------------------------------------------
@@ -59,14 +61,7 @@ contains
 type(compute_mass_matrix_kernel_w3_type) function compute_mass_matrix_constructor() result(self)
   return
 end function compute_mass_matrix_constructor
-  
-subroutine compute_mass_matrix_w3_code(cell, nlayers, ncell_3d,        &
-                                       mm,                             &
-                                       chi1, chi2, chi3,               & ! dof vectors                         
-                                       ndf_w3, basis_w3,               &
-                                       ndf_chi, undf_chi,              &
-                                       map_chi, diff_basis_chi, & ! arrays
-                                       nqp_h, nqp_v, wqp_h, wqp_v )
+
 !> @brief This subroutine computes the mass matrix for the w3 space
 !! @param[in] cell Integer: The cell number
 !! @param[in] nlayers Integer: The number of layers.
@@ -86,6 +81,16 @@ subroutine compute_mass_matrix_w3_code(cell, nlayers, ncell_3d,        &
 !! @param[in] nqp_v Integer number of vertical quadrature points
 !! @param[in] wqp_h Real array. Quadrature weights horizontal
 !! @param[in] wqp_v Real array. Quadrature weights vertical
+!!
+subroutine compute_mass_matrix_w3_code(cell, nlayers, ncell_3d,        &
+                                       mm,                             &
+                                       chi1, chi2, chi3,               & ! dof vectors
+                                       ndf_w3, basis_w3,               &
+                                       ndf_chi, undf_chi,              &
+                                       map_chi, diff_basis_chi, & ! arrays
+                                       nqp_h, nqp_v, wqp_h, wqp_v )
+
+  implicit none
 
   !Arguments
   integer, intent(in)     :: cell, nqp_h, nqp_v
@@ -117,7 +122,7 @@ subroutine compute_mass_matrix_w3_code(cell, nlayers, ncell_3d,        &
   !loop over layers: Start from 1 as in this loop k is not an offset
   do k = 1, nlayers
     ik = k + (cell-1)*nlayers
-     
+
     ! indirect the chi coord field here
     do df = 1, ndf_chi
       chi1_e(df) = chi1(map_chi(df) + k - 1)
@@ -150,13 +155,11 @@ subroutine compute_mass_matrix_w3_code(cell, nlayers, ncell_3d,        &
           end do
         end do
       end do
-      do df = df2, 1, -1  
+      do df = df2, 1, -1
         mm(df,df2,ik) = mm(df2,df,ik)
-      end do       
-    end do    
+      end do
+    end do
   end do ! end of k loop
-
-
 
 end subroutine compute_mass_matrix_w3_code
 

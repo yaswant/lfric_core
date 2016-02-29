@@ -8,28 +8,34 @@
 !>@brief wrapper algorithm to compute the advection of the prognostic
 !>       equations
 module advection_alg_mod
-  use psykal_lite_mod,                   only: invoke_set_field_scalar, &
-                                               invoke_flux_rhs, &
-                                               invoke_multiply_field
- 
-  use rtheta_kernel_mod,                 only: rtheta_kernel_type
-  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
-  use vorticity_advection_kernel_mod,    only: vorticity_advection_kernel_type
-  use rtheta_supg_kernel_mod,            only: rtheta_supg_kernel_type
-  use matrix_vector_mod,                 only: matrix_vector_kernel_type
-  use transpose_matrix_vector_mod,       only: transpose_matrix_vector_kernel_type
 
-  use mesh_mod,                          only: mesh_type
-  use field_mod,                         only: field_type
-  use solver_mod,                        only: solver_algorithm
-  use constants_mod,                     only: r_def
-  use configuration_mod,                 only: solver_option, dt, l_supg, &
-                                               DIAGONAL_PRE_COND, element_order
-  use quadrature_mod,                    only: quadrature_type, GAUSSIAN
-  use operator_mod,                      only: operator_type
-  use function_space_mod,                only: function_space_type
-  use runtime_constants_mod,             only: runtime_constants_type
-  use field_bundle_mod,                  only: bundle_ax
+  use constants_mod,                  only: r_def
+  use enforce_bc_kernel_mod,          only: enforce_bc_kernel_type
+  use field_bundle_mod,               only: bundle_ax
+  use field_mod,                      only: field_type
+  use finite_element_config_mod,      only: element_order
+  use formulation_config_mod,         only: supg
+  use function_space_mod,             only: function_space_type
+  use matrix_vector_kernel_mod,       only: matrix_vector_kernel_type
+  use mesh_mod,                       only: mesh_type
+  use operator_mod,                   only: operator_type
+  use psykal_lite_mod,                only: invoke_set_field_scalar, &
+                                            invoke_flux_rhs, &
+                                            invoke_multiply_field
+  use quadrature_mod,                 only: quadrature_type, GAUSSIAN
+  use rrho_kernel_mod,                only: rrho_kernel_type
+  use rtheta_kernel_mod,              only: rtheta_kernel_type
+  use rtheta_supg_kernel_mod,         only: rtheta_supg_kernel_type
+  use runtime_constants_mod,          only: runtime_constants_type
+  use solver_config_mod,              only: method,         &
+                                            preconditioner, &
+                                            solver_preconditioner_diagonal
+  use solver_mod,                     only: solver_algorithm
+  use timestepping_config_mod,        only: dt
+  use transpose_matrix_vector_kernel_mod, &
+                                      only: transpose_matrix_vector_kernel_type
+  use vorticity_advection_kernel_mod, only: vorticity_advection_kernel_type
+  use vorticity_rhs_kernel_mod,       only: vorticity_rhs_kernel_type
 
   implicit none
 
@@ -114,17 +120,17 @@ contains
   call invoke_set_field_scalar( 0.0_r_def, advection(1) ) 
   call invoke_flux_rhs( advection(1), u, rho, chi, qr ) 
   call invoke_set_field_scalar( 0.0_r_def, mass_flux ) 
-  call solver_algorithm( mass_flux, advection(1), mesh, chi, solver_option, &
+  call solver_algorithm( mass_flux, advection(1), mesh, chi, method, &
                          mm=mm_w2, mmd=mmd_w2, &
-                         preconditioner_choice=DIAGONAL_PRE_COND)
+                         preconditioner_choice=solver_preconditioner_diagonal)
 
   ! 2) Vorticity advection dt*( F/rho \cross curl(u))
   call invoke_set_field_scalar( 0.0_r_def, r_xi )
   call invoke( transpose_matrix_vector_kernel_type(r_xi, u, curl) )
   call invoke( enforce_bc_kernel_type( r_xi ) )
-  call solver_algorithm( xi, r_xi, mesh, chi, solver_option, &
+  call solver_algorithm( xi, r_xi, mesh, chi, method, &
                          mm=mm_w1, mmd=mmd_w1, &
-                         preconditioner_choice=DIAGONAL_PRE_COND) 
+                         preconditioner_choice=solver_preconditioner_diagonal)
   call invoke_set_field_scalar( 0.0_r_def, advection(1) ) 
   call invoke( vorticity_advection_kernel_type( advection(1), mass_flux, rho, xi, chi, qr ) )
   call invoke( enforce_bc_kernel_type( advection(1) ) )
@@ -132,7 +138,7 @@ contains
   ! 3) theta_advection dt*( F/rho . grad(theta) )
   call invoke_set_field_scalar( 0.0_r_def, advection(2) )
   call invoke( rtheta_kernel_type( advection(2), theta, mass_flux, rho, qr) )
-  if ( l_supg ) &
+  if ( supg ) &
     call invoke( rtheta_supg_kernel_type( advection(2),     &
                                 theta_np1, theta_n, mass_flux, rho, chi, qr) )
 
@@ -140,7 +146,7 @@ contains
   call invoke_set_field_scalar( 0.0_r_def, r_rho )
   call invoke( matrix_vector_kernel_type( r_rho, mass_flux, div) )
   call invoke_multiply_field(-1.0_r_def, r_rho, r_rho) 
-  call solver_algorithm( advection(3), r_rho, mesh, chi, solver_option, qr=qr )
+  call solver_algorithm( advection(3), r_rho, mesh, chi, method, qr=qr )
 
   ! Add in Dt factor
   call bundle_ax( dt, advection, advection, 3 )

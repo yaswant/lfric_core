@@ -9,19 +9,19 @@
 !>       3D equations
 module iter_timestep_alg_mod
 
+  use constants_mod,                     only: r_def
   use log_mod,                           only: log_event,         &
                                                log_scratch_space, &
                                                LOG_LEVEL_INFO,    &
                                                LOG_LEVEL_TRACE
-  use constants_mod,                     only: r_def    
 
-  ! Configuration and restart/checkpoint options                                                      
-  use configuration_mod,                 only: solver_option, dt, &
-                                               l_newton_krylov,   &
-                                               ALPHA, BETA,       &
-                                               N_OUTER_ITER, N_INNER_ITER, &
-                                               element_order
-  use restart_control_mod,               only: restart_type
+  ! Configuration and restart/checkpoint options
+  use finite_element_config_mod, only : element_order
+  use formulation_config_mod,    only : newton_krylov
+  use restart_control_mod,       only : restart_type
+  use solver_config_mod,         only : method
+  use timestepping_config_mod,   only : dt, alpha, beta, &
+                                        outer_iterations, inner_iterations
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                   only: invoke_axpby,                  &
@@ -232,7 +232,7 @@ contains
       call invoke_set_field_scalar(0.0_r_def, u)
       call invoke_set_field_scalar(0.0_r_def, r_u) 
       call invoke( initial_u_kernel_type( r_u, chi, qr ) )
-      call solver_algorithm(u, r_u, mesh, chi, solver_option, mm=mm_w2)
+      call solver_algorithm(u, r_u, mesh, chi, method, mm=mm_w2)
     end if
 
     !--- Intial output and output frequency -----------------------------------! 
@@ -258,21 +258,21 @@ contains
        call copy_bundle(state_np1, state_n, 3)
        call rhs_alg(rhs_n, BETA*dt, state_n, runtime_constants, .false.)
        !=== Section 3.1:  Outer (advection loop) ==============================!
-       do outer = 1,N_OUTER_ITER
+       do outer = 1,outer_iterations
           ! Set advecting velocity & terms
           call bundle_axpby(ALPHA, state_np1, BETA, state_n, state_adv, 3)
           call advection_alg(rhs_adv, state_adv, state_np1, state_n,  &
                xi, runtime_constants)
           !=== Section 3.2: Inner (nonlinear, coriolis loop) ===================!
-          do inner = 1,N_INNER_ITER
+          do inner = 1,inner_iterations
              call rhs_alg(rhs_np1, -ALPHA*dt, state_np1, runtime_constants, .false.)
-             
+
              ! === Section 3.3: Solve for increments ============================!
              ! Add on advective terms: rhs = rhs_n - rhs_np1 + rhs_adv
              ! (reuse rhs_np1 for rhs)
              call bundle_axpy(-1.0_r_def, rhs_np1, rhs_n, rhs_np1, 3)
              call add_bundle(rhs_np1, rhs_adv, rhs_np1, 3)
-             
+
              write( log_scratch_space, '(A,I6,2I3)' ) &
                   'loop indices (n, o, i): ', timestep, outer, inner
              call log_event( log_scratch_space, LOG_LEVEL_INFO )

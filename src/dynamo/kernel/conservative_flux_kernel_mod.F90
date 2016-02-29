@@ -10,11 +10,12 @@
 !> @brief Kernel which computes the fluxes for the split transport scheme
 
 module conservative_flux_kernel_mod
-use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def
-use argument_mod,            only : arg_type, func_type,                  &
-                                    GH_FIELD, GH_WRITE, GH_READ,          &
-                                    W0, W2, W3, GH_BASIS, CELLS
+
+use argument_mod,  only : arg_type, func_type,                  &
+                          GH_FIELD, GH_WRITE, GH_READ,          &
+                          W0, W2, W3, GH_BASIS, CELLS
+use constants_mod, only : r_def
+use kernel_mod,    only : kernel_type
 
 implicit none
 
@@ -95,13 +96,13 @@ subroutine conservative_flux_code( nlayers,              &
                                    direction,            &
                                    deltaT )
 
-  use cosmic_flux_mod,      only : calc_stencil_ordering,                &
-                                   frac_and_int_part,                    &
-                                   calc_integration_limits,              &
-                                   populate_array,                       &
-                                   map_cell_index,                       &
-                                   return_part_mass
-  use configuration_mod,    only : x_direction, y_direction
+  use cosmic_flux_mod,    only : calc_stencil_ordering,                &
+                                 frac_and_int_part,                    &
+                                 calc_integration_limits,              &
+                                 populate_array,                       &
+                                 map_cell_index,                       &
+                                 return_part_mass
+  use flux_direction_mod, only : x_direction, y_direction
 
   !Arguments
   integer, intent(in)                                   :: nlayers

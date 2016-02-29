@@ -1,26 +1,27 @@
 module nodal_output_alg_mod
 
-
-use constants_mod,      only: r_def, str_max_filename
-use field_mod,          only: field_type
-use mesh_mod,           only: mesh_type
-use log_mod,            only: log_event, log_scratch_space, LOG_LEVEL_INFO
-use multiplicity_kernel_mod, &
-                        only: multiplicity_kernel_type
-use psykal_lite_mod,    only: invoke_set_field_scalar, &
-                              invoke_nodal_coordinates_kernel, &
-                              invoke_copy_field_data, &
-                              invoke_convert_hcurl_field, &
-                              invoke_convert_hdiv_field, &
-                              invoke_divide_field, &
-                              invoke_convert_cart2sphere_vector, &
-                              invoke_pointwise_convert_xyz2llr, &
-                              invoke_compute_dof_level_kernel, &
-                              invoke_write_fields
-use configuration_mod,  only: l_spherical, &
-                              element_order
-use function_space_mod, only: function_space_type
-use fs_continuity_mod,  only: W0, W1, W2, W3
+use base_mesh_config_mod,      only: geometry, &
+                                     base_mesh_geometry_spherical
+use constants_mod,             only: r_def, str_max_filename
+use field_mod,                 only: field_type
+use finite_element_config_mod, only: element_order
+use fs_continuity_mod,         only: W0, W1, W2, W3
+use function_space_mod,        only: function_space_type
+use log_mod,                   only: log_event,         &
+                                     log_scratch_space, &
+                                     LOG_LEVEL_INFO
+use mesh_mod,                  only: mesh_type
+use multiplicity_kernel_mod,   only: multiplicity_kernel_type
+use psykal_lite_mod,           only: invoke_set_field_scalar, &
+                                     invoke_nodal_coordinates_kernel, &
+                                     invoke_copy_field_data, &
+                                     invoke_convert_hcurl_field, &
+                                     invoke_convert_hdiv_field, &
+                                     invoke_divide_field, &
+                                     invoke_convert_cart2sphere_vector, &
+                                     invoke_pointwise_convert_xyz2llr, &
+                                     invoke_compute_dof_level_kernel, &
+                                     invoke_write_fields
 
 implicit none
 
@@ -80,7 +81,7 @@ subroutine nodal_output_alg(field, chi, fname, mesh)
     ! (3) If in spherical geometry convert the vector spaces to standard SI units
     ! (m/s) in orthogonal directions and convert the coordinate field to
     ! (longitude, latitude, radius)
-    if ( l_spherical ) then
+    if ( geometry == base_mesh_geometry_spherical ) then
       if ( output_fs == W1 .or. output_fs == W2) then
         do i = 1,output_dim
           call invoke_divide_field( nodal_output(i), nodal_multiplicity, nodal_output(i) ) 

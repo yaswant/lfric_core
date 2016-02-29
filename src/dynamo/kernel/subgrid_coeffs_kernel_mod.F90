@@ -26,23 +26,23 @@
 !>         since it is assumed that ndf_w3 = 1 with stencil_map(1,:) containing
 !>         the relevant dofmaps.
 module subgrid_coeffs_kernel_mod
-use kernel_mod,              only : kernel_type
-use constants_mod,           only : r_def
-use configuration_mod,       only : CONSTANT_SUBGRID, &
-                                    CONSTANT_POSITIVE, &
-                                    LINEAR_CENTERED_DIFF, &
-                                    SUPERBEE, &
-                                    MINMOD, &
-                                    PPM_NO_LIMITER, &
-                                    PPM_POSITIVE_ONLY, &
-                                    PPM_POSITIVE_MONOTONE, &
-                                    rho_stencil_length
 
-use argument_mod,            only : arg_type, func_type,           &
-                                    GH_FIELD, GH_INC, GH_WRITE,    &
-                                    W3,                            &
-                                    GH_BASIS,                      &
-                                    CELLS
+use argument_mod,       only : arg_type, func_type,        &
+                               GH_FIELD, GH_INC, GH_WRITE, &
+                               W3,                         &
+                               GH_BASIS,                   &
+                               CELLS
+use constants_mod,      only : r_def
+use subgrid_config_mod, only : subgrid_rho_approximation_constant_subgrid,     &
+                               subgrid_rho_approximation_constant_positive,    &
+                               subgrid_rho_approximation_linear_centered_diff, &
+                               subgrid_rho_approximation_linear_superbee,      &
+                               subgrid_rho_approximation_linear_minmod,        &
+                               subgrid_rho_approximation_ppm_no_limiter,       &
+                               subgrid_rho_approximation_ppm_positive_only,    &
+                               subgrid_rho_approximation_ppm_positive_monotone,&
+                               rho_stencil_length
+use kernel_mod,         only : kernel_type
 
 implicit none
 
@@ -127,22 +127,22 @@ subroutine subgrid_coeffs_code(                                               &
   do k=0,nlayers-1
 
     select case(subgridrho_option)
-      case (CONSTANT_SUBGRID)
+      case (subgrid_rho_approximation_constant_subgrid)
         a0(stencil_map(1,1)) = rho(stencil_map(1,1))
         a1(stencil_map(1,1)) = 0.0_r_def
         a2(stencil_map(1,1)) = 0.0_r_def
 
-      case (CONSTANT_POSITIVE)
+      case (subgrid_rho_approximation_constant_positive)
         a0(stencil_map(1,1)) = max(rho(stencil_map(1,1)),0.0_r_def)
         a1(stencil_map(1,1)) = 0.0_r_def
         a2(stencil_map(1,1)) = 0.0_r_def
 
-      case (LINEAR_CENTERED_DIFF)
+      case (subgrid_rho_approximation_linear_centered_diff)
         a1(stencil_map(1,1)) = (rho(stencil_map(1,3))-rho(stencil_map(1,2)))/2.0_r_def
         a0(stencil_map(1,1)) = rho(stencil_map(1,1))-a1(stencil_map(1,1))*0.5_r_def
         a2(stencil_map(1,1)) = 0.0_r_def
 
-      case (SUPERBEE)
+      case (subgrid_rho_approximation_linear_superbee)
         sigma1 = minmod_function(                                             &
                       rho(stencil_map(1,3))-rho(stencil_map(1,1)),            &
                       2.0_r_def*(rho(stencil_map(1,1))-rho(stencil_map(1,2))) &
@@ -155,14 +155,14 @@ subroutine subgrid_coeffs_code(                                               &
         a0(stencil_map(1,1)) = rho(stencil_map(1,1))-a1(stencil_map(1,1))*0.5_r_def
         a2(stencil_map(1,1)) = 0.0_r_def
 
-      case (MINMOD)
+      case (subgrid_rho_approximation_linear_minmod)
         a1(stencil_map(1,1)) = minmod_function(                               &
                                 rho(stencil_map(1,1))-rho(stencil_map(1,2)) , &
                                 rho(stencil_map(1,3))-rho(stencil_map(1,1)) )
         a0(stencil_map(1,1)) = rho(stencil_map(1,1))-a1(stencil_map(1,1))*0.5_r_def
         a2(stencil_map(1,1)) = 0.0_r_def
 
-      case (PPM_NO_LIMITER)
+      case (subgrid_rho_approximation_ppm_no_limiter)
         positive=.false.
         monotone=.false.
         call return_ppm_output(rho(stencil_map(1,1:5)),coeffs,positive,monotone)
@@ -170,10 +170,11 @@ subroutine subgrid_coeffs_code(                                               &
         a1(stencil_map(1,1)) = coeffs(2)
         a2(stencil_map(1,1)) = coeffs(3)
 
-      case (PPM_POSITIVE_ONLY,PPM_POSITIVE_MONOTONE)
+      case (subgrid_rho_approximation_ppm_positive_only, &
+            subgrid_rho_approximation_ppm_positive_monotone)
         positive=.true.
         monotone=.false.
-        if ( subgridrho_option == PPM_POSITIVE_MONOTONE) monotone=.true.
+        if ( subgridrho_option == subgrid_rho_approximation_ppm_positive_monotone) monotone=.true.
         call return_ppm_output(rho(stencil_map(1,1:5)),coeffs,positive,monotone)
         a0(stencil_map(1,1)) = coeffs(1)
         a1(stencil_map(1,1)) = coeffs(2)
