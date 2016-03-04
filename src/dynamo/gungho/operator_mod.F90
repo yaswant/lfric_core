@@ -14,6 +14,7 @@ module operator_mod
 
   use constants_mod,            only : r_def
   use function_space_mod,       only : function_space_type
+  use mesh_mod,                 only : mesh_type
     
   implicit none
 
@@ -49,11 +50,15 @@ module operator_mod
 
     !> function returns the enumerated integer for the functions_spaces which
     !! the local stencil maps from
-    procedure :: which_fs_from
+    procedure, public :: which_fs_from
 
     !> function returns the enumerated integer for the functions_spaces which
     !! the local stencil mapsto
-    procedure :: which_fs_to
+    procedure, public :: which_fs_to
+
+    !> Returns a pointer to the mesh on which the function spaces, used by
+    !> this operator, are built
+    procedure, public :: get_mesh
 
  end type operator_type
 
@@ -155,5 +160,16 @@ contains
     return
   end function which_fs_to
 
+  function get_mesh(self) result(mesh)
+
+    implicit none
+
+    class (operator_type), intent(in) :: self
+    type(mesh_type), pointer :: mesh
+
+    mesh => self%fs_from%get_mesh()
+
+    return
+  end function get_mesh
 
 end module operator_mod
