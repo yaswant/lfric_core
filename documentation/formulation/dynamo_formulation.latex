@@ -961,7 +961,7 @@ and in Figure \ref{fig:Spherical-Rotating-Gravity-wave-test_p1} for higher order
 \par\end{centering}
 
 \begin{centering}
-\subfloat[]{\includegraphics[scale=0.5]{figures/GW_C24L10K0_theta_rotating_SI_dt10.eps}}\subfloat[]{\includegraphics[scale=0.5]{figures/GW_C24L10K0_theta_rotating_SI_dt10_xz.eps}}
+\subfloat[]{\includegraphics[scale=0.5]{GW_C24L10K0_theta_rotating_SI_dt10}}\subfloat[]{\includegraphics[scale=0.5]{GW_C24L10K0_theta_rotating_SI_dt10_xz}}
 \par\end{centering}
 
 \centering{}\protect\caption{\label{fig:Spherical-Rotating-Gravity-wave-test}Rotating gravity

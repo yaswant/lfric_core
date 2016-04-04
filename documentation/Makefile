@@ -14,7 +14,7 @@ API_COLLECTIONS = $(patsubst Doxyfile.%,api/%,$(wildcard Doxyfile.*))
 most: design-documents api-documents
 
 .PHONY: design-documents
-documents: $(DOCUMENT_DIRECTORIES)
+design-documents: $(DOCUMENT_DIRECTORIES)
 
 .PHONY: api-documents
 api-documents: $(API_COLLECTIONS)
