@@ -1,183 +1,812 @@
 !-------------------------------------------------------------------------------
-! (c) The copyright relating to this work is owned jointly by the Crown,
-! Met Office and NERC 2012.
-! However, it has been created by John Thuburn.
+! (c) The copyright relating to this work is owned jointly by the Crown, 
+! Met Office and NERC 2014. 
+! However, it has been created with the help of the GungHo Consortium, 
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
 !-------------------------------------------------------------------------------
-!>  @brief    Produce a cubed-sphere grid.
+!>  @brief      Module to define the gencube_ps_type, a subclass of the
+!!              ugrid_generator_type which generates a cubed-sphere mesh in a
+!!              format suitable for storage as a ugrid file.
 !!
-!!  @details  Implements the mesh generator interface to produce a cubed-sphere
-!!            grid.
-!!
-!!  <pre>
-!!  Program to generate a cubed sphere grid, including cross-
-!!  reference tables of adjacent faces, edges and vertices,
-!!  coordinates of faces and vertices, and lengths of edges
-!!  and areas of faces.
-!!
-!!          .....
-!!         :  3  |
-!!         :     |
-!!          -----
-!!   -----  .....  .....  -----
-!!  |  5  :|  1  :|  2  :|  4  :
-!!  |     :|     :|     :|     :
-!!   .....  -----  -----  .....
-!!          .....
-!!         |  6  :
-!!         |     :
-!!          -----
-!!
-!!  Solid lines: left and bottom edges of panel
-!!  Dotted lines: right and top edges of panel
-!!
-!!  John Thuburn Nov 2011
-!!  </pre>
+!!  @details    Type implements the ugrid_generator_type interface to
+!!              construct a cubed-sphere mesh.  All required connectivity is
+!!              calculated and made available to the ugrid writer.
+!!         
+!!      +---+
+!!      | 5 |
+!!  +---+---+---+---+
+!!  | 1 | 2 | 3 | 4 |
+!!  +---+---+---+---+
+!!      | 6 |
+!!      +---+
+!! 
+!!  Paul Slavin <slavinp@cs.man.ac.uk>
 !-------------------------------------------------------------------------------
 module gencube_mod
-use constants_mod,       only : r_def, str_def, PI
-use ugrid_generator_mod, only : ugrid_generator_type
+!-------------------------------------------------------------------------------
+use ugrid_generator_mod,   only : ugrid_generator_type
+use constants_mod,         only : r_def, i_def
+use log_mod,               only : log_event, LOG_LEVEL_ERROR
+use reference_element_mod, only : W, S, E, N, SWB, SEB, NWB, NEB
 implicit none
 private
-
 !-------------------------------------------------------------------------------
-! Module parameters
+! Mesh Vertex directions: local aliases for reference_element_mod values
+integer, parameter     :: NW = NWB
+integer, parameter     :: NE = NEB
+integer, parameter     :: SE = SEB
+integer, parameter     :: SW = SWB
+! Prefix for error messages
+character(len=*), parameter  :: prefix = "[Cubed-Sphere Mesh] "
 !-------------------------------------------------------------------------------
-
-!Number of grids in multigrid hierarchy
-integer, parameter :: NGRIDS = 1
-
-!Number of smoothing iterations. must be at least 1 for consistency of h
-!operator.
-integer, parameter :: NSMOOTH = 1
-
-real(kind=r_def), parameter :: PIBY4 = PI / 4.0_r_def
-
-!-------------------------------------------------------------------------------
-!> @brief    Cubed sphere generator type (function object).
-!!
-!! @details  Implements abstract mesh generator type.
-!-------------------------------------------------------------------------------
-
-! Some representative variable descriptions. (Namings follow a pattern.)
-
-! nfacex : number of faces
-! neoff  : number of edges of each face
-! neofv  : number of edges associated with each vertex 
-! eofv   : edges corresponding to each vertex
-! fnxtf  : faces next to each face
-! vlong  : Longitude of each vertex
-
-type, extends(ugrid_generator_type), public :: gencube_type
+type, extends(ugrid_generator_type), public        :: gencube_ps_type
   private
-
-  !n x n cells on each panel smallest and largest n
-  integer                       :: n0
-  integer                       :: nfacex
-  integer                       :: nedgex
-  integer                       :: nvertx
-  integer         , allocatable :: neoff(:,:)
-  integer         , allocatable :: neofv(:,:)
-  integer         , allocatable :: nface(:)
-  integer         , allocatable :: nedge(:)
-  integer         , allocatable :: nvert(:)
-  integer         , allocatable :: fnxtf(:,:,:)
-  integer         , allocatable :: eoff(:,:,:)
-  integer         , allocatable :: voff(:,:,:)
-  integer         , allocatable :: fnxte(:,:,:)
-  integer         , allocatable :: vofe(:,:,:)
-  integer         , allocatable :: fofv(:,:,:)
-  integer         , allocatable :: eofv(:,:,:)
-  real(kind=r_def), allocatable :: flong(:,:)
-  real(kind=r_def), allocatable :: flat(:,:)
-  real(kind=r_def), allocatable :: vlong(:,:)
-  real(kind=r_def), allocatable :: vlat(:,:)
-  real(kind=r_def), allocatable :: farea(:,:)
-  real(kind=r_def), allocatable :: ldist(:,:)
-  real(kind=r_def), allocatable :: ddist(:,:)
-
+  integer                            :: ndivs
+  integer, allocatable               :: cell_next(:,:)     ! 
+  integer, allocatable               :: mesh(:,:)          ! 
+  integer, allocatable               :: edges_on_cell(:,:) ! 
+  integer, allocatable               :: verts_on_edge(:,:) ! 
+  real(kind=r_def), allocatable      :: vert_coords(:,:)   ! 
 contains
+  procedure :: calc_adjacency
+  procedure :: calc_face_to_vert
+  procedure :: calc_edges
+  procedure :: calc_coords
   procedure :: get_dimensions
   procedure :: get_coordinates
   procedure :: get_connectivity
   procedure :: generate
-  procedure :: write_data
-end type
-
-integer, parameter :: QUADS_NUM_NODES_PER_FACE  = 4
-integer, parameter :: QUADS_NUM_EDGES_PER_FACE  = 4
-integer, parameter :: QUADS_NUM_NODES_PER_EDGE  = 2
-integer, parameter :: QUADS_NUM_EDGE_NEIGHBOURS = 2
-integer, parameter :: QUADS_NUM_FACE_NEIGHBOURS = 4 
-
+  procedure :: write_mesh
+  procedure :: orient_lfric
+end type gencube_ps_type
 !-------------------------------------------------------------------------------
-! Constructors
-!-------------------------------------------------------------------------------
-
-interface gencube_type
-  module procedure constructor
-end interface gencube_type
-
-!-------------------------------------------------------------------------------
-! Contained functions/subroutines
+interface gencube_ps_type
+  module procedure         gencube_ps_constructor
+end interface gencube_ps_type
 !-------------------------------------------------------------------------------
 contains
-
 !-------------------------------------------------------------------------------
-!>  @brief   Constructor for cubed-sphere grids.
+!>  @brief       Constructor for gencube_ps_type
 !!
-!!  @param[in]  half_num_cells_on_panel_edge   Half the number of cells along 
-!!                                             the edge of one panel.
+!!  @details     Accepts mesh dimension for initialisation and validation.
+!!
+!!  @param[in]   ndivs  Number of subdivisions per panale of the cubed-sphere.
+!!                      Each panel will contain ndivs*ndivs faces.
 !-------------------------------------------------------------------------------
+type(gencube_ps_type) function gencube_ps_constructor(ndivs) &
+                      result(self)
 
-type(gencube_type) function constructor(half_num_cells_on_panel_edge) result(self)
   implicit none
 
-  !Arguments
-  integer, intent(in) :: half_num_cells_on_panel_edge
+  integer(kind=i_def), intent(in)                   :: ndivs
 
-  !Internal variables
-  integer :: n0, nx
 
-  !n x n cells on each panel smallest and largest n
-  n0          = half_num_cells_on_panel_edge
-  nx          = n0*(2**(NGRIDS-1))
+  if(ndivs < 3) then
+    call log_event(prefix//"Invalid dimension argument.", LOG_LEVEL_ERROR)
+  end if
 
-  self%n0     = n0
-  self%nfacex = 6*nx*nx
-  self%nedgex = 2*self%nfacex
-  self%nvertx = self%nfacex + 2
-
-  !Allocate storage
-  allocate (self%neoff (self%nfacex,    NGRIDS))
-  allocate (self%neofv (self%nvertx,    NGRIDS))
-  allocate (self%nface (                NGRIDS))
-  allocate (self%nedge (                NGRIDS))
-  allocate (self%nvert (                NGRIDS))
-  allocate (self%fnxtf (self%nfacex, 4, NGRIDS))
-  allocate (self%eoff  (self%nfacex, 4, NGRIDS))
-  allocate (self%voff  (self%nfacex, 4, NGRIDS))
-  allocate (self%fnxte (self%nedgex, 2, NGRIDS))
-  allocate (self%vofe  (self%nedgex, 2, NGRIDS))
-  allocate (self%fofv  (self%nvertx, 4, NGRIDS))
-  allocate (self%eofv  (self%nvertx, 4, NGRIDS))
-  allocate (self%flong (self%nfacex,    NGRIDS))
-  allocate (self%flat  (self%nfacex,    NGRIDS))
-  allocate (self%vlong (self%nvertx,    NGRIDS))
-  allocate (self%vlat  (self%nvertx,    NGRIDS))
-  allocate (self%farea (self%nfacex,    NGRIDS))
-  allocate (self%ldist (self%nedgex,    NGRIDS))
-  allocate (self%ddist (self%nedgex,    NGRIDS))
+  self%ndivs = ndivs
 
   return
-end function constructor
 
+end function gencube_ps_constructor
 !-------------------------------------------------------------------------------
-!>  @brief    Gets number of nodes and other mesh dimensions.
+!>  @brief       For each cell, calculates the set of cells to which it is
+!!               adjacent.
 !!
-!!  @details  Routine provides the number of nodes, edges and faces; also the 
-!!            number of nodes per face etc.
+!!  @details     Allocates and populates the instance's cell_next(:,:) array
+!!               with the id of each cell to which the index cell is adjacent.
 !!
-!!  @param[in]   self                 The cubed-sphere function object.
+!!  @param[in]   self      The gencube_ps_type instance reference.
+!!  @param[out]  cell_next A rank 2 (4,ncells)-sized array containing the
+!!                         adjacency map.
+!-------------------------------------------------------------------------------
+subroutine calc_adjacency(self, cell_next)
+
+  implicit none
+
+  class(gencube_ps_type), intent(in)                 :: self
+  integer, allocatable, intent(out)                  :: cell_next(:,:)
+
+  integer        :: ndivs, ncells, cpp
+  integer        :: cell, astat
+
+
+  ndivs = self%ndivs
+  cpp = self%ndivs*self%ndivs
+  ncells = 6*self%ndivs*self%ndivs
+
+  allocate(cell_next(4, ncells), stat=astat)
+
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate cell_next.", &
+                                        LOG_LEVEL_ERROR)
+
+  cell_next = 0
+
+  ! Panel I
+  do cell = 1, cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= ndivs) then
+      cell_next(N, cell) = 4*cpp+1+(cell-1)*ndivs
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = cpp+1+cell-ndivs
+    end if
+    ! Bottom edge
+    if(cell > cpp-ndivs) then
+      cell_next(S, cell) = 5*cpp+1+(cpp-cell)*ndivs
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = 3*cpp+(cell/ndivs+1)*ndivs
+    end if
+  end do
+
+  ! Panel II
+  do cell = cpp+1, 2*cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= cpp+ndivs) then
+      cell_next(N, cell) = 5*cpp-ndivs+cell-cpp
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = 2*cpp+1+(cell-cpp-ndivs)
+    end if
+    ! Bottom edge
+    if(cell > 2*cpp-ndivs) then
+      cell_next(S, cell) = 5*cpp+(cell-(2*cpp-ndivs))
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = cell-(cpp+1)+ndivs
+    end if
+  end do
+
+  ! Panel III
+  do cell = 2*cpp+1, 3*cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= 2*cpp+ndivs) then
+      cell_next(N, cell) = 5*cpp-(cell-1-2*cpp)*ndivs
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = 3*cpp+1+(cell-2*cpp-ndivs)
+    end if
+    ! Bottom edge
+    if(cell > 3*cpp-ndivs) then
+      cell_next(S, cell) = 5*cpp+(cell-(3*cpp-ndivs))*ndivs
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = cell-(cpp+1)+ndivs
+    end if
+  end do
+
+  ! Panel IV
+  do cell = 3*cpp+1, 4*cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= 3*cpp+ndivs) then
+      cell_next(N, cell) = 4*cpp+1+ndivs-(cell-3*cpp)
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = (cell-ndivs)-3*cpp+1
+    end if
+    ! Bottom edge
+    if(cell > 4*cpp-ndivs) then
+      cell_next(S, cell) = 6*cpp-(cell-1-(4*cpp-ndivs))
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = cell-(cpp+1)+ndivs
+    end if
+  end do
+
+  ! Panel V
+  do cell = 4*cpp+1, 5*cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= 4*cpp+ndivs) then
+      cell_next(N, cell) = 3*cpp+ndivs-(cell-1-4*cpp)
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = (5*cpp-cell)/ndivs + 2*cpp+1
+    end if
+    ! Bottom edge
+    if(cell > 5*cpp-ndivs) then
+      cell_next(S, cell) = cell - (5*cpp-ndivs) + cpp
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = (cell-4*cpp)/ndivs + 1
+    end if
+  end do
+
+  ! Panel VI
+  do cell = 5*cpp+1, 6*cpp
+    ! Default: W, S, E, N
+    cell_next(:, cell) = (/ cell-1, cell+ndivs, cell+1, cell-ndivs /)
+    ! Top edge
+    if(cell <= 5*cpp+ndivs) then
+      cell_next(N, cell) = 2*cpp-ndivs + cell-5*cpp
+    end if
+    ! Right edge
+    if(mod(cell, ndivs) == 0) then
+      cell_next(E, cell) = 3*cpp-ndivs + (cell-5*cpp)/ndivs
+    end if
+    ! Bottom edge
+    if(cell > 6*cpp-ndivs) then
+      cell_next(S, cell) = 4*cpp - (cell-(6*cpp-ndivs+1))
+    end if
+    ! Left edge
+    if(mod(cell, ndivs) == 1) then
+      cell_next(W, cell) = cpp - (cell-5*cpp)/ndivs
+    end if
+  end do
+
+
+end subroutine calc_adjacency
+!-------------------------------------------------------------------------------
+!>  @brief       For each cell, calculates the four vertices which comprise it.
+!!
+!!  @details     Allocates and populates the instance's mesh(:,:) array with
+!!               the vertices which form each cell.
+!!
+!!  @param[in]   self The gencube_ps_type instance reference.
+!!  @param[out]  mesh A rank 2 (4,ncells)-sized integer array of vertices
+!!                    which constitute each cell.
+!-------------------------------------------------------------------------------
+subroutine calc_face_to_vert(self, mesh)
+
+  implicit none
+
+  class(gencube_ps_type), intent(in)                 :: self
+  integer, allocatable, intent(out)                  :: mesh(:,:)
+
+  integer        :: ndivs, ncells, cpp
+  integer        :: cell, idx, panel, nxf, astat
+
+  ndivs = self%ndivs
+  cpp = self%ndivs*self%ndivs
+  ncells = 6*self%ndivs*self%ndivs
+
+  allocate(mesh(4, 6*cpp+2), stat=astat)
+
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate mesh.", &
+                                        LOG_LEVEL_ERROR)
+
+  mesh = 0
+  cell = 1
+  nxf = 1
+
+  ! NW vert of every cell in panels 1:4
+  do cell = 1, 4*cpp
+    mesh(NW, cell) = cell
+  end do
+
+  nxf = 4*cpp + 1
+
+  ! Copy NE from E neighbour for every cell panels 1:4
+  do cell = 1, 4*cpp
+    mesh(NE, cell) = mesh(NW, self%cell_next(E, cell))
+  end do
+
+  ! Copy from S for non-S-edge rows of panels 1:4
+  do panel = 1, 4
+    do cell = (panel-1)*cpp+1, panel*cpp-ndivs
+      mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
+      mesh(SE, cell) = mesh(NE, self%cell_next(S, cell))
+    end do
+  end do
+
+  ! SE internals panel 5
+  do idx = 0, ndivs-2
+    do cell = 4*cpp+(idx*ndivs)+1, 4*cpp+(idx*ndivs)+ndivs-1
+      mesh(SE, cell) = nxf
+      nxf = nxf+1
+      mesh(SW, self%cell_next(E, cell)) = mesh(SE, cell)
+      mesh(NE, self%cell_next(S, cell)) = mesh(SE, cell)
+      ! Transitive is valid here 
+      mesh(NW, self%cell_next(E, self%cell_next(S, cell))) = mesh(SE, cell)
+    end do
+  end do
+
+  ! NW vert of every cell in panel 6
+  do cell = 5*cpp+1, 6*cpp
+    mesh(NW, cell) = nxf
+    nxf = nxf+1
+  end do
+
+  ! Copy SW from S neighbour for non-S-edge rows of panel 6
+  do cell = 5*cpp+1, 6*cpp-ndivs
+    mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
+  end do
+
+  ! SW verts of bottom row, panel 6
+  do cell = 6*cpp-ndivs+1, 6*cpp
+    mesh(SW, cell) = nxf
+    nxf = nxf+1
+  end do
+
+  ! SW verts of bottom row, panel 3
+  do cell = 3*cpp-ndivs+1, 3*cpp
+    mesh(SW, cell) = nxf
+    mesh(SE, self%cell_next(W, cell)) = mesh(SW, cell)
+    nxf = nxf+1
+  end do
+
+  ! vert at SE of panel 3
+  cell = 3*cpp
+  mesh(SE, cell) = nxf
+  mesh(SW, self%cell_next(E, cell)) = mesh(SE, cell)
+
+  ! Panel boundary joins...
+
+  ! S=>W join, I=>VI
+  do cell = cpp-ndivs+1, cpp
+    mesh(SW, cell) = mesh(SW, self%cell_next(S, cell))
+    mesh(SE, cell) = mesh(NW, self%cell_next(S, cell))
+  end do
+
+  ! N=>W join, I=>V
+  do cell = 1, ndivs
+    mesh(NW, self%cell_next(N, cell)) = mesh(NW, cell)
+    mesh(SW, self%cell_next(N, cell)) = mesh(NE, cell)
+  end do
+
+  ! N=>E join, III=>V
+  do cell = 2*cpp+1, 2*cpp+ndivs
+    mesh(SE, self%cell_next(N, cell)) = mesh(NW, cell)
+    mesh(NE, self%cell_next(N, cell)) = mesh(NE, cell)
+  end do
+
+  ! E=>S join, III=>VI
+  do cell = 3*cpp-ndivs+1, 3*cpp
+     mesh(NE, self%cell_next(S, cell)) = mesh(SW, cell)
+     mesh(SE, self%cell_next(S, cell)) = mesh(SE, cell)
+  end do
+
+  ! N=>N join, IV=>V
+  do cell = 3*cpp+1, 3*cpp+ndivs
+    mesh(NE, self%cell_next(N, cell)) = mesh(NW, cell)
+    mesh(NW, self%cell_next(N, cell)) = mesh(NE, cell)
+  end do
+
+  ! Copy NE,SE from E neighbour for non-E-edge cells of panel 6
+  do idx = 0, ndivs-1
+    do cell = 5*cpp+1+(idx*ndivs), 5*cpp+1+(idx*ndivs)+ndivs-2
+      mesh(NE, cell) = mesh(NW, self%cell_next(E, cell))
+      mesh(SE, cell) = mesh(SW, self%cell_next(E, cell))
+    end do
+  end do
+
+  ! S=>S join, VI=>IV
+  do cell = 6*cpp-ndivs+1, 6*cpp
+    mesh(SW, self%cell_next(S, cell)) = mesh(SE, cell)
+    mesh(SE, self%cell_next(S, cell)) = mesh(SW, cell)
+  end do
+
+  ! S=>N join, II=>VI
+  do cell = 2*cpp-ndivs+1, 2*cpp
+    mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
+    mesh(SE, cell) = mesh(NE, self%cell_next(S, cell))
+  end do
+
+  ! N=>S join, II=>V
+  do cell = cpp+1, cpp+ndivs
+    mesh(SW, self%cell_next(N, cell)) = mesh(NW, cell)
+    mesh(SE, self%cell_next(N, cell)) = mesh(NE, cell)
+  end do
+
+
+end subroutine calc_face_to_vert
+!-------------------------------------------------------------------------------
+!>  @brief       Calculates the edges which are found on each cell and the
+!!               pair of vertices which are found on each edge.
+!!
+!!  @details     Allocates and populates both the edges_on_cell and
+!!               verts_on_edge arrays for the instance.
+!!
+!!  @param[in]   self          The gencube_ps_type instance reference.
+!!  @param[out]  edges_on_cell A rank-2 (4,ncells)-sized integer array of
+!!                             the edges found on each cell.
+!!  @param[out]  verts_on_edge A rank-2 (2,2*ncells)-sized integer array
+!!                             of the vertices found on each edge.
+!-------------------------------------------------------------------------------
+subroutine calc_edges(self, edges_on_cell, verts_on_edge)
+
+  implicit none
+
+  class(gencube_ps_type), intent(in)                 :: self
+  integer, allocatable, intent(out)                  :: edges_on_cell(:,:)
+  integer, allocatable, intent(out)                  :: verts_on_edge(:,:)
+
+  integer        :: ndivs, ncells, cpp
+  integer        :: cell, panel, idx, nxf, astat
+
+  ndivs = self%ndivs
+  cpp = self%ndivs*self%ndivs
+  ncells = 6*self%ndivs*self%ndivs
+
+  allocate(edges_on_cell(4, ncells), stat=astat)
+
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate edges_on_cell.", &
+                                        LOG_LEVEL_ERROR)
+
+  allocate(verts_on_edge(2, 2*ncells), stat=astat)
+
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate verts_on_edge.", &
+                                        LOG_LEVEL_ERROR)
+
+  edges_on_cell = 0
+  verts_on_edge = 0
+  cell = 1
+  nxf = 1
+
+  do panel = 1, 4
+    ! Top row of panel
+    do cell = (panel-1)*cpp + 1, (panel-1)*cpp + ndivs
+      edges_on_cell(N, cell) = nxf
+      edges_on_cell(W, cell) = nxf+1
+      edges_on_cell(S, cell) = nxf+2
+      verts_on_edge(1, nxf) = self%mesh(NW, cell)
+      verts_on_edge(2, nxf) = self%mesh(NE, cell)
+      verts_on_edge(1, nxf+1) = self%mesh(SW, cell)
+      verts_on_edge(2, nxf+1) = self%mesh(NW, cell)
+      verts_on_edge(1, nxf+2) = self%mesh(SE, cell)
+      verts_on_edge(2, nxf+2) = self%mesh(SW, cell)
+      nxf = nxf + 3
+      ! Push W edge to W neighbour
+      edges_on_cell(E, self%cell_next(W, cell)) = edges_on_cell(W, cell)
+    end do
+    ! Remainder of panel
+    do cell = (panel-1)*cpp+1+ndivs, panel*cpp
+      edges_on_cell(W, cell) = nxf
+      edges_on_cell(S, cell) = nxf+1
+      verts_on_edge(1, nxf) = self%mesh(SW, cell)
+      verts_on_edge(2, nxf) = self%mesh(NW, cell)
+      verts_on_edge(1, nxf+1) = self%mesh(SE, cell)
+      verts_on_edge(2, nxf+1) = self%mesh(SW, cell)
+      nxf = nxf+2
+      ! Copy N edge from N cell
+      edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
+      ! Push W edge to W neighbour
+      edges_on_cell(E, self%cell_next(W, cell)) = edges_on_cell(W, cell)
+    end do
+  end do
+
+  ! Panel V non-S-edge rows
+  do cell = 4*cpp+1, 5*cpp-ndivs
+    edges_on_cell(S, cell) = nxf
+    verts_on_edge(1, nxf) = self%mesh(SE, cell)
+    verts_on_edge(2, nxf) = self%mesh(SW, cell)
+    nxf = nxf + 1
+    ! Push S edge to S neighbour
+    edges_on_cell(N, self%cell_next(S, cell)) = edges_on_cell(S, cell)
+  end do
+
+  ! Panel V non-E-edge columns
+  do idx = 0, ndivs-1
+    do cell = 4*cpp+1+idx*ndivs, 4*cpp+(idx+1)*ndivs-1
+      edges_on_cell(E, cell) = nxf
+      verts_on_edge(1, nxf) = self%mesh(NE, cell)
+      verts_on_edge(2, nxf) = self%mesh(SE, cell)
+      nxf = nxf + 1
+      ! Push E edge to E neighbour
+      edges_on_cell(W, self%cell_next(E, cell)) = edges_on_cell(E, cell)
+    end do
+  end do
+
+  ! Panel VI non-S-edge rows
+  do cell = 5*cpp+1, 6*cpp-ndivs
+    edges_on_cell(S, cell) = nxf
+    verts_on_edge(1, nxf) = self%mesh(SE, cell)
+    verts_on_edge(2, nxf) = self%mesh(SW, cell)
+    nxf = nxf + 1
+    ! Copy from N neighbour
+    edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
+  end do
+
+  ! Panel VI non-E-edge columns
+  do idx = 0, ndivs-1
+    do cell = 5*cpp+1+idx*ndivs, 5*cpp+(idx+1)*ndivs-1
+      edges_on_cell(E, cell) = nxf
+      verts_on_edge(1, nxf) = self%mesh(NE, cell)
+      verts_on_edge(2, nxf) = self%mesh(SE, cell)
+      nxf = nxf + 1
+      ! Push E edge to E neighbour
+      edges_on_cell(W, self%cell_next(E, cell)) = edges_on_cell(E, cell)
+    end do
+  end do
+
+  ! Panel VI S-edge row copy in N
+  do cell = 6*cpp-ndivs+1, 6*cpp
+    edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
+  end do
+
+  ! Join edges on panel boundaries...
+  ! N=>W join, I=>V
+  do cell = 1, ndivs
+    edges_on_cell(W, self%cell_next(N, cell)) = edges_on_cell(N, cell)
+  end do
+
+  ! S=>W join, I=>VI
+  do cell = cpp-ndivs+1, cpp
+    edges_on_cell(W, self%cell_next(S, cell)) = edges_on_cell(S, cell)
+  end do
+
+  ! N=>E join, III=>V
+  do cell = 2*cpp+1, 2*cpp+ndivs
+    edges_on_cell(E, self%cell_next(N, cell)) = edges_on_cell(N, cell)
+  end do
+
+  ! E=>S join, III=>VI
+  do cell = 3*cpp-ndivs+1, 3*cpp
+    edges_on_cell(E, self%cell_next(S, cell)) = edges_on_cell(S, cell)
+  end do
+
+  ! N=>N join, IV=>V
+  do cell = 3*cpp+1, 3*cpp+ndivs
+    edges_on_cell(N, self%cell_next(N, cell)) = edges_on_cell(N, cell)
+  end do
+
+  ! S=>N join, II=>VI
+  do cell = 2*cpp-ndivs+1, 2*cpp
+    edges_on_cell(N, self%cell_next(S, cell)) = edges_on_cell(S, cell)
+  end do
+
+  ! N=>S join, II=>V
+  do cell = cpp+1, cpp+ndivs
+    edges_on_cell(S, self%cell_next(N, cell)) = edges_on_cell(N, cell)
+  end do
+
+  ! S=>S join, IV=>VI
+  do cell = 4*cpp-ndivs+1, 4*cpp
+    edges_on_cell(S, self%cell_next(S, cell)) = edges_on_cell(S, cell)
+  end do
+
+
+end subroutine calc_edges
+!-------------------------------------------------------------------------------
+!>  @brief       Calculates the coordinates of vertices in the mesh.
+!!
+!!  @details     Assigns an (x,y) lat-long coordinate to each mesh
+!!               vertex according to its Cartesian position in the mesh.
+!!
+!!  @param[in]   self        The gencube_ps_type instance reference.
+!!  @param[out]  vert_coords A rank 2 (2,ncells)-sized real array of long and 
+!!                           lat coordinates respectively for each vertex.
+!-------------------------------------------------------------------------------
+subroutine calc_coords(self, vert_coords)
+  use coord_transform_mod, only: xyz2ll
+  use constants_mod,       only: PI
+  implicit none
+
+  class(gencube_ps_type), intent(in)                 :: self
+  real(kind=r_def), allocatable, intent(out)         :: vert_coords(:,:)
+
+  integer              :: ncells, ndivs, nverts
+  integer              :: cell, x, y, astat, cpp, vert, vert0
+  real(kind=r_def)     :: lat, long
+  real(kind=r_def)     :: x0, y0, z0
+  real(kind=r_def)     :: xs, ys, zs
+  real(kind=r_def)     :: dlambda, lambda1, lambda2, t1, t2
+  real(kind=r_def), parameter :: pio4 = PI/4.0_r_def
+
+  ndivs = self%ndivs
+  ncells = 6*ndivs*ndivs
+  nverts = ncells+2
+  cpp = self%ndivs*self%ndivs
+
+  allocate(vert_coords(2, nverts), stat=astat)
+
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate vert_coords.", &
+                                        LOG_LEVEL_ERROR)
+
+  vert_coords = 0.0_r_def
+  dlambda = 0.5_r_def*PI/ndivs
+  vert = 1
+
+! Panels I-IV
+  do y=1,ndivs
+    lambda2 = (y-1)*dlambda - pio4
+    t2 = tan(lambda2) 
+    do x=1,ndivs
+      lambda1 = (x-1)*dlambda - pio4
+      t1 = tan(lambda1)
+
+      ! Panel I
+      xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+      ys = xs*t1 
+      zs = xs*t2 
+
+      call xyz2ll(xs, ys, zs, long, lat)
+      vert_coords(1, vert) = long
+      vert_coords(2, vert) = -lat
+
+      ! Panel II
+      vert0 = vert + cpp
+      x0 = -ys
+      y0 =  xs
+      z0 =  zs
+
+      call xyz2ll(x0, y0, z0, long, lat)
+      vert_coords(1, vert0) = long
+      vert_coords(2, vert0) = -lat
+
+      ! Panel III
+      vert0 = vert + 2*cpp
+      x0 = -xs
+      y0 = -ys
+      z0 =  zs
+
+      call xyz2ll(x0, y0, z0, long, lat)
+      vert_coords(1, vert0) = long
+      vert_coords(2, vert0) = -lat
+
+      ! Panel IV
+      vert0 = vert + 3*cpp
+      x0 =  ys
+      y0 = -xs
+      z0 =  z0
+
+      call xyz2ll(x0, y0, z0, long, lat)
+      vert_coords(1, vert0) = long
+      vert_coords(2, vert0) = -lat
+
+      vert = vert + 1
+    end do
+  end do
+
+! Panel V
+! NB Change to cell-based vert lookup from here
+  cell = 4*cpp
+
+  do y=1, ndivs-1
+    lambda2 = y*dlambda - pio4 ! NB not y-1
+    t2 = tan(lambda2) 
+    do x=1, ndivs-1
+      lambda1 = x*dlambda - pio4 ! NB not x-1
+      t1 = tan(lambda1) 
+
+      xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+      ys = xs*t1 
+      zs = xs*t2
+      ! Lookup vert with x offset
+      vert0 = self%mesh(SE, cell+x) 
+
+      x0 = -ys
+      y0 =  zs
+      z0 = -xs
+
+      call xyz2ll(x0, y0, z0, long, lat)
+      vert_coords(1, vert0) = long
+      vert_coords(2, vert0) = -lat
+
+    end do
+    cell = cell + ndivs
+  end do
+
+! Panel VI
+  cell = 5*cpp + 1
+
+  do y=1, ndivs
+    lambda2 = (y-1)*dlambda - pio4
+    t2 = tan(lambda2) 
+    do x=1, ndivs
+      lambda1 = (x-1)*dlambda - pio4
+      t1 = tan(lambda1) 
+
+      xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+      ys = xs*t1 
+      zs = xs*t2
+      ! Lookup vert
+      vert0 = self%mesh(NW, cell) 
+
+      x0 = -ys
+      y0 = -zs
+      z0 =  xs
+
+      call xyz2ll(x0, y0, z0, long, lat)
+      vert_coords(1, vert0) = long
+      vert_coords(2, vert0) = -lat
+
+      cell = cell + 1
+    end do
+  end do
+
+! Panel VI: Bottom edge
+  cell = 6*cpp-ndivs+1
+
+  ! y constant
+  lambda2 = ndivs*dlambda - pio4
+  t2 = tan(lambda2) 
+  do x=1, ndivs
+    lambda1 = (x-1)*dlambda - pio4
+    t1 = tan(lambda1) 
+
+    xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+    ys = xs*t1 
+    zs = xs*t2
+
+    vert0 = self%mesh(SW, cell) 
+
+    x0 = -ys
+    y0 = -zs
+    z0 =  xs
+
+    call xyz2ll(x0, y0, z0, long, lat)
+    vert_coords(1, vert0) = long
+    vert_coords(2, vert0) = -lat
+
+    cell = cell + 1
+  end do
+
+! Panel VI: Right edge
+  cell = 5*cpp+ndivs
+
+  ! x constant
+  lambda1 = ndivs*dlambda - pio4
+  t1 = tan(lambda1) 
+  do y=1, ndivs
+    lambda2 = (y-1)*dlambda - pio4
+    t2 = tan(lambda2)
+
+    xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+    ys = xs*t1 
+    zs = xs*t2
+
+    vert0 = self%mesh(NE, cell) 
+
+    x0 = -ys
+    y0 = -zs
+    z0 =  xs
+
+    call xyz2ll(x0, y0, z0, long, lat)
+    vert_coords(1, vert0) = long
+    vert_coords(2, vert0) = -lat
+
+    cell = cell + ndivs  ! NB Step size
+  end do
+
+! 6*ndivs*ndivs+2
+  lambda1 = ndivs*dlambda - pio4
+  t1 = tan(lambda1) 
+  lambda2 = ndivs*dlambda - pio4
+  t2 = tan(lambda2) 
+
+  xs = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2) 
+  ys = xs*t1 
+  zs = xs*t2
+
+  x0 = -ys
+  y0 = -zs
+  z0 =  xs
+
+  vert0 = 6*cpp+2
+  call xyz2ll(x0, y0, z0, long, lat)
+  vert_coords(1, vert0) = long
+  vert_coords(2, vert0) = -lat
+
+end subroutine calc_coords
+!-------------------------------------------------------------------------------
+!>  @brief       Populates the arguments with the dimensions defining
+!!               the mesh.
+!!
+!!  @details     
+!!
+!!  @param[in]   self                 The gencube_ps_type instance reference.
 !!  @param[out]  num_nodes            The number of nodes on the mesh.
 !!  @param[out]  num_edges            The number of edges on the mesh.
 !!  @param[out]  num_faces            The number of faces on the mesh.
@@ -185,1357 +814,231 @@ end function constructor
 !!  @param[out]  num_edges_per_face   The number of edges around each face.
 !!  @param[out]  num_nodes_per_face   The number of nodes around each edge.
 !-------------------------------------------------------------------------------
-  
-subroutine get_dimensions(self, num_nodes, num_edges, num_faces,    &
-                           num_nodes_per_face,  num_edges_per_face, &
-                           num_nodes_per_edge)
+subroutine get_dimensions(self, num_nodes, num_edges, num_faces,        &
+                                num_nodes_per_face, num_edges_per_face, &
+                                num_nodes_per_edge)
   implicit none
 
-  !Arguments
-  class(gencube_type), intent(in)  :: self
+  class(gencube_ps_type), intent(in)            :: self
 
-  integer, intent(out) :: num_nodes
-  integer, intent(out) :: num_edges
-  integer, intent(out) :: num_faces
-  integer, intent(out) :: num_nodes_per_face
-  integer, intent(out) :: num_edges_per_face
-  integer, intent(out) :: num_nodes_per_edge
+  integer, intent(out)                             :: num_nodes
+  integer, intent(out)                             :: num_edges
+  integer, intent(out)                             :: num_faces
+  integer, intent(out)                             :: num_nodes_per_face
+  integer, intent(out)                             :: num_edges_per_face
+  integer, intent(out)                             :: num_nodes_per_edge
 
-  num_nodes = self%nvert(NGRIDS)
-  num_edges = self%nedge(NGRIDS)
-  num_faces = self%nface(NGRIDS)
+  num_faces =   6*self%ndivs*self%ndivs
+  num_nodes =   6*self%ndivs*self%ndivs+2
+  num_edges = 2*6*self%ndivs*self%ndivs
 
-  num_nodes_per_face = QUADS_NUM_NODES_PER_FACE 
-  num_edges_per_face = QUADS_NUM_EDGES_PER_FACE 
-  num_nodes_per_edge = QUADS_NUM_NODES_PER_EDGE 
+  num_nodes_per_face = 4
+  num_edges_per_face = 4
+  num_nodes_per_edge = 2
 
   return
 end subroutine get_dimensions
-
 !-------------------------------------------------------------------------------
-!>  @brief   Gets the coordinates of nodes, edges and faces.
+!>  @brief       Populates the argument array with the coordinates of the
+!!               mesh's vertices.
 !!
-!!  @details Places node, edge and face coordinates into the passed arrays.
+!!  @details     Exposes the instance's vert_coords array to the caller.
 !!
-!!  @param[in]   self                The cubed-sphere function object.
-!!  @param[out]  node_coordinates    The node coordinates.
+!!  @param[in]   self             The gencube_ps_type instance reference.
+!!  @param[out]  node_coordinates The argument to receive the vert_coords data.
 !-------------------------------------------------------------------------------
-
 subroutine get_coordinates(self, node_coordinates)
   implicit none
 
-  class(gencube_type), intent(in) :: self
-  real(kind=r_def),   intent(out) :: node_coordinates(:,:)
+  class(gencube_ps_type), intent(in)               :: self
+  real(kind=r_def), intent(out)                    :: node_coordinates(:,:)
 
-  !Internal variables
-  integer :: iv
-  real(kind=r_def) :: long, lat
 
-  do iv = 1, self%nvert(NGRIDS)
-    long    = self%vlong(iv,NGRIDS)
-    lat     = self%vlat(iv,NGRIDS)
-    node_coordinates(:,iv) = [long, lat]
-  end do
- 
-  return
+  node_coordinates = self%vert_coords
+
 end subroutine get_coordinates
-
 !-------------------------------------------------------------------------------
-!>  @brief   Gets the connectivity information of nodes, edges and faces.
+!>  @brief       Populates the argument arrays with the corresponding mesh
+!!               connectivity information.
 !!
-!!  @details Places face-node, edge-node and face-face connectivity to the
-!!           passed arrays. The left-most loop index covers e.g. all nodes
-!!           around one face.
+!!  @details     Implements the connectivity-providing interface required
+!!               by the ugrid writer.
+!!         
 !!
-!!  @param[in]   self                     The cubed-sphere function object.
+!!  @param[in]   self
 !!  @param[out]  face_node_connectivity   Face-node connectivity.
 !!  @param[out]  edge_node_connectivity   Edge-node connectivity.
 !!  @param[out]  face_edge_connectivity   Face-edge connectivity.
 !!  @param[out]  face_face_connectivity   Face-face connectivity.
 !-------------------------------------------------------------------------------
-
-subroutine get_connectivity(self,                            &
-           face_node_connectivity, edge_node_connectivity,   &
-           face_edge_connectivity, face_face_connectivity)
+subroutine get_connectivity(self, face_node_connectivity,   &
+                                  edge_node_connectivity,   &
+                                  face_edge_connectivity,   &
+                                  face_face_connectivity)
   implicit none
 
-  !Arguments
-  class(gencube_type), intent(in)  :: self
-  integer, intent(out) :: face_node_connectivity(:,:)
-  integer, intent(out) :: edge_node_connectivity(:,:) 
-  integer, intent(out) :: face_edge_connectivity(:,:)
-  integer, intent(out) :: face_face_connectivity(:,:)
+  class(gencube_ps_type), intent(in)            :: self
+  integer, intent(out)                             :: face_node_connectivity(:,:)
+  integer, intent(out)                             :: edge_node_connectivity(:,:)
+  integer, intent(out)                             :: face_edge_connectivity(:,:)
+  integer, intent(out)                             :: face_face_connectivity(:,:)
 
-  !Internal variables
-  integer :: iface, iedge, inode
-  integer :: iface1, iface2
 
-  !Face-face connectivity
-  do iface2 = 1, self%nface(NGRIDS)
-    do iface1 = 1, QUADS_NUM_FACE_NEIGHBOURS
-      face_face_connectivity(iface1, iface2) = self%fnxtf(iface2, iface1, NGRIDS)
-    end do
-  end do
+  face_node_connectivity = self%mesh
+  edge_node_connectivity = self%verts_on_edge
+  face_edge_connectivity = self%edges_on_cell
+  face_face_connectivity = self%cell_next
 
-  !Face-node connectivity
-  do iface = 1, self%nface(NGRIDS)
-    do inode = 1, QUADS_NUM_NODES_PER_FACE
-      face_node_connectivity(inode, iface) = self%voff(iface, inode, NGRIDS)
-    end do
-  end do
-
-  !Edge-node connectivity
-  do iedge = 1, self%nedge(NGRIDS)
-    do inode = 1, QUADS_NUM_NODES_PER_EDGE
-      edge_node_connectivity(inode, iedge) = self%vofe(iedge, inode, NGRIDS)
-    end do
-  end do
-
-  !Face-edge connectivity
-  do iface = 1, self%nface(NGRIDS)
-    do iedge = 1, QUADS_NUM_EDGES_PER_FACE
-      face_edge_connectivity(iedge, iface) = self%eoff(iface, iedge, NGRIDS)
-    end do
-  end do
-
-  return
 end subroutine get_connectivity
-
 !-------------------------------------------------------------------------------
-!>  @brief     Generate a cubed-sphere mesh.
+!>  @brief          Generates the mesh and connectivity.
 !!
-!!  @details   Implements the deferred generate method to generate a
-!!             cubed-sphere mesh, as configured in the constructor. Calls down
-!!             to other subroutines in this module in the correct sequence.
+!!  @details        Calls each of the instance methods which calculate the
+!!                  specified mesh and populate the arrays.
 !!
-!!  @param[in,out]   self   The cubed-sphere function object.
+!!  @param[in,out]  self The gencube_ps_type instance reference.
 !-------------------------------------------------------------------------------
-
 subroutine generate(self)
   implicit none
 
-  !Arguments
-  class(gencube_type), intent(inout)  :: self
+  class(gencube_ps_type), intent(inout)         :: self
 
-  !Internal variables
-  integer :: igrid
 
-  integer          :: n, n2
-  real(kind=r_def) :: dlambda
-
-  do igrid = 1, NGRIDS
-
-    !Size of panels on this grid
-    n       = self%n0*(2**(igrid-1))
-    n2      = n*n
-    dlambda = 0.5_r_def*PI/n
-
-    self%nface(igrid) = 6*n2
-    self%nedge(igrid) = 2*self%nface(igrid)
-
-    self%nvert(igrid) = self%nface(igrid) + 2
-
-    call part1(self, igrid, dlambda, n, n2)
-    call part2(self, igrid, n, n2)
-    call part3(self, igrid, n, n2)
-
-  end do ! end of main loop over grids
-
-  call part4(self)
-  call part5(self)
-  call part6(self)
-  call part7(self)
-  call part8(self)
-  call part9(self)
-
-  return
+  call calc_adjacency(self, self%cell_next)
+  call calc_face_to_vert(self, self%mesh)
+  call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
+  call calc_coords(self, self%vert_coords)
+  call orient_lfric(self)
+!  call write_mesh(self)
+  
 end subroutine generate
-
 !-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part1.
+!>  @brief      Writes out the mesh and connectivity for debugging purposes.
 !!
-!!  @details   First unit of work to generate the mesh. Called by the
-!!             generate method. 
+!!  @details       
 !!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!!  @param[in]      igrid    Mesh index in the multi-grid hierarchy.
-!!  @param[in]      n        
-!!  @param[in]      n2        
-!!  @param[in]      dlambda  
+!!  @param[in]  self The gencube_ps_type instance reference.
 !-------------------------------------------------------------------------------
-
-subroutine part1(self, igrid, dlambda, n, n2)
-
-  use coord_transform_mod, only: xyz2ll
-
+subroutine write_mesh(self)
+  use iso_fortran_env,     only : stdout => output_unit
   implicit none
 
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-  integer,          intent(in)       :: igrid
-  integer,          intent(in)       :: n
-  integer,          intent(in)       :: n2
-  real(kind=r_def), intent(in)       :: dlambda
+  class(gencube_ps_type), intent(in)            :: self
 
-  !Internal variables
-  real(kind=r_def) :: lambda1, lambda2
-  real(kind=r_def) :: lat, long
-  real(kind=r_def) :: t1, t2
-  real(kind=r_def) :: x1, y1, z1
-  real(kind=r_def) :: x2, y2, z2
-  real(kind=r_def) :: x3, y3, z3
-  real(kind=r_def) :: x4, y4, z4
-  real(kind=r_def) :: x5, y5, z5
-  real(kind=r_def) :: x6, y6, z6
+  integer(kind=i_def)                           :: i, cell, vert, ncells
 
-  integer          :: i, j, ixv, p1
 
-  !Loop over vertices/faces of one panel
-  do j = 1, n
-    lambda2 = (j-1)*dlambda - PIBY4
-    t2 = tan(lambda2)
+  ncells = self%ndivs*self%ndivs
 
-    do i = 1, n
-      lambda1 = (i-1)*dlambda - PIBY4
-      t1 = tan(lambda1)
-
-      !Set up coordinates of vertices
-      !Panel 1 ...
-
-      !Index of vertex
-      ixv = (j-1)*n + i
-
-      !Cartesian coordinates of vertex
-      x1 = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2)
-      y1 = x1*t1
-      z1 = x1*t2
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x1,y1,z1,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid) = lat
-
-      !Panel 2 ...
-      !Index of vertex
-      ixv = ixv + n2
-
-      !Cartesian coordinates of vertex
-      x2 = -y1
-      y2 = x1
-      z2 = z1
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x2,y2,z2,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid) = lat
-
-      !Panel 3 ...
-      !Index of vertex
-      ixv = ixv + n2
-
-      !Cartesian coordinates of vertex
-      x3 = x2
-      y3 = -z2
-      z3 = y2
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x3,y3,z3,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid) = lat
-
-      !Panel 4
-      !Index of vertex
-      ixv = ixv + n2
-
-      !Cartesian coordinates of vertex
-      x4 = -z3
-      y4 = y3
-      z4 = x3
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x4,y4,z4,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid)  = lat
-
-      !Panel 5
-      !Index of vertex
-      ixv = ixv + n2
-
-      !Cartesian coordinates of vertex
-      x5 = -y4
-      y5 = x4
-      z5 = z4
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x5,y5,z5,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid)  = lat
-
-      !Panel 6
-      !Index of vertex
-      ixv = ixv + n2
-
-      !Cartesian coordinates of vertex
-      x6 = x5
-      y6 = -z5
-      z6 = y5
-
-      !Lat long coordinates of vertex
-      call xyz2ll(x6,y6,z6,long,lat)
-      self%vlong(ixv,igrid) = long
-      self%vlat(ixv,igrid)  = lat
-
-      !Set up incidence tables ignoring complications at
-      !panel edges
-      do p1 = 1, 6
-        ixv = (p1 - 1)*n2 + (j-1)*n + i
-        !Edges of the face
-        self%eoff(ixv,1,igrid) = 2*ixv - 1
-        self%eoff(ixv,2,igrid) = 2*ixv
-        self%eoff(ixv,3,igrid) = 2*ixv + 1
-        self%eoff(ixv,4,igrid) = 2*ixv + 2*n
-
-        !Vertices of the face
-        self%voff(ixv,1,igrid) = ixv
-        self%voff(ixv,2,igrid) = ixv + 1
-        self%voff(ixv,3,igrid) = ixv + n + 1
-        self%voff(ixv,4,igrid) = ixv + n
-
-        !Faces neighboring this face
-        self%fnxtf(ixv,1,igrid) = ixv - 1
-        self%fnxtf(ixv,2,igrid) = ixv - n
-        self%fnxtf(ixv,3,igrid) = ixv + 1
-        self%fnxtf(ixv,4,igrid) = ixv + n
-
-        !Edges incident on the vertex
-        self%eofv(ixv,1,igrid) = 2*ixv - 2
-        self%eofv(ixv,2,igrid) = 2*(ixv-n) - 1
-        self%eofv(ixv,3,igrid) = 2*ixv 
-        self%eofv(ixv,4,igrid) = 2*ixv - 1
-      end do
-
-    end do
+  write(stdout,*) "cell_next"
+  do cell=1, ncells
+      write(stdout,"(I3,T8,4I4)") cell, self%cell_next(:,cell)
   end do
 
-  return
-end subroutine part1
+  write(stdout,*)
+  write(stdout,*) "verts_on_cell"
+  do cell=1, ncells
+    write(stdout,"(I3,T8,4I4)") cell, self%mesh(:,cell)
+  end do
 
-!-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part2.
-!!
-!!  @details   Second unit of work to generate the mesh. Called by the
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!!  @param[in]      igrid    Mesh index in the multi-grid hierarchy.
-!!  @param[in]      n        
-!!  @param[in]      n2        
-!-------------------------------------------------------------------------------
+  write(stdout,*)
+  write(stdout,*) "verts_on_edge"
+  do i=1, size(self%verts_on_edge, 2)
+    write(stdout,"(I3,T8,2I4)") i, self%verts_on_edge(:,i)
+  end do
 
-subroutine part2(self, igrid, n, n2)
+  write(stdout,*)
+  write(stdout,*) "edges_on_cell"
+  do cell=1, ncells
+    write(stdout,"(I3,T8,4I4)") cell, self%edges_on_cell(:,cell)
+  end do
+
+  write(stdout,*)
+  write(stdout,*) "vert_coords"
+  do vert=1, 6*ncells+2
+    write(*,*) vert, self%vert_coords(:,vert)
+  end do
+
+end subroutine write_mesh
+!-------------------------------------------------------------------------------
+!>  @brief          Reorients the cubed-sphere to be compatible with
+!!                  the orientation assumed by the LFRic infrastructure.
+!!
+!!  @details        Performs circular shifts on appropriate panels.
+!!
+!!  @param[in,out]  self The gencube_ps_type instance reference.
+!-------------------------------------------------------------------------------
+subroutine orient_lfric(self)
   implicit none
 
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-  integer,             intent(in)    :: igrid
-  integer,             intent(in)    :: n, n2
+  class(gencube_ps_type), intent(inout)         :: self
 
-  !Internal variables
-  integer :: j
-  integer :: jr
-  integer :: pp
-  integer :: p1, p2
-  integer :: ixv
+  integer(kind=i_def)                           :: cpp, p0, p1
 
-  !Now sort out complications at panel edges
-  do j = 1, n
-    jr = n + 1 - j
+  cpp = self%ndivs*self%ndivs
 
-    do pp = 1, 3
+  ! Panel III - rotate left 1
+  p0 = 2*cpp+1
+  p1 = 3*cpp
+  ! verts
+  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), 1, 1)
+  ! adj
+  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
+  ! edges
+  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), 1, 1)
 
-      !Odd numbered panels
-      p1 = 2*pp - 1
+  ! Panel IV - rotate left 1
+  p0 = 3*cpp+1
+  p1 = 4*cpp
+  ! verts
+  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), 1, 1)
+  ! adj
+  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
+  ! edges
+  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), 1, 1)
 
-      !Left edge of panel p1 joins to top edge of panel p1 - 2
-      !Reverse order
-      p2 = modulo(p1 + 3, 6) + 1
-      ixv = (p1 - 1)*n2 + n*(j - 1) + 1
-      self%fnxtf(ixv,1,igrid) = p2*n2 - n + jr
-      self%eofv(ixv,1,igrid)  = 2*p2*n2 - 2*n - 1 + 2*(jr + 1)
+  ! Panel V - rotate right 1
+  p0 = 4*cpp+1
+  p1 = 5*cpp
+  ! verts
+  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), -1, 1)
+  ! adj
+  self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), -1, 1)
+  ! edges
+  self%edges_on_cell(:, p0:p1) = cshift(self%edges_on_cell(:, p0:p1), -1, 1)
 
-      !Bottom edge of panel p1 joins to top edge of panel p1 - 1
-      p2 = modulo(p1 + 4, 6) + 1
-      ixv = (p1 - 1)*n2 + j
-      self%fnxtf(ixv,2,igrid) = p2*n2 - n + j
-      self%eofv(ixv,2,igrid)  = 2*p2*n2 - 2*n - 1 + 2*j
 
-      !Right edge of panel p1 joins to left edge of panel p1 + 1
-      p2 = modulo(p1, 6) + 1
-      ixv = (p1 - 1)*n2 + n*j
-      self%eoff(ixv,3,igrid)  = 2*(p2 - 1)*n2 + 2*(j - 1)*n + 1
-      self%voff(ixv,2,igrid)  = (p2 - 1)*n2 + (j - 1)*n + 1
-      self%voff(ixv,3,igrid)  = (p2 - 1)*n2 + j*n + 1
-      self%fnxtf(ixv,3,igrid) = (p2 - 1)*n2 + (j - 1)*n + 1
-
-      !Top edge of panel p1 joins to left edge of panel p1 + 2
-      !Reverse order
-      p2 = modulo(p1 + 1, 6) + 1
-      ixv = p1*n2 - n + j
-      self%eoff(ixv,4,igrid)  = 2*(p2 - 1)*n2 + 2*(jr - 1)*n + 1
-      self%voff(ixv,3,igrid)  = (p2 - 1)*n2 + (jr - 1)*n + 1
-      self%voff(ixv,4,igrid)  = (p2 - 1)*n2 + jr*n + 1
-      self%fnxtf(ixv,4,igrid) = (p2 - 1)*n2 + (jr - 1)*n + 1
-
-      !Even numbered panels
-      p1 = 2*pp
-
-      !Left edge of panel p1 joins to right edge of panel p1 - 1
-      p2 = modulo(p1 + 4, 6) + 1
-      ixv = (p1 - 1)*n2 + n*(j - 1) + 1
-      self%fnxtf(ixv,1,igrid) = (p2 - 1)*n2 + n*j
-      self%eofv(ixv,1,igrid)  = 2*(p2 - 1)*n2 + 2*n*j
-
-      !Bottom edge of panel p1 joins to right edge of panel p1 - 2
-      !Reverse order
-      p2 = modulo(p1 + 3, 6) + 1
-      ixv = (p1 - 1)*n2 + j
-      self%fnxtf(ixv,2,igrid) = (p2 - 1)*n2 + n*jr
-      self%eofv(ixv,2,igrid)  = 2*(p2 - 1)*n2 + 2*n*(jr + 1)
-
-      !Top edge of panel p1 joins to bottom edge of panel p1 + 1
-      p2 = modulo(p1, 6) + 1
-      ixv = p1*n2 - n + j
-      self%eoff(ixv,4,igrid)  = 2*(p2 - 1)*n2 + 2*j
-      self%voff(ixv,3,igrid)  = (p2 - 1)*n2 + j + 1
-      self%voff(ixv,4,igrid)  = (p2 - 1)*n2 + j
-      self%fnxtf(ixv,4,igrid) = (p2 - 1)*n2 + j
-
-      !Right edge of panel p1 joins to bottom edge of panel p1 + 2
-      !Reverse order
-      p2 = modulo(p1 + 1, 6) + 1
-      ixv = (p1-1)*n2 + n*j
-      self%eoff(ixv,3,igrid)  = 2*(p2 - 1)*n2 + 2*jr
-      self%voff(ixv,2,igrid)  = (p2 - 1)*n2 + jr + 1
-      self%voff(ixv,3,igrid)  = (p2 - 1)*n2 + jr
-      self%fnxtf(ixv,3,igrid) = (p2 - 1)*n2 + jr
-
-    end do
-  end do
-
-  return
-end subroutine part2
-
+end subroutine orient_lfric
 !-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part3.
+!>  @brief      Projects Cartesian coordinates onto the unit sphere
 !!
-!!  @details   Third unit of work to generate the mesh. Called by the
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!!  @param[in]      igrid    Mesh index in the multi-grid hierarchy.
-!!  @param[in]      n        
-!!  @param[in]      n2        
+!!  @details    Non-member routine
+!!            
+!!  @param[in]   x    x-coord argument
+!!  @param[in]   y    y-coord argument
+!!  @param[in]   z    z-coord argument
+!!  @param[out]  xs   x-coord of returned projection
+!!  @param[out]  ys   y-coord of returned projection
+!!  @param[out]  zs   z-coord of returned projection
 !-------------------------------------------------------------------------------
+subroutine map_sphere(x, y, z, xs, ys, zs)
 
-subroutine part3(self, igrid, n, n2)
-  use coord_transform_mod, only: xyz2ll
   implicit none
+  real(kind=r_def), intent(in)       :: x, y, z
+  real(kind=r_def), intent(out)      :: xs, ys, zs
 
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-  integer,             intent(in)    :: igrid
-  integer,             intent(in)    :: n
-  integer,             intent(in)    :: n2
+  real(kind=r_def)                   :: xrad, yrad, zrad
 
-  !Internal variables
-  integer          :: pp, p1
-  integer          :: ixv, iv
-  real(kind=r_def) :: t1, t2
 
-  real(kind=r_def) :: lambda1
-  real(kind=r_def) :: lambda2
+  xrad = 1.0_r_def - 0.5_r_def*y*y - 0.5_r_def*z*z + (y*y*z*z)/3.0_r_def
+  xs = x * sqrt(xrad)
 
-  real(kind=r_def) :: lat, long
+  yrad = 1.0_r_def - 0.5_r_def*z*z - 0.5_r_def*x*x + (x*x*z*z)/3.0_r_def
+  ys = y * sqrt(yrad)
 
-  real(kind=r_def) :: x1, y1, z1
+  zrad = 1.0_r_def - 0.5_r_def*x*x - 0.5_r_def*y*y + (x*x*y*y)/3.0_r_def
+  zs = z * sqrt(zrad)
 
-  !All faces have 4 edges and vertices
-  self%neoff(1:self%nface(igrid),igrid) = 4
-
-  !Almost all vertices have 4 edges (exceptions dealt with below)
-  self%neofv(1:self%nvert(igrid),igrid) = 4
-
-  !Vertices not correctly captured by the above
-  !Corner vertices only have 3 edges
-  do pp = 1, 3
-    !Bottom left of odd numbered panels
-    p1 = 2*pp - 1
-    ixv = (p1 - 1)*n2 + 1
-    !First edge needs to be deleted
-    self%eofv(ixv,1,igrid) = self%eofv(ixv,2,igrid)
-    self%eofv(ixv,2,igrid) = self%eofv(ixv,3,igrid)
-    self%eofv(ixv,3,igrid) = self%eofv(ixv,4,igrid)
-    self%eofv(ixv,4,igrid) = 0
-    self%neofv(ixv,igrid)  = 3
-
-    !Bottom left of even numbered panels
-    p1 = 2*pp
-    ixv = (p1 - 1)*n2 + 1
-
-    !Second edge needs to be deleted
-    self%eofv(ixv,2,igrid) = self%eofv(ixv,3,igrid)
-    self%eofv(ixv,3,igrid) = self%eofv(ixv,4,igrid)
-    self%eofv(ixv,4,igrid) = 0
-    self%neofv(ixv,igrid)  = 3
-  end do
-
-  !Vertex 6*n2 + 1 is at top left of panels 1, 3, and 5
-  iv      = 6*n2 + 1
-  lambda2 = PIBY4
-  t2      = tan(lambda2)
-  lambda1 = - PIBY4
-  t1      = tan(lambda1)
-
-  !Cartesian coordinates of vertex
-  x1 = 1.0_r_def/sqrt(1.0_r_def + t1*t1 + t2*t2)
-  y1 = x1*t1
-  z1 = x1*t2
-
-  !Lat long coordinates of vertex
-  call xyz2ll(x1,y1,z1,long,lat)
-  self%vlong(iv,igrid) = long
-  self%vlat(iv,igrid) = lat
-
-  do pp = 1, 3
-    p1 = 2*pp - 1
-    ixv = p1*n2 - n + 1
-    self%voff(ixv,4,igrid) = iv
-    self%eofv(iv,pp,igrid) = 2*p1*n2 - 2*n + 1
-  end do
-
-  self%neofv(iv,igrid) = 3
-
-  !Vertex 6*n2 + 2 is at bottom right of panels 2, 4, and 6
-  iv = 6*n2 + 2
-  x1 = -x1
-  y1 = -y1
-  z1 = -z1
-
-  !Lat long coordinates of vertex
-  call xyz2ll(x1,y1,z1,long,lat)
-
-  self%vlong(iv,igrid) = long
-  self%vlat(iv,igrid) = lat
-  do pp = 1, 3
-    p1 = 2*pp
-    ixv = (p1 - 1)*n2 + n
-    self%voff(ixv,2,igrid) = iv
-    self%eofv(iv,pp,igrid) = 2*(p1 - 1)*n2 + 2*n
-  end do
-
-  self%neofv(iv,igrid) = 3
-
-  return
-end subroutine part3
-
+end subroutine map_sphere
 !-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part4.
-!!
-!!  @details   Fourth unit of work to generate the mesh. Called by the
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!!  @param[in]      igrid    Mesh index in the multi-grid hierarchy.
-!!  @param[in]      i        
-!!  @param[in]      j        
-!!  @param[in]      ixv        
-!!  @param[in]      ie1        
-!-------------------------------------------------------------------------------
-
-subroutine part4(self)
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  !Internal variables
-  integer :: igrid
-  integer :: i, j
-  integer :: ixv
-  integer :: ie1
- 
-  !Now construct inverse tables
-  !First initialize entries to zero
-  self%fnxte = 0
-  self%vofe  = 0
-  self%fofv  = 0
-
-  do igrid = 1, NGRIDS
-    do j = 1, self%nface(igrid)
-      do i = 1, 4
-        ie1 = self%eoff(j,i,igrid)
-        call addtab(self%fnxte(1,1,igrid),ie1,j,self%nedgex,2)
-        ixv = self%voff(j,i,igrid)
-        call addtab(self%fofv(1,1,igrid),ixv,j,self%nvertx,4)
-      end do
-    end do
-
-    do j = 1, self%nvert(igrid)
-      do i = 1, 4
-        ixv = self%eofv(j,i,igrid)
-        if (ixv > 0) then
-          call addtab(self%vofe(1,1,igrid),ixv,j,self%nedgex,2)
-        end if
-      end do
-    end do
-  end do
-
-  return
-end subroutine part4
-
-!-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part5.
-!!
-!!  @details   Fifth unit of work to generate the mesh. Called by the
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!-------------------------------------------------------------------------------
-
-subroutine part5(self)
-  use coord_transform_mod, only : xyz2ll, ll2xyz, starea2, spdist
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  !Internal variables
-  integer :: igrid, ismooth
-
-  integer :: if1, if2, ixv,  ie0, ie1, i
-  integer :: iv1, iv2
-
-  real(kind=r_def) :: lat, long
-  real(kind=r_def) :: rmag
-
-  real(kind=r_def) :: xc, yc, zc
-  real(kind=r_def) :: x0, y0, z0
-  real(kind=r_def) :: x1, y1, z1
-  real(kind=r_def) :: x2, y2, z2
-
-  real(kind=r_def) :: aface, atri
-
-  real(kind=r_def) :: lmn
-  real(kind=r_def) :: lmx
-  real(kind=r_def) :: dmn
-  real(kind=r_def) :: dmx
-  real(kind=r_def) :: dav
-
-  real(kind=r_def) :: s
-
-  !Calculate geometrical quantities
-  do igrid = 1, NGRIDS
-
-    !Smoothing iterations
-    do ismooth = 1, NSMOOTH
-
-      !First locate face centres at barycentres of 
-      !surrounding vertices
-      do if1 = 1, self%nface(igrid)
-        xc = 0.0_r_def
-        yc = 0.0_r_def
-        zc = 0.0_r_def
-        do i = 1, 4
-          ixv  = self%voff(if1,i,igrid)
-          long = self%vlong(ixv,igrid)
-          lat  = self%vlat(ixv,igrid)
-          call ll2xyz(long,lat,x1,y1,z1)
-          xc = xc + x1
-          yc = yc + y1
-          zc = zc + z1
-        end do
-        rmag = 1.0_r_def/sqrt(xc*xc + yc*yc + zc*zc)
-        xc = xc*rmag
-        yc = yc*rmag
-        zc = zc*rmag
-        call xyz2ll(xc,yc,zc,long,lat)
-        self%flong(if1,igrid) = long
-        self%flat(if1,igrid)  = lat
-      end do
-
-      !next relocate vertices at barycentres of 
-      !surrounding face centres - needed for h operator
-!      do iv1 = 1, self%nvert(igrid)
-!        xc = 0.0_r_def
-!        yc = 0.0_r_def
-!        zc = 0.0_r_def
-!        do i = 1, self%neofv(iv1,igrid)
-!          if1  = self%fofv(iv1,i,igrid)
-!          long = self%flong(if1,igrid)
-!          lat  = self%flat(if1,igrid)
-!          call ll2xyz(long,lat,x1,y1,z1)
-!          xc = xc + x1
-!          yc = yc + y1
-!          zc = zc + z1
-!        enddo
-!        rmag = 1.0_r_def/sqrt(xc*xc + yc*yc + zc*zc)
-!        xc = xc*rmag
-!        yc = yc*rmag
-!        zc = zc*rmag
-!        call xyz2ll(xc,yc,zc,long,lat)
-!        self%vlong(iv1,igrid) = long
-!        self%vlat(iv1,igrid) = lat
-!      end do
-
-    end do
-
-    !Tabulate areas
-    do if1 = 1, self%nface(igrid)
-      long = self%flong(if1,igrid)
-      lat  = self%flat(if1,igrid)
-      call ll2xyz(long,lat,x0,y0,z0)
-      !Compute face area
-      aface = 0.0_r_def
-      do i = 1, 4
-
-        ie1  = self%eoff(if1,i,igrid)
-        ixv  = self%vofe(ie1,1,igrid)
-        long = self%vlong(ixv,igrid)
-        lat  = self%vlat(ixv,igrid)
-        call ll2xyz(long,lat,x1,y1,z1)
-
-        ixv  = self%vofe(ie1,2,igrid)
-        long = self%vlong(ixv,igrid)
-        lat  = self%vlat(ixv,igrid)
-        call ll2xyz(long,lat,x2,y2,z2)
-        call starea2(x0,y0,z0,x1,y1,z1,x2,y2,z2,atri)
-
-        aface = aface + atri
-      end do
-
-      self%farea(if1,igrid) = aface
-    end do
-
-    !Tabulate lengths of edges and distances between face centres
-    !across each edge
-    lmn = 5.0_r_def
-    lmx = 0.0_r_def
-    dmn = 5.0_r_def
-    dmx = 0.0_r_def
-    dav = 0.0_r_def
-
-    do ie0 = 1, self%nedge(igrid)
-
-      !Vertices at ends of this edge
-      iv1  = self%vofe(ie0,1,igrid)
-      iv2  = self%vofe(ie0,2,igrid)
-      long = self%vlong(iv1,igrid)
-      lat  = self%vlat(iv1,igrid)
-      call ll2xyz(long,lat,x1,y1,z1)
-
-      long = self%vlong(iv2,igrid)
-      lat  = self%vlat(iv2,igrid)
-      call ll2xyz(long,lat,x2,y2,z2)
-
-      call spdist(x1,y1,z1,x2,y2,z2,s)
-
-      self%ldist(ie0,igrid) = s
-      lmn = min(lmn,self%ldist(ie0,igrid))
-      lmx = min(lmx,self%ldist(ie0,igrid))
-
-      !faces either side of this edge
-      if1 = self%fnxte(ie0,1,igrid)
-      if2 = self%fnxte(ie0,2,igrid)
-      long = self%flong(if1,igrid)
-      lat  = self%flat(if1,igrid)
-      call ll2xyz(long,lat,x1,y1,z1)
-      long = self%flong(if2,igrid)
-      lat  = self%flat(if2,igrid)
-      call ll2xyz(long,lat,x2,y2,z2)
-      call spdist(x1,y1,z1,x2,y2,z2,s)
-      self%ddist(ie0,igrid) = s
-      dmn = min(dmn,self%ddist(ie0,igrid))
-      dmx = min(dmx,self%ddist(ie0,igrid))
-      dav = dav + self%ddist(ie0,igrid)/self%nedge(igrid)
-    end do
-  end do
-
-  return
-end subroutine part5
-
-!-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part6.
-!!
-!!  @details   Sixth unit of work to generate the mesh. Called by the
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!-------------------------------------------------------------------------------
-
-subroutine part6(self)
-  use coord_transform_mod, only : ll2xyz
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  !Internal variables
-  integer          :: igrid
-  logical          :: lfound
-
-  integer          :: if0, if1, if2, if3
-  integer          :: ix1, ix2
-  integer          :: ie1
-  integer          :: ixmin, ifmin
-
-  integer          :: if21, if22
-  integer          :: iv0
-
-  real(kind=r_def) :: x0, y0, z0
-  real(kind=r_def) :: x1, y1, z1
-  real(kind=r_def) :: x2, y2, z2
-
-  real(kind=r_def) :: d1x, d1y, d1z
-  real(kind=r_def) :: d2x, d2y, d2z
-
-  real(kind=r_def) :: long, lat
-  
-  real(kind=r_def) :: thetamin, theta
-
-  real(kind=r_def) :: sn, cs
-
-
-  !Sort FNXTF into anticlockwise order on each grid
-  !and sort EOFF to correspond to FNXTF
-  !Also sort fofv into anticlockwise order
-  do igrid = 1, NGRIDS
-    do if0 = 1, self%nface(igrid)
-
-      !Coordinates of face if0
-      long = self%flong(if0,igrid)
-      lat  = self%flat (if0,igrid)
-      call ll2xyz(long,lat,x0,y0,z0)
-
-      do ix1 = 1, 2
-
-        !Coordinates of IX1'th neighbour
-        if1  = self%fnxtf(if0,ix1,igrid)
-        long = self%flong(if1,igrid)
-        lat  = self%flat(if1,igrid)
-        call ll2xyz(long,lat,x1,y1,z1)
-
-        d1x = x1 - x0
-        d1y = y1 - y0
-        d1z = z1 - z0
-
-        !Find next neighbour (anticlockwise)
-        thetamin = PI
-        ixmin = 0
-        ifmin = 0
-
-        do ix2 = ix1 + 1, 4
-
-          !Coordinates of IX2'th neighbour
-          if2  = self%fnxtf(if0,ix2,igrid)
-          long = self%flong(if2,igrid)
-          lat  = self%flat(if2,igrid)
-          CALL ll2xyz(long,lat,x2,y2,z2)
-
-          d2x=x2 - x0
-          d2y=y2 - y0
-          d2z=z2 - z0
-
-          cs = d1x*d2x + d1y*d2y + d1z*d2z
-          sn = x0*(d1y*d2z - d1z*d2y) &
-             + y0*(d1z*d2x - d1x*d2z) &
-             + z0*(d1x*d2y - d1y*d2x)
-          theta = atan2(sn,cs)
-
-          if ((theta < thetamin) .and. (theta > 0.0_r_def)) then
-            ixmin    = ix2
-            ifmin    = if2
-            thetamin = theta
-          end if
-        end do
-
-        !The face in position IXMIN belongs in position IX1+1 so swap them
-        if3 = self%fnxtf(if0,ix1+1,igrid)
-        self%fnxtf(if0,ix1+1,igrid) = ifmin
-
-        self%fnxtf(if0,ixmin,igrid) = if3
-
-      end do
-
-      do ix1 = 1, 4
-        if1 = self%fnxtf(if0,ix1,igrid)
-        ix2 = ix1 - 1
-        lfound = .false.
-
-        do while (.not. lfound)
-          ix2  = ix2 + 1
-          ie1  = self%eoff(if0,ix2,igrid)
-          if21 = self%fnxte(ie1,1,igrid)
-          if22 = self%fnxte(ie1,2,igrid)
-          if ((if21 + if22) == (if0 + if1)) lfound = .true.
-        end do
-  !     edge ie2 corresponds to face if1
-        self%eoff(if0,ix2,igrid) = self%eoff(if0,ix1,igrid)
-        self%eoff(if0,ix1,igrid) = ie1
-      end do
-
-    end do
-
-    do iv0 = 1, self%nvert(igrid)
-
-      !coordinates of vertex iv0
-      long = self%vlong(iv0,igrid)
-      lat  = self%vlat(iv0,igrid)
-      call ll2xyz(long,lat,x0,y0,z0)
-      do ix1 = 1, self%neofv(iv0,igrid) - 2
-
-        !coordinates of ix1'th face
-        if1  = self%fofv(iv0,ix1,igrid)
-        long = self%flong(if1,igrid)
-        lat  = self%flat(if1,igrid)
-
-        call ll2xyz(long,lat,x1,y1,z1)
-        d1x = x1 - x0
-        d1y = y1 - y0
-        d1z = z1 - z0
-
-        !find next neighbour (anticlockwise)
-        thetamin = PI
-        ixmin = 0
-        ifmin = 0
-
-        do ix2 = ix1 + 1, self%neofv(iv0,igrid)
-          !coordinates of ix2'th neighbour
-          if2  = self%fofv(iv0,ix2,igrid)
-          long = self%flong(if2,igrid)
-          lat  = self%flat(if2,igrid)
-          call ll2xyz(long,lat,x2,y2,z2)
-
-          d2x=x2 - x0
-          d2y=y2 - y0
-          d2z=z2 - z0
-
-          cs = d1x*d2x + d1y*d2y + d1z*d2z
-          sn = x0*(d1y*d2z - d1z*d2y) &
-             + y0*(d1z*d2x - d1x*d2z) &
-             + z0*(d1x*d2y - d1y*d2x)
-          theta = atan2(sn,cs)
-          if ((theta < thetamin) .and. (theta > 0.0_r_def)) then
-            ixmin = ix2
-            ifmin = if2
-            thetamin = theta
-          end if
-        end do
-
-        !the face in position ixmin belongs in position ix1+1 so swap them
-        if3 = self%fofv(iv0,ix1+1,igrid)
-        self%fofv(iv0,ix1+1,igrid) = ifmin
-        self%fofv(iv0,ixmin,igrid) = if3
-
-      end do
-    end do
-
-  end do
-
-  return
-end subroutine part6
-
-!-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part7.
-!!
-!!  @details   Seventh unit of work to generate the mesh. Called by the 
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!-------------------------------------------------------------------------------
-
-subroutine part7(self)
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  !Internal variables
-  integer :: iv0, iv11, iv12, iv21, iv22
-  integer :: if0
-  integer :: ix1, ix2
-  integer :: ie1, ie2
-
-  integer :: igrid
-
-  !Order VOFF so that the k'th vertex is between the
-  !k'th and (k+1)'th edges in EOFF
-  do igrid = 1, NGRIDS
-    do if0 = 1, self%nface(igrid)
-      do ix1 = 1, self%neoff(if0,igrid)
-        ix2 = ix1 + 1
-        if (ix2 > self%neoff(if0,igrid)) ix2 = 1
-        ie1 = self%eoff(if0,ix1,igrid)
-        ie2 = self%eoff(if0,ix2,igrid)
-
-        !Find the common vertex of ie1 and ie2
-        iv11 = self%vofe(ie1,1,igrid)
-        iv12 = self%vofe(ie1,2,igrid)
-        iv21 = self%vofe(ie2,1,igrid)
-        iv22 = self%vofe(ie2,2,igrid)
-
-        if ((iv11 == iv21) .or. (iv11 == iv22)) then
-          iv0 = iv11
-        else if ((iv12 == iv21) .or. (iv12 == iv22)) then
-          iv0 = iv12
-        else
-          print *,'Common vertex not found'
-          stop
-        end if
-        self%voff(if0,ix1,igrid) = iv0
-      end do
-    end do
-  end do
-
-  return
-end subroutine part7
-
-!-------------------------------------------------------------------------------
-!>  @brief     Mesh generation part8.
-!!
-!!  @details   Eighth unit of work to generate the mesh. Called by the 
-!!             generate method. 
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!-------------------------------------------------------------------------------
-
-subroutine part8(self)
-  use coord_transform_mod, only: ll2xyz
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  !Internal variables
-  real(kind=r_def) :: sn
-
-  real(kind=r_def) :: x0,  y0,  z0
-  real(kind=r_def) :: x1,  y1,  z1
-  real(kind=r_def) :: d1x, d1y, d1z
-  real(kind=r_def) :: d2x, d2y, d2z
-  real(kind=r_def) :: lat, long
-
-  integer          :: igrid
-  integer          :: ie0
-
-  integer          :: if1, if2
-  integer          :: iv1, iv2
-
-  !Sort VOFE so that VOFE(1) -> VOFE(2) (tangent vector)
-  !is 90 degrees anticlockwise of FNXTE(1) -> FNXTE(2) (normal vector)
-
-  do igrid = 1, NGRIDS
-    do ie0 = 1, self%nedge(igrid)
-
-      if1  = self%fnxte(ie0,1,igrid)
-      if2  = self%fnxte(ie0,2,igrid)
-      long = self%flong(if1,igrid)
-      lat  = self%flat(if1,igrid)
-      call ll2xyz(long,lat,x0,y0,z0)
-
-      long = self%flong(if2,igrid)
-      lat  = self%flat(if2,igrid)
-      call ll2xyz(long,lat,x1,y1,z1)
-      d1x  = x1 - x0
-      d1y  = y1 - y0
-      d1z  = z1 - z0
-      iv1  = self%vofe(ie0,1,igrid)
-      iv2  = self%vofe(ie0,2,igrid)
-      long = self%vlong(iv1,igrid)
-      lat  = self%vlat(iv1,igrid)
-
-      call ll2xyz(long,lat,x0,y0,z0)
-      long = self%vlong(iv2,igrid)
-      lat  = self%vlat(iv2,igrid)
-      call ll2xyz(long,lat,x1,y1,z1)
-
-      d2x = x1 - x0
-      d2y = y1 - y0
-      d2z = z1 - z0
-
-      sn = x0*(d1y*d2z - d1z*d2y) &
-         + y0*(d1z*d2x - d1x*d2z) &
-         + z0*(d1x*d2y - d1y*d2x)
-
-      if (sn < 0.0_r_def) then
-        !swap the two vertices
-        self%vofe(ie0,1,igrid) = iv2
-        self%vofe(ie0,2,igrid) = iv1
-      end if
-    end do
-  end do
-
-  return
-end subroutine part8
-
-!>details Rotate elements on certain panels so that there is no
-!! change in normal or tangent orientation between panels
-!!  @param[in,out]  self     The cubed-sphere function object.
-subroutine part9(self)
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  integer :: grid, ncell, npanel, cell
-  integer, parameter :: clockwise = 1,&
-                        anticlockwise = -1
-
-  do grid = 1,NGRIDS
-    ncell = self%nface(grid)
-    npanel = ncell/6
-    ! Panel 3
-    do cell = 2*npanel+1,3*npanel
-      call rotate_cell(self%fnxtf(cell,:,grid), self%voff(cell,:,grid), self%eoff(cell,:,grid), clockwise) 
-    end do
-    ! Panel 4 & 5
-    do cell = 3*npanel+1,5*npanel
-      call rotate_cell(self%fnxtf(cell,:,grid), self%voff(cell,:,grid), self%eoff(cell,:,grid), anticlockwise) 
-      call rotate_cell(self%fnxtf(cell,:,grid), self%voff(cell,:,grid), self%eoff(cell,:,grid), anticlockwise) 
-    end do
-    ! Panel 6
-    do cell = 5*npanel+1,6*npanel
-      call rotate_cell(self%fnxtf(cell,:,grid), self%voff(cell,:,grid), self%eoff(cell,:,grid), clockwise) 
-    end do
-  end do
-
-end subroutine part9
-
-!-------------------------------------------------------------------------------
-!>  @brief     Write mesh data to rough-and-ready files.
-!!
-!!  @details   Write mesh data to files, largely for code testing purposes.
-!!             File unit numbers are hard-coded for the moment.
-!!
-!!  @param[in,out]  self     The cubed-sphere function object.
-!-------------------------------------------------------------------------------
-
-subroutine write_data(self)
-  use coord_transform_mod, only: ll2xyz
-  implicit none
-
-  !Arguments
-  class(gencube_type), intent(inout) :: self
-
-  integer          :: iv, if1, if2, j
-  integer          :: ie1, iv1, iv2
-  integer          :: igrid
-
-  real(kind=r_def) :: long, lat
-
-  real(kind=r_def) :: x1, y1, z1
-  real(kind=r_def) :: x2, y2, z2
-
-  character(len=str_def) :: ygridfile
-
-  !Write out coordinates of edges for plotting
-  open(44,file='primalgrid.dat',form='formatted')
-
-  do j = 1, self%nedgex
-    iv   = self%vofe(j,1,NGRIDS)
-    long = self%vlong(iv,NGRIDS)
-    lat  = self%vlat(iv,NGRIDS)
-    call ll2xyz(long,lat,x1,y1,z1)
-
-    iv   = self%vofe(j,2,NGRIDS)
-    long = self%vlong(iv,NGRIDS)
-    lat  = self%vlat(iv,NGRIDS)
-    call ll2xyz(long,lat,x2,y2,z2)
-
-    write(44,'(3e15.7)') x1,y1,z1
-    write(44,'(3e15.7)') x2,y2,z2
-  end do
-
-  close(44)
-
-  open(44,file='dualgrid.dat',form='formatted')
-  do j = 1, self%nedgex
-    if1  = self%fnxte(j,1,NGRIDS)
-    long = self%flong(if1,NGRIDS)
-    lat  = self%flat(if1,NGRIDS)
-    call ll2xyz(long,lat,x1,y1,z1)
-
-    if1  = self%fnxte(j,2,NGRIDS)
-    long = self%flong(if1,NGRIDS)
-    lat  = self%flat(if1,NGRIDS)
-    call ll2xyz(long,lat,x2,y2,z2)
-    write(44,'(3e15.7)') x1,y1,z1
-    write(44,'(3e15.7)') x2,y2,z2
-  end do
-
-  close(44)
-
-  !output gridmap file
-  write(ygridfile,'(''gridmap_cube_'',i10.10,''.dat'')') self%nfacex
-  open(22,file=trim(ygridfile),form='unformatted')
-  
-  ! write(22,*) 'gridmap for NGRIDS=',NGRIDS
-  write(22) NGRIDS
-  write(22) self%nface
-  write(22) self%nedge
-  write(22) self%nvert
-
-  ! write(22,*) 'number of edges of each face - all grids'
-  write(22) ((self%neoff(if1,igrid),            &
-                 if1 = 1, self%nface(igrid)),   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'number of edges of each vertex - all grids'
-  write(22) ((self%neofv(iv1,igrid),            &
-                 iv1 = 1, self%nvert(igrid)),   &
-                 igrid=1, NGRIDS)
-  ! write(22,*) 'faces next to each face - all grids'
-  write(22) (((self%fnxtf(if1,if2,igrid),       &
-                 if1 = 1, self%nface(igrid)),   &
-                 if2 = 1, 4),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'edges of each face - all grids'
-  write(22) (((self%eoff(if1,ie1,igrid),        &
-                 if1 = 1, self%nface(igrid)),   &
-                 ie1 = 1, 4),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'vertices of each face - all grids'
-  write(22) (((self%voff(if1,iv1,igrid),        &
-                 if1 = 1, self%nface(igrid)),   &
-                 iv1 = 1, 4),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'faces next to each edge - all grids'
-  write(22) (((self%fnxte(ie1,if2,igrid),       &
-                 ie1 = 1, self%nedge(igrid)),   &
-                 if2 = 1, 2),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'vertices of each edge - all grids'
-  write(22) (((self%vofe(ie1,iv2,igrid),        &
-                 ie1 = 1, self%nedge(igrid)),   &
-                 iv2 = 1, 2),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'faces around each vertex - all grids'
-  write(22) (((self%fofv(iv1,if2,igrid),        &
-                 iv1 = 1, self%nvert(igrid)),   &
-                 if2 = 1, 4),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'edges around each vertex - all grids'
-  write(22) (((self%eofv(iv1,ie1,igrid),        &
-                 iv1 = 1, self%nvert(igrid)),   &
-                 ie1 = 1, 4),                   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'longitudes of faces - all grids'
-  write(22) ((self%flong(if1,igrid),            &
-                 if1 = 1, self%nface(igrid)),   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'latitudes of faces - all grids'
-  write(22) ((self%flat(if1,igrid),             &
-                 if1 = 1, self%nface(igrid)),   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'longitudes of vertices - all grids'
-  write(22) ((self%vlong(iv1,igrid),            &
-                 iv1 = 1, self%nvert(igrid)),   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'latitudes of vertices - all grids'
-  write(22) ((self%vlat(iv1,igrid),             &
-                 iv1 = 1, self%nvert(igrid)),   &
-                 igrid = 1, NGRIDS)
-  ! write(22,*) 'areas of faces - all grids'
-  write(22) ((self%farea(if1,igrid),            &
-                if1 = 1, self%nface(igrid)),    &
-                igrid = 1, NGRIDS)
-  ! write(22,*) 'lengths of edges - all grids'
-  write(22) ((self%ldist(ie1,igrid),            &
-                ie1 = 1, self%nedge(igrid)),    &
-                igrid = 1, NGRIDS)
-  ! write(22,*) 'distance between faces across edges - all grids'
-  write(22) ((self%ddist(ie1,igrid),            &
-                ie1 = 1, self%nedge(igrid)),    &
-                igrid = 1, NGRIDS)
-
-  return
-end subroutine write_data
-
-!-------------------------------------------------------------------------------
-!>  @brief     Add an entry to a table.
-!!
-!!  @param[in]      dim1 
-!!  @param[in]      dim2 
-!!  @param[in]      index 
-!!  @param[in]      entry 
-!!  @param[in,out]  tab 
-!-------------------------------------------------------------------------------
-
-subroutine addtab(tab,index,entry,dim1,dim2)
-  use log_mod, only: log_event, log_scratch_space, LOG_LEVEL_INFO, LOG_LEVEL_ERROR
-  implicit none
-
-  !Arguments
-  integer, intent(in)    :: dim1,dim2
-  integer, intent(in)    :: index
-  integer, intent(in)    :: entry
-  integer, intent(inout) :: tab(dim1,dim2)
-
-  !Internal
-  integer :: i
-
-  i=1
-  do while (tab(index,i)/=0)
-    if (i>dim2) then
-      call log_event('**********', LOG_LEVEL_INFO)
-      call log_event('TABLE FULL', LOG_LEVEL_INFO)
-      call log_event('**********', LOG_LEVEL_INFO)
-      write(log_scratch_space,*) index,entry,dim1,dim2
-      call log_event(trim(log_scratch_space), LOG_LEVEL_INFO)
-      write(log_scratch_space,*) tab(index,:)
-      call log_event(trim(log_scratch_space), LOG_LEVEL_INFO)
-      call log_event('Terminating execution.', LOG_LEVEL_ERROR)
-      stop
-    end if
-    i=i+1
-  end do
-
-  tab(index,i)=entry
-
-  return
-end subroutine addtab
-
-!> @brief Rotate a cell
-subroutine rotate_cell(cell_next, vert_on_cell, edge_on_cell, direction)
-  implicit none
- 
-  integer, intent(inout) :: cell_next(4), &
-                            vert_on_cell(4), &
-                            edge_on_cell(4)  
-  integer, intent(in)    :: direction
-
-  integer, parameter :: clockwise = 1
-  integer ::  local(4)
-
-  if ( direction == clockwise ) then
-    local = cell_next
-    cell_next(2:4) = local(1:3)
-    cell_next(1)   = local(4)
-    local = vert_on_cell
-    vert_on_cell(2:4) = local(1:3)
-    vert_on_cell(1)   = local(4)
-    local = edge_on_cell
-    edge_on_cell(2:4) = local(1:3)
-    edge_on_cell(1)   = local(4)
-  else
-    local = cell_next
-    cell_next(1:3) = local(2:4)
-    cell_next(4)   = local(1)
-    local = vert_on_cell
-    vert_on_cell(1:3) = local(2:4)
-    vert_on_cell(4)   = local(1)
-    local = edge_on_cell
-    edge_on_cell(1:3) = local(2:4)
-    edge_on_cell(4)   = local(1)
-
-  end if
-
-end subroutine rotate_cell
-
 end module gencube_mod
