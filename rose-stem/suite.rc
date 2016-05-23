@@ -58,22 +58,23 @@
             copy_{{label}}_to_target       => compile_with_{{label}}
             compile_with_{{label}}         => generate_{{label}}_cubedsphere
             compile_with_{{label}}         => generate_{{label}}_biperiodic
-{%-    if compiler not in TARGET_SKIP_UNIT_TESTS %}
+{%-    if compiler in TARGET_PERFORM_UNIT_TESTS %}
             compile_with_{{label}}         => unit_test_with_{{label}}
-            unit_test_with_{{label}}       => clean_build_{{label}}
-{%-    else %}
-            compile_with_{{label}}         => clean_build_{{label}}
 {%-    endif %}
+{%-    if compiler in TARGET_PERFORM_KGO_TESTS %}
             generate_{{label}}_cubedsphere => check_{{label}}_cubedsphere_metadata
             generate_{{label}}_cubedsphere => check_{{label}}_cubedsphere_data
             generate_{{label}}_biperiodic  => check_{{label}}_biperiodic_metadata
             generate_{{label}}_biperiodic  => check_{{label}}_biperiodic_data
+{%-    endif %}
 {%-    for config in science_configs %}
 {#-       At the point where we have more than one compiler or target we will #}
 {#-       need some logic here.                                               #}
 {%-       set config_label = config | lower + '_' + label %}
                 compile_with_{{label}}    => run_{{config_label}}_dynamo
+{%-       if compiler in TARGET_PERFORM_KGO_TESTS %}
                 run_{{config_label}}_dynamo => check_{{config_label}}_dynamo
+{%-       endif %}
 {%-     endfor %}
 {%-   endfor %}
 {%- endfor %}
@@ -102,7 +103,7 @@
         [[[remote]]]
             host = {{ ROSE_ORIG_HOST }}
         [[[job submission]]]
-            method = at
+            method = background
 
     [[TARGET]]
         [[[remote]]]
@@ -146,15 +147,13 @@
 
     [[api_documentation]]
         inherit = TECHNICAL
-        pre-script = {{command_list(LOCAL_BASE_SETUP)}}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation api-documents"
         pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
+        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation api-documents"
 
     [[design_documentation]]
         inherit = TECHNICAL
-        pre-script = {{command_list(LOCAL_BASE_SETUP)}}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents"
         pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
+        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents"
 
 {#############################################################################}
 {% macro pipeline_tasks( label, compiler, build ) %}
@@ -167,7 +166,7 @@
             DYNAMO_SOURCE_DIRECTORY      = $SOURCE_ROOT/{{label}}
             DYNAMO_DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{label}}
             DYNAMO_COMPILER              = {{compiler}}
-            DYNAMO_TARGET                = {{TARGET_OPT}}
+            DYNAMO_BUILD_TARGET          = {{TARGET_OPT}}
 
     [[{{family}}_BUILD_ENVIRONMENT]]
         inherit = TARGET
@@ -220,13 +219,15 @@
 
     [[compile_with_{{label}}]]
         inherit    = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT")}}
         script     = "rose task-run --app-key=compile --command-key={{build}}"
+        post-script = "cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build; rm -rf $DYNAMO_BUILD_ROOT"
 
     [[unit_test_with_{{label}}]]
         inherit = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
         script = "make -C $DYNAMO_SOURCE_DIRECTORY test"
+        post-script = "cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build; rm -rf $DYNAMO_BUILD_ROOT"
 
     [[clean_build_{{label}}]]
         inherit = {{family}}, {{family}}_BUILD_ENVIRONMENT

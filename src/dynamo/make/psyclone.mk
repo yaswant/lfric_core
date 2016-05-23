@@ -7,8 +7,6 @@
 
 PSYCLONE ?= python2.7 $(PSYCLONE_DIR)/src/generator.py
 
-DYNAMO_BUILD_TARGET ?= meto-desktop
-
 PSY_ALGORITHM_PATH = algorithm
 PSY_PSY_PATH       = psy
 PSY_KERNEL_PATH    = kernel
@@ -45,8 +43,6 @@ $(PSY_AUTO_ALGORITHM_PATH)/%.f90: $(PSY_ALGORITHM_PATH)/%.x90 \
 	$(PSYCLONE) -api dynamo0.3 -d $(PSY_KERNEL_PATH) \
 	            -oalg $@ \
 	            $<
-
-.SECONDEXPANSION:
 
 $(PSY_AUTO_PSY_PATH)/psy_%.f90: $(PSY_ALGORITHM_PATH)/%.x90  \
                         $(PSY_OPTIMISATION_PATH)/$(DYNAMO_BUILD_TARGET)/%.py \

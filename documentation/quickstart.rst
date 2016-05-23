@@ -34,23 +34,31 @@ Dynamo environment to set up libraries and compiler:
       +--------------------+----------------------------------------------+
       | Met Office XC-40   | ``. /data/d03/lfric/modules/setup``          |
       +--------------------+----------------------------------------------+
+      | MONSooN            | ``. /projects/umadmin/mhambl/modules/setup`` |
+      +--------------------+----------------------------------------------+
+      | ARCHER             | ``. /fs2/n02/n02/mhambley/modules/setup``    |
+      +--------------------+----------------------------------------------+
 
  #. Load the modules
 
-      +--------------------+-----------------------------------------------+
-      | Met Office Desktop | ``module load environment/dynamo/intel``      |
-      |                    +-----------------------------------------------+
-      |                    | ``module load environment/dynamo/gnu``        |
-      +--------------------+-----------------------------------------------+
-      | Met Office XC-40   | ``module load meto-environment/dynamo/cce``   |
-      |                    +-----------------------------------------------+
-      |                    | ``module load meto-environment/dynamo/intel`` |
-      +--------------------+-----------------------------------------------+
+      +--------------------+------------------------------------------------+
+      | Met Office Desktop | ``module load environment/dynamo/intel``       |
+      |                    +------------------------------------------------+
+      |                    | ``module load environment/dynamo/gnu``         |
+      +--------------------+------------------------------------------------+
+      | Met Office XC-40   | ``module load meto-environment/dynamo/cce``    |
+      |                    +------------------------------------------------+
+      |                    | ``module load meto-environment/dynamo/intel``  |
+      +--------------------+------------------------------------------------+
+      | MONSooN            | ``module load meto-environment/dynamo/intel``  |
+      +--------------------+------------------------------------------------+
+      | ARCHER             | ``module load lfric-environment/dynamo/intel`` |
+      +--------------------+------------------------------------------------+
 
 Render your own video using the "gource" documentation target is only available
 on the Met Office desktop. You will need to do the following::
 
-  module load environment/visualisation
+  ``module load environment/visualisation``
 
 Outwith the Met Office
 ~~~~~~~~~~~~~~~~~~~~~~
