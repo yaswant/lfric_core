@@ -1,0 +1,10 @@
+class scalar_mod::scalar_type {
+  +value : real
+
+  <<create>>+scalar_constructor( <<in>>value:real ) : scalar_type
+
+  +get_sum() : real
+  +get_min() : real
+  +get_max() : real
+  +reduction_finish()
+}

@@ -1,0 +1,5 @@
+class quadrature_rule_newton_cotes_mod::quadrature_rule_newton_cotes_type {
+  quadrature_rule( <<in>>nqp_1d: integer) : real(::)
+}
+
+quadrature_rule_mod::quadrature_rule_type <|-- quadrature_rule_newton_cotes_mod::quadrature_rule_newton_cotes_type

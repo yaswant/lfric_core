@@ -1,0 +1,45 @@
+class field_mod::field_type {
+  -data : real[] <<pointer>>
+  -esmf_array : ESMF_Array
+  -halo_dirty : integer[]<<allocatable>>
+  -vspace : function_space_type <<pointer>>
+
+  <<create>>+field_constructor( <<in>>vector_space : function_space_type ) : field_type
+  <<destroy>>+field_destructor_scalar()
+  <<destroy>>+field_destructor_array1d()
+  <<destroy>>+field_destructor_array2d()
+
+  <<assignment(=)>>+field_type_assign( <<out>>dest : field_type, <<in>>source : field_type )
+
+  +get_proxy() : field_proxy_type
+  +log_dofs( <<in>>log_level: integer, <<in>>label: string )
+  +log_field( <<in>>dump_level: integer, <<in>>checksum_level: integer, <<in>>label: string )
+  +log_minmax( <<in>>log_level: integer, <<in>>label: string )
+  +which_function_space() : integer
+  +write_checksum( <<in>>stream: integer, <<in>>label: string )
+  +get_mesh() : mesh_type <<pointer>>
+  +get_mesh_id() : integer
+  +read_field( <<in>>io_strategy: field_io_strategy_type )
+  +write_field( <<in>>io_strategy: field_io_strategy_type )
+}
+
+class field_mod::field_proxy_type {
+  +data: real[] <<pointer>>
+  -esmf_array: ESMF_Array <<pointer>>
+  -halo_dirty: integer[] <<pointer>>
+  +vpsace: function_space_type <<pointer>>
+  -dummy_for_gnu: integer <<allocatable>>
+
+  +halo_exchange( <<in>>depth: integer )
+  +halo_exchange_start( <<in>>depth: integer )
+  +halo_exchange_finish( <<in>>depth: integer )
+  +get_sum() : real
+  +get_min() : real
+  +get_max() : real
+  +reduction_finish()
+  +is_dirty( <<in>>depth: integer ) : logical
+  +set_dirty()
+  +set_clean( <<in>>depth: integer )
+}
+
+field_mod::field_proxy_type -> field_mod::field_type : field accessor

@@ -20,6 +20,7 @@ module linked_list_int_mod
 
   type, extends(linked_list_data_type), public        :: linked_list_int_type
     private
+    contains
     ! Nothing in here - it's all in the base class
   end type linked_list_int_type
 

@@ -1,0 +1,5 @@
+interface ugrid::file {
+  +file_close()
+  +file_new( <<in>>file_name: string )
+  +file_open( <<in>>file_name: string )
+}

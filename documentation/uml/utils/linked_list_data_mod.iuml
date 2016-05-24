@@ -1,0 +1,6 @@
+abstract class linked_list_data_mod::linked_list_data_type {
+  -id: integer
+
+  +get_id() : integer
+  +set_id( <<in>>id : integer )
+}

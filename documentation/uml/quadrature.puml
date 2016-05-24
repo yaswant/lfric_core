@@ -1,0 +1,15 @@
+@startuml
+
+!include look.iuml
+!include gungho/quadrature_rule_mod.iuml
+!include gungho/quadrature_rule_gaussian_mod.iuml
+!include gungho/quadrature_rule_newton_cotes_mod.iuml
+!include gungho/quadrature_abstract_mod.iuml
+!include gungho/quadrature_3d_xoyozo_mod.iuml
+!include gungho/quadrature_3d_xyz_mod.iuml
+!include gungho/quadrature_3d_xyoz_mod.iuml
+
+quadrature_3d_xoyozo_mod -[hidden]- quadrature_3d_xyz_mod
+quadrature_3d_xyz_mod -[hidden]- quadrature_3d_xyoz_mod
+
+@enduml

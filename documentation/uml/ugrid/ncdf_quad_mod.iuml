@@ -1,0 +1,29 @@
+class ugrid::ncdf_quad {
+  -file_name: string
+  -four_dim_id: integer
+  -ncid: integer
+  -mesh2_edge_nodes_id: integer
+  -mesh2_face_edges_id: integer
+  -mesh2_face_links_id: integer
+  -mesh2_face_nodes_id: integer
+  -mesh2_id: integer
+  -mesh2_node_x_id: integer
+  -mesh2_node_y_id: integer
+  -nMesh2_edge_dim_id: integer
+  -nMesh2_edge_len: integer
+  -nMesh2_face_dim_id: integer
+  -nMesh2_face_len: integer
+  -nMesh2_node_dim_id: integer
+  -nMesh2_node_len: integer
+  -num_vars: string
+  -two_dim_id: integer
+
+  file_close()
+  file_new( file_name: string )
+  file_open( file_name: string )
+  get_dimensions( <<out>>num_nodes: integer, <<out>>num_edges: integer, <<out>>num_faces: integer, <<out>>num_nodes_per_face: integer, <<out>>num_edges_per_face: integer, <<out>>num_nodes_per_edge: integer, <<out>>max_num_faces_per_node: integer )
+  read( <<out>>node_coordinates: real[::], <<out>>face_node_connectivity: integer[::], <<out>>edge_node_connectivity: integer[::], <<out>>face_edge_connectivity: integer[::], <<out>>face_face_connectivity: integer[::] )
+  write( <<in>>num_nodes: integer, <<in>>num_edges: integer, <<in>>num_faces: integer, <<in>>node_coordinates: real[::], <<in>>face_node_connectivity: integer[::], <<in>>edge_node_connectivity: integer[::], <<in>>face_edge_connectivity: integer[::], <<in>>face_face_connectivity: integer[::])
+}
+
+ugrid::ugrid_file <|.. ugrid::ncdf_quad

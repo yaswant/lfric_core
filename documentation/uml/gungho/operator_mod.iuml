@@ -1,0 +1,22 @@
+class operator_mod::operator_type {
+  -fs_from       : function_space_type <<pointer>>
+  -fs_to         : function_space_type <<pointer>>
+  -local_stencil : real[:::] <<allocatable>>
+  -ncell_3d      : integer
+
+  <<create>>+operator_constructor( <<in>>fs_to: function_space_type, <<in>>fs_from: function_space_type ) : operator_type
+
+  +get_proxy()     : operator_proxy_type
+  +which_fs_from() : integer
+  +which_fs_to()   : integer
+  +get_mesh()      : mesh
+}
+
+class operator_mod::operator_proxy_type {
+  +fs_from       : function_space_type <<pointer>>
+  +fs_to         : function_space_type <<pointer>>
+  +local_stencil : real[:::] <<pointer>>
+  +ncell_3d      : integer
+}
+
+operator_mod::operator_proxy_type -> operator_mod::operator_type : operator accessor

@@ -1,0 +1,6 @@
+interface ugrid::field_io_strategy {
+  +read_field_data( <<out>>field_data: real[] )
+  +write_field_data( <<in>>field_data: real[] )
+}
+
+ugrid::file <|-- ugrid::field_io_strategy

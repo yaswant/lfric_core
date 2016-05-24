@@ -17,7 +17,7 @@ export DYNAMO_COMMON_FIGURES
 most: design-documents api-documents
 
 .PHONY: design-documents
-design-documents: $(DOCUMENT_DIRECTORIES)
+design-documents: $(DOCUMENT_DIRECTORIES) uml
 
 .PHONY: api-documents
 api-documents: $(API_COLLECTIONS)
@@ -35,12 +35,19 @@ api:
 $(DOCUMENT_DIRECTORIES):
 	$(MAKE) -f ../make/latex.mk -C $@
 
+.PHONY: uml
+uml:
+	$(MAKE) -C uml
+
 .PHONY: gource
 gource:
 	$(MAKE) -C visualisation
 
-clean: $(addprefix clean_,$(DOCUMENT_DIRECTORIES))
+clean: $(addprefix clean_,$(DOCUMENT_DIRECTORIES)) clean_uml
 	-rm -rf api/*
+
+cleam_uml: ALWAYS
+	$(MAKE) -C uml clean
 
 clean_%: ALWAYS
 	$(MAKE) -f ../make/latex.mk -C $* clean

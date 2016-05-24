@@ -1,0 +1,72 @@
+class function_space_mod::function_space_type {
+    -basis_index: integer[::] <<allocatable>>
+    -basis_order: integer[::] <<allocatable>>
+    -basis_vector: real[::] <<allocatable>>
+    -basis_x: real[:::] <<allocatable>>
+    -dim_space: integer
+    -dim_space_diff: integer
+    -distgrid: ESMF_DistGrid
+    -dofmap_list: linked_list
+    -dof_on_vert_boundary: integer[::]
+    -element_order: integer
+    -fs: integer
+    -fs_order: integer
+    -global_dof_id: integer[] <<allocatable>>
+    -haloHandle: ESMF_RouteHandle[] <<allocatable>>
+    -last_dof_annexed: integer
+    -last_dof_halo: integer[] <<allocatable>>
+    -last_dof_owned: integer
+    -master_dofmap: master_dofmap
+    -mesh: mesh_type <<pointer>>
+    -ndof_cell: integer
+    -ndof_edge: integer
+    -ndof_exterior: integer
+    -ndof_face: integer
+    -ndof_glob: integer
+    -ndof_interior: integer
+    -ndof_vert: integer
+    -ndof_vol: integer
+    -nodal_coords: real[::] <<allocatable>>
+
+    <<create>>+fs_constructor( <<in>>mesh_id: integer, <<in>>element_order: integer, <<in>>dynamo_fs: integer ) : function_space_type <<pointer>>
+    <<destroy>>+function_space_destructor()
+
+    +clear()
+    +compute_basis_function( <<out>>basis: real[::::], <<in>>ndf: integer, <<in>>qp_h: integer, <<in>>qp_v: integer, <<in>>x_qp: real[::], <<in>>z_qp[] )
+    +compute_basis_function_3d_xoyoz( <<out>>basis: real[:::::], <<in>>ndf: integer, <<in>>nqp_x: integer, <<in>>nqp_y: integer, <<in>>nqp_z: integer, <<in>>xqp_x: real[], <<in>>xqp_y[], <<in>>xqp_z: real[] )
+    +compute_basis_function_3d_xyoz( <<out>>basis: real[::::], <<in>>ndf: integer, <<in>>nqp_xy: integer, <<in>>nqp_z: integer, <<in>>xqp_xy: real[::], <<in>>xqp_z: real[] )
+    +compute_basis_function_3d_xyz( <<out>>basis: real[:::], <<in>>ndf: integer, <<in>>nqp_xyz: integer, <<in>>xqp_xyz: real[:::] )
+    +compute_diff_basis_function( <<out>>dbasis: real[::::], <<in>>ndf: integer, <<in>>qp_h: integer, <<in>>qp_v: integer, <<in>>x_qp::real[::], <<in>>z_qp: real[] )
+    +compute_diff_basis_function_3d_xoyoz( <<out>>dbasis: real[:::::], <<in>>ndf: integer, <<in>>nqp_x: integer, <<in>>nqp_y: integer, <<in>>nqp_z: integer, <<in>>xqp_x::real[], <<in>>xqp_y: real[], <<in>>xqp_z: real[] )
+    +compute_diff_basis_function_3d_xyoz( <<out>>dbasis: real[::::], <<in>>ndf: integer, <<in>>nqp_xy: integer, <<in>>nqp_z: integer, <<in>>xqp_xy::real[::], <<in>>xqp_z: real[] )
+    +compute_diff_basis_function_3d_xyz( <<out>>dbasis: <<in>>real[:::], <<in>>ndf: integer, <<in>>nqp_xyz: integer, <<in>>xqp_xyz::real[::] )
+    +compute_nodal_basis_function( <<out>>basis: real[:::], <<in>>ndf: integer, <<in>>n_node: integer, <<in>>x_node::real[::] )
+    +compute_nodal_diff_basis_function( <<out>>dbasis: real[:::], <<in>>ndf: integer, <<in>>n_node: integer, <<in>>x_node: real[::] )
+    +evaluate_basis( <<in>>df: integer, <<in>>xi: real[3] ) : real[]
+    +evaluate_diff_basis( <<in>>df: integer, <<in>>xi: real[3] ) : real[]
+    +get_boundary_dofs() : integer <<pointer>>
+    +get_cell_dofmap( <<in>>cell_lid: integer ) : integer[] <<pointer>>
+    +get_colours( <<out>>ncolours: integer, <<out>>ncells_per_colour: integer[] <<pointer>>, <<out>>colour_map: integer[::] <<pointer>> )
+    +get_dim_space() : integer
+    +get_dim_space_diff() : integer
+    +get_distgrid(): ESMF_DistGrid
+    +get_element_order(): integer
+    +get_fs_order() : integer
+    +get_global_dof_id( <<inout>>global_dof_id: integer[] )
+    +get_haloHandle( <<in>>depth: integer ): ESMF_RouteHandle
+    +get_last_dof_halo() : integer
+    +get_last_dof_owned() : integer
+    +get_mesh(): mesh_type <<pointer>>
+    +get_mesh_id(): integer
+    +get_ncell() : integer
+    +get_ncolours(): integer
+    +get_ndf() : integer
+    +get_nodes() : real[::] <<pointer>>
+    +get_nlayers() : integer
+    +get_stencil_dofmap( <<in>>stencil_shape: integer, <<in>>stencil_size: integer ) : stencil_dofmap <<pointer>>
+    +get_undf() : integer
+    +set_colours()
+    +which() : integer
+}
+
+linked_list_data_mod::linked_list_data_type <|-- function_space_mod::function_space_type

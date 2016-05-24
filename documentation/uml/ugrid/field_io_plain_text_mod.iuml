@@ -1,0 +1,12 @@
+class ugrid::field_io_plain_text {
+  -file_name: string
+  -unit_no: integer
+
+  file_close()
+  file_new( <<in>>file_name: string )
+  file_open( <<in>>file_name: string )
+  read_field_data( <<out>>field_data: real[] )
+  write_field_data( <<in>>field_data: real[] ))
+}
+
+ugrid::field_io_strategy <|.. ugrid::field_io_plain_text

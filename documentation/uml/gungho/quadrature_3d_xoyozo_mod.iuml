@@ -1,0 +1,33 @@
+class quadrature_3d_xoyozo_mod::quadrature_3d_xoyozo_type {
+  -nqp_is_equal: logical
+  -nqp_x: integer
+  -nqp_y: integer
+  -nqp_z: integer
+  -wqp_x: real[] <<allocatable>>
+  -wqp_y: real[] <<allocatable>>
+  -wqp_z: real[] <<allocatable>>
+  -xqp_x: real[] <<allocatable>>
+  -xqp_y: real[] <<allocatable>>
+  -xqp_z: real[] <<allocatable>>
+
+  +<<create>>init_quadrature_uniform( <<in>>nqp: integer, <<in>>rule: quadrature_rul ) : quadrature_3d_xoyozo_type
+  +<<create>>init_quadrature_variable( <<in>>nqp_x: integer, <<in>>nqp_y: integer, <<in>>nqp_z: integer, <<in>>rule: quadrature_rule ) : quadrature_3d_xoyozo_type
+  +<<destroy>>quadrature_destructor()
+
+  +get_proxy() : quadrature_3d_xoyozo_proxy_type
+}
+
+class quadrature_3d_xoyozo_mod::quadrature_3d_xoyozo_proxy_type {
+  +nqp_x: integer <<pointer>>
+  +nqp_y: integer <<pointer>>
+  +nqp_z: integer <<pointer>>
+  +wqp_x: real[] <<pointer>>
+  +wqp_y: real[] <<pointer>>
+  +wqp_z: real[] <<pointer>>
+  +xqp_x: real[] <<pointer>>
+  +xqp_y: real[] <<pointer>>
+  +xqp_z: real[] <<pointer>>
+}
+
+quadrature_abstract_mod::quadrature_abstract_type <|-- quadrature_3d_xoyozo_mod::quadrature_3d_xoyozo_type
+quadrature_3d_xoyozo_mod::quadrature_3d_xoyozo_proxy_type -> quadrature_3d_xoyozo_mod::quadrature_3d_xoyozo_type

@@ -1,0 +1,7 @@
+@startuml
+
+!include look.iuml
+!include utils/linked_list_mod.iuml
+!include utils/linked_list_data_mod.iuml
+
+@enduml
