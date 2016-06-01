@@ -71,6 +71,7 @@ $(OBJ_DIR)/%.o $(OBJ_DIR)/%.mod: $(OBJ_DIR)/%.f90 | $(dir $@)
 $(OBJ_DIR)/modules.a: $(ALL_MODULES)
 	$(Q)$(AR) -r $@ $^
 
+.PRECIOUS: $(OBJ_DIR)/%.x
 $(OBJ_DIR)/%.x: $$($$(shell echo $$* | tr a-z A-Z)_OBJS)
 	@echo -e \$(VT_BOLD)Linking$(VT_RESET) $@
 	$(Q)$(LDMPI) $(LDFLAGS) -o $@ \
