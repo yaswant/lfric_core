@@ -33,6 +33,8 @@ if __name__ == '__main__':
                          version='%(prog)s {}'.format( __version__ ) )
     parser.add_argument( '-verbose', action='store_true', \
                          help='Provide a running commentry' )
+    parser.add_argument( '-directory', default='./build', \
+                         help='Generated source files are here.' )
     parser.add_argument( '-database', metavar='filename', required=True, \
                          help='Database file to use' )
     parser.add_argument( 'sourceFiles', metavar='source-file', nargs='*', \
@@ -54,13 +56,21 @@ if __name__ == '__main__':
         logger.logEvent( 'Tidying source filename {} -> {}'.format( key, \
                                                                     filename ) )
 
+    programUnits = fortranDependencies.getPrograms()
+
     usedSources = set()
     for unit, unitFilename, prerequisite, prerequisiteFilename \
                                    in fortranDependencies.getAllDependencies():
-        usedSources.add( unitFilename )
-        usedSources.add( prerequisiteFilename )
-        logger.logEvent( 'Found usage of files {} and {}' \
-                                .format( unitFilename, prerequisiteFilename ) )
+        if unit in programUnits:
+            usedSources.add( unitFilename )
+            logger.logEvent( 'Found program {}'.format( unitFilename ) )
+
+        filename = prerequisiteFilename[len(args.directory)+1:] \
+                          if prerequisiteFilename.startswith(args.directory) \
+                          else prerequisiteFilename
+        usedSources.add( filename )
+        logger.logEvent( 'Found usage of files {} in {}' \
+                                .format( filename, unitFilename ) )
 
     sourceFiles = sourceFiles - usedSources
 

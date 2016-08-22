@@ -17,12 +17,7 @@ FFLAGS_NO_OPTIMISATION    = -O0
 FFLAGS_SAFE_OPTIMISATION  = -Og
 FFLAGS_RISKY_OPTIMISATION = -Ofast
 FFLAGS_DEBUG              = -g
-# The following list of warnings is the list that would be applied when
-# using "-Wall" minus "-Wsurprising" - as this produces spurious warnings
-# when finalisers are used
-FFLAGS_WARNINGS           = -Waliasing -Wampersand -Wintrinsics-std \
-                            -Wno-tabs -Wintrinsic-shadow -Wline-truncation \
-                            -Werror
+FFLAGS_WARNINGS           = -Wall
 FFLAGS_INIT               = -finit-integer=31173 -finit-real=snan \
                             -finit-logical=true -finit-character=85
 FFLAGS_RUNTIME            = -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow

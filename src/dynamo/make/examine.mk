@@ -42,7 +42,8 @@ $(OBJ_DIR)/dependencies.mk: $(MANUAL_TOUCH_FILES) $(AUTO_TOUCH_FILES) \
 .PHONY: unused-check
 unused-check: $(OBJ_DIR)/dependencies.mk | $(OBJ_DIR)
 	@echo -e $(VT_BOLD)Checking for unused source$(VT_RESET)
-	$(Q)$(TOOL_DIR)/CheckForUnused -database $(OBJ_DIR)/dependencies.db \
+	$(Q)$(TOOL_DIR)/CheckForUnused -directory $(OBJ_DIR)                \
+	                               -database $(OBJ_DIR)/dependencies.db \
 	                               $(MANUAL_SRC) $(AUTO_SRC)
 
 .SECONDEXPANSION:

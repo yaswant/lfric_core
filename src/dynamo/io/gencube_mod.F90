@@ -43,7 +43,7 @@ type, extends(ugrid_generator_type), public        :: gencube_ps_type
   private
   integer                            :: ndivs
   integer, allocatable               :: cell_next(:,:)     ! 
-  integer, allocatable               :: mesh(:,:)          ! 
+  integer, allocatable               :: verts_on_cell(:,:)          !
   integer, allocatable               :: edges_on_cell(:,:) ! 
   integer, allocatable               :: verts_on_edge(:,:) ! 
   real(kind=r_def), allocatable      :: vert_coords(:,:)   ! 
@@ -260,19 +260,19 @@ end subroutine calc_adjacency
 !-------------------------------------------------------------------------------
 !>  @brief       For each cell, calculates the four vertices which comprise it.
 !!
-!!  @details     Allocates and populates the instance's mesh(:,:) array with
+!!  @details     Allocates and populates the instance's verts_on_cell(:,:) array with
 !!               the vertices which form each cell.
 !!
 !!  @param[in]   self The gencube_ps_type instance reference.
-!!  @param[out]  mesh A rank 2 (4,ncells)-sized integer array of vertices
+!!  @param[out]  verts_on_cell A rank 2 (4,ncells)-sized integer array of vertices
 !!                    which constitute each cell.
 !-------------------------------------------------------------------------------
-subroutine calc_face_to_vert(self, mesh)
+subroutine calc_face_to_vert(self, verts_on_cell)
 
   implicit none
 
   class(gencube_ps_type), intent(in)                 :: self
-  integer, allocatable, intent(out)                  :: mesh(:,:)
+  integer, allocatable, intent(out)                  :: verts_on_cell(:,:)
 
   integer        :: ndivs, ncells, cpp
   integer        :: cell, idx, panel, nxf, astat
@@ -281,132 +281,132 @@ subroutine calc_face_to_vert(self, mesh)
   cpp = self%ndivs*self%ndivs
   ncells = 6*self%ndivs*self%ndivs
 
-  allocate(mesh(4, 6*cpp+2), stat=astat)
+  allocate(verts_on_cell(4, 6*cpp), stat=astat)
 
-  if(astat.ne.0) call log_event(prefix//"Failure to allocate mesh.", &
+  if(astat.ne.0) call log_event(prefix//"Failure to allocate verts_on_cell.", &
                                         LOG_LEVEL_ERROR)
 
-  mesh = 0
+  verts_on_cell = 0
   cell = 1
   nxf = 1
 
   ! NW vert of every cell in panels 1:4
   do cell = 1, 4*cpp
-    mesh(NW, cell) = cell
+    verts_on_cell(NW, cell) = cell
   end do
 
   nxf = 4*cpp + 1
 
   ! Copy NE from E neighbour for every cell panels 1:4
   do cell = 1, 4*cpp
-    mesh(NE, cell) = mesh(NW, self%cell_next(E, cell))
+    verts_on_cell(NE, cell) = verts_on_cell(NW, self%cell_next(E, cell))
   end do
 
   ! Copy from S for non-S-edge rows of panels 1:4
   do panel = 1, 4
     do cell = (panel-1)*cpp+1, panel*cpp-ndivs
-      mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
-      mesh(SE, cell) = mesh(NE, self%cell_next(S, cell))
+      verts_on_cell(SW, cell) = verts_on_cell(NW, self%cell_next(S, cell))
+      verts_on_cell(SE, cell) = verts_on_cell(NE, self%cell_next(S, cell))
     end do
   end do
 
   ! SE internals panel 5
   do idx = 0, ndivs-2
     do cell = 4*cpp+(idx*ndivs)+1, 4*cpp+(idx*ndivs)+ndivs-1
-      mesh(SE, cell) = nxf
+      verts_on_cell(SE, cell) = nxf
       nxf = nxf+1
-      mesh(SW, self%cell_next(E, cell)) = mesh(SE, cell)
-      mesh(NE, self%cell_next(S, cell)) = mesh(SE, cell)
+      verts_on_cell(SW, self%cell_next(E, cell)) = verts_on_cell(SE, cell)
+      verts_on_cell(NE, self%cell_next(S, cell)) = verts_on_cell(SE, cell)
       ! Transitive is valid here 
-      mesh(NW, self%cell_next(E, self%cell_next(S, cell))) = mesh(SE, cell)
+      verts_on_cell(NW, self%cell_next(E, self%cell_next(S, cell))) = verts_on_cell(SE, cell)
     end do
   end do
 
   ! NW vert of every cell in panel 6
   do cell = 5*cpp+1, 6*cpp
-    mesh(NW, cell) = nxf
+    verts_on_cell(NW, cell) = nxf
     nxf = nxf+1
   end do
 
   ! Copy SW from S neighbour for non-S-edge rows of panel 6
   do cell = 5*cpp+1, 6*cpp-ndivs
-    mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
+    verts_on_cell(SW, cell) = verts_on_cell(NW, self%cell_next(S, cell))
   end do
 
   ! SW verts of bottom row, panel 6
   do cell = 6*cpp-ndivs+1, 6*cpp
-    mesh(SW, cell) = nxf
+    verts_on_cell(SW, cell) = nxf
     nxf = nxf+1
   end do
 
   ! SW verts of bottom row, panel 3
   do cell = 3*cpp-ndivs+1, 3*cpp
-    mesh(SW, cell) = nxf
-    mesh(SE, self%cell_next(W, cell)) = mesh(SW, cell)
+    verts_on_cell(SW, cell) = nxf
+    verts_on_cell(SE, self%cell_next(W, cell)) = verts_on_cell(SW, cell)
     nxf = nxf+1
   end do
 
   ! vert at SE of panel 3
   cell = 3*cpp
-  mesh(SE, cell) = nxf
-  mesh(SW, self%cell_next(E, cell)) = mesh(SE, cell)
+  verts_on_cell(SE, cell) = nxf
+  verts_on_cell(SW, self%cell_next(E, cell)) = verts_on_cell(SE, cell)
 
   ! Panel boundary joins...
 
   ! S=>W join, I=>VI
   do cell = cpp-ndivs+1, cpp
-    mesh(SW, cell) = mesh(SW, self%cell_next(S, cell))
-    mesh(SE, cell) = mesh(NW, self%cell_next(S, cell))
+    verts_on_cell(SW, cell) = verts_on_cell(SW, self%cell_next(S, cell))
+    verts_on_cell(SE, cell) = verts_on_cell(NW, self%cell_next(S, cell))
   end do
 
   ! N=>W join, I=>V
   do cell = 1, ndivs
-    mesh(NW, self%cell_next(N, cell)) = mesh(NW, cell)
-    mesh(SW, self%cell_next(N, cell)) = mesh(NE, cell)
+    verts_on_cell(NW, self%cell_next(N, cell)) = verts_on_cell(NW, cell)
+    verts_on_cell(SW, self%cell_next(N, cell)) = verts_on_cell(NE, cell)
   end do
 
   ! N=>E join, III=>V
   do cell = 2*cpp+1, 2*cpp+ndivs
-    mesh(SE, self%cell_next(N, cell)) = mesh(NW, cell)
-    mesh(NE, self%cell_next(N, cell)) = mesh(NE, cell)
+    verts_on_cell(SE, self%cell_next(N, cell)) = verts_on_cell(NW, cell)
+    verts_on_cell(NE, self%cell_next(N, cell)) = verts_on_cell(NE, cell)
   end do
 
   ! E=>S join, III=>VI
   do cell = 3*cpp-ndivs+1, 3*cpp
-     mesh(NE, self%cell_next(S, cell)) = mesh(SW, cell)
-     mesh(SE, self%cell_next(S, cell)) = mesh(SE, cell)
+     verts_on_cell(NE, self%cell_next(S, cell)) = verts_on_cell(SW, cell)
+     verts_on_cell(SE, self%cell_next(S, cell)) = verts_on_cell(SE, cell)
   end do
 
   ! N=>N join, IV=>V
   do cell = 3*cpp+1, 3*cpp+ndivs
-    mesh(NE, self%cell_next(N, cell)) = mesh(NW, cell)
-    mesh(NW, self%cell_next(N, cell)) = mesh(NE, cell)
+    verts_on_cell(NE, self%cell_next(N, cell)) = verts_on_cell(NW, cell)
+    verts_on_cell(NW, self%cell_next(N, cell)) = verts_on_cell(NE, cell)
   end do
 
   ! Copy NE,SE from E neighbour for non-E-edge cells of panel 6
   do idx = 0, ndivs-1
     do cell = 5*cpp+1+(idx*ndivs), 5*cpp+1+(idx*ndivs)+ndivs-2
-      mesh(NE, cell) = mesh(NW, self%cell_next(E, cell))
-      mesh(SE, cell) = mesh(SW, self%cell_next(E, cell))
+      verts_on_cell(NE, cell) = verts_on_cell(NW, self%cell_next(E, cell))
+      verts_on_cell(SE, cell) = verts_on_cell(SW, self%cell_next(E, cell))
     end do
   end do
 
   ! S=>S join, VI=>IV
   do cell = 6*cpp-ndivs+1, 6*cpp
-    mesh(SW, self%cell_next(S, cell)) = mesh(SE, cell)
-    mesh(SE, self%cell_next(S, cell)) = mesh(SW, cell)
+    verts_on_cell(SW, self%cell_next(S, cell)) = verts_on_cell(SE, cell)
+    verts_on_cell(SE, self%cell_next(S, cell)) = verts_on_cell(SW, cell)
   end do
 
   ! S=>N join, II=>VI
   do cell = 2*cpp-ndivs+1, 2*cpp
-    mesh(SW, cell) = mesh(NW, self%cell_next(S, cell))
-    mesh(SE, cell) = mesh(NE, self%cell_next(S, cell))
+    verts_on_cell(SW, cell) = verts_on_cell(NW, self%cell_next(S, cell))
+    verts_on_cell(SE, cell) = verts_on_cell(NE, self%cell_next(S, cell))
   end do
 
   ! N=>S join, II=>V
   do cell = cpp+1, cpp+ndivs
-    mesh(SW, self%cell_next(N, cell)) = mesh(NW, cell)
-    mesh(SE, self%cell_next(N, cell)) = mesh(NE, cell)
+    verts_on_cell(SW, self%cell_next(N, cell)) = verts_on_cell(NW, cell)
+    verts_on_cell(SE, self%cell_next(N, cell)) = verts_on_cell(NE, cell)
   end do
 
 
@@ -460,12 +460,12 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
       edges_on_cell(N, cell) = nxf
       edges_on_cell(W, cell) = nxf+1
       edges_on_cell(S, cell) = nxf+2
-      verts_on_edge(1, nxf) = self%mesh(NW, cell)
-      verts_on_edge(2, nxf) = self%mesh(NE, cell)
-      verts_on_edge(1, nxf+1) = self%mesh(SW, cell)
-      verts_on_edge(2, nxf+1) = self%mesh(NW, cell)
-      verts_on_edge(1, nxf+2) = self%mesh(SE, cell)
-      verts_on_edge(2, nxf+2) = self%mesh(SW, cell)
+      verts_on_edge(1, nxf) = self%verts_on_cell(NW, cell)
+      verts_on_edge(2, nxf) = self%verts_on_cell(NE, cell)
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(SW, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(NW, cell)
+      verts_on_edge(1, nxf+2) = self%verts_on_cell(SE, cell)
+      verts_on_edge(2, nxf+2) = self%verts_on_cell(SW, cell)
       nxf = nxf + 3
       ! Push W edge to W neighbour
       edges_on_cell(E, self%cell_next(W, cell)) = edges_on_cell(W, cell)
@@ -474,10 +474,10 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
     do cell = (panel-1)*cpp+1+ndivs, panel*cpp
       edges_on_cell(W, cell) = nxf
       edges_on_cell(S, cell) = nxf+1
-      verts_on_edge(1, nxf) = self%mesh(SW, cell)
-      verts_on_edge(2, nxf) = self%mesh(NW, cell)
-      verts_on_edge(1, nxf+1) = self%mesh(SE, cell)
-      verts_on_edge(2, nxf+1) = self%mesh(SW, cell)
+      verts_on_edge(1, nxf) = self%verts_on_cell(SW, cell)
+      verts_on_edge(2, nxf) = self%verts_on_cell(NW, cell)
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(SE, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(SW, cell)
       nxf = nxf+2
       ! Copy N edge from N cell
       edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
@@ -489,8 +489,8 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
   ! Panel V non-S-edge rows
   do cell = 4*cpp+1, 5*cpp-ndivs
     edges_on_cell(S, cell) = nxf
-    verts_on_edge(1, nxf) = self%mesh(SE, cell)
-    verts_on_edge(2, nxf) = self%mesh(SW, cell)
+    verts_on_edge(1, nxf) = self%verts_on_cell(SE, cell)
+    verts_on_edge(2, nxf) = self%verts_on_cell(SW, cell)
     nxf = nxf + 1
     ! Push S edge to S neighbour
     edges_on_cell(N, self%cell_next(S, cell)) = edges_on_cell(S, cell)
@@ -500,8 +500,8 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
   do idx = 0, ndivs-1
     do cell = 4*cpp+1+idx*ndivs, 4*cpp+(idx+1)*ndivs-1
       edges_on_cell(E, cell) = nxf
-      verts_on_edge(1, nxf) = self%mesh(NE, cell)
-      verts_on_edge(2, nxf) = self%mesh(SE, cell)
+      verts_on_edge(1, nxf) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf) = self%verts_on_cell(SE, cell)
       nxf = nxf + 1
       ! Push E edge to E neighbour
       edges_on_cell(W, self%cell_next(E, cell)) = edges_on_cell(E, cell)
@@ -511,8 +511,8 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
   ! Panel VI non-S-edge rows
   do cell = 5*cpp+1, 6*cpp-ndivs
     edges_on_cell(S, cell) = nxf
-    verts_on_edge(1, nxf) = self%mesh(SE, cell)
-    verts_on_edge(2, nxf) = self%mesh(SW, cell)
+    verts_on_edge(1, nxf) = self%verts_on_cell(SE, cell)
+    verts_on_edge(2, nxf) = self%verts_on_cell(SW, cell)
     nxf = nxf + 1
     ! Copy from N neighbour
     edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
@@ -522,8 +522,8 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
   do idx = 0, ndivs-1
     do cell = 5*cpp+1+idx*ndivs, 5*cpp+(idx+1)*ndivs-1
       edges_on_cell(E, cell) = nxf
-      verts_on_edge(1, nxf) = self%mesh(NE, cell)
-      verts_on_edge(2, nxf) = self%mesh(SE, cell)
+      verts_on_edge(1, nxf) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf) = self%verts_on_cell(SE, cell)
       nxf = nxf + 1
       ! Push E edge to E neighbour
       edges_on_cell(W, self%cell_next(E, cell)) = edges_on_cell(E, cell)
@@ -684,7 +684,7 @@ subroutine calc_coords(self, vert_coords)
       ys = xs*t1 
       zs = xs*t2
       ! Lookup vert with x offset
-      vert0 = self%mesh(SE, cell+x) 
+      vert0 = self%verts_on_cell(SE, cell+x)
 
       x0 = -ys
       y0 =  zs
@@ -712,7 +712,7 @@ subroutine calc_coords(self, vert_coords)
       ys = xs*t1 
       zs = xs*t2
       ! Lookup vert
-      vert0 = self%mesh(NW, cell) 
+      vert0 = self%verts_on_cell(NW, cell)
 
       x0 = -ys
       y0 = -zs
@@ -740,7 +740,7 @@ subroutine calc_coords(self, vert_coords)
     ys = xs*t1 
     zs = xs*t2
 
-    vert0 = self%mesh(SW, cell) 
+    vert0 = self%verts_on_cell(SW, cell)
 
     x0 = -ys
     y0 = -zs
@@ -767,7 +767,7 @@ subroutine calc_coords(self, vert_coords)
     ys = xs*t1 
     zs = xs*t2
 
-    vert0 = self%mesh(NE, cell) 
+    vert0 = self%verts_on_cell(NE, cell)
 
     x0 = -ys
     y0 = -zs
@@ -884,7 +884,7 @@ subroutine get_connectivity(self, face_node_connectivity,   &
   integer, intent(out)                             :: face_face_connectivity(:,:)
 
 
-  face_node_connectivity = self%mesh
+  face_node_connectivity = self%verts_on_cell
   edge_node_connectivity = self%verts_on_edge
   face_edge_connectivity = self%edges_on_cell
   face_face_connectivity = self%cell_next
@@ -905,7 +905,7 @@ subroutine generate(self)
 
 
   call calc_adjacency(self, self%cell_next)
-  call calc_face_to_vert(self, self%mesh)
+  call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
   call calc_coords(self, self%vert_coords)
   call orient_lfric(self)
@@ -938,7 +938,7 @@ subroutine write_mesh(self)
   write(stdout,*)
   write(stdout,*) "verts_on_cell"
   do cell=1, ncells
-    write(stdout,"(I3,T8,4I4)") cell, self%mesh(:,cell)
+    write(stdout,"(I3,T8,4I4)") cell, self%verts_on_cell(:,cell)
   end do
 
   write(stdout,*)
@@ -981,7 +981,7 @@ subroutine orient_lfric(self)
   p0 = 2*cpp+1
   p1 = 3*cpp
   ! verts
-  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), 1, 1)
+  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), 1, 1)
   ! adj
   self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
   ! edges
@@ -991,7 +991,7 @@ subroutine orient_lfric(self)
   p0 = 3*cpp+1
   p1 = 4*cpp
   ! verts
-  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), 1, 1)
+  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), 1, 1)
   ! adj
   self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), 1, 1)
   ! edges
@@ -1001,7 +1001,7 @@ subroutine orient_lfric(self)
   p0 = 4*cpp+1
   p1 = 5*cpp
   ! verts
-  self%mesh(:, p0:p1) = cshift(self%mesh(:, p0:p1), -1, 1)
+  self%verts_on_cell(:, p0:p1) = cshift(self%verts_on_cell(:, p0:p1), -1, 1)
   ! adj
   self%cell_next(:, p0:p1) = cshift(self%cell_next(:, p0:p1), -1, 1)
   ! edges

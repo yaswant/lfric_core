@@ -1,36 +1,134 @@
 #!jinja2
-{%- set builds = ['fast-debug'] %}
-{%- set science_configs = ['semi-implicit', 'si-helmholtz', 'runge-kutta', 'transport-rk', 'transport-cosmic'] %}
-{%- set science_target = 'fast-debug' %}
-{%- set compile_config = 'semi_implicit' %}
+{%- set science_configurations = 'runge-kutta', 'semi-implicit',
+                                 'si-helmholtz', 'transport-cosmic',
+                                 'transport-rk' %}
+{%- set groups = {'developer': ['science(semi-implicit)',
+                                'science(si-helmholtz)',
+                                'science(runge-kutta)',
+                                'science(transport-rk)',
+                                'science(transport-cosmic)',
+                                'check_compilers(fast-debug)',
+                                'godlines',
+                                'cleanlines'],
+                  'nightly': ['check_compilers(full-debug, True)',
+                              'godlines(True)',
+                              'publish_index']} %}
+{%- set mesh_types = ['cubedsphere', 'biperiodic'] %}
 
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
 {%-     do compiler_setup.update({compiler : [setup]}) -%}
-{%-     if compiler == TARGET_SCIENCE_COMPILER -%}
-{%-         set default_science_setup = setup -%}
-{%-     endif -%}
 {%- endfor -%}
 
-{%- macro command_list() %}
-{%-     set list = [] %}
-{%-     for thing in varargs %}
-{%-         if thing is string %}
-{%-             do list.append(thing) %}
-{%-         else %}
-{%-             do list.extend(thing) %}
-{%-         endif %}
-{%-    endfor -%}
-"""{{ list | join('\n') }}"""
-{%- endmacro %}
+{%- if RUN_NAMES is defined %}
+{%-   if RUN_NAMES is string %}
+{%-     set groupsToRun = [RUN_NAMES] %}
+{%-   else %}
+{%-     set groupsToRun = RUN_NAMES %}
+{%-   endif %}
+{%- else %}
+{%-   set groupsToRun = ['developer'] %}
+{%- endif %}
 
 [cylc]
     UTC mode = True
     [[event hooks]]
         mail events = timeout
         abort on timeout = True
+{%- if 'nightly' in groupsToRun %}
+        abort on stalled = True
+{%- endif %}
         timeout = 180 # 3 hours
 
+{#- #########################################################################}
+{%- macro science( configuration ) %}
+{%-   set label =  TARGET_SCIENCE_COMPILER | lower|replace('-','foo') + '_fastfoodebug' %}
+            purge_local => purge_target
+            purge_target => export_for_{{label}}
+            export_for_{{label}} => compile_with_{{label}}
+{%-   if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
+            compile_with_{{label}} => run_{{configuration|replace('-','foo')}}_{{label}}
+            compile_with_{{label}} => run_{{label}}_boundary_test
+{%-     if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS %}
+            run_{{configuration|replace('-','foo')}}_{{label}} => check_{{configuration|replace('-','foo')}}_{{label}}
+            run_{{label}}_boundary_test => check_{{label}}_boundary_test
+{%-     endif %}
+{%-   endif %}
+{%- endmacro %}
+{#- #########################################################################}
+{%- macro cleanlines() %}
+{%-   set label =  TARGET_TECHNICAL_COMPILER | lower|replace('-','foo') + '_fastfoodebug' %}
+{%-   if 'cleanliness' in TECHNICAL_DEVELOPER_TESTS %}
+            purge_local => purge_target
+            purge_target => export_for_{{label}}
+            export_for_{{label}} => compile_with_{{label}}
+            compile_with_{{label}} => check_for_unused_source
+{%-   endif %}
+{%- endmacro %}
+{#- Documentation, it's next to cleanlines ##################################}
+{%- macro godlines(publish=False) %}
+{%-   set label =  TARGET_TECHNICAL_COMPILER | lower + '_fastfoodebug' %}
+{%-   if 'documentation' in TECHNICAL_DEVELOPER_TESTS %}
+            purge_local => purge_target
+            purge_target => export_for_{{label}}
+            export_for_{{label}} => api_documentation
+            export_for_{{label}} => design_documentation
+{%-     if publish %}
+            api_documentation    => publish_api_documentation
+            api_documentation    => publish_api_log
+            design_documentation => publish_design_documentation
+{%-     endif %}
+{%-   endif %}
+{%- endmacro %}
+{#- #########################################################################}
+{%- macro publish_index() %}
+            PUBLISH:finish-all => publish_index
+{%- endmacro %}
+{#- #########################################################################}
+{%- macro check_compilers( build, publish=False ) %}
+{%-   for compiler in compiler_setup.keys() %}
+{%-     set label = compiler | lower + '_' + build | lower|replace('-','foo')%}
+{%-     set perform_run = TARGET_PERFORM_RUN %}
+{%-     if build == 'full-debug' and TARGET_PERFORM_DEBUG_RUN is defined %}
+{%-       set perform_run = TARGET_PERFORM_DEBUG_RUN %}
+{%-     endif %}
+            purge_local => purge_target
+            purge_target => export_for_{{label}}
+            export_for_{{label}} => compile_with_{{label}}
+{%-     if publish %}
+            compile_with_{{label}}:finish => publish_{{label}}_compile
+{%-     endif %}
+{%-     if compiler in perform_run %}
+{%-       for mesh in mesh_types %}
+            compile_with_{{label}} => generate_mesh_{{mesh}}_{{label}}
+{%-         if compiler in TARGET_PERFORM_KGO_TESTS %}
+            generate_mesh_{{mesh}}_{{label}} => check_mesh_{{mesh}}_{{label}}
+{%-         endif %}
+{%-       endfor %}
+{%-       if compiler in TARGET_PERFORM_UNIT_TESTS %}
+            compile_with_{{label}} => unit_test_with_{{label}}
+{%-       endif %}
+{%-       if compiler in TARGET_PERFORM_FUNCTIONAL_TESTS %}
+            compile_with_{{label}} => functional_test_with_{{label}}
+{%-       endif %}
+            compile_with_{{label}} => run_semifooimplicit_{{label}}
+{%-       if publish %}
+            run_semifooimplicit_{{label}}:finish => publish_{{label}}_semifooimplicit
+{%-       endif %}
+{%-       if compiler in TARGET_PERFORM_KGO_TESTS %}
+            run_semifooimplicit_{{label}} => check_semifooimplicit_{{label}}
+{%-       endif %}
+{%-     endif %}
+{%-   endfor %}
+{%- endmacro %}
+{#- #########################################################################}
+{%- macro schedule() %}
+{%-   for group in groupsToRun %}
+{%-       for mission in groups[group] %}
+{{          mission | executeMacro() }}
+{%-       endfor %}
+{%-   endfor %}
+{%- endmacro %}
 [scheduling]
     [[queues]]
         [[[host_throttle]]]
@@ -38,56 +136,8 @@
             members = root
     [[dependencies]]
         graph = """
-{%- if TECHNICAL_DEVELOPER_TESTS %}
-            purge_for_technical => export_for_technical
-{%-   if 'cleanliness' in TECHNICAL_DEVELOPER_TESTS %}
-            export_for_technical => check_for_unused_source
-{%-   endif %}
-
-{%-   if 'documentation' in TECHNICAL_DEVELOPER_TESTS %}
-            export_for_technical => api_documentation
-            export_for_technical => design_documentation
-{%-   endif %}
-{%- endif %}
-
-{%- for compiler, script in TARGET_COMPILER_SETUP | batch(2) %}
-{%-   for build in builds %}
-{%-     set label = compiler | lower + '_' + build | lower %}
-            local_purge_for_{{label}}      => target_purge_for_{{label}}
-            target_purge_for_{{label}}     => export_for_{{label}}
-            export_for_{{label}}           => copy_{{label}}_to_target
-            copy_{{label}}_to_target       => compile_with_{{label}}
-{%-     if compiler in TARGET_PERFORM_RUN %}
-            compile_with_{{label}}         => generate_{{label}}_cubedsphere
-            compile_with_{{label}}         => generate_{{label}}_biperiodic
-{%-         if compiler in TARGET_PERFORM_KGO_TESTS %}
-            generate_{{label}}_cubedsphere => check_{{label}}_cubedsphere_metadata
-            generate_{{label}}_cubedsphere => check_{{label}}_cubedsphere_data
-            generate_{{label}}_biperiodic  => check_{{label}}_biperiodic_metadata
-            generate_{{label}}_biperiodic  => check_{{label}}_biperiodic_data
-{%-         endif %}
-{%-     endif %}
-{%-     if compiler in TARGET_PERFORM_UNIT_TESTS %}
-            compile_with_{{label}}         => unit_test_with_{{label}}
-{%-     endif %}
-{%-    if compiler in TARGET_PERFORM_FUNCTIONAL_TESTS %}
-            compile_with_{{label}}         => functional_test_with_{{label}}
-{%-    endif %}
-{%-     for config in science_configs %}
-{#-         At the point where we have more than one compiler or target we  #}
-{#-         will need some logic here.                                      #}
-{%-         set config_label = config | lower + '_' + label %}
-{%-         if compiler in TARGET_PERFORM_RUN %}
-                compile_with_{{label}} => run_{{config_label}}_dynamo
-                compile_with_{{label}} => run_{{label}}_boundary_test
-{%-             if compiler in TARGET_PERFORM_KGO_TESTS %}
-                run_{{config_label}}_dynamo => check_{{config_label}}_dynamo
-                run_{{label}}_boundary_test => check_{{label}}_boundary_test
-{%-             endif %}
-{%-         endif %}
-{%-     endfor %}
-{%-   endfor %}
-{%- endfor %}
+{%- set scheduledTasks = schedule() | deduplicateSchedule() %}
+{{scheduledTasks}}
                 """
 [runtime]
     [[root]]
@@ -95,7 +145,7 @@
                             export CYLC_VERSION={{CYLC_VERSION}}
                             export ROSE_VERSION={{ROSE_VERSION}}
                             """
-        script     = "rose task-run"
+        script = "rose task-run"
         [[[events]]]
             mail events = retry, submission failed, submission timout, execution timeout
             submission timeout = 720 # 12 hours
@@ -116,218 +166,315 @@
         [[[job submission]]]
             method = {{TARGET_BATCHER}}
 
-{#############################################################################}
-{# Godliness, it is, afterall, next to cleanliness                           #}
-
-    [[TECHNICAL]]
-        inherit = None, LOCAL
+    [[PUBLISH]]
         [[[environment]]]
-            DYNAMO_SOURCE_DIRECTORY      = $SOURCE_ROOT/technical
-            DYNAMO_DESTINATION_DIRECTORY = $OUTPUT_ROOT/technical
-            DYNAMO_BUILD_ROOT = {{TARGET_BUILD_ROOT}}/technical
+            DESTINATION = ~/public_html/dynamo-{{TARGET_OPT}}
+
+##############################################################################
+    [[purge_local]]
+        inherit = None, LOCAL
+        script = rm -rf $OUTPUT_ROOT/* $SOURCE_ROOT/*
+
+    # The build directives are used to ensure that any temporary space which
+    # might be used for building is available to be cleaned.
+    [[purge_target]]
+        inherit = None, TARGET
+        script = rm -rf {{TARGET_BUILD_ROOT}}/* $OUTPUT_ROOT/* $SOURCE_ROOT/*
         [[[directives]]]
-{%- for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
+{%- for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
             {{DIRECTIVE}}
 {%- endfor %}
 
-    [[purge_for_technical]]
-        {#- This task is done locally since it's just file handling. #}
-        inherit = TECHNICAL
-        script = "rm -rf $DYNAMO_SOURCE_DIRECTORY $DYNAMO_DESTINATION_DIRECTORY $DYNAMO_BUILD_ROOT"
+{%- if 'publish_index' in scheduledTasks %}
+    # This task can not be part of the PUBLISH family as a prerequisite of
+    # running it is that the PUBLISH family have completed. i.e. A circular
+    # dependency. This means it can not take advantage of the environment set
+    # up by the family. That is why some items are duplicated.
+    [[publish_index]]
+        inherit = None, LOCAL
+        script = rose task-run --app-key=publish --command-key=index
+        [[[environment]]]
+            DESTINATION = ~/public_html/dynamo-{{TARGET_OPT}}
+{%-   if ROSE_BUSH_URL %}
+            ROSE_BUSH_ARG = -bush {{ROSE_BUSH_URL}}
+{%-   endif %}
+{%- endif %}
 
-    [[export_for_technical]]
-        {#- This task has to be done locally as the working copy may be   #}
-        {#- on a local disc.                                              #}
-        inherit = TECHNICAL
-        script = """
-                 mkdir -p `dirname $DYNAMO_SOURCE_DIRECTORY`
-                 svn export {{ SOURCE_DYNAMO }} $DYNAMO_SOURCE_DIRECTORY
-                 """
+##############################################################################
+    [[TECHNICAL]]
+        [[[environment]]]
+            DYNAMO_SOURCE_DIRECTORY      = $SOURCE_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fastfoodebug
+            DYNAMO_DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fastfoodebug
+            DYNAMO_BUILD_ROOT            = {{TARGET_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fastfoodebug
 
+{%- if 'check_for_unused_source' in scheduledTasks %}
     [[check_for_unused_source]]
-        inherit = TECHNICAL
-        pre-script = {{command_list(LOCAL_BASE_SETUP, LOCAL_TECHNICAL_SETUP, LOCAL_REVEAL_SETUP)}}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/src/dynamo unused-check"
-        post-script = "rm -r $DYNAMO_BUILD_ROOT"
+        inherit = None, TARGET, TECHNICAL
+        pre-script = """
+                     {{'\n'|commandList(LOCAL_BASE_SETUP, LOCAL_TECHNICAL_SETUP, LOCAL_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
+                     """
+        script = make -C $DYNAMO_SOURCE_DIRECTORY/src/dynamo unused-check
+        [[[directives]]]
+{%-   for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-   endfor %}
+{%- endif %}
 
+    # Run locally as they need workstation tools such as Doxygen.
+{%- if 'api_documentation' in scheduledTasks %}
     [[api_documentation]]
-        inherit = TECHNICAL
-        pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation api-documents"
+        inherit = None, LOCAL, TECHNICAL
+        pre-script = """
+                     {{'\n'|commandList( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP, 'mkdir -p $DYNAMO_DESTINATION_DIRECTORY') }}
+                     """
+        script = make -C $DYNAMO_SOURCE_DIRECTORY/documentation api-documents
+        post-script = """
+                      # Future publisher stages need this information
+                      echo $CYLC_TASK_LOG_ROOT > $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.log.path
+                      """
+{%- endif %}
 
+{%- if 'publish_api_log' in scheduledTasks %}
+    [[publish_api_log]]
+        inherit = PUBLISH, TECHNICAL, LOCAL
+        pre-script = """
+                     cp `cat $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.log.path`.out $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.out
+                     cp `cat $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.log.path`.err $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.err
+                     """
+        script = rose task-run --app-key=publish --command-key=doxygen
+        [[[environment]]]
+            LOG_OUT = $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.out
+            LOG_ERR = $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.err
+{%- endif %}
+
+{%- if 'publish_api_documentation' in scheduledTasks %}
+    [[publish_api_documentation]]
+        inherit = PUBLISH, LOCAL, TECHNICAL
+        script = rose task-run --app-key=publish --command-key=directory
+        [[[environment]]]
+            DIRECTORY = $DYNAMO_SOURCE_DIRECTORY/documentation/api
+{%- endif %}
+
+    # Run locally as they need workstation tools like Inkscape.
+{%- if 'design_documentation' in scheduledTasks %}
     [[design_documentation]]
-        inherit = TECHNICAL
-        pre-script = {{command_list( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents"
+        inherit = None, LOCAL, TECHNICAL
+        pre-script = """
+                     {{'\n'|commandList( LOCAL_BASE_SETUP, LOCAL_REVEAL_SETUP) }}
+                     """
+        script = make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents.tar
+{%- endif %}
 
-{#############################################################################}
-{% macro pipeline_tasks( label, compiler, build ) %}
-{#   A set of tasks for an "extract, compile, unit test, run, check" pipeline #}
-{%   set family = label | upper %}
-{%   set label = label | lower %}
+{%- if 'publish_design_documentation' in scheduledTasks %}
+    [[publish_design_documentation]]
+        inherit = PUBLISH, LOCAL, TECHNICAL
+        script = rose task-run --app-key=publish --command-key=tar-file
+        [[[environment]]]
+            FILE = $DYNAMO_SOURCE_DIRECTORY/documentation/design-documents.tar
+            DESTINATION = ~/public_html/dynamo-{{TARGET_OPT}}/design
+{%- endif %}
 
+##############################################################################
+{%- for compiler in compiler_setup.keys() -%}
+{%-   for build in 'fast-debug', 'full-debug' %}
+{%-     set label = compiler | lower + '_' + build | lower|replace('-','foo') %}
+{%-     set family = label | upper %}
     [[{{family}}]]
         [[[environment]]]
             DYNAMO_SOURCE_DIRECTORY      = $SOURCE_ROOT/{{label}}
             DYNAMO_DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{label}}
             DYNAMO_COMPILER              = {{compiler}}
-            DYNAMO_BUILD_TARGET          = {{TARGET_OPT}}
 
-    [[{{family}}_BUILD_ENVIRONMENT]]
-        inherit = TARGET
-        [[[directives]]]
-{%-    for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
-            {{DIRECTIVE}}
-{%-    endfor %}
-        [[[environment]]]
-            DYNAMO_BUILD_ROOT = {{TARGET_BUILD_ROOT}}/{{label}}
-
-    [[{{family}}_RUN_ENVIRONMENT]]
-        inherit = TARGET
-        [[[directives]]]
-{%-    for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
-            {{DIRECTIVE}}
-{%-    endfor %}
-
-    [[{{family}}_TECHNICAL_ENVIRONMENT]]
-        inherit = TARGET
-        [[[directives]]]
-{%- for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
-            {{DIRECTIVE}}
-{%- endfor %}
-
-    [[local_purge_for_{{label}}]]
-        inherit = {{family}}, LOCAL
-        script = "rm -rf $DYNAMO_SOURCE_DIRECTORY $DYNAMO_DESTINATION_DIRECTORY"
-
-    [[target_purge_for_{{label}}]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        script = "rm -rf $DYNAMO_SOURCE_DIRECTORY $DYNAMO_DESTINATION_DIRECTORY"
-
+    # Export must be performed locally as it needs access to any working copy
+    # involved. Such a working copy may well be on a local disc.
+    #
+{%- if 'export_for_' + label in scheduledTasks %}
     [[export_for_{{label}}]]
-        {#- This task has to be done locally as the working copy may be   #}
-        {#- on a local disc.                                              #}
         inherit = {{family}}, LOCAL
         script = """
                  mkdir -p `dirname $DYNAMO_SOURCE_DIRECTORY`
                  svn export {{ SOURCE_DYNAMO }} $DYNAMO_SOURCE_DIRECTORY
+                 HOST={{TARGET_HOST}}
+                 DYNAMO_RELATIVE_SOURCE_DIRECTORY=`echo $DYNAMO_SOURCE_DIRECTORY | sed "s|$HOME/||"`
+                 ssh $HOST mkdir -p $DYNAMO_RELATIVE_SOURCE_DIRECTORY
+                 rsync -avz $DYNAMO_SOURCE_DIRECTORY/ $HOST:$DYNAMO_RELATIVE_SOURCE_DIRECTORY/
                  """
+{%- endif %}
 
-    [[copy_{{label}}_to_target]]
-        inherit = {{family}}, LOCAL
-        script = """
-            HOST={{TARGET_HOST}}
-            DYNAMO_RELATIVE_SOURCE_DIRECTORY=`echo $DYNAMO_SOURCE_DIRECTORY | sed "s|$HOME/||"`
-            ssh $HOST mkdir -p $DYNAMO_RELATIVE_SOURCE_DIRECTORY
-            rsync -avz $DYNAMO_SOURCE_DIRECTORY/ $HOST:$DYNAMO_RELATIVE_SOURCE_DIRECTORY/
-                  """
-
+{%- if 'compile_with_' + label in scheduledTasks %}
     [[compile_with_{{label}}]]
-        inherit    = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "rm -rf $DYNAMO_BUILD_ROOT", "mkdir -p $DYNAMO_BUILD_ROOT")}}
-        script     = "rose task-run --app-key=compile --command-key={{build}}"
-        post-script = {{command_list("cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build", "rm -rf $DYNAMO_BUILD_ROOT")}}
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, 'rm -rf $DYNAMO_BUILD_ROOT/*')}}
+                     """
+        script      = rose task-run --app-key=compile
+        post-script = """
+                      cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build
+                      rm -rf $DYNAMO_BUILD_ROOT
+                      # Future publisher stages need this information
+                      echo $CYLC_TASK_LOG_ROOT > $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.log.path
+                      """
+        [[[environment]]]
+            DYNAMO_BUILD_ROOT           = {{TARGET_BUILD_ROOT}}/{{label}}
+            BUILD_TARGET                = {{build}}
+            DYNAMO_OPTIMISATION_PROFILE = {{TARGET_OPT}}
+        [[[directives]]]
+{%-   for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-   endfor %}
+{%- endif %}
 
-    [[unit_test_with_{{label}}]]
-        inherit = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/src/test"
-        post-script = {{command_list("cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build", "rm -rf $DYNAMO_BUILD_ROOT")}}
+{%- if 'publish_' + label + '_compile' in scheduledTasks %}
+    [[publish_{{label}}_compile]]
+        inherit = PUBLISH, {{family}}, LOCAL
+        pre-script = """
+                     mkdir -p $DYNAMO_DESTINATION_DIRECTORY
+                     RELATIVE_DESTINATION_DIRECTORY=`echo $DYNAMO_DESTINATION_DIRECTORY | sed "s|$HOME/||"`
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/dynamo.{{compiler}}.log.path .
+                     scp {{TARGET_HOST}}:`cat dynamo.{{compiler}}.log.path`.out $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.out
+                     scp {{TARGET_HOST}}:`cat dynamo.{{compiler}}.log.path`.err $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.err
+                     """
+        script = rose task-run --app-key=publish --command-key=compile
+        [[[environment]]]
+            CONTEXT  = {{build}}
+            COMPILER = {{compiler}}
+            LOG_OUT  = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.out
+            LOG_ERR  = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.err
+{%- endif %}
 
-    [[functional_test_with_{{label}}]]
-        inherit = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
-        script = "make -C $DYNAMO_SOURCE_DIRECTORY/src/functional-test"
-        post-script = {{command_list("cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build", "rm -rf $DYNAMO_BUILD_ROOT")}}
-
-    [[clean_build_{{label}}]]
-        inherit = {{family}}, {{family}}_BUILD_ENVIRONMENT
-        script = "rm -rf $DYNAMO_BUILD_ROOT"
-
-{%- for config in science_configs %}
-{%-   set config_label = config | lower + '_' + label %}
-    [[run_{{config_label}}_dynamo]]
-        inherit = {{family}}, {{family}}_RUN_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_RUN_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = "rose task-run --verbose --debug --app-key=dynamo --command-key={{TARGET_RUN_METHOD}} --opt-conf-key={{config}}"
-        post-script = "cp dynamo-checksums.txt $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{config}}.{{compiler}}.out.txt"
+{%-     for configuration in science_configurations %}
+{%-       set configuration_label = configuration|lower|replace('-','foo') + '_' + label %}
+{%-       if 'run_' + configuration_label in scheduledTasks %}
+    [[run_{{configuration_label}}]]
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_RUN_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+                     """
+        script = rose task-run --app-key=dynamo --command-key={{TARGET_RUN_METHOD}} --opt-conf-key={{configuration}}
+        post-script = """
+                      cp dynamo-checksums.txt $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.checksums
+                      # Future publisher stages need this information
+                      echo $CYLC_TASK_LOG_ROOT > $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.log.path
+                      """
         [[[environment]]]
             OMP_NUM_THREADS=2
+#            FOR_DIAGNOSTIC_LOG_FILE=$CYLC_TASK_WORK_DIR/diagnostic.log # Intel only option
+        [[[directives]]]
+{%-         for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-         endfor %}
+{%-       endif %}
 
-    [[check_{{config_label}}_dynamo]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        script = "rose task-run --app-key=check_dynamo"
+{%-       if 'publish_' + label + '_' +  configuration|lower|replace('-','foo') in scheduledTasks %}
+    [[publish_{{label}}_{{configuration|lower|replace('-','foo')}}]]
+        inherit = PUBLISH, {{family}}, TARGET
+        pre-script = """
+                     mkdir -p $DYNAMO_DESTINATION_DIRECTORY
+                     RELATIVE_DESTINATION_DIRECTORY=`echo $DYNAMO_DESTINATION_DIRECTORY | sed "s|$HOME/||"`
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.log.path .
+                     scp {{TARGET_HOST}}:`cat dynamo.{{configuration}}.{{compiler}}.log.path`.out $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.out
+                     scp {{TARGET_HOST}}:`cat dynamo.{{configuration}}.{{compiler}}.log.path`.err $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.err
+                     """
+        script = rose task-run --app-key=publish --command-key=run
         [[[environment]]]
-        DYNAMO_CONFIG = {{config}}
-{%- endfor %}
+            CONTEXT       = {{build}}
+            CONFIGURATION = {{configuration}}
+            COMPILER      = {{compiler}}
+            LOG_OUT       = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.out
+            LOG_ERR       = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.err
+{%-       endif %}
+
+{%-       if 'check_' + configuration_label in scheduledTasks %}
+    [[check_{{configuration_label}}]]
+        inherit = {{family}}, TARGET
+        script = rose task-run --app-key=check_dynamo
+        [[[environment]]]
+            TARGET_OPT = {{TARGET_OPT}}
+            DYNAMO_CONFIG = {{configuration}}
+        [[[directives]]]
+{%-         for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-         endfor %}
+{%-       endif %}
+{%-     endfor %}{# science configurations #}
 
     [[run_{{label}}_boundary_test]]
-        inherit = {{family}}, {{family}}_RUN_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_RUN_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_RUN_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+                     """
         script = rose task-run --app-key=boundary_test --command-key={{TARGET_RUN_METHOD}}
         post-script = cp boundary_test-checksums.txt $DYNAMO_DESTINATION_DIRECTORY/boundary_test.{{compiler}}.checksums.txt
         [[[environment]]]
             OMP_NUM_THREADS=2
 
     [[check_{{label}}_boundary_test]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
+        inherit = {{family}}, TARGET
         script = rose task-run --app-key=check_boundary
 
-    [[generate_{{label}}_cubedsphere]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            mkdir -p $DYNAMO_DESTINATION_DIRECTORY
-            $DYNAMO_SOURCE_DIRECTORY/bin/generate_cubedsphere -ndivs 4 \
-                             -o $DYNAMO_DESTINATION_DIRECTORY/ugrid_quads_2d.nc
-                 """
+{%-     if 'unit_test_with_' + label in scheduledTasks %}
+    [[unit_test_with_{{label}}]]
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
+                     """
+        script = make -C $DYNAMO_SOURCE_DIRECTORY test
+        post-script = """
+                      {{'\n'|commandList("cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build", "rm -rf $DYNAMO_BUILD_ROOT")}}
+                      """
+        [[[environment]]]
+            DYNAMO_BUILD_ROOT = {{TARGET_BUILD_ROOT}}/{{label}}
+        [[[directives]]]
+{%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-       endfor %}
+{%-     endif %}
 
-    [[check_{{label}}_cubedsphere_metadata]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            rose task-run --app-key=check_cubedsphere \
-                          --command-key=check_cubedsphere_metadata
-                 """
+{%-     if 'functional_test_with_' + label in scheduledTasks %}
 
-    [[check_{{label}}_cubedsphere_data]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            rose task-run --app-key=check_cubedsphere \
-                          --command-key=check_cubedsphere_data
-                 """
+    [[functional_test_with_{{label}}]]
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP, "mkdir -p $DYNAMO_BUILD_ROOT", "cp -rp $DYNAMO_SOURCE_DIRECTORY/build/* $DYNAMO_BUILD_ROOT")}}
+                     """
+        script = make -C $DYNAMO_SOURCE_DIRECTORY/src/functional-test
+        post-script = """
+                      {{'\n'|commandList("cp -rp $DYNAMO_BUILD_ROOT $DYNAMO_SOURCE_DIRECTORY/build", "rm -rf $DYNAMO_BUILD_ROOT")}}
+                      """
+        [[[environment]]]
+            DYNAMO_BUILD_ROOT = {{TARGET_BUILD_ROOT}}/{{label}}
+        [[[directives]]]
+{%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-       endfor %}
+{%-     endif %}
 
-    [[generate_{{label}}_biperiodic]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            mkdir -p $DYNAMO_DESTINATION_DIRECTORY
-            mkdir -p data
-            $DYNAMO_SOURCE_DIRECTORY/bin/generate_biperiodic -nx 16 -ny 8 \
-                  -dx 100 -dy 50 -o $DYNAMO_DESTINATION_DIRECTORY/biperiodic.nc
-                 """
+{%-     for mesh in mesh_types %}
+{%-       if 'generate_mesh_' + mesh + '_' + label in scheduledTasks %}
+    [[generate_mesh_{{mesh}}_{{label}}]]
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, TARGET_BUILD_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+                     """
+        script = "rose task-run --app-key=mesh --command-key={{mesh}}"
+        [[[directives]]]
+{%-         for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-         endfor %}
+{%-       endif %}
 
-    [[check_{{label}}_biperiodic_metadata]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            rose task-run --app-key=check_biperiodic \
-                          --command-key=check_biperiodic_metadata
-                 """
-
-    [[check_{{label}}_biperiodic_data]]
-        inherit = {{family}}, {{family}}_TECHNICAL_ENVIRONMENT
-        pre-script = {{command_list(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
-        script = """
-            rose task-run --app-key=check_biperiodic \
-                          --command-key=check_biperiodic_data
-                 """
-{% endmacro %}
-{#############################################################################}
-
-{% for compiler, module in TARGET_COMPILER_SETUP | batch(2) -%}
-{%   for build in builds -%}
-{{     pipeline_tasks( compiler + '_' + build, compiler, build ) }}
-{%   endfor -%}
-{% endfor -%}
+{%-       if 'check_mesh_' + mesh + '_' + label in scheduledTasks %}
+    [[check_mesh_{{mesh}}_{{label}}]]
+        inherit = {{family}}, TARGET
+        pre-script = """
+                     {{'\n'|commandList(TARGET_BASE_SETUP, compiler_setup[compiler], TARGET_REVEAL_SETUP)}}
+                     """
+        script = rose task-run --app-key=check_{{mesh}}
+        [[[directives]]]
+{%-         for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-         endfor %}
+{%-       endif %}
+{%-     endfor %}
+{%-   endfor %}
+{%- endfor %}

@@ -1,0 +1,44 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN"
+                      "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">
+<html>
+  <head>
+    <title>Dynamo Nightly Build Report</title>
+    <style type="text/css">
+      h1 { text-align: center; }
+      a.changed      { background-color: #dd5; }
+      a.aged:link    { color: #444; }
+      a.aged:visited { color: #222; }
+      #doclist li { display: inline; list-style-type: none; padding-right: 1em; }
+      #loglist li { display: inline; list-style-type: none; padding-right: 1em; }
+    </style>
+  </head>
+  <body>
+    <h1>Dynamo Nightly Build Report</h1>
+    <p>
+{%- if cronout %}
+      Last updated {{crontimestamp}} (<a href="{{cronout}}"> log </a>)
+{%- endif %}
+{%- if suiteurl %}
+      Suite <a href="{{suiteurl}}">run details</a>
+{%- endif %}
+    </p>
+    <h2>Documentation</h2>
+    <ul id="doclist">
+{%- for url, details in subsites|dictsort %}
+      <li><a href="{{url}}">{{details.name|replace(' ', '&nbsp;')}}</a></li>
+{%- endfor %}
+    </ul>
+    <h2>Logs</h2>
+    <ul id="loglist">
+{%-   macro changed(details) -%}
+{{'unchanged' if details.digest == details.previousDigest else 'changed'}}
+{%-   endmacro %}
+{%-   macro old(details) -%}
+{{'current' if details.timestamp > oldthreshold else 'aged'}}
+{%-   endmacro %}
+{%- for url, details in pages|dictsort %}
+      <li><a href="{{url}}" class="{{changed(details)}} {{old(details)}}">{{details.name|replace(' ', '&nbsp;')}}</a></li>
+{%- endfor %}
+    </ul>
+  </body>
+</html>

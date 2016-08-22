@@ -1,0 +1,78 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN"
+                      "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">
+<html>
+  <head>
+    <title>Dynamo compiler output from {{compiler}} {{'(' + context + ')' if context}} at {{timestamp}}</title>
+    <style type="text/css">
+      h1 { text-align: center; }
+      .filename { padding: 0.5ex; }
+      .event { margin-left: 5em; padding: 0.5ex;}
+      .odd  { background-color: #ddd; }
+      .even { background-color: #eee; }
+      .comment { color: #333; }
+      .beware  { color: #aa2; }
+      .warning { color: #a72; }
+      .error   { color: #a00; }
+      .line:before { content: "line "; font-size: small; }
+      .level { margin-left: 1em; }
+      .code:before { content: "code "; font-size: small; }
+      .code { margin-left: 1em; }
+      .message { margin-left: 1em; }
+      .context { margin-left: 3em; font-family: monospace;}
+      .hot { border-left: thin solid black; border-bottom: thin solid black; border-right: thin solid black; }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Dynamo compiler output from <span id='compiler'>{{compiler}}</span>
+      {% if context %}(<span id='context'>{{context}}</span>){% endif %}
+      at <span id='timestamp'>{{timestamp}}</span>
+    </h1>
+    <div id='events'>
+{%- for filename, events in eventBuckets|dictsort %}
+{%-   if events|length > 0 %}
+      <div class='sourcefile'>
+        <div class='filename'>{{filename}}</div>
+{%-     for lineNumber, eventList in events|sort(attribute='lineNumber')|groupby('lineNumber') %}
+{%-       for event in eventList|sort(attribute='highlightRange') %}
+        <div class='event {{loop.cycle('odd', 'even')}}'>
+          <div class='nature'>
+            <span class='line'>{{event.lineNumber}}</span>
+            <span class='level {{event.level}}'>{{event.level}}</span>
+{%-         if event.eventCode %}
+            <span class='code'>{{event.eventCode}}</span>
+{%-         endif %}
+          </div>
+          <div class='message'>
+            {{event.message|escape}}
+          </div>
+{%-         if event.source %}
+          <div class='context'>
+{%-           if event.highlightStart %}
+{%-               set hotStart = event.highlightStart %}
+{%-           else %}
+{%-           set hotStart = 0 %}
+{%-           endif %}
+{%-           if event.highlightEnd %}
+{%-               set hotEnd = event.highlightEnd %}
+{%-           else %}
+{%-               set hotEnd = event.source|length %}
+{%-           endif %}
+            <span class='lead-in'>{{event.source[:hotStart]|escape}}</span>
+{%-           if hotStart != hotEnd %}
+            <span class='hot'>{{event.source[hotStart:hotEnd]|escape}}</span>
+{%-           endif %}
+            <span class='lead-out'>{{event.source[hotEnd:]|escape}}</span>
+          </div>
+{%-         endif %}
+        </div>
+{%-       endfor %}
+{%-     endfor %}
+      </div>
+{%-   endif %}
+{%- else %}
+        Nothing found in log.
+{%- endfor %}
+    </div>
+  </body>
+</html>

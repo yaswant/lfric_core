@@ -6,7 +6,7 @@ build system for testing. Each is discussed here giving details on how to make
 use of it and in which circumstances you may wish to do so.
 
 Unit Testing
-------------
+^^^^^^^^^^^^
 
 Unit testing is intended to exercise a discrete, well contained and defined,
 "unit" of code. This will generally be a class, ("type" in Fortran parlance)
@@ -77,7 +77,7 @@ There are a number of things to note here:
     is usually for a single procedure under test.
 
 Fully Fledged Test Class
-------------------------
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 The simple test outlined above is fine for situations where there are no
 resources to be managed. When there are, a full test class is needed.
@@ -187,7 +187,7 @@ If the unit calls down to help procedures any configuration they make use of
 must also be frigged.
 
 Problems With pFUnit
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 Currently there is an issue with pFUnit whereby it will report finding errors,
 then tell you no errors were found and exit with "Okay".
@@ -202,7 +202,7 @@ To find out what is failing you can run the tests by hand in non-robust mode.
 To do this change to ``src/unit-test`` and run ``../../build/unit-test/test``.
 
 Functional Testing
---------------------
+^^^^^^^^^^^^^^^^^^
 
 Some things can not be easily tested using the unit testing framework. For
 instance things which halt execution or interact with command line arguments.
@@ -246,7 +246,7 @@ shown in this example::
       TestEngine.run( simple_test )
 
 Test Suite
-==========
+^^^^^^^^^^
 
 `Rose <http://metomi.github.io/rose/doc/rose.html>`_ and
 `Cylc <http://cylc.github.io/cylc/>`_ are used to run a suite of tests. There
@@ -280,7 +280,7 @@ Developers and reviewers should remember not to allow changes to this default
 on to trunk.
 
 Test Suite on MONSooN
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 The test suite can only be launched from the machine "exvmsrose", within the
 MONSooN subnet. Ensure you have suitable, unprotected, keys set up to allow you
@@ -288,3 +288,123 @@ to connect from "exvmscylc" back to "exvmsrose" and to "xcml00".
 
 Loading the module "meto-common-environment/dynamo" will set everything up so
 you need only type ``make test-suite``.
+
+Nightly Testing with the Test Suite
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are a number of tests which we want to run regularly but which consume
+too many resources (especially run-time) to include in the developer test
+suite. For this reason the test suite is actually split into a number of
+groups.
+
+As of the time of writing available groups are:
+
+- developer
+- nightly
+
+Just running ``rose stem``, without specifying a group, causes the developer
+tests to be run. If you want to run the nightly tests you must use ``rose
+stem --group=nightly``.
+
+These tests will publish various reports to your
+``~/public_html/dynamo-<target>`` (where "target" is as described for
+``DYNAMO_TEST_SUITE_TARGETS``) directory. If this does not exist you will see
+suite failures.
+
+If you want to run the nightly tests as a "Cron" job the following ``crontab``
+should give you some pointers::
+
+  MAILTO = joe.bloggs@metoffice.gov.uk
+  PATH = /opt/ukmo/utils/bin:/usr/local/sci/bin:/usr/local/bin:/usr/bin:/bin
+  DATADIR = /data/users/jbloggs
+  TMPDIR = /var/tmp
+  ROSE_BUSH_URL = http://fcm1/rose-bush
+  # Minute # Hour # Day of Month # Month # Day of Week # Command
+  21 03 * * 1-5 $HOME/local/bin/run-nightly-test
+
+Where the ``run-nightly-test`` script looks like this::
+
+  #!/bin/sh
+
+  rm -rf /data/local/jbloggs/dynamo-nightly
+  fcm checkout fcm:dynamo.xm-br/dev/joebloggs/r9999_SpecialBranch /data/local/jbloggs/dynamo-nightly
+  rose stem --group=nightly --source=/data/local/jbloggs/dynamo-nightly --no-gcontrol
+
+Test Suite Development
+~~~~~~~~~~~~~~~~~~~~~~
+
+A Cylc suite consists of an acyclic graph of "tasks". Each task is performed by
+an "application" which is a discrete executable unit. The test suite is held
+in the "rose-stem" directory.
+
+Adding new science tests
+------------------------
+
+It is hoped that adding new science tests should be as simple as you would
+hope.
+
+You will need to add a new optional configuration for your test to
+``rose-stem/app/dynamo/opt/rose-app-<test name>.conf``. The contents of this
+file will override the basic configuration in
+``rose-stem/app/dynamo/rose-app.conf``.
+
+Now add the name of this new test to the ``science_configurations`` list at
+the top of "suite.rc".
+
+Finally decide which group or groups you would like your test to appear in and
+add it to them in the ``groups`` structure just below. The form to use is
+``'science(<test name>)'``.
+
+From that point everything should be taken care of for you.
+
+suite.rc
+--------
+
+The heart of the suite is the "suite.rc" file. This describes the tasks and the
+graph which orders them. Each task sets up an execution environment for the
+application it invokes. This means multiple tasks may invoke the same
+application to gain different effects.
+
+The file itself uses a modified version of the Windows INI file syntax.
+Modified to support hierarchical data which is indicated by multiple square
+brackets on section headers.
+
+Before it is interpreted by Cylc the suite.rc file is processed using the
+Jinja2 template engine. Directives to this process are identified by the use of
+curly brackets.
+
+Not all tasks invoke an application. Sometimes called "group tasks" they exist
+as a means to consolidate common environment details for multiple "child"
+tasks. Be aware, however that this inheritance is only by replacement, not by
+extension. This makes sense for environment variables as it means that a child
+task's definition of a specific variable will override any in a parent. It is
+problematic with command scripting though since it is not possible to have the
+parent's script run, then the child.
+
+The task graph is compiled using Jinja scripting. Sadly this rather obfuscates
+what is happening but an outline is given below.
+
+The macro ``schedule`` is called to generate the graph. This loops over each
+group of tests to be run. For each group it loops over the list of tests and
+calls a similarly named macro. These macros generate the set of graph nodes
+required to perform that test.
+
+The generating macros do not check to ensure that they are not duplicating
+tasks already in the schedule. Thus it is important to deduplicate it and this
+is the final stage before the list makes it into the processed "suite.rc".
+
+Having generated the schedule each task must be described. All possible task
+definitions are generated by the scripting and are then gated by the schedule
+list. If a task isn't actually in the schedule it shouldn't end up in the
+processed file.
+
+Suite Style Guide
+-----------------
+
+This guide is based on common practice within the Met Office.
+
+Indent your suite.rc file. Each section level should be indented with respect
+to the parent section.
+
+Capitalise group task names. Non executive tasks which exist to group other
+tasks should have their name in all caps.

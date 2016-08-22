@@ -223,8 +223,8 @@ All targets include debug symbols into the executable code.
 
 In order for PSyclone to select the correct optimisation script it must know
 the platform you are building on. This is achieved by setting the
-`DYNAMO_BUILD_TARGET` environment variable to a single target platform in the
-same form as used for `DYNAMO_TEST_SUITE_TARGETS`, described below.
+`DYNAMO_OPTIMISATION_PROFILE` environment variable to a single target platform
+n the same form as used for `DYNAMO_TEST_SUITE_TARGETS`, described below.
 
 This is done for Met Office users by the LFRic module system.
 

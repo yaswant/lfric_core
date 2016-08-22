@@ -7,7 +7,8 @@
 
 DOXYGEN  ?= doxygen
 
-DOCUMENT_DIRECTORIES = $(patsubst %/,%,$(dir $(wildcard */*.latex)))
+DOCUMENT_SOURCES = $(wildcard */*.latex)
+DOCUMENT_DIRECTORIES = $(patsubst %/,%,$(dir $(DOCUMENT_SOURCES)))
 API_COLLECTIONS = $(patsubst Doxyfile.%,api/%,$(wildcard Doxyfile.*))
 
 DYNAMO_COMMON_FIGURES := $(shell pwd)/common-figures
@@ -18,6 +19,12 @@ most: design-documents api-documents
 
 .PHONY: design-documents
 design-documents: $(DOCUMENT_DIRECTORIES) uml
+
+design-documents.tar: design-documents
+	gtar --mode=644 -cf $@ uml/*.pdf
+	for filename in $(patsubst %.latex,%.pdf,$(DOCUMENT_SOURCES)); do \
+	    gtar --mode=644 -C `dirname $$filename` -rf $@  `basename $$filename`; \
+	done
 
 .PHONY: api-documents
 api-documents: $(API_COLLECTIONS)

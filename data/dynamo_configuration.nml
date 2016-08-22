@@ -1,5 +1,5 @@
 &base_mesh
-  filename    = 'ugrid_quads_2d.nc'
+  filename    = 'cubedsphere.12x12.nc'
   geometry    = 'spherical'
   partitioner = 'cubedsphere'
   fplane      = .false.
@@ -34,7 +34,9 @@
 &initial_density
   tracer_max = 2.0
   tracer_background = 0.1
+  x1 = 0.0
   y1 = 0.0
+  x2 = 0.0
   y2 = 0.0
 /
 
@@ -52,7 +54,7 @@
 &output
   diag_stem_name            = 'diagDynamo'
   write_interpolated_output = .true.
-  write_nodal_output        = .true.
+  write_nodal_output        = .false.
   diagnostic_frequency      = 3
 /
 

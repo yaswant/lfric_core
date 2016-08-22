@@ -1,0 +1,42 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML Basic 1.1//EN"
+                      "http://www.w3.org/TR/xhtml-basic/xhtml-basic11.dtd">
+<html>
+  <head>
+    <title>Dynamo runtime output from {{compiler}} {{'(' + context + ')' if context}} at {{timestamp}}</title>
+    <style type="text/css">
+      h1 { text-align: center; }
+      .event { margin-left: 5em; padding: 0.5ex;}
+      .odd  { background-color: #ddd; }
+      .even { background-color: #eee; }
+      .occurrences:before { content: "occurred "; font-size: small; }
+      .level { margin-left: 1em; }
+      .remark { color: #333; }
+      .warning { color: #aa2; }
+      .message { margin-left: 1em; }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Dynamo runtime output from <span id='compiler'>{{compiler}}</span>
+      {% if context %}(<span id='context'>{{context}}</span>){% endif %}
+      at <span id='timestamp'>{{timestamp}}</span>
+    </h1>
+    <div id='events'>
+{%- for event in events %}
+      <div class='event {{loop.cycle('odd', 'even')}}'>
+        <div class='particulars'>
+{%-   if event.occurrences > 1 %}
+          <span class='occurrences'>{{event.occurrences}}</span>
+{%-   endif %}
+          <span class='level {{event.level}}'>{{event.level}}</span>
+        </div>
+        <div class='message'>
+          {{event.message}}
+        </div>
+      </div>
+{%- else %}
+        Nothing found in log file.
+{%- endfor %}
+    </div>
+  </body>
+</html>

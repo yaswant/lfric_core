@@ -22,9 +22,9 @@ Building
 
 It is necessary for PSyclone to know which platform you are building on in
 order that it be able to select the correct optimisation scripts. This is
-achieved through the `DYNAMO_BUILD_TARGET` environment variable. It should
-contain a single platform identifier following the same convention as outlined
-for test suite targets, detailed in the section on testing.
+achieved through the `DYNAMO_OPTIMISATION_PROFILE` environment variable. It
+should contain a single platform identifier following the same convention as
+outlined for test suite targets, detailed in the section on testing.
 
 This variable will be set up for Met Office developers using the LFRic module
 system.
