@@ -15,7 +15,7 @@ module feign_config_mod
   implicit none
 
   private
-  public :: {{ namelists.keys() | sort | decorate( 'feign_', '_config' ) | join( ', ' ) }}
+  public :: {{ namelists.keys() | sort | decorate( 'feign_', '_config' ) | join( ', &\n' + ' '*12 ) }}
 
   integer(i_native), parameter :: temporary_unit = 3
 
@@ -25,15 +25,17 @@ contains
 {%-   set parameters   = description.getParameters() %}
 {%-   set enumerations = description.getEnumerations() %}
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine feign_{{name}}_config( {{arguments[name] | join( ', ')}} )
-
-    use {{name}}_config_mod, only : read_{{name}}_namelist
+{%-   set procedureName = 'feign_' + name + '_config' %}
+  subroutine {{procedureName}}( {{arguments[name] | join( ', &\n' + ' '*(15 + procedureName|length) )}} )
+{{-'\n'}}
+{%- set onlies = ['read_' + name + '_namelist'] %}
 {%- if enumerations %}
-{%- for enum, keys in enumerations | dictsort -%}
-, &
-            key_from_{{enum}}, {{enum}}_from_key
-{%- endfor %}
+{%-   for enum, keys in enumerations|dictsort -%}
+{%-     do onlies.extend( ['key_from_' + enum, enum + '_from_key'] ) %}
+{%-   endfor %}
 {%- endif %}
+{%- set moduleName = name + '_config_mod' %}
+    use {{moduleName}}, only : {{onlies | join( ', &\n' + ' '*(17 + moduleName|length) )}}
 
     implicit none
 {{-'\n'}}

@@ -17,7 +17,8 @@ import jinjamacros
 class NamelistFeigner():
     def __init__( self ):
         self._engine = jinja.Environment( \
-                   loader=jinja.PackageLoader( 'configurator', 'templates') )
+                   loader=jinja.PackageLoader( 'configurator', 'templates'), \
+                   extensions=['jinja2.ext.do'] )
         self._engine.filters['decorate'] = jinjamacros.decorateMacro
 
         self._namelists = {}

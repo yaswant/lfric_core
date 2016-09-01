@@ -76,7 +76,10 @@ module feign_config_mod
 
 contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine feign_simple_config( foo, bar, baz, fred )
+  subroutine feign_simple_config( foo, &
+                                  bar, &
+                                  baz, &
+                                  fred )
 
     use simple_config_mod, only : read_simple_namelist
 
@@ -156,7 +159,8 @@ contains
   subroutine feign_enum_config( thing )
 
     use enum_config_mod, only : read_enum_namelist, &
-            key_from_thing, thing_from_key
+                                key_from_thing, &
+                                thing_from_key
 
     implicit none
 
@@ -221,7 +225,8 @@ module feign_config_mod
 
 contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine feign_computed_config( teapot, cheese )
+  subroutine feign_computed_config( teapot, &
+                                    cheese )
 
     use computed_config_mod, only : read_computed_namelist
 
@@ -292,10 +297,15 @@ module feign_config_mod
 
 contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine feign_everything_config( cake, teapot, cheese, fish, tail )
+  subroutine feign_everything_config( cake, &
+                                      teapot, &
+                                      cheese, &
+                                      fish, &
+                                      tail )
 
     use everything_config_mod, only : read_everything_namelist, &
-            key_from_teapot, teapot_from_key
+                                      key_from_teapot, &
+                                      teapot_from_key
 
     implicit none
 
