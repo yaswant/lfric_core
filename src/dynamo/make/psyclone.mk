@@ -5,7 +5,7 @@
 # https://puma.nerc.ac.uk/trac/GungHo/wiki
 ##############################################################################
 
-PSYCLONE ?= python2.7 $(PSYCLONE_DIR)/src/generator.py
+PSYCLONE ?= psyclone
 
 PSY_ALGORITHM_PATH = algorithm
 PSY_PSY_PATH       = psy
@@ -27,12 +27,6 @@ PSY_AUTO_FILES   := $(filter-out $(patsubst $(PSY_PSY_PATH)/%, \
 PSY_MANUAL_FILES := $(patsubst $(PSY_PSY_PATH)/psy_%, \
                            $(PSY_AUTO_ALGORITHM_PATH)/%, \
                            $(PSY_MANUAL_FILES) )
-
-# The appending operator (+=) is not used below as Cylc adds a space on the
-# end of the variable, thereby ruining anyone elses chance to append.
-# Instead we prepend manually.
-#
-export PYTHONPATH := $(PSYCLONE_DIR)/f2py_93:$(PSYCLONE_DIR)/src:$(PYTHONPATH)
 
 .PHONY: generate-psykal
 generate-psykal: $(PSY_AUTO_FILES) $(PSY_MANUAL_FILES) $(PSY_ALGORITHM_FILES)
