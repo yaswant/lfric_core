@@ -71,7 +71,7 @@ else                     ! BIPERIODIC PLANE DOMAIN
       theta_s = theta_surf
       exner_s = exner_surf - gravity/(Cp*THETA_SURF)*z
     case( idealised_test_warm_bubble )   ! Warm bubble test
-      theta_s = theta_surf
+      theta_s = THETA_SURF_HOT
       exner_s = exner_surf - gravity/(Cp*THETA_SURF_HOT)*z
   end select
   ! Calculate rho for all biperiodic tests
@@ -130,7 +130,7 @@ else                     ! BIPERIODIC PLANE DOMAIN
       theta_s = theta_surf
       exner_s = exner_surf - gravity/(Cp*THETA_SURF)*z
     case( idealised_test_warm_bubble )   ! Warm bubble test
-      theta_s = theta_surf
+      theta_s = THETA_SURF_HOT
       exner_s = exner_surf - gravity/(Cp*THETA_SURF_HOT)*z
   end select
   ! Calculate rho for all biperiodic tests

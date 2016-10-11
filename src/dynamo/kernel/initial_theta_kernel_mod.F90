@@ -16,7 +16,7 @@ module initial_theta_kernel_mod
 
     use argument_mod,                  only: arg_type,  &
         GH_FIELD, GH_WRITE, GH_READ,                    &
-        ANY_SPACE_9, ANY_SPACE_1, GH_BASIS,                      &
+        ANY_SPACE_9, ANY_SPACE_1, GH_BASIS,             &
         GH_DIFF_BASIS,                                  &
         CELLS
     use constants_mod,                 only: r_def, i_def
@@ -33,7 +33,7 @@ module initial_theta_kernel_mod
         private
         type(arg_type) :: meta_args(2) = (/                               &
             arg_type(GH_FIELD,   GH_WRITE, ANY_SPACE_1),                  &
-            arg_type(GH_FIELD*3, GH_READ, ANY_SPACE_9)                             &
+            arg_type(GH_FIELD*3, GH_READ, ANY_SPACE_9)                    &
             /)
         integer :: iterates_over = CELLS
 

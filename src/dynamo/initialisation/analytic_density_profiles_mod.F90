@@ -16,6 +16,7 @@ use log_mod,                    only : log_event,                &
                                        LOG_LEVEL_ERROR
 use coord_transform_mod,        only : xyz2llr, central_angle
 use idealised_config_mod,       only : idealised_test_cold_bubble,   &
+                                       idealised_test_warm_bubble,   &
                                        idealised_test_gaussian_hill, &
                                        idealised_test_cosine_hill,   &
                                        idealised_test_slotted_cylinder, &
@@ -77,7 +78,8 @@ function analytic_density(chi, choice) result(density)
       temperature = temperature - dt/pressure
       density = p_zero/(Rd*temperature) * pressure**( (1.0_r_def - kappa )/ kappa )
     end if 
-
+  case ( idealised_test_warm_bubble ) 
+    call reference_profile(pressure, density, temperature, chi, choice)
   case( idealised_test_GAUSSIAN_HILL )
     h1 = tracer_max*exp( -(l1/r1)**2 )
     h2 = tracer_max*exp( -(l2/r2)**2 )

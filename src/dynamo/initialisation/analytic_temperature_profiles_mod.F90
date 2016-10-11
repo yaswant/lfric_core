@@ -49,7 +49,7 @@ function analytic_temperature(chi, choice, chi_surf) result(temperature)
 
   real(kind=r_def)             :: l, dt
   real(kind=r_def), parameter  :: THETA0 = 0.01_r_def
-  real(kind=r_def), parameter  :: XC     = -15000.0_r_def
+  real(kind=r_def), parameter  :: XC     = 0.0_r_def
   real(kind=r_def), parameter  :: YC     = 0.0_r_def
   real(kind=r_def), parameter  :: A      = 5000.0_r_def
   real(kind=r_def), parameter  :: H      = 10000.0_r_def
