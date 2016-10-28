@@ -21,7 +21,7 @@ use kernel_mod,              only: kernel_type
 use argument_mod,            only: arg_type, func_type,            &
                                    GH_OPERATOR, GH_FIELD,          &
                                    GH_READ, GH_WRITE,              &
-                                   W0, W2, W3,                     &
+                                   ANY_SPACE_9, W2, W3,            &
                                    GH_BASIS,GH_DIFF_BASIS,         &
                                    CELLS
 implicit none
@@ -33,13 +33,13 @@ implicit none
 type, public, extends(kernel_type) :: weighted_proj_2theta_kernel_type
   private
   type(arg_type) :: meta_args(3) = (/                                  &
-       arg_type(GH_OPERATOR, GH_WRITE, W2, W0),                        &
-       arg_type(GH_FIELD,    GH_READ,  W0),                            &
+       arg_type(GH_OPERATOR, GH_WRITE, W2, ANY_SPACE_9),               &
+       arg_type(GH_FIELD,    GH_READ,  ANY_SPACE_9),                   &
        arg_type(GH_FIELD,    GH_READ,  W3)                             &
        /)
   type(func_type) :: meta_funcs(3) = (/                                &
        func_type(W2, GH_BASIS, GH_DIFF_BASIS),                         &
-       func_type(W0, GH_BASIS, GH_DIFF_BASIS),                         &
+       func_type(ANY_SPACE_9, GH_BASIS, GH_DIFF_BASIS),                &
        func_type(W3, GH_BASIS)                                         &
        /)
   integer :: iterates_over = CELLS
@@ -81,23 +81,23 @@ end function weighted_proj_2theta_constructor
 !! @param[in] ndf_w2 Number of degrees of freedom per cell.
 !! @param[in] basis_w2 Basis functions evaluated at quadrature points.
 !! @param[in] diff_basis_w2 Differential vector basis functions evaluated at quadrature points.
-!! @param[in] ndf_w0 Number of degrees of freedom per cell.
-!! @param[in] undf_w0 Total number of degrees.
-!! @param[in] map_w0 Dofmap at the base of the column
-!! @param[in] basis_w0 Basis functions evaluated at quadrature points.
-!! @param[in] diff_basis_w0 Differential vector basis functions evaluated at quadrature points.
+!! @param[in] ndf_wtheta Number of degrees of freedom per cell.
+!! @param[in] undf_wtheta Total number of degrees.
+!! @param[in] map_wtheta Dofmap at the base of the column
+!! @param[in] basis_wtheta Basis functions evaluated at quadrature points.
+!! @param[in] diff_basis_wtheta Differential vector basis functions evaluated at quadrature points.
 !! @param[in] nqp_h Number of horizontal quadrature points
 !! @param[in] nqp_v Number of vertical quadrature points
 !! @param[in] wqp_h Horizontal quadrature weights
 !! @param[in] wqp_v Vertical quadrature weights
-subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,          &
-                                     projection,                       &
-                                     theta,                            &
-                                     rho,                              &
-                                     ndf_w2, basis_w2, diff_basis_w2,  &
-                                     ndf_w0, undf_w0, map_w0,          &
-                                     basis_w0, diff_basis_w0,          &
-                                     ndf_w3, undf_w3, map_w3, basis_w3,&
+subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,             &
+                                     projection,                          &
+                                     theta,                               &
+                                     rho,                                 &
+                                     ndf_w2, basis_w2, diff_basis_w2,     &
+                                     ndf_wtheta, undf_wtheta, map_wtheta, &
+                                     basis_wtheta, diff_basis_wtheta,     &
+                                     ndf_w3, undf_w3, map_w3, basis_w3,   &
                                      nqp_h, nqp_v, wqp_h, wqp_v )
 
   use calc_exner_pointwise_mod, only: calc_exner_pointwise
@@ -107,18 +107,18 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,          &
   integer(kind=i_def),                     intent(in) :: cell, nqp_h, nqp_v
   integer(kind=i_def),                     intent(in) :: nlayers
   integer(kind=i_def),                     intent(in) :: ncell_3d
-  integer(kind=i_def),                     intent(in) :: undf_w3, ndf_w3, ndf_w2, ndf_w0, undf_w0
-  integer(kind=i_def), dimension(ndf_w0),  intent(in) :: map_w0
+  integer(kind=i_def),                     intent(in) :: undf_w3, ndf_w3, ndf_w2, ndf_wtheta, undf_wtheta
+  integer(kind=i_def), dimension(ndf_wtheta),  intent(in) :: map_wtheta
   integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
 
   real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),   intent(in) :: basis_w3
   real(kind=r_def), dimension(1,ndf_w2,nqp_h,nqp_v),   intent(in) :: diff_basis_w2
   real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v),   intent(in) :: basis_w2
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v),   intent(in) :: basis_w0
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v),   intent(in) :: diff_basis_w0
+  real(kind=r_def), dimension(1,ndf_wtheta,nqp_h,nqp_v),   intent(in) :: basis_wtheta
+  real(kind=r_def), dimension(3,ndf_wtheta,nqp_h,nqp_v),   intent(in) :: diff_basis_wtheta
 
-  real(kind=r_def), dimension(ndf_w2,ndf_w0,ncell_3d), intent(inout) :: projection
-  real(kind=r_def), dimension(undf_w0),                intent(in)    :: theta
+  real(kind=r_def), dimension(ndf_w2,ndf_wtheta,ncell_3d), intent(inout) :: projection
+  real(kind=r_def), dimension(undf_wtheta),                intent(in)    :: theta
   real(kind=r_def), dimension(undf_w3),                intent(in)    :: rho
   real(kind=r_def), dimension(nqp_h),                  intent(in)    :: wqp_h
   real(kind=r_def), dimension(nqp_v),                  intent(in)    :: wqp_v
@@ -126,7 +126,7 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,          &
   !Internal variables
   integer(kind=i_def)                  :: df, df0, df2, k, ik
   integer(kind=i_def)                  :: qp1, qp2
-  real(kind=r_def), dimension(ndf_w0)  :: theta_e
+  real(kind=r_def), dimension(ndf_wtheta)  :: theta_e
   real(kind=r_def), dimension(ndf_w3)  :: rho_e
   real(kind=r_def)                     :: integrand
   real(kind=r_def)                     :: div_gamma_v
@@ -134,22 +134,22 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,          &
 
   do k = 0, nlayers - 1
     ik = k + 1 + (cell-1)*nlayers
-    do df = 1,ndf_w0
-      theta_e(df) = theta(map_w0(df) + k)
+    do df = 1,ndf_wtheta
+      theta_e(df) = theta(map_wtheta(df) + k)
     end do
     do df = 1,ndf_w3
       rho_e(df) = rho(map_w3(df) + k)
     end do
 
-    do df0 = 1, ndf_w0
+    do df0 = 1, ndf_wtheta
       do df2 = 1, ndf_w2
         projection(df2,df0,ik) = 0.0_r_def
         do qp2 = 1, nqp_v
           do qp1 = 1, nqp_h
             theta_quad = 0.0_r_def            
-            do df = 1, ndf_w0
+            do df = 1, ndf_wtheta
               theta_quad = theta_quad                                      &
-                         + theta_e(df)*basis_w0(1,df,qp1,qp2)
+                         + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
             end do
             rho_quad = 0.0_r_def
             do df = 1, ndf_w3
@@ -159,9 +159,9 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,          &
 
             exner_quad = calc_exner_pointwise(rho_quad, theta_quad)
 
-            div_gamma_v = diff_basis_w2(1,df2,qp1,qp2)*basis_w0(1,df0,qp1,qp2) &
+            div_gamma_v = diff_basis_w2(1,df2,qp1,qp2)*basis_wtheta(1,df0,qp1,qp2) &
                         + dot_product(basis_w2(:,df2,qp1,qp2), &
-                                      diff_basis_w0(:,df0,qp1,qp2))
+                                      diff_basis_wtheta(:,df0,qp1,qp2))
             integrand = wqp_h(qp1)*wqp_v(qp2)*exner_quad*div_gamma_v 
             projection(df2,df0,ik) = projection(df2,df0,ik) + integrand
           end do

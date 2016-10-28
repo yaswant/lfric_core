@@ -92,6 +92,9 @@ contains
 
   !------------------------------------------------------------------------------
   !> invoke_initial_theta_kernel: invoke the potential temperature initialization for a generic space
+  !> Computation of nodal basis function for coordinates chi not currently supported PSyClone,
+  !> will be introduced in modification of quadrature strategy, see ticket #723.
+
   subroutine invoke_initial_theta_kernel( theta, chi, evaluator )
 
     use initial_theta_kernel_mod, only : initial_theta_code
@@ -152,6 +155,8 @@ contains
   end subroutine invoke_initial_theta_kernel
 
   !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
   !> Invoke_rtheta_bd_kernel: Invoke the boundary part of the RHS of the theta equation
   subroutine invoke_rtheta_bd_kernel( r_theta_bd, theta, f, rho, qr )
 
@@ -311,6 +316,8 @@ contains
   end subroutine invoke_rtheta_bd_kernel
 
   !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
   !> Invoke_ru_bd_kernel: Invoke the boundary part of the RHS of the momentum equation
   subroutine invoke_ru_bd_kernel( r_u_bd, rho, theta, qr )
 
@@ -470,6 +477,8 @@ contains
   end subroutine invoke_ru_bd_kernel
 
   !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
   !> Invoke_exner_gradient_bd_kernel: Invoke the boundary integral for the exner_gradient kernel
   subroutine invoke_exner_gradient_bd_kernel( r_u_bd, exner, theta, qr )
 
@@ -623,6 +632,8 @@ contains
   end subroutine invoke_exner_gradient_bd_kernel
 
   !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
   !> Invoke_pert_pressure_gradient_bd_kernel: Invoke the boundary part of pert_pressure_gradient kernel.
   subroutine invoke_pert_pressure_gradient_bd_kernel( r_u_bd, rho, rho_ref, theta, theta_ref, qr )
 
@@ -784,6 +795,143 @@ contains
     deallocate(basis_w3_face, basis_w2_face, basis_wtheta_face, adjacent_face, xp_f)
 
   end subroutine invoke_pert_pressure_gradient_bd_kernel
+
+  !-------------------------------------------------------------------------------
+  !> Computation of 2d quadrature on faces not currently supported PSyClone,
+  !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.
+  !> Invoke_weighted_div_bd_kernel: Invoke the boundary part of the divergence of the lhs Helmholtz
+  subroutine invoke_weighted_div_bd_kernel_type(div_star, theta, qr)
+
+      use weighted_div_bd_kernel_mod, only : weighted_div_bd_code
+      use mesh_mod,                   only : mesh_type
+      use reference_element_mod,      only : nfaces_h
+
+      implicit none
+
+      type( mesh_type ), pointer           :: mesh => null()
+      type(field_type), intent(in)         :: theta
+      type(operator_type), intent(inout)   :: div_star
+      type(quadrature_type), intent(in)    :: qr
+
+      integer :: cell, nlayers, nqp_h, nqp_v, nqp_h_1d
+      integer :: ndf_w2, ndf_w3, ndf_wtheta, undf_wtheta
+      integer :: dim_w2, dim_w3, dim_wtheta
+
+      integer, pointer        :: map_wtheta(:) => null()
+
+      integer                 :: ff
+
+      real(kind=r_def), allocatable  :: basis_w2_face(:,:,:,:,:), &
+      basis_w3_face(:,:,:,:,:), &
+      basis_wtheta_face(:,:,:,:,:)
+
+      real(kind=r_def), pointer :: xp(:,:), xp_f(:,:,:) => null()
+      real(kind=r_def), pointer :: zp(:) => null()
+      real(kind=r_def), pointer :: wh(:), wv(:) => null()
+
+      type(operator_proxy_type) ::div_star_proxy
+      type(field_proxy_type)    ::theta_proxy
+
+      !
+      ! Initialise field proxies
+      !
+      div_star_proxy = div_star%get_proxy()
+      theta_proxy = theta%get_proxy()
+      !
+      ! Initialise number of layers
+      !
+      nlayers = div_star_proxy%fs_from%get_nlayers()
+      !
+      ! Create a mesh object
+      !
+      mesh => div_star%get_mesh()
+
+      !
+      ! Initialise qr values
+      !
+      nqp_h=qr%get_nqp_h()
+      nqp_v=qr%get_nqp_v()
+      zp=>qr%get_xqp_v()
+      xp=>qr%get_xqp_h()
+      wh=>qr%get_wqp_h()
+      wv=>qr%get_wqp_v()
+
+      ! Assumes same number of horizontal qp in x and y
+      nqp_h_1d = int(nqp_h**(1./2.))  ! use sqrt
+
+      allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+
+      ndf_w2      = div_star_proxy%fs_from%get_ndf( )
+      dim_w2      = div_star_proxy%fs_from%get_dim_space( )
+      allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+
+      ndf_w3  = div_star_proxy%fs_to%get_ndf( )
+      dim_w3  = div_star_proxy%fs_to%get_dim_space( )
+      allocate(basis_w3_face(nfaces_h,dim_w3,ndf_w3,nqp_h_1d,nqp_v))
+
+      ndf_wtheta      = theta_proxy%vspace%get_ndf( )
+      dim_wtheta      = theta_proxy%vspace%get_dim_space( )
+      undf_wtheta     = theta_proxy%vspace%get_undf()
+      allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+
+      ! Quadrature points on horizontal faces
+
+      xp_f(1, :, :) = xp(1:nqp_h_1d, :)
+      xp_f(1, :, 1) = 0.0_r_def
+
+      xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+      xp_f(2, :, 2) = 0.0_r_def
+
+      xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+      xp_f(3, :, 1) = 1.0_r_def
+
+      xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+      xp_f(4, :, 2) = 1.0_r_def
+
+      ! Filling up the face basis vector with value of the basis functions at the horizontal faces quadrature points
+
+      do ff = 1, nfaces_h
+
+        call div_star_proxy%fs_from%compute_basis_function( &
+          basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+        call div_star_proxy%fs_to%compute_basis_function( &
+          basis_w3_face(ff,:,:,:,:), ndf_w3, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+
+        call theta_proxy%vspace%compute_basis_function( &
+          basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+
+      end do
+      !
+      ! Call kernels and communication routines
+      !
+      if (theta_proxy%is_dirty(depth=1)) then
+        call theta_proxy%halo_exchange(depth=2)
+      end if
+      !
+      do cell=1,mesh%get_last_halo_cell(1)
+
+        map_wtheta => theta_proxy%vspace%get_cell_dofmap( cell )
+
+        call weighted_div_bd_code(cell,                               &
+                                  nlayers,                            &
+                                  div_star_proxy%ncell_3d,            &
+                                  div_star_proxy%local_stencil,       &
+                                  theta_proxy%data,                   &
+                                  ndf_w2, ndf_w3,                     &
+                                  ndf_wtheta, undf_wtheta,            &
+                                  map_wtheta,                         &
+                                  nqp_v, nqp_h_1d, wv,                &
+                                  basis_w2_face,                      &
+                                  basis_w3_face, basis_wtheta_face)
+      end do
+      !
+      ! Deallocate basis arrays
+      !
+      deallocate (basis_w3_face, basis_w2_face, basis_wtheta_face)
+      !
+    end subroutine invoke_weighted_div_bd_kernel_type
+
 
 
 !-------------------------------------------------------------------------------    
@@ -2747,9 +2895,9 @@ end subroutine invoke_sample_poly_adv
       type(field_type), intent(in) :: theta, rho, chi(3)
       type(evaluator_xyz_type), intent(in) :: evaluator
 
-      integer, pointer :: map_w3(:) => null(), map_w0(:) => null(), map_any_space_1_chi(:) => null()
+      integer, pointer :: map_w3(:) => null(), map_wtheta(:) => null(), map_any_space_1_chi(:) => null()
       integer :: cell
-      integer :: ndf_w3, undf_w3, ndf_w0, undf_w0, ndf_any_space_1_chi, undf_any_space_1_chi
+      integer :: ndf_w3, undf_w3, ndf_wtheta, undf_wtheta, ndf_any_space_1_chi, undf_any_space_1_chi
       type(mesh_type), pointer :: mesh => null()
       integer :: nlayers
       type(field_proxy_type) :: tri_precon_proxy(3), theta_proxy, rho_proxy, chi_proxy(3)
@@ -2782,8 +2930,8 @@ end subroutine invoke_sample_poly_adv
       !
       ! Initialise sizes and allocate any basis arrays for w0
       !
-      ndf_w0 = theta_proxy%vspace%get_ndf()
-      undf_w0 = theta_proxy%vspace%get_undf()
+      ndf_wtheta = theta_proxy%vspace%get_ndf()
+      undf_wtheta = theta_proxy%vspace%get_undf()
       !
       ! Initialise sizes and allocate any basis arrays for any_space_1_chi
       !
@@ -2820,7 +2968,7 @@ end subroutine invoke_sample_poly_adv
       do cell=1,mesh%get_last_edge_cell()
         !
         map_w3 => tri_precon_proxy(1)%vspace%get_cell_dofmap(cell)
-        map_w0 => theta_proxy%vspace%get_cell_dofmap(cell)
+        map_wtheta => theta_proxy%vspace%get_cell_dofmap(cell)
         map_any_space_1_chi => chi_proxy(1)%vspace%get_cell_dofmap(cell)
         !
         CALL compute_tri_precon_code(nlayers, &
@@ -2835,9 +2983,9 @@ end subroutine invoke_sample_poly_adv
                                      ndf_w3, &
                                      undf_w3, &
                                      map_w3, &
-                                     ndf_w0, &
-                                     undf_w0, &
-                                     map_w0, &
+                                     ndf_wtheta, &
+                                     undf_wtheta, &
+                                     map_wtheta, &
                                      ndf_any_space_1_chi, &
                                      undf_any_space_1_chi, &
                                      map_any_space_1_chi, &

@@ -18,7 +18,7 @@ use constants_mod,           only: r_def, i_def
 use kernel_mod,              only: kernel_type
 use argument_mod,            only: arg_type, func_type,                      &
                                    GH_OPERATOR, GH_FIELD, GH_READ, GH_WRITE, &
-                                   W0, W3, ANY_SPACE_1,                      &
+                                   ANY_SPACE_9, W3, ANY_SPACE_1,                      &
                                    GH_BASIS, GH_DIFF_BASIS,                  &
                                    CELLS
 use planet_config_mod,       only : kappa, cp
@@ -33,7 +33,7 @@ type, public, extends(kernel_type) :: compute_tri_precon_kernel_type
   private
   type(arg_type) :: meta_args(4) = (/                                  &
        arg_type(GH_FIELD*3,  GH_WRITE, W3),                            &
-       arg_type(GH_FIELD,    GH_READ,  W0),                            &
+       arg_type(GH_FIELD,    GH_READ,  ANY_SPACE_9),                            &
        arg_type(GH_FIELD,    GH_READ,  W3),                            &
        arg_type(GH_FIELD*3,  GH_READ,  ANY_SPACE_1)                    &
        /)
@@ -79,17 +79,17 @@ end function compute_tri_precon_constructor
 !! @param[in]  ndf_w3 Number of degrees of freedom per cell for the operator space.
 !! @param[in]  undf_w3 Number of unique degrees of freedum for the w3 space
 !! @param[in]  map_w3 Dofmap for the cell at the base of the column.
-!! @param[in]  ndf_w0 Number of degrees of freedom per cell for the operator space.
-!! @param[in]  undf_w0 Number of unique degrees of freedum for the w0 space
-!! @param[in]  map_w0 Dofmap for the cell at the base of the column.
+!! @param[in]  ndf_wtheta Number of degrees of freedom per cell for the operator space.
+!! @param[in]  undf_wtheta Number of unique degrees of freedum for the wtheta space
+!! @param[in]  map_wtheta Dofmap for the cell at the base of the column.
 !! @param[in]  diff_basis_chi Differential basis functions evaluated at W3 nodal points.
-subroutine compute_tri_precon_code(nlayers,                         &
-                                   tri_0, tri_plus, tri_minus,      &
-                                   theta, rho,                      &
-                                   chi1, chi2, chi3,                &
-                                   ndf_w3, undf_w3, map_w3,         &
-                                   ndf_w0, undf_w0, map_w0,         &
-                                   ndf_chi, undf_chi, map_chi,      &
+subroutine compute_tri_precon_code(nlayers,                             &
+                                   tri_0, tri_plus, tri_minus,          &
+                                   theta, rho,                          &
+                                   chi1, chi2, chi3,                    &
+                                   ndf_w3, undf_w3, map_w3,             &
+                                   ndf_wtheta, undf_wtheta, map_wtheta, &
+                                   ndf_chi, undf_chi, map_chi,          &
                                    diff_basis_chi )
 
   use calc_exner_pointwise_mod, only: calc_exner_pointwise
@@ -97,22 +97,22 @@ subroutine compute_tri_precon_code(nlayers,                         &
 
   implicit none
   !Arguments
-  integer(kind=i_def), intent(in) :: ndf_w3, ndf_w0, ndf_chi
-  integer(kind=i_def), intent(in) :: undf_w3, undf_w0, undf_chi
+  integer(kind=i_def), intent(in) :: ndf_w3, ndf_wtheta, ndf_chi
+  integer(kind=i_def), intent(in) :: undf_w3, undf_wtheta, undf_chi
   integer(kind=i_def), intent(in) :: nlayers
 
   integer, dimension(ndf_chi), intent(in) :: map_chi
-  integer, dimension(ndf_w0),  intent(in) :: map_w0
+  integer, dimension(ndf_wtheta),  intent(in) :: map_wtheta
   integer, dimension(ndf_w3),  intent(in) :: map_w3
 
-  real(kind=r_def), dimension(undf_w3),  intent(out) :: tri_0
-  real(kind=r_def), dimension(undf_w3),  intent(out) :: tri_plus
-  real(kind=r_def), dimension(undf_w3),  intent(out) :: tri_minus
-  real(kind=r_def), dimension(undf_w3),  intent(in)  :: rho
-  real(kind=r_def), dimension(undf_w0),  intent(in)  :: theta
-  real(kind=r_def), dimension(undf_chi), intent(in)  :: chi1
-  real(kind=r_def), dimension(undf_chi), intent(in)  :: chi2
-  real(kind=r_def), dimension(undf_chi), intent(in)  :: chi3
+  real(kind=r_def), dimension(undf_w3),      intent(out) :: tri_0
+  real(kind=r_def), dimension(undf_w3),      intent(out) :: tri_plus
+  real(kind=r_def), dimension(undf_w3),      intent(out) :: tri_minus
+  real(kind=r_def), dimension(undf_w3),      intent(in)  :: rho
+  real(kind=r_def), dimension(undf_wtheta),  intent(in)  :: theta
+  real(kind=r_def), dimension(undf_chi),     intent(in)  :: chi1
+  real(kind=r_def), dimension(undf_chi),     intent(in)  :: chi2
+  real(kind=r_def), dimension(undf_chi),     intent(in)  :: chi3
 
   real(kind=r_def), dimension(3,ndf_chi,ndf_w3,1), intent(in) :: diff_basis_chi
 
@@ -130,14 +130,15 @@ subroutine compute_tri_precon_code(nlayers,                         &
   ! Metric terms: 
   ! J(3)^2 on w points
   ! dj on w and rho points
-  ! Currently only for lowest order uniform grid with theta in W0
+  ! Currently only for lowest order uniform grid
   kappa_term = (1.0_r_def - kappa)/kappa
   ! Compute layer terms
-  do k = 0,nlayers-1 
-    theta_ref = 0.125*(theta(map_w0(1) + k) + theta(map_w0(2) + k) &
-                     + theta(map_w0(3) + k) + theta(map_w0(4) + k) &
-                     + theta(map_w0(5) + k) + theta(map_w0(6) + k) &
-                     + theta(map_w0(7) + k) + theta(map_w0(8) + k))
+  do k = 0,nlayers-1
+    theta_ref = 0.0_r_def
+    do df = 1, ndf_wtheta
+       theta_ref = theta_ref &
+                     + 1.0_r_def/real(ndf_wtheta) * (theta(map_wtheta(df) + k))
+    end do
     exner(k) = calc_exner_pointwise(rho(map_w3(1)+k), theta_ref)
 
     do df = 1,ndf_chi
@@ -153,10 +154,15 @@ subroutine compute_tri_precon_code(nlayers,                         &
   HB_inv(0)   = 1.0
   dthetadz(0) = 0.0
   do k = 1, nlayers-1
-    theta_p = 0.25*(theta(map_w0(1)+k+1) + theta(map_w0(2)+k+1) &
-                  + theta(map_w0(3)+k+1) + theta(map_w0(4)+k+1) )
-    theta_m = 0.25*(theta(map_w0(1)+k-1) + theta(map_w0(2)+k-1) &
-                  + theta(map_w0(3)+k-1) + theta(map_w0(4)+k-1) )
+    theta_p = 0.0_r_def
+    theta_m = 0.0_r_def
+    do df = 1, int(0.5 * real(ndf_wtheta))
+      theta_p = theta_p &
+                  + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df)+k+1)
+      theta_m = theta_m &
+                  + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df)+k-1)
+    end do
+
     dthetadz(k) = (theta_p - theta_m)
     dpdz = (exner(k) - exner(k-1))
    
@@ -170,8 +176,12 @@ subroutine compute_tri_precon_code(nlayers,                         &
   Pw(0) = 0.0_r_def
   Pt(0) = 0.0_r_def
   do k = 1, nlayers-1
-    theta_ref = 0.25*(theta(map_w0(1) + k) + theta(map_w0(2) + k) &
-                    + theta(map_w0(3) + k) + theta(map_w0(4) + k)  )  
+    theta_ref = 0.0_r_def
+    do df = 1, int(0.5 * real(ndf_wtheta))
+      theta_ref = theta_ref &
+                    + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df) + k)
+    end do
+
     Pw(k) = -alpha*dt*cp*theta_ref*HB_inv(k)
     Pt(k) = -alpha*dt*dthetadz(k)*Pw(k)
   end do
@@ -181,10 +191,14 @@ subroutine compute_tri_precon_code(nlayers,                         &
   do k = 0, nlayers - 1
     kp = min(k+1,nlayers-1)
     km = max(k-1,0)
-    theta_m = 0.25*(theta(map_w0(1)+k) + theta(map_w0(2)+k) &
-                  + theta(map_w0(3)+k) + theta(map_w0(4)+k) )
-    theta_p = 0.25*(theta(map_w0(5)+k) + theta(map_w0(6)+k) &
-                  + theta(map_w0(7)+k) + theta(map_w0(8)+k) )
+    theta_m = 0.0_r_def
+    theta_p = 0.0_r_def
+    do df = 1, int(0.5 * real(ndf_wtheta))
+      theta_m = theta_m &
+                  + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df)+k)
+      theta_p = theta_p &
+                  + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df + int(0.5 * real(ndf_wtheta)))+k)
+    end do
 
     rho_p = 0.5_r_def*(rho(map_w3(1)+k)*dj(k) + rho(map_w3(1)+kp)*dj(kp))
     rho_m = 0.5_r_def*(rho(map_w3(1)+k)*dj(k) + rho(map_w3(1)+km)*dj(km))

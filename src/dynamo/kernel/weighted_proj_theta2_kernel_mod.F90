@@ -14,7 +14,7 @@ module weighted_proj_theta2_kernel_mod
 use kernel_mod,              only : kernel_type
 use argument_mod,            only : arg_type, func_type,                     &
                                     GH_OPERATOR, GH_FIELD, GH_READ, GH_WRITE,&
-                                    W0, W2,                                  &
+                                    ANY_SPACE_9, W2,                                  &
                                     GH_BASIS, GH_DIFF_BASIS,                 &
                                     CELLS
 use constants_mod,           only : r_def, i_def
@@ -28,11 +28,11 @@ implicit none
 type, public, extends(kernel_type) :: weighted_proj_theta2_kernel_type
   private
   type(arg_type) :: meta_args(2) = (/                                  &
-       arg_type(GH_OPERATOR, GH_WRITE, W0, W2),                        &
-       arg_type(GH_FIELD,    GH_READ,  W0)                             &
+       arg_type(GH_OPERATOR, GH_WRITE, ANY_SPACE_9, W2),                        &
+       arg_type(GH_FIELD,    GH_READ,  ANY_SPACE_9)                             &
        /)
   type(func_type) :: meta_funcs(2) = (/                                &
-       func_type(W0, GH_BASIS, GH_DIFF_BASIS),                         &
+       func_type(ANY_SPACE_9, GH_BASIS, GH_DIFF_BASIS),                         &
        func_type(W2, GH_BASIS)                                         &
        /)
   integer :: iterates_over = CELLS
@@ -65,69 +65,69 @@ end function weighted_proj_theta2_kernel_constructor
 !! @param[in] ncell_3d Total number of cells in the 3d mesh
 !! @param[inout] projection Locally assembled projection operator
 !! @param[in] theta Potential temperature array
-!! @param[in] ndf_w0 Number of degrees of freedom per cell for w0
-!! @param[in] undf_w0 Number of unique degrees of freedom  for w0
-!! @param[in] map_w0 Dofmap for the cell at the base of the column for w0
-!! @param[in] w0_basis Basis functions evaluated at gaussian quadrature points 
-!! @param[in] w0_diff_basis Differential basis functions evaluated at gaussian quadrature points 
+!! @param[in] ndf_wtheta Number of degrees of freedom per cell for wtheta
+!! @param[in] undf_wtheta Number of unique degrees of freedom  for wtheta
+!! @param[in] map_wtheta Dofmap for the cell at the base of the column for wtheta
+!! @param[in] wtheta_basis Basis functions evaluated at gaussian quadrature points
+!! @param[in] wtheta_diff_basis Differential basis functions evaluated at gaussian quadrature points
 !! @param[in] ndf_w2 Number of degrees of freedom per cell for w2
 !! @param[in] w2_basis Basis functions evaluated at gaussian quadrature points 
 !! @param[in] nqp_h Number of horizontal quadrature points
 !! @param[in] nqp_v Number of vertical quadrature points
 !! @param[in] wqp_h Weights of the horizontal quadrature points
 !! @param[in] wqp_v Weights of the vertical quadrature points
-subroutine weighted_proj_theta2_code(cell, nlayers, ncell_3d,  &
-                                     projection,               &
-                                     theta,                    &
-                                     ndf_w0, undf_w0, map_w0,  &
-                                     w0_basis, w0_diff_basis,  &
-                                     ndf_w2, w2_basis,         &
+subroutine weighted_proj_theta2_code(cell, nlayers, ncell_3d,              &
+                                     projection,                           &
+                                     theta,                                &
+                                     ndf_wtheta, undf_wtheta, map_wtheta,  &
+                                     wtheta_basis, wtheta_diff_basis,      &
+                                     ndf_w2, w2_basis,                     &
                                      nqp_h, nqp_v, wqp_h, wqp_v )
 
   
   !Arguments
   integer(kind=i_def), intent(in) :: cell, nlayers, ncell_3d, nqp_h, nqp_v
-  integer(kind=i_def), intent(in) :: ndf_w0, ndf_w2, undf_w0
+  integer(kind=i_def), intent(in) :: ndf_wtheta, ndf_w2, undf_wtheta
 
-  integer(kind=i_def), dimension(ndf_w0), intent(in) :: map_w0
+  integer(kind=i_def), dimension(ndf_wtheta), intent(in) :: map_wtheta
 
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_basis  
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v), intent(in) :: w0_diff_basis  
+  real(kind=r_def), dimension(1,ndf_wtheta,nqp_h,nqp_v), intent(in) :: wtheta_basis
+  real(kind=r_def), dimension(3,ndf_wtheta,nqp_h,nqp_v), intent(in) :: wtheta_diff_basis
   real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v), intent(in) :: w2_basis 
 
-  real(kind=r_def), dimension(ndf_w0,ndf_w2,ncell_3d), intent(inout) :: projection
-  real(kind=r_def), dimension(undf_w0),                intent(in)    :: theta
+  real(kind=r_def), dimension(ndf_wtheta,ndf_w2,ncell_3d), intent(inout) :: projection
+  real(kind=r_def), dimension(undf_wtheta),                intent(in)    :: theta
 
   real(kind=r_def), dimension(nqp_h), intent(in) ::  wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in) ::  wqp_v
 
   !Internal variables
-  integer(kind=i_def) :: df, k, ik, df0, df2
+  integer(kind=i_def) :: df, k, ik, dft, df2
   integer(kind=i_def) :: qp1, qp2
   
-  real(kind=r_def), dimension(ndf_w0) :: theta_e
+  real(kind=r_def), dimension(ndf_wtheta) :: theta_e
   real(kind=r_def) :: grad_theta_at_quad(3)
   real(kind=r_def) :: integrand 
   
   do k = 0, nlayers-1
     ik = k + 1 + (cell-1)*nlayers
-    do df = 1, ndf_w0
-      theta_e(df)  = theta( map_w0(df) + k )
+    do df = 1, ndf_wtheta
+      theta_e(df)  = theta( map_wtheta(df) + k )
     end do
 
     do df2 = 1,ndf_w2
-      do df0 = 1,ndf_w0
-        projection(df0,df2,ik) = 0.0_r_def
+      do dft = 1,ndf_wtheta
+        projection(dft,df2,ik) = 0.0_r_def
         do qp2 = 1, nqp_v
           do qp1 = 1, nqp_h
             grad_theta_at_quad(:) = 0.0_r_def
-            do df = 1, ndf_w0
+            do df = 1, ndf_wtheta
               grad_theta_at_quad(:) = grad_theta_at_quad(:) &
-                                    + theta_e(df)*w0_diff_basis(:,df,qp1,qp2)
+                                    + theta_e(df)*wtheta_diff_basis(:,df,qp1,qp2)
             end do
-            integrand = wqp_h(qp1)*wqp_v(qp2)*w0_basis(1,df0,qp1,qp2) &
+            integrand = wqp_h(qp1)*wqp_v(qp2)*wtheta_basis(1,dft,qp1,qp2) &
                       *dot_product(grad_theta_at_quad,w2_basis(:,df2,qp1,qp2))
-            projection(df0,df2,ik) = projection(df0,df2,ik) + integrand
+            projection(dft,df2,ik) = projection(dft,df2,ik) + integrand
           end do
         end do
       end do

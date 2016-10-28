@@ -144,15 +144,18 @@ contains
 
   type(quadrature_type)        :: qr
   type(field_type),    pointer :: chi(:)=> null()
-  type(operator_type), pointer :: mm_w2, mm_w0, mm_w3_inv, mm_wtheta => null()
+  type(operator_type), pointer :: mm_w2, mm_w3_inv, mm_wtheta => null()
   type(operator_type), pointer :: div => null()
   type(field_type),    pointer :: u ,theta, rho, exner, theta_ref, rho_ref => null()
   type(evaluator_xyz_type)     :: evaluator
 
-  mm_w0        => get_mass_matrix(0)
   mm_w2        => get_mass_matrix(2)
   mm_w3_inv    => get_mass_matrix(4)
-  mm_wtheta    => get_mass_matrix(5)
+  if(wtheta_on) then
+    mm_wtheta  => get_mass_matrix(5)
+  else
+    mm_wtheta  => get_mass_matrix(0)
+  end if
   chi          => get_coordinates()
   div          => get_div()
 
@@ -204,12 +207,12 @@ contains
   call invoke_set_field_scalar( 0.0_r_def, lhs(2) )
   if(wtheta_on) then
     call invoke_rtheta_bd_kernel ( lhs_tmp(2), theta_ref, u, ones, qr )
-    call invoke( rtheta_wtheta_kernel_type( lhs_tmp(2), theta_ref, u, qr), &
-                 matrix_vector_kernel_type( lhs(2), theta, mm_wtheta ) )
+    call invoke( rtheta_wtheta_kernel_type( lhs_tmp(2), theta_ref, u, qr) )
   else
-    call invoke( rtheta_kernel_type( lhs_tmp(2), theta_ref, u, ones, qr), &
-                 matrix_vector_kernel_type( lhs(2), theta, mm_w0) )
+    call invoke( rtheta_kernel_type( lhs_tmp(2), theta_ref, u, ones, qr) )
   end if
+  call invoke( matrix_vector_kernel_type( lhs(2), theta, mm_wtheta ) )
+
   call invoke_axpy( -tau_dt, lhs_tmp(2), lhs(2), lhs(2) ) 
 
   ! Compute lhs_rho
@@ -243,6 +246,7 @@ contains
   use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
   use operator_mod,                       only: operator_type
   use derived_config_mod,                 only: si_bundle_size
+  use finite_element_config_mod,          only: wtheta_on
   use psykal_lite_mod,                    only: invoke_multiply_field_data, &
                                                 invoke_inc_axpy, &
                                                 invoke_inc_axpby, &
@@ -265,16 +269,20 @@ contains
   type(field_type),                intent(inout) :: lhs(si_bundle_size)
   real(kind=r_def),                intent(in)    :: tau_dt
 
-  type(operator_type), pointer :: mm_w2, mm_w0, mm_w3_inv => null()
+  type(operator_type), pointer :: mm_w2, mm_w3_inv, mm_wtheta => null()
   type(operator_type), pointer :: div => null()
   type(field_type),    pointer :: u ,theta, rho, exner => null()
   type(operator_type), pointer :: p2theta, div_star, ptheta2, m3_rho_star, &
                                   m3_exner_star, p3theta => null()
   type(field_type),    pointer :: rho_at_u => null()
   
-  mm_w0        => get_mass_matrix(0)
   mm_w2        => get_mass_matrix(2)
   mm_w3_inv    => get_mass_matrix(4)
+  if(wtheta_on) then
+    mm_wtheta  => get_mass_matrix(5)
+  else
+    mm_wtheta  => get_mass_matrix(0)
+  end if
   div          => get_div()
 
   u     => state(1)
@@ -303,7 +311,7 @@ contains
   call invoke_set_field_scalar( 0.0_r_def, lhs_tmp(2) )
   call invoke_set_field_scalar( 0.0_r_def, lhs(2) )
   call invoke( matrix_vector_kernel_type(lhs(2), u, ptheta2) )
-  call invoke( matrix_vector_kernel_type(lhs_tmp(2), theta, mm_w0) )
+  call invoke( matrix_vector_kernel_type(lhs_tmp(2), theta, mm_wtheta) )
   call invoke_inc_axpy(tau_dt, lhs(2), lhs_tmp(2))  
   ! L_rho
   call invoke_multiply_field_data(rho_at_u, u, f_star)

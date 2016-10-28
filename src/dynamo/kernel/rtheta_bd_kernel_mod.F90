@@ -15,13 +15,16 @@
 !>         rtheta_bd = - theta * gamma * u * normal
 module rtheta_bd_kernel_mod
     use kernel_mod,              only : kernel_type
-    use argument_mod,            only : arg_type, func_type,                 &
-        GH_FIELD, GH_READ, GH_INC, GH_ORIENTATION,                           &
-        W2, W3, Wtheta, GH_BASIS,                                            &
-        GH_DIFF_BASIS, CELLS
+    use argument_mod,            only : arg_type, func_type,                       &
+                                        GH_FIELD, GH_READ, GH_INC, GH_ORIENTATION, &
+                                        W2, W3, Wtheta, GH_BASIS,                  &
+                                        GH_DIFF_BASIS, CELLS
     use constants_mod,           only : r_def, i_def
     use cross_product_mod,       only : cross_product
     use planet_config_mod,       only : cp
+    use reference_element_mod,   only : nfaces_h, normal_to_face, out_face_normal
+
+
 
     implicit none
 
@@ -92,24 +95,21 @@ contains
     !! @param[in] wtheta_basis_face Real 5-dim array holding wtheta basis functions evaluated at gaussian quadrature points on horizontal faces
     !! @param[in] adjacent_face Vector containing information on neighbouring face index for the current cell
 
-    subroutine rtheta_bd_code(nlayers,                              &
-        ndf_w2, undf_w2,                                            &
-        stencil_w2_map,                                             &
-        stencil_w2_size,                                            &
-        ndf_w3, undf_w3,                                            &
-        stencil_w3_map,                                             &
-        stencil_w3_size,                                            &
-        ndf_wtheta, undf_wtheta,                                    &
-        stencil_wtheta_map,                                         &
-        stencil_wtheta_size,                                        &
-        r_theta_bd,                                                 &
-        rho, theta, f,                                              &
-        nqp_v, nqp_h_1d, wqp_v, w2_basis_face, w3_basis_face,       &
-        wtheta_basis_face, adjacent_face )
+    subroutine rtheta_bd_code(nlayers,                                                    &
+                              ndf_w2, undf_w2,                                            &
+                              stencil_w2_map,                                             &
+                              stencil_w2_size,                                            &
+                              ndf_w3, undf_w3,                                            &
+                              stencil_w3_map,                                             &
+                              stencil_w3_size,                                            &
+                              ndf_wtheta, undf_wtheta,                                    &
+                              stencil_wtheta_map,                                         &
+                              stencil_wtheta_size,                                        &
+                              r_theta_bd,                                                 &
+                              rho, theta, f,                                              &
+                              nqp_v, nqp_h_1d, wqp_v, w2_basis_face, w3_basis_face,       &
+                              wtheta_basis_face, adjacent_face )
 
-        use log_mod,                  only: log_event,         &
-            LOG_LEVEL_INFO
-        use reference_element_mod,    only: nfaces_h, normal_to_face
 
         ! Arguments
         integer(kind=i_def), intent(in) :: nlayers, nqp_h_1d, nqp_v
@@ -118,16 +118,15 @@ contains
         integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta
 
         integer(kind=i_def), intent(in) :: stencil_w2_size
-        integer(kind=i_def), dimension(ndf_w2, stencil_w2_size), intent(in)  :: stencil_w2_map
-
         integer(kind=i_def), intent(in) :: stencil_w3_size
-        integer(kind=i_def), dimension(ndf_w3, stencil_w3_size), intent(in)  :: stencil_w3_map
-
         integer(kind=i_def), intent(in) :: stencil_wtheta_size
+
+        integer(kind=i_def), dimension(ndf_w2, stencil_w2_size), intent(in)          :: stencil_w2_map
+        integer(kind=i_def), dimension(ndf_w3, stencil_w3_size), intent(in)          :: stencil_w3_map
         integer(kind=i_def), dimension(ndf_wtheta, stencil_wtheta_size), intent(in)  :: stencil_wtheta_map
 
-        real(kind=r_def), dimension(4,3,ndf_w2,nqp_h_1d,nqp_v), intent(in)  :: w2_basis_face
-        real(kind=r_def), dimension(4,1,ndf_w3,nqp_h_1d,nqp_v), intent(in)  :: w3_basis_face
+        real(kind=r_def), dimension(4,3,ndf_w2,nqp_h_1d,nqp_v), intent(in)     :: w2_basis_face
+        real(kind=r_def), dimension(4,1,ndf_w3,nqp_h_1d,nqp_v), intent(in)     :: w3_basis_face
         real(kind=r_def), dimension(4,1,ndf_wtheta,nqp_h_1d,nqp_v), intent(in) :: wtheta_basis_face
 
         integer(kind=i_def), dimension(nfaces_h), intent(in) :: adjacent_face
@@ -148,11 +147,11 @@ contains
         real(kind=r_def), dimension(ndf_wtheta)      :: rtheta_bd_e
         real(kind=r_def), dimension(ndf_w2)          :: f_e, f_next_e
 
-        real(kind=r_def) :: f_at_fquad(3), f_next_at_fquad(3), face_outward_normal(3), face_next_inward_normal(3)
-        real(kind=r_def) :: rho_at_fquad, rho_next_at_fquad, theta_at_fquad, theta_next_at_fquad, &
-            bdary_term, gamma_wtheta, sign_face_outward, sign_face_next_outward, flux_term
+        real(kind=r_def) :: f_at_fquad(3), f_next_at_fquad(3), face_next_inward_normal(3)
+        real(kind=r_def) :: rho_at_fquad, rho_next_at_fquad, theta_at_fquad, theta_next_at_fquad
+        real(kind=r_def) :: bdary_term, gamma_wtheta, sign_face_next_outward, flux_term
 
-        logical               :: upwind = .false.
+        logical          :: upwind = .false.
 
         ! Assumes same number of horizontal qp in x and y
 
@@ -167,12 +166,7 @@ contains
 
               face_next = adjacent_face(face)
 
-              ! This is needed because the normal is inward for faces 1 and 4, outward for 2 and 3
-              ! This gives -1 for face = 1,4 and +1 for face = 2,3
-              sign_face_outward = (-1.0_r_def)**(int(floor(real(mod(face, 4))/2.0) + 1.0_r_def))
               sign_face_next_outward = (-1.0_r_def)**(int(floor(real(mod(face_next, 4))/2.0) + 1.0_r_def))
-
-              face_outward_normal(:) = sign_face_outward * normal_to_face(face, :)
               face_next_inward_normal(:) = -sign_face_next_outward * normal_to_face(face_next, :)
 
               ! Computing rho, theta and f in adjacent cells
@@ -220,11 +214,11 @@ contains
                   end do
 
                   flux_term = 0.5_r_def * (theta_next_at_fquad / rho_next_at_fquad * dot_product(f_next_at_fquad, face_next_inward_normal) + &
-                                           theta_at_fquad / rho_at_fquad * dot_product(f_at_fquad, face_outward_normal))
+                                           theta_at_fquad / rho_at_fquad * dot_product(f_at_fquad, out_face_normal(:, face)))
 
                   if (upwind) then
-                    flux_term = flux_term + 0.5_r_def * abs(dot_product(f_at_fquad, face_outward_normal)/rho_at_fquad) * &
-                                            (dot_product( theta_at_fquad * face_outward_normal, face_outward_normal) - &
+                    flux_term = flux_term + 0.5_r_def * abs(dot_product(f_at_fquad, out_face_normal(:, face))/rho_at_fquad) * &
+                                            (dot_product( theta_at_fquad * out_face_normal(:, face), out_face_normal(:, face)) - &
                                                 dot_product(theta_next_at_fquad * face_next_inward_normal , face_next_inward_normal))
                   end if
 

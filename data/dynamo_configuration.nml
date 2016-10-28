@@ -1,9 +1,10 @@
 &base_mesh
-  filename            = 'cubedsphere.12x12.nc'
-  geometry            = 'spherical'
-  partitioner         = 'cubedsphere'
-  fplane              = .false.
-  f_lat_deg           = 45.0
+  filename    = 'cubedsphere.12x12.nc'
+  geometry    = 'spherical'
+  partitioner = 'cubedsphere'
+  fplane      = .false.
+  f_lat_deg   = 45.0
+/
 
 &extrusion
   method           = 'uniform'

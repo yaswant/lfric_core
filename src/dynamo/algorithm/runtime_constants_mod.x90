@@ -35,17 +35,17 @@ module runtime_constants_mod
                                                invoke_compute_geopotential_kernel_type
 
   ! PsyKAl PSYClone kernels
-  use compute_mass_matrix_kernel_w0_mod, only: compute_mass_matrix_kernel_w0_type
-  use compute_mass_matrix_kernel_w1_mod, only: compute_mass_matrix_kernel_w1_type
-  use compute_mass_matrix_kernel_w2_mod, only: compute_mass_matrix_kernel_w2_type
-  use compute_mass_matrix_kernel_w3_mod, only: compute_mass_matrix_kernel_w3_type
+  use compute_mass_matrix_kernel_w0_mod,     only: compute_mass_matrix_kernel_w0_type
+  use compute_mass_matrix_kernel_w1_mod,     only: compute_mass_matrix_kernel_w1_type
+  use compute_mass_matrix_kernel_w2_mod,     only: compute_mass_matrix_kernel_w2_type
+  use compute_mass_matrix_kernel_w3_mod,     only: compute_mass_matrix_kernel_w3_type
   use compute_mass_matrix_kernel_wtheta_mod, only: compute_mass_matrix_kernel_wtheta_type
-  use compute_geopotential_kernel_mod,   only: compute_geopotential_kernel_type
-  use mm_diagonal_kernel_mod,            only: mm_diagonal_kernel_type
-  use invert_local_operator_kernel_mod,  only: invert_local_operator_kernel_type
-  use compute_grad_operator_kernel_mod,  only: compute_grad_operator_kernel_type
-  use compute_curl_operator_kernel_mod,  only: compute_curl_operator_kernel_type
-  use compute_div_operator_kernel_mod,   only: compute_div_operator_kernel_type
+  use compute_geopotential_kernel_mod,       only: compute_geopotential_kernel_type
+  use mm_diagonal_kernel_mod,                only: mm_diagonal_kernel_type
+  use invert_local_operator_kernel_mod,      only: invert_local_operator_kernel_type
+  use compute_grad_operator_kernel_mod,      only: compute_grad_operator_kernel_type
+  use compute_curl_operator_kernel_mod,      only: compute_curl_operator_kernel_type
+  use compute_div_operator_kernel_mod,       only: compute_div_operator_kernel_type
 
 
 
@@ -134,10 +134,10 @@ contains
     mm_w3_inv = operator_type( w3_fs, w3_fs )
     mm_wtheta = operator_type( wtheta_fs, wtheta_fs )
 
-    call invoke( compute_mass_matrix_kernel_w0_type(mm_w0, chi, qr),       &
-                 compute_mass_matrix_kernel_w1_type(mm_w1, chi, qr),       &
-                 compute_mass_matrix_kernel_w2_type(mm_w2, chi, qr),       &
-                 compute_mass_matrix_kernel_w3_type(mm_w3, chi, qr),       &
+    call invoke( compute_mass_matrix_kernel_w0_type(mm_w0, chi, qr),         &
+                 compute_mass_matrix_kernel_w1_type(mm_w1, chi, qr),         &
+                 compute_mass_matrix_kernel_w2_type(mm_w2, chi, qr),         &
+                 compute_mass_matrix_kernel_w3_type(mm_w3, chi, qr),         &
                  compute_mass_matrix_kernel_wtheta_type(mm_wtheta, chi, qr), &
                  invert_local_operator_kernel_type(mm_w3_inv, mm_w3) )
 

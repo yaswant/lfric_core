@@ -19,8 +19,8 @@ use constants_mod,           only: r_def, i_def
 use kernel_mod,              only: kernel_type
 use argument_mod,            only: arg_type, func_type,                      &
                                    GH_OPERATOR, GH_FIELD, GH_READ, GH_WRITE, &
-                                   W0, W3, ANY_SPACE_1, &
-                                   GH_BASIS, GH_DIFF_BASIS, &
+                                   ANY_SPACE_9, W3, ANY_SPACE_1,             &
+                                   GH_BASIS, GH_DIFF_BASIS,                  &
                                    CELLS
 use coordinate_jacobian_mod, only: coordinate_jacobian
 
@@ -32,13 +32,13 @@ implicit none
 type, public, extends(kernel_type) :: weighted_proj_3theta_kernel_type
   private
   type(arg_type) :: meta_args(3) = (/                                  &
-       arg_type(GH_OPERATOR, GH_WRITE, W3, W0),                        &
-       arg_type(GH_FIELD,    GH_READ,  W0),                            &
+       arg_type(GH_OPERATOR, GH_WRITE, W3, ANY_SPACE_9),               &
+       arg_type(GH_FIELD,    GH_READ,  ANY_SPACE_9),                   &
        arg_type(GH_FIELD*3,  GH_READ,  ANY_SPACE_1)                    &
        /)
   type(func_type) :: meta_funcs(3) = (/                                &
        func_type(W3, GH_BASIS),                                        &
-       func_type(W0, GH_BASIS),                                        &
+       func_type(ANY_SPACE_9, GH_BASIS),                               &
        func_type(ANY_SPACE_1, GH_DIFF_BASIS)                           &
        /)
   integer :: iterates_over = CELLS
@@ -77,10 +77,10 @@ end function weighted_proj_3theta_constructor
 !! @param[in] chi3 Chi in the 3rd dir
 !! @param[in] ndf_w3 Number of degrees of freedom per cell for the operator space.
 !! @param[in] basis_w3 Basis functions evaluated at quadrature points.
-!! @param[in] ndf_w0 Number of degrees of freedom per cell for the theta space.
-!! @param[in] undf_w0 Number of unique degrees of freedum  for theta field
-!! @param[in] map_w0 Dofmap for the cell at the base of the column.
-!! @param[in] basis_w0 Basis functions evaluated at quadrature points.
+!! @param[in] ndf_wtheta Number of degrees of freedom per cell for the theta space.
+!! @param[in] undf_wtheta Number of unique degrees of freedum  for theta field
+!! @param[in] map_wtheta Dofmap for the cell at the base of the column.
+!! @param[in] basis_wtheta Basis functions evaluated at quadrature points.
 !! @param[in] ndf_chi Number of degrees of freedom per cell for the coordinate field.
 !! @param[in] undf_chi Number of unique degrees of freedum  for chi field
 !! @param[in] map_chi Dofmap for the cell at the base of the column.
@@ -94,28 +94,28 @@ subroutine weighted_proj_3theta_code(cell, nlayers, ncell_3d,        &
                                      theta,                          &
                                      chi1, chi2, chi3,               & 
                                      ndf_w3, basis_w3,               &
-                                     ndf_w0, undf_w0, map_w0,basis_w0, &
+                                     ndf_wtheta, undf_wtheta, map_wtheta,basis_wtheta, &
                                      ndf_chi, undf_chi,              &
                                      map_chi, diff_basis_chi, & 
                                      nqp_h, nqp_v, wqp_h, wqp_v )
 
   !Arguments
   integer(kind=i_def), intent(in) :: cell, nlayers, ncell_3d, nqp_h, nqp_v
-  integer(kind=i_def), intent(in) :: ndf_w3, ndf_w0, undf_w0, ndf_chi, undf_chi
+  integer(kind=i_def), intent(in) :: ndf_w3, ndf_wtheta, undf_wtheta, ndf_chi, undf_chi
 
-  integer(kind=i_def), dimension(ndf_w0),  intent(in) :: map_w0
-  integer(kind=i_def), dimension(ndf_chi), intent(in) :: map_chi
+  integer(kind=i_def), dimension(ndf_wtheta),  intent(in) :: map_wtheta
+  integer(kind=i_def), dimension(ndf_chi),     intent(in) :: map_chi
 
-  real(kind=r_def), dimension(ndf_w3,ndf_w0,ncell_3d),  intent(inout)  :: projection
+  real(kind=r_def), dimension(ndf_w3,ndf_wtheta,ncell_3d),  intent(inout)  :: projection
 
-  real(kind=r_def), dimension(1,ndf_w0, nqp_h,nqp_v), intent(in) :: basis_w0
-  real(kind=r_def), dimension(3,ndf_chi,nqp_h,nqp_v), intent(in) :: diff_basis_chi
-  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),  intent(in) :: basis_w3
+  real(kind=r_def), dimension(1,ndf_wtheta, nqp_h,nqp_v), intent(in) :: basis_wtheta
+  real(kind=r_def), dimension(3,ndf_chi,nqp_h,nqp_v),     intent(in) :: diff_basis_chi
+  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),      intent(in) :: basis_w3
 
-  real(kind=r_def), dimension(undf_w0),  intent(in) :: theta
-  real(kind=r_def), dimension(undf_chi), intent(in) :: chi1
-  real(kind=r_def), dimension(undf_chi), intent(in) :: chi2
-  real(kind=r_def), dimension(undf_chi), intent(in) :: chi3
+  real(kind=r_def), dimension(undf_wtheta),  intent(in) :: theta
+  real(kind=r_def), dimension(undf_chi),     intent(in) :: chi1
+  real(kind=r_def), dimension(undf_chi),     intent(in) :: chi2
+  real(kind=r_def), dimension(undf_chi),     intent(in) :: chi3
 
   real(kind=r_def), dimension(nqp_h), intent(in) :: wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in) :: wqp_v
@@ -124,7 +124,7 @@ subroutine weighted_proj_3theta_code(cell, nlayers, ncell_3d,        &
   integer(kind=i_def)                          :: df, df1, df2, k, ik, loc
   integer(kind=i_def)                          :: qp1, qp2
   real(kind=r_def), dimension(ndf_chi)         :: chi1_e, chi2_e, chi3_e
-  real(kind=r_def), dimension(ndf_w0)          :: theta_e
+  real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
   real(kind=r_def)                             :: theta_quad
   real(kind=r_def)                             :: integrand
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
@@ -141,20 +141,20 @@ subroutine weighted_proj_3theta_code(cell, nlayers, ncell_3d,        &
     end do
     call coordinate_jacobian(ndf_chi, nqp_h, nqp_v, chi1_e, chi2_e, chi3_e,  &
                              diff_basis_chi, jac, dj)
-    do df = 1, ndf_w0
-      theta_e(df) = theta(map_w0(df) + k)
+    do df = 1, ndf_wtheta
+      theta_e(df) = theta(map_wtheta(df) + k)
     end do
-    do df2 = 1, ndf_w0
+    do df2 = 1, ndf_wtheta
       do df1 = 1, ndf_w3
         projection(df1,df2,ik) = 0.0_r_def
         do qp2 = 1, nqp_v
           do qp1 = 1, nqp_h 
             theta_quad = 0.0_r_def
-            do df = 1,ndf_w0
-              theta_quad = theta_quad + theta_e(df)*basis_w0(1,df,qp1,qp2)
+            do df = 1,ndf_wtheta
+              theta_quad = theta_quad + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
             end do
             integrand = wqp_h(qp1)*wqp_v(qp2) & 
-                       *basis_w3(1,df1,qp1,qp2)*basis_w0(1,df2,qp1,qp2)  &
+                       *basis_w3(1,df1,qp1,qp2)*basis_wtheta(1,df2,qp1,qp2)  &
                        /theta_quad*dj(qp1,qp2) 
             projection(df1,df2,ik) = projection(df1,df2,ik) + integrand
           end do

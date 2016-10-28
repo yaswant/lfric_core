@@ -16,7 +16,7 @@ use kernel_mod,              only: kernel_type
 use argument_mod,            only: arg_type, func_type,            &
                                    GH_OPERATOR, GH_FIELD,          &
                                    GH_READ, GH_WRITE,              &
-                                   W0, W2, W3,                     &
+                                   ANY_SPACE_9, W2, W3,            &
                                    GH_BASIS,GH_DIFF_BASIS,         &
                                    CELLS
 implicit none
@@ -29,12 +29,12 @@ type, public, extends(kernel_type) :: weighted_div_kernel_type
   private
   type(arg_type) :: meta_args(2) = (/                                  &
        arg_type(GH_OPERATOR, GH_WRITE, W3, W2),                        &
-       arg_type(GH_FIELD,    GH_READ,  W0)                             &
+       arg_type(GH_FIELD,    GH_READ,  ANY_SPACE_9)                    &
        /)
   type(func_type) :: meta_funcs(3) = (/                                &
        func_type(W3, GH_BASIS),                                        &
        func_type(W2, GH_BASIS, GH_DIFF_BASIS),                         &
-       func_type(W0, GH_BASIS, GH_DIFF_BASIS)                          &
+       func_type(ANY_SPACE_9, GH_BASIS, GH_DIFF_BASIS)                 &
        /)
   integer :: iterates_over = CELLS
 
@@ -70,56 +70,56 @@ end function weighted_div_kernel_constructor
 !! @param[in] ndf_w2 Number of degrees of freedom per cell.
 !! @param[in] basis_w2 Scalar basis functions evaluated at quadrature points.
 !! @param[in] diff_basis_w2 Differential vector basis functions evaluated at quadrature points.
-!! @param[in] ndf_w0 Number of degrees of freedom per cell.
-!! @param[in] undf_w0 Total number of degrees of freedom
-!! @param[in] map_w0 Dofmap for W0
-!! @param[in] basis_w0 Basis functions evaluated at quadrature points.
-!! @param[in] diff_basis_w0 Differential vector basis functions evaluated at quadrature points.
+!! @param[in] ndf_wtheta Number of degrees of freedom per cell.
+!! @param[in] undf_wtheta Total number of degrees of freedom
+!! @param[in] map_wtheta Dofmap for Wtheta
+!! @param[in] basis_wtheta Basis functions evaluated at quadrature points.
+!! @param[in] diff_basis_wtheta Differential vector basis functions evaluated at quadrature points.
 !! @param[in] div Local stencil of the div operator
 !! @param[in] theta Potential temperature
 !! @param[in] nqp_h Number of horizontal quadrature points
 !! @param[in] nqp_v Number of vertical quadrature points
 !! @param[in] wqp_h Horizontal quadrature weights
 !! @param[in] wqp_v Vertical quadrature weights
-subroutine weighted_div_code(cell, nlayers, ncell_3d,          &
-                             div,                              &
-                             theta,                            &
-                             ndf_w3, basis_w3,                 &
-                             ndf_w2, basis_w2, diff_basis_w2,  &
-                             ndf_w0, undf_w0, map_w0,          &
-                             basis_w0, diff_basis_w0,          &
+subroutine weighted_div_code(cell, nlayers, ncell_3d,             &
+                             div,                                 &
+                             theta,                               &
+                             ndf_w3, basis_w3,                    &
+                             ndf_w2, basis_w2, diff_basis_w2,     &
+                             ndf_wtheta, undf_wtheta, map_wtheta, &
+                             basis_wtheta, diff_basis_wtheta,     &
                              nqp_h, nqp_v, wqp_h, wqp_v )
   implicit none
   !Arguments
-  integer(kind=i_def),                     intent(in) :: cell, nqp_h, nqp_v
-  integer(kind=i_def),                     intent(in) :: nlayers
-  integer(kind=i_def),                     intent(in) :: ncell_3d
-  integer(kind=i_def),                     intent(in) :: ndf_w3, ndf_w2, ndf_w0, undf_w0
-  integer(kind=i_def), dimension(ndf_w0),  intent(in) :: map_w0
+  integer(kind=i_def),                         intent(in) :: cell, nqp_h, nqp_v
+  integer(kind=i_def),                         intent(in) :: nlayers
+  integer(kind=i_def),                         intent(in) :: ncell_3d
+  integer(kind=i_def),                         intent(in) :: ndf_w3, ndf_w2, ndf_wtheta, undf_wtheta
+  integer(kind=i_def), dimension(ndf_wtheta),  intent(in) :: map_wtheta
 
-  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),   intent(in) :: basis_w3
-  real(kind=r_def), dimension(1,ndf_w2,nqp_h,nqp_v),   intent(in) :: diff_basis_w2
-  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v),   intent(in) :: basis_w2
-  real(kind=r_def), dimension(1,ndf_w0,nqp_h,nqp_v),   intent(in) :: basis_w0
-  real(kind=r_def), dimension(3,ndf_w0,nqp_h,nqp_v),   intent(in) :: diff_basis_w0
+  real(kind=r_def), dimension(1,ndf_w3,nqp_h,nqp_v),       intent(in) :: basis_w3
+  real(kind=r_def), dimension(1,ndf_w2,nqp_h,nqp_v),       intent(in) :: diff_basis_w2
+  real(kind=r_def), dimension(3,ndf_w2,nqp_h,nqp_v),       intent(in) :: basis_w2
+  real(kind=r_def), dimension(1,ndf_wtheta,nqp_h,nqp_v),   intent(in) :: basis_wtheta
+  real(kind=r_def), dimension(3,ndf_wtheta,nqp_h,nqp_v),   intent(in) :: diff_basis_wtheta
 
   real(kind=r_def), dimension(ndf_w3,ndf_w2,ncell_3d), intent(inout) :: div
-  real(kind=r_def), dimension(undf_w0),                intent(in)    :: theta
+  real(kind=r_def), dimension(undf_wtheta),            intent(in)    :: theta
   real(kind=r_def), dimension(nqp_h),                  intent(in)    :: wqp_h
   real(kind=r_def), dimension(nqp_v),                  intent(in)    :: wqp_v
 
   !Internal variables
   integer(kind=i_def)                          :: df, df2, df3, k, ik
   integer(kind=i_def)                          :: qp1, qp2
-  real(kind=r_def), dimension(ndf_w0)          :: theta_e
+  real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
   real(kind=r_def)                             :: integrand
   real(kind=r_def)                             :: div_theta_v
   real(kind=r_def)                             :: theta_quad, grad_theta_quad(3)
 
   do k = 0, nlayers - 1
     ik = k + 1 + (cell-1)*nlayers
-    do df = 1,ndf_w0
-      theta_e(df) = theta(map_w0(df) + k)
+    do df = 1,ndf_wtheta
+      theta_e(df) = theta(map_wtheta(df) + k)
     end do
     do df2 = 1, ndf_w2
       do df3 = 1, ndf_w3
@@ -128,11 +128,11 @@ subroutine weighted_div_code(cell, nlayers, ncell_3d,          &
           do qp1 = 1, nqp_h
             theta_quad         = 0.0_r_def
             grad_theta_quad(:) = 0.0_r_def
-            do df = 1, ndf_w0
+            do df = 1, ndf_wtheta
               theta_quad = theta_quad                                      &
-                         + theta_e(df)*basis_w0(1,df,qp1,qp2)
+                         + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
               grad_theta_quad(:) = grad_theta_quad(:) &
-                                 + theta_e(df)*diff_basis_w0(:,df,qp1,qp2) 
+                                 + theta_e(df)*diff_basis_wtheta(:,df,qp1,qp2)
             end do
             div_theta_v = diff_basis_w2(1,df2,qp1,qp2)*theta_quad &
                         + dot_product(basis_w2(:,df2,qp1,qp2),grad_theta_quad)

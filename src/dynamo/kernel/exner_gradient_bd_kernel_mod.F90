@@ -25,6 +25,7 @@ module exner_gradient_bd_kernel_mod
   use constants_mod,           only : r_def, i_def
   use cross_product_mod,       only : cross_product
   use planet_config_mod,       only : cp
+  use reference_element_mod,    only: nfaces_h, out_face_normal
 
   implicit none
 
@@ -37,12 +38,12 @@ module exner_gradient_bd_kernel_mod
     type(arg_type) :: meta_args(3) = (/                               &
       arg_type(GH_FIELD,   GH_INC,  W2),                              &
       arg_type(GH_FIELD,   GH_READ, W3),                              &
-      arg_type(GH_FIELD,   GH_READ, Wtheta)                      &
+      arg_type(GH_FIELD,   GH_READ, Wtheta)                           &
       /)
     type(func_type) :: meta_funcs(3) = (/                             &
       func_type(W2, GH_BASIS, GH_DIFF_BASIS),                         &
       func_type(W3, GH_BASIS),                                        &
-      func_type(Wtheta, GH_BASIS)                                &
+      func_type(Wtheta, GH_BASIS)                                     &
       /)
     integer :: iterates_over = CELLS
   contains
@@ -104,10 +105,6 @@ contains
                                     nqp_v, nqp_h_1d, wqp_v, w2_basis_face, w3_basis_face,       &
                                     wtheta_basis_face, adjacent_face)
 
-    use calc_exner_pointwise_mod, only: calc_exner_pointwise
-    use log_mod,                  only: log_event,         &
-                                        LOG_LEVEL_INFO
-    use reference_element_mod,    only: nfaces_h, normal_to_face
 
     ! Arguments
     integer(kind=i_def), intent(in) :: nlayers, nqp_v, nqp_h_1d
@@ -141,9 +138,9 @@ contains
     real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
     real(kind=r_def), dimension(ndf_w2)          :: ru_bd_e
 
-    real(kind=r_def) :: v(3), face_outward_normal(3)
+    real(kind=r_def) :: v(3)
     real(kind=r_def) :: exner_at_fquad, exner_next_at_fquad
-    real(kind=r_def) :: theta_at_fquad, bdary_term, av_pi_at_fquad, sign_face_outward
+    real(kind=r_def) :: theta_at_fquad, bdary_term, av_pi_at_fquad
 
     do k = 0, nlayers-1
 
@@ -158,11 +155,6 @@ contains
         ! Storing opposite face number on neighbouring cell
 
         face_next = adjacent_face(face)
-
-        ! This is needed because the normal is inward for faces 1 and 4, outward for 2 and 3
-        ! This gives -1 for face = 1,4 and +1 for face = 2,3
-        sign_face_outward = (-1.0_r_def)**(int(floor(real(mod(face, 4))/2.0) + 1.0_r_def))
-        face_outward_normal(:) = sign_face_outward * normal_to_face(face, :)
 
         ! Computing exner and theta in local and adjacent cell
 
@@ -197,7 +189,7 @@ contains
             do df = 1, ndf_w2
               v  = w2_basis_face(face,:,df,qp1,qp2)
 
-              bdary_term = - cp * dot_product(v, face_outward_normal) *  theta_at_fquad * av_pi_at_fquad
+              bdary_term = - cp * dot_product(v, out_face_normal(:, face)) *  theta_at_fquad * av_pi_at_fquad
               ru_bd_e(df) = ru_bd_e(df) + wqp_v(qp1)*wqp_v(qp2) * bdary_term
             end do
 

@@ -7,15 +7,16 @@
 
 !>@brief compute the locally assembled SI operators
 module si_operators_alg_mod
-  use constants_mod,     only: i_def, r_def
-  use operator_mod,      only: operator_type
-  use field_mod,         only: field_type
-  use log_mod,           only: log_event, &
-                               LOG_LEVEL_INFO, &
-                               LOG_LEVEL_ERROR
-  use solver_config_mod, only: preconditioner, &
-                               solver_preconditioner_tridiagonal, &
-                               normalise
+  use constants_mod,             only: i_def, r_def
+  use operator_mod,              only: operator_type
+  use field_mod,                 only: field_type
+  use finite_element_config_mod, only: wtheta_on
+  use log_mod,                   only: log_event, &
+                                       LOG_LEVEL_INFO, &
+                                       LOG_LEVEL_ERROR
+  use solver_config_mod,         only: preconditioner, &
+                                       solver_preconditioner_tridiagonal, &
+                                       normalise
   implicit none
   private
 
@@ -29,7 +30,7 @@ module si_operators_alg_mod
   type(operator_type), target :: p3theta
   type(operator_type), target :: compound_div
   type(field_type),    target :: rho_at_u
-  type(field_type),    target :: m0_lumped
+  type(field_type),    target :: mt_lumped
   type(field_type),    target :: tri_precon(3)
   type(field_type),    target :: Helm_diag
 
@@ -44,7 +45,7 @@ module si_operators_alg_mod
   public :: get_p3theta
   public :: get_compound_div 
   public :: get_rho_at_u 
-  public :: get_m0_lumped
+  public :: get_mt_lumped
   public :: get_tri_precon
   public :: get_helm_diag
 contains
@@ -52,7 +53,7 @@ contains
 !> Subroutine to create the si operators
 subroutine create_si_operators(mesh_id)
   use function_space_mod,        only: function_space_type
-  use fs_continuity_mod,         only: W0, W2, W3
+  use fs_continuity_mod,         only: W0, W2, W3, Wtheta
   use finite_element_config_mod, only: element_order
   use function_space_collection_mod, &
                                  only: function_space_collection
@@ -64,25 +65,29 @@ subroutine create_si_operators(mesh_id)
   type(function_space_type), pointer     :: w0_fs => null()
   type(function_space_type), pointer     :: w2_fs => null()
   type(function_space_type), pointer     :: w3_fs => null()
+  type(function_space_type), pointer     :: wtheta_fs => null()
 
   call log_event( "Dynamo: creating si_operators", LOG_LEVEL_INFO )
 
-  w0_fs => function_space_collection%get_fs( mesh_id, element_order, W0 )
-  w2_fs => function_space_collection%get_fs( mesh_id, element_order, W2 )
-  w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
- 
+  w2_fs     => function_space_collection%get_fs( mesh_id, element_order, W2 )
+  w3_fs     => function_space_collection%get_fs( mesh_id, element_order, W3 )
+  if (wtheta_on) then
+    wtheta_fs => function_space_collection%get_fs( mesh_id, element_order, Wtheta )
+  else
+    wtheta_fs => function_space_collection%get_fs( mesh_id, element_order, W0 )
+  end if
   ! Should change 0 to theta
  
   m3_rho_star   = operator_type( w3_fs, w3_fs )
   m3_exner_star = operator_type( w3_fs, w3_fs )
   div_star      = operator_type( w3_fs, w2_fs )
-  p2theta       = operator_type( w2_fs, w0_fs )
-  ptheta2       = operator_type( w0_fs, w2_fs ) 
-  p3theta       = operator_type( w3_fs, w0_fs )
+  p2theta       = operator_type( w2_fs, wtheta_fs )
+  ptheta2       = operator_type( wtheta_fs, w2_fs )
+  p3theta       = operator_type( w3_fs, wtheta_fs )
   compound_div  = operator_type( w3_fs, w2_fs )
 
   rho_at_u  = field_type(vector_space = w2_fs)
-  m0_lumped = field_type(vector_space = w0_fs)
+  mt_lumped = field_type(vector_space = wtheta_fs)
 
   if ( preconditioner == solver_preconditioner_tridiagonal ) then
     if ( element_order /= 0 ) then
@@ -111,9 +116,10 @@ subroutine compute_si_operators(ref_state)
   use psykal_lite_mod,                 only: invoke_sample_flux_kernel, &
                                              invoke_set_field_scalar, &
                                              invoke_compute_tri_precon_kernel, &
-                                             invoke_divide_field_data
+                                             invoke_divide_field_data, &
+                                             invoke_weighted_div_bd_kernel_type
   use multiplicity_kernel_mod,         only: multiplicity_kernel_type
-  use finite_element_config_mod,       only: element_order
+  use finite_element_config_mod,       only: element_order, wtheta_on
   use function_space_mod,              only: function_space_type
   use function_space_collection_mod,   only: function_space_collection
   use matrix_vector_kernel_mod,        only: matrix_vector_kernel_type
@@ -127,7 +133,7 @@ subroutine compute_si_operators(ref_state)
   type(field_type),            pointer :: theta, rho => null()
   type(quadrature_type)                :: qr
   type(field_type),            pointer :: chi(:) => null()
-  type(operator_type),         pointer :: m3_inv, div, m0 => null()
+  type(operator_type),         pointer :: m3_inv, div, mt => null()
   integer(i_def)                       :: mesh
   integer(i_def)                       :: fs_handle
   type(field_type)                     :: ones, w2_multiplicity
@@ -143,12 +149,18 @@ subroutine compute_si_operators(ref_state)
   m3_inv => get_mass_matrix(4)
   div    => get_div()
 
-  call invoke( weighted_m3_rho_kernel_type(m3_rho_star, rho, chi, qr), &
-               weighted_m3_exner_kernel_type(m3_exner_star, rho, theta, chi, qr), &
-               weighted_div_kernel_type(div_star, theta, qr),         &
-               weighted_proj_theta2_kernel_type(ptheta2, theta, qr),    & 
-               weighted_proj_2theta_kernel_type(p2theta, theta, rho, qr) ) 
+  call invoke( weighted_m3_rho_kernel_type(m3_rho_star, rho, chi, qr) )
+  call invoke( weighted_m3_exner_kernel_type(m3_exner_star, rho, theta, chi, qr) )
+
  ! Split off due to use of any_space for chi
+
+  call invoke( weighted_div_kernel_type(div_star, theta, qr) )
+  if (wtheta_on) then
+    call invoke_weighted_div_bd_kernel_type(div_star, theta, qr)
+  end if
+  call invoke( weighted_div_kernel_type(div_star, theta, qr) )
+  call invoke( weighted_proj_theta2_kernel_type(ptheta2, theta, qr) )
+  call invoke( weighted_proj_2theta_kernel_type(p2theta, theta, rho, qr) )
   call invoke( weighted_proj_3theta_kernel_type(p3theta, theta, chi, qr) )
   call invoke( compound_operator_kernel_type(compound_div, m3_rho_star, m3_inv, div) )
 
@@ -166,13 +178,17 @@ subroutine compute_si_operators(ref_state)
   evaluator = evaluator_xyz_type( u_fs%get_ndf( ), u_fs%get_nodes( ) )
   call invoke_sample_flux_kernel( rho_at_u, ones, w2_multiplicity, rho, evaluator )
 
-  m0 => get_mass_matrix(0)
+  if(wtheta_on) then
+    mt => get_mass_matrix(5)
+  else
+    mt => get_mass_matrix(0)
+  end if
   fs_handle = ref_state(2)%which_function_space()
   theta_fs => function_space_collection%get_fs(mesh, element_order, fs_handle)
   ones  = field_type( vector_space = theta_fs )
   call invoke_set_field_scalar( 1.0_r_def, ones )
-  call invoke_set_field_scalar( 0.0_r_def,  m0_lumped)
-  call invoke(matrix_vector_kernel_type(m0_lumped, ones, m0) )
+  call invoke_set_field_scalar( 0.0_r_def,  mt_lumped)
+  call invoke(matrix_vector_kernel_type(mt_lumped, ones, mt) )
 
   ! compute terms for tridiagonal preconditioner
   if ( preconditioner == solver_preconditioner_tridiagonal ) then
@@ -261,13 +277,13 @@ end subroutine compute_si_operators
     field => rho_at_u
   end function get_rho_at_u
 
- !> Function to return a pointer to the m0_lumped
+ !> Function to return a pointer to the mt_lumped
  !> @return The field
-  function get_m0_lumped() result(field)
+  function get_mt_lumped() result(field)
     implicit none
     type(field_type), pointer :: field
-    field => m0_lumped
-  end function get_m0_lumped
+    field => mt_lumped
+  end function get_mt_lumped
 
  !> Function to return a pointer to the tri_precon
  !> @return The field

@@ -43,13 +43,13 @@ module rk_alg_timestep_mod
                                                set_bundle_scalar
 
   ! PsyKAl PSYClone kernels
-  use held_suarez_kernel_mod,            only: held_suarez_kernel_type
-  use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
-  use rotation_kernel_mod,               only: rotation_kernel_type
-  use pressure_gradient_kernel_mod,      only: pressure_gradient_kernel_type
+  use held_suarez_kernel_mod,              only: held_suarez_kernel_type
+  use enforce_bc_kernel_mod,               only: enforce_bc_kernel_type
+  use rotation_kernel_mod,                 only: rotation_kernel_type
+  use pressure_gradient_kernel_mod,        only: pressure_gradient_kernel_type
   use pressure_gradient_wtheta_kernel_mod, only: pressure_gradient_wtheta_kernel_type
-  use kinetic_energy_gradient_kernel_mod, only: kinetic_energy_gradient_kernel_type
-  use geopotential_gradient_kernel_mod,  only: geopotential_gradient_kernel_type
+  use kinetic_energy_gradient_kernel_mod,  only: kinetic_energy_gradient_kernel_type
+  use geopotential_gradient_kernel_mod,    only: geopotential_gradient_kernel_type
 
   ! Derived Types
   use function_space_collection_mod,     only: function_space_collection
