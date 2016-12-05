@@ -27,20 +27,22 @@ implicit none
   type(ugrid_2d_type)                    :: ugrid_2d
   class(ugrid_file_type), allocatable    :: ugrid_file
   character(len=str_def)                 :: filename, sztext
-  integer(kind=i_def)                    :: ndivs
+  integer(kind=i_def)                    :: ndivs, nsmooth
   logical                                :: nowrite
   integer                                :: fsize
   
 
-  call parse_args(filename, ndivs, nowrite)
+  call parse_args(filename, ndivs, nsmooth, nowrite)
 
   allocate(ncdf_quad_type::ugrid_file)
   call ugrid_2d%set_file_handler(ugrid_file)
 
-  csgen = gencube_ps_type(ndivs)
+  csgen = gencube_ps_type(ndivs, nsmooth)
 
   write(stdout, "(A)") "Generating cubed-sphere mesh with..."
-  write(stdout, "(A,I5)") "  ndivs: ", ndivs
+  write(stdout, "(A,I5)") "  ndivs:   ", ndivs
+  write(stdout, "(A,I5)") "  nsmooth: ", nsmooth
+ 
 
   call ugrid_2d%set_by_generator(csgen)
   write(stdout, "(A)") "...generation complete."

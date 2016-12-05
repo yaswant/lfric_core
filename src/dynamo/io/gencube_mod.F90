@@ -20,7 +20,6 @@
 !!      | 6 |
 !!      +---+
 !! 
-!!  Paul Slavin <slavinp@cs.man.ac.uk>
 !-------------------------------------------------------------------------------
 module gencube_mod
 !-------------------------------------------------------------------------------
@@ -38,15 +37,18 @@ integer, parameter     :: SE = SEB
 integer, parameter     :: SW = SWB
 ! Prefix for error messages
 character(len=*), parameter  :: prefix = "[Cubed-Sphere Mesh] "
+! flag to print out mesh data for debugging purposes
+logical, parameter :: debug = .false.
 !-------------------------------------------------------------------------------
 type, extends(ugrid_generator_type), public        :: gencube_ps_type
   private
   integer                            :: ndivs
-  integer, allocatable               :: cell_next(:,:)     ! 
-  integer, allocatable               :: verts_on_cell(:,:)          !
-  integer, allocatable               :: edges_on_cell(:,:) ! 
-  integer, allocatable               :: verts_on_edge(:,:) ! 
-  real(kind=r_def), allocatable      :: vert_coords(:,:)   ! 
+  integer                            :: nsmooth
+  integer, allocatable               :: cell_next(:,:)
+  integer, allocatable               :: verts_on_cell(:,:)
+  integer, allocatable               :: edges_on_cell(:,:)
+  integer, allocatable               :: verts_on_edge(:,:)
+  real(kind=r_def), allocatable      :: vert_coords(:,:)
 contains
   procedure :: calc_adjacency
   procedure :: calc_face_to_vert
@@ -58,6 +60,7 @@ contains
   procedure :: generate
   procedure :: write_mesh
   procedure :: orient_lfric
+  procedure :: smooth
 end type gencube_ps_type
 !-------------------------------------------------------------------------------
 interface gencube_ps_type
@@ -73,12 +76,12 @@ contains
 !!  @param[in]   ndivs  Number of subdivisions per panale of the cubed-sphere.
 !!                      Each panel will contain ndivs*ndivs faces.
 !-------------------------------------------------------------------------------
-type(gencube_ps_type) function gencube_ps_constructor(ndivs) &
+type(gencube_ps_type) function gencube_ps_constructor(ndivs, nsmooth) &
                       result(self)
 
   implicit none
 
-  integer(kind=i_def), intent(in)                   :: ndivs
+  integer(kind=i_def), intent(in)                   :: ndivs, nsmooth
 
 
   if(ndivs < 3) then
@@ -86,6 +89,7 @@ type(gencube_ps_type) function gencube_ps_constructor(ndivs) &
   end if
 
   self%ndivs = ndivs
+  self%nsmooth = nsmooth
 
   return
 
@@ -907,9 +911,10 @@ subroutine generate(self)
   call calc_adjacency(self, self%cell_next)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
-  call calc_coords(self, self%vert_coords)
+  call calc_coords(self, self%vert_coords)  
   call orient_lfric(self)
-!  call write_mesh(self)
+  if (self%nsmooth > 0_i_def) call smooth(self)
+  if (debug) call write_mesh(self)
   
 end subroutine generate
 !-------------------------------------------------------------------------------
@@ -921,14 +926,15 @@ end subroutine generate
 !-------------------------------------------------------------------------------
 subroutine write_mesh(self)
   use iso_fortran_env,     only : stdout => output_unit
+  use coord_transform_mod, only : ll2xyz
   implicit none
 
   class(gencube_ps_type), intent(in)            :: self
 
   integer(kind=i_def)                           :: i, cell, vert, ncells
+  real(kind=r_def)                              :: x,y,z
 
-
-  ncells = self%ndivs*self%ndivs
+  ncells = 6*self%ndivs*self%ndivs
 
   write(stdout,*) "cell_next"
   do cell=1, ncells
@@ -955,8 +961,8 @@ subroutine write_mesh(self)
 
   write(stdout,*)
   write(stdout,*) "vert_coords"
-  do vert=1, 6*ncells+2
-    write(*,*) vert, self%vert_coords(:,vert)
+  do vert=1, ncells+2
+    write(stdout,*) vert, self%vert_coords(:,vert)
   end do
 
 end subroutine write_mesh
@@ -1041,4 +1047,88 @@ subroutine map_sphere(x, y, z, xs, ys, zs)
 
 end subroutine map_sphere
 !-------------------------------------------------------------------------------
+!>  @brief  Smooth the cube grid
+!>  @details Smooth the grid by iteratively computing the face centres as 
+!!           barycentres of the surrounding vertices and then the vertices
+!!           as  barycentres of the surrounding faces
+!!  @param[in,out]  self The gencube_ps_type instance reference.
+!!  @param[in]      nsmooth Number of smoothing iterations to perform
+subroutine smooth(self)
+  use coord_transform_mod, only : ll2xyz, xyz2ll
+
+  implicit none
+
+  class(gencube_ps_type), intent(inout)  :: self 
+
+  integer(kind=i_def)                              :: s, ncells, nverts, v, i, &
+                                                      j, cell, f
+  integer(kind=i_def), allocatable, dimension(:,:) :: cell_on_vert
+  integer(kind=i_def), allocatable, dimension(:)   :: ncell_on_vert
+  real(kind=r_def),    allocatable, dimension(:,:) :: cell_coords
+  real(kind=r_def)                                 :: xc(3), x0(3), &
+                                                      radius_ratio, ll(2)
+  
+
+  ncells = 6*self%ndivs*self%ndivs
+  nverts = ncells + 2
+
+  allocate( cell_on_vert(4,nverts) )
+  allocate( ncell_on_vert(nverts) )
+  allocate( cell_coords(3,ncells) )
+
+  ! Preliminary - Compute cell on vertices look up
+  cell_on_vert(:,:) = -1_i_def
+  ncell_on_vert(:) = 0_i_def
+  do cell = 1,ncells
+    do i = 1,4
+      v = self%verts_on_cell(i,cell)   
+      do j = 1,4
+        if (cell_on_vert(j,v) == -1_i_def ) then
+          cell_on_vert(j,v) = cell
+          ncell_on_vert(v) = ncell_on_vert(v) + 1_i_def
+          exit
+        end if
+      end do
+    end do
+  end do
+
+  ! Preliminary - Compute cell centre coordinates
+  do f = 1,ncells
+    xc(:) = 0.0_r_def
+    do v = 1,4
+      ll = self%vert_coords(:,self%verts_on_cell(v,f))         
+      call ll2xyz(ll(1),ll(2),x0(1),x0(2),x0(3))
+      xc(:) = xc(:) + x0(:)
+    end do
+    radius_ratio = 1.0_r_def/sqrt( xc(1)**2 + xc(2)**2 + xc(3)**2)
+    cell_coords(:,f) = xc(:)*radius_ratio
+  end do
+
+
+  do s = 1,self%nsmooth
+    ! Compute vertices of barycentres of surrounding faces
+    do v = 1,nverts
+      xc(:) = 0.0_r_def
+      do f = 1,ncell_on_vert(v)        
+        xc(:) = xc(:) + cell_coords(:,cell_on_vert(f,v))
+      end do
+      radius_ratio = 1.0_r_def/sqrt( xc(1)**2 + xc(2)**2 + xc(3)**2)
+      x0(:) =  xc(:)*radius_ratio
+      call xyz2ll(x0(1),x0(2),x0(3),self%vert_coords(1,v),self%vert_coords(2,v))
+    end do
+    ! Compute faces as barycentres of surrounding vertices
+    do f = 1,ncells
+      xc(:) = 0.0_r_def
+      do v = 1,4      
+        ll = self%vert_coords(:,self%verts_on_cell(v,f))         
+        call ll2xyz(ll(1),ll(2),x0(1),x0(2),x0(3))
+        xc(:) = xc(:) + x0(:)
+      end do
+      radius_ratio = 1.0_r_def/sqrt( xc(1)**2 + xc(2)**2 + xc(3)**2)
+      cell_coords(:,f) = xc(:)*radius_ratio
+    end do
+  end do
+
+end subroutine smooth
+
 end module gencube_mod

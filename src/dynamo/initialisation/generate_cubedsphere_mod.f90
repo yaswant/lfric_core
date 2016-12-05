@@ -27,6 +27,7 @@ subroutine write_usage(dest)
 
   write(dest, "(A)") "Usage: generate_cubedsphere -h | -r <input_file> | "//&
                      "[[-o <output_file>] [-ndivs <divs_per_panel>] "//&
+                     "[-nsmooth <number_of_smooths>] "//&
                      "[-nowrite]]"
   write(dest, "(A)") "   -h                      Print this help."
   write(dest, "(A)") "   -o  <output_file>       Write ugrid data to "//&
@@ -34,13 +35,15 @@ subroutine write_usage(dest)
   write(dest, "(A)") "   -ndivs <divs_per_panel> Generate mesh with "//&
                      "<divs_per_panel> subdivisions per panel of "//&
                      "the cubed-sphere."
+  write(dest, "(A)") "   -nsmooth <number_of_smooths> "//&
+                     "Number of smoothing iterations to perform."
   write(dest, "(A)") "   -nowrite                Generate mesh in "//&
                      "memory only, do not write ugrid file. Useful "//&
                      "for benchmarking."
   write(dest, "(A)") "   -r  <input_file>        Read existing mesh"//&
                                                  " <input_file>."
   write(dest, *)
-  write(dest, "(A)") "Defaults: -o ugrid_quads_2d.nc -ndivs 4"
+  write(dest, "(A)") "Defaults: -o ugrid_quads_2d.nc -ndivs 4 -nsmooth 0"
 
 end subroutine write_usage
 !-------------------------------------------------------------------------------
@@ -54,14 +57,14 @@ end subroutine write_usage
 !!  @param[out]  ndivs  Number of subdivisions per panel of cubed-sphere mesh.
 !!  @param[out]  nowrite  Whether mesh should be written to a file or discarded.
 !-------------------------------------------------------------------------------
-subroutine parse_args(filename, ndivs, nowrite)
+subroutine parse_args(filename, ndivs, nsmooth, nowrite)
   use constants_mod,       only : i_def, r_def, str_def
   use iso_fortran_env,     only : stdout => output_unit, &
                                   stderr => error_unit
   implicit none
 
   character(len=*), intent(out)          :: filename
-  integer(kind=i_def), intent(out)       :: ndivs
+  integer(kind=i_def), intent(out)       :: ndivs, nsmooth
   logical                                :: nowrite
   
   integer                                :: argc, arg
@@ -70,6 +73,7 @@ subroutine parse_args(filename, ndivs, nowrite)
 
   filename = "ugrid_quads_2d.nc"
   ndivs = 4_i_def
+  nsmooth = 0_i_def
   argc = command_argument_count()
   nowrite = .FALSE.
 
@@ -94,6 +98,9 @@ subroutine parse_args(filename, ndivs, nowrite)
         case("-ndivs")
             arg = arg + 1
             read(argv(arg), *) ndivs
+        case("-nsmooth")
+            arg = arg + 1
+            read(argv(arg), *) nsmooth
         case("-nowrite")
             nowrite = .TRUE.
         case default
