@@ -28,22 +28,23 @@ module init_dynamo_mod
                                              operators, &
                                              transport_scheme_method_of_lines, &
                                              transport_operators_fv
-
+  use mr_indices_mod,                 only : nummr
   implicit none
 
 
   contains
 
-  subroutine init_dynamo(mesh_id, chi, u, rho, theta, xi, restart)
+  subroutine init_dynamo(mesh_id, chi, u, rho, theta, rho_in_wth, mr, xi, restart)
 
     integer(i_def), intent(in)               :: mesh_id
     ! coordinate field
     type( field_type ), intent(inout)        :: chi(3)
     ! prognostic fields
     type( field_type ), intent(inout)        :: u, rho, theta, xi
+    type( field_type ), intent(inout)        :: mr(nummr), rho_in_wth
     type(restart_type), intent(in)           :: restart
 
-    integer(i_def)                           :: coord
+    integer(i_def)                           :: coord, imr
     integer(i_def)                           :: chi_space
 
     call log_event( 'Dynamo: initialisation...', LOG_LEVEL_INFO )
@@ -83,9 +84,16 @@ module init_dynamo_mod
     rho   = field_type( vector_space = &
                        function_space_collection%get_fs(mesh_id, element_order, W3) )
 
-    ! Initialise prognostic fields
-    call init_prognostic_fields_alg( mesh_id, chi, u, rho, theta, xi, restart)
+    rho_in_wth = field_type( vector_space = & 
+       function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()))
 
+    do imr = 1,nummr
+      mr(imr) = field_type( vector_space = &
+         function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()) )
+    end do
+
+    ! Initialise prognostic fields
+    call init_prognostic_fields_alg( mesh_id, chi, u, rho, theta, rho_in_wth, mr, xi, restart)
 
     call log_event( 'Dynamo initialised', LOG_LEVEL_INFO )
 

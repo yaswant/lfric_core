@@ -18,7 +18,7 @@ module runtime_constants_mod
                                                LOG_LEVEL_INFO, &
                                                LOG_LEVEL_ERROR
   ! Configuration
-  use finite_element_config_mod,         only: element_order
+  use finite_element_config_mod,         only: element_order, wtheta_on
 
   ! Derived Types
   use field_mod,                         only: field_type
@@ -141,7 +141,6 @@ contains
                  compute_mass_matrix_kernel_wtheta_type(mm_wtheta, chi, qr), &
                  invert_local_operator_kernel_type(mm_w3_inv, mm_w3) )
 
-
     !=================== Create grad, div, curl operators =====================!
 
     grad = operator_type( w1_fs, w0_fs )
@@ -221,6 +220,12 @@ contains
         mm => mm_w3_inv
       case (5)
         mm => mm_wtheta
+      case (6)
+        if (wtheta_on)then
+          mm => mm_wtheta
+        else
+          mm => mm_w0
+        end if
       case default
         mm => null()
         call log_event( "Mass matrix operator does not exist", LOG_LEVEL_ERROR)

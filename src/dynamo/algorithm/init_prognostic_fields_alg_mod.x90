@@ -19,7 +19,7 @@ module init_prognostic_fields_alg_mod
 
   ! Configuration and restart/checkpoint options
   use finite_element_config_mod,       only: element_order, wtheta_on
-  use formulation_config_mod,          only: nonlinear, transport_only
+  use formulation_config_mod,          only: nonlinear, transport_only, use_moisture
   use transport_config_mod,            only: scheme, &
                                              operators, &
                                              transport_scheme_method_of_lines, &
@@ -29,15 +29,15 @@ module init_prognostic_fields_alg_mod
   use field_io_mod,                    only: read_state_netcdf
 
   ! PsyKAl-lite kernels
-  use psykal_lite_mod,                 only: invoke_set_field_scalar, &
+  use psykal_lite_mod,                 only: invoke_copy_field_data, &
+                                             invoke_set_field_scalar, &
+                                             invoke_initial_mr_kernel, &
                                              invoke_initial_theta_kernel
 
   ! PsyKAl PSYClone kernels
   use initial_rho_kernel_mod,          only: initial_rho_kernel_type
   use initial_u_kernel_mod,            only: initial_u_kernel_type
   use compute_mass_matrix_kernel_w2_mod, only: compute_mass_matrix_kernel_w2_type
-
-  use compute_mass_matrix_kernel_wtheta_mod, only: compute_mass_matrix_kernel_wtheta_type
 
   ! Derived Types
   use function_space_collection_mod,   only: function_space_collection
@@ -49,7 +49,8 @@ module init_prognostic_fields_alg_mod
 
   ! Handles
   use fs_continuity_mod,               only: W0, W1, W2, W3, Wtheta
-
+  use mr_indices_mod,                  only: nummr
+  use map_rho_to_theta_mod,            only: map_rho_to_theta
   implicit none
 
   private
@@ -65,7 +66,7 @@ contains
   !> @param[inout] theta The potential temperature
   !> @param[inout] xi The vorticity field 
   !> @param[in] restart Checkpoint/restart type with timestepping information
-  subroutine init_prognostic_fields_alg( mesh_id, chi, u, rho, theta, xi, restart)
+  subroutine init_prognostic_fields_alg( mesh_id, chi, u, rho, theta, rho_in_wth, mr, xi, restart)
 
     implicit none
 
@@ -74,7 +75,7 @@ contains
     ! Coordinate fields
     type( field_type ), intent( inout ) :: chi(3)
     ! Prognostic fields
-    type( field_type ), intent( inout ) :: u, rho, theta, xi
+    type( field_type ), intent( inout ) :: u, rho, theta, xi, mr(nummr),rho_in_wth
     ! Control
     type( restart_type ), intent(in)    :: restart
 
@@ -82,11 +83,14 @@ contains
     type( field_type ), allocatable     :: state(:)
     type( field_type )                  :: r_u
     type( operator_type )               :: mm_w2
-    type(function_space_type), pointer  :: w2_fs, wtheta_fs    => null()
+    type(function_space_type), pointer  :: w2_fs, wtheta_fs   => null()
 
     integer                             :: n_fields
     type(evaluator_xyz_type)            :: evaluator
 
+    integer :: i
+    integer :: n_checkpoint  ! number of fields to checkpoint
+    character(5) :: name
 
     qr = quadrature_type( element_order + 3, GAUSSIAN )
 
@@ -102,7 +106,7 @@ contains
       wtheta_fs => function_space_collection%get_fs( mesh_id, element_order, theta%which_function_space() )
       evaluator = evaluator_xyz_type( wtheta_fs%get_ndf( ), wtheta_fs%get_nodes( ))
       call invoke_initial_theta_kernel( theta, chi, evaluator )
-
+      
       ! Initialise U and Rho according to formulation
       if (  nonlinear .OR. transport_only ) then
         r_u = field_type( vector_space =                                           &
@@ -125,11 +129,19 @@ contains
         call invoke_set_field_scalar(0.0_r_def, rho)
       end if
 
+      call log_event( "Dynamo: Mapping rho->rho_in_wth in same space as theta..", LOG_LEVEL_INFO )
+
+      call map_rho_to_theta(rho, theta, rho_in_wth, chi)
+      
+      if (use_moisture)call invoke_initial_mr_kernel( theta, rho_in_wth, mr(:), chi, evaluator )
+
       call log_event( "Dynamo: Initialised prognostic fields", LOG_LEVEL_INFO )
 
     else                                   ! Recorded check point to start from
 
-      allocate(state(4))
+      n_checkpoint = 4
+      if (use_moisture)n_checkpoint=n_checkpoint+nummr
+      allocate(state(n_checkpoint))
       n_fields = 1
       write(log_scratch_space,'(A,A)') "Reading file:", &
             trim(restart%startfname("rho"))
@@ -177,9 +189,22 @@ contains
       call read_state_netcdf(n_fields, state(4), trim(restart%startfname("xi")))
       xi = state(4)
 
-      deallocate(state)
-      call log_event( "Dynamo: Read prognostic fields from files", LOG_LEVEL_INFO )
+      if (use_moisture)then
+        do i=1,nummr
+          state(4+i) = field_type(vector_space =                                      &
+             function_space_collection%get_fs(mesh_id, element_order, Wtheta))
+          write(name, '(A,I2.2)') 'mr_', i
+          call read_state_netcdf(n_fields, state(4+i), trim(restart%startfname(name)))
+          mr(i) = state(4+i)
+        end do
+      end if
 
+      deallocate(state)
+
+      call log_event( "Dynamo: Mapping rho->rho_in_wth in same space as theta..", LOG_LEVEL_INFO )
+      call map_rho_to_theta(rho, theta, rho_in_wth, chi)
+
+      call log_event( "Dynamo: Read prognostic fields from files", LOG_LEVEL_INFO )
     end if
 
     !==========================================================================!

@@ -24,11 +24,14 @@ module advection_alg_mod
   use function_space_mod,             only: function_space_type
   use matrix_vector_kernel_mod,       only: matrix_vector_kernel_type
   use operator_mod,                   only: operator_type
-  use psykal_lite_mod,                only: invoke_set_field_scalar, &
-                                            invoke_multiply_field, &
-                                            invoke_sample_poly_flux, &
-                                            invoke_sample_poly_adv, &
-                                            invoke_rtheta_bd_kernel
+  use psykal_lite_mod,                only: invoke_set_field_scalar,  &
+                                            invoke_multiply_field,    &
+                                            invoke_sample_poly_flux,  &
+                                            invoke_sample_poly_adv,   &
+                                            invoke_rtheta_bd_kernel,  &
+                                            invoke_axpy,              &
+                                            invoke_copy_field_data,   &
+                                            invoke_divide_field
   use quadrature_mod,                 only: quadrature_type, GAUSSIAN
   use rrho_kernel_mod,                only: rrho_kernel_type
   use rtheta_kernel_mod,              only: rtheta_kernel_type
@@ -53,14 +56,20 @@ module advection_alg_mod
   use log_mod,                        only: log_event,         &
                                             LOG_LEVEL_ERROR
   use evaluator_xyz_mod,              only: evaluator_xyz_type
+  use mr_indices_mod,                    only: nummr
+  use timestepping_config_mod,   only: dt
+  use runge_kutta_init_mod,              only: num_rk_stage, ak
   implicit none
 
   private
   integer(i_def) :: flux_stencil_extent, &
                     advective_stencil_extent
 
+  type( field_type ), allocatable :: mr_prediction(:)
+
   public :: advection_alg
   public :: advection_alg_init
+  public :: advection_mr_alg
 
 contains
 !>@brief Initialisation routine to advection algortithm
@@ -85,8 +94,9 @@ contains
       else
         call log_event( "Dynamo: subgrid mappings needed for FV MoL with high order elements", LOG_LEVEL_ERROR )
       end if
-    end if
 
+      allocate ( mr_prediction(num_rk_stage) )
+    end if
 
   end subroutine advection_alg_init
 
@@ -226,6 +236,71 @@ contains
   call solver_algorithm( advection(3), r_rho, mesh, chi, method, qr=qr )
 
   end subroutine advection_alg
+
+!>@details A wrapper algorithm for computing the advection of the moisture prognostic
+!> @param[inout] advection Field array containing the advective terms
+!> @param[in]    mr Field array. Mixing ratios
+!> @param[in]    u Field array. Winds
+
+  subroutine advection_mr_alg( mr, u )
+  
+    use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
+    implicit none
+    type(field_type), intent(inout),    target  :: mr(nummr)
+    type(field_type), intent(in),       target  :: u
+
+    type(evaluator_xyz_type)  :: evaluator_theta
+    integer(i_def)            :: mesh 
+    type(function_space_type), pointer :: theta_fs  => null()
+    type(operator_type)                :: mm_wtheta
+
+    type(field_type), pointer :: chi(:) => null()
+    type(field_type)          :: mr_inc, mr_adv, mr_n
+    type(field_type)          :: mm_diagonal_wtheta
+
+    type( field_type ) :: ones
+    type( field_type ) :: mt_lumped
+    integer :: imr, stage, st
+
+    chi    => get_coordinates()
+    mesh = chi(1)%get_mesh_id()
+    theta_fs => function_space_collection%get_fs( mesh, &
+                                                  element_order, &
+                                                  mr(1)%which_function_space() )
+    evaluator_theta = evaluator_xyz_type( theta_fs%get_ndf( ), theta_fs%get_nodes( ) )
+    mm_wtheta = get_mass_matrix(5)
+    mm_diagonal_wtheta = get_mass_matrix_diagonal(4)
+
+    ones  = field_type( vector_space = theta_fs )
+    mt_lumped  = field_type( vector_space = theta_fs )
+    call invoke_set_field_scalar( 1.0_r_def, ones )
+    call invoke_set_field_scalar( 0.0_r_def, mt_lumped)
+    call invoke(matrix_vector_kernel_type(mt_lumped, ones, mm_wtheta) )
+
+    mr_inc = field_type( vector_space = theta_fs )
+    mr_adv = field_type( vector_space = theta_fs )
+    mr_n   = field_type( vector_space = theta_fs )
+    do stage = 1,num_rk_stage
+      mr_prediction(stage) = field_type( vector_space = theta_fs )
+    end do
+
+    ! Runge-Kutta algorithm
+    do imr=1,nummr
+      call invoke_copy_field_data(mr(imr), mr_n)
+      do stage = 1,num_rk_stage
+        call invoke_sample_poly_adv(mr_prediction(stage), u, mr(imr), &
+                                    advective_stencil_extent, evaluator_theta)
+        call invoke_set_field_scalar(0.0_r_def, mr_adv)
+        do st = 1, stage
+          call invoke_axpy(-ak(stage,st), mr_prediction(st), mr_adv,  mr_adv)
+        end do
+        ! Use lumped mass matrix
+        call invoke_divide_field(mr_adv, mt_lumped, mr_inc)          
+        call invoke_axpy(dt, mr_inc, mr_n, mr(imr))
+      end do
+    end do
+
+  end subroutine advection_mr_alg
 
 end module advection_alg_mod
 

@@ -1,0 +1,65 @@
+!-------------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown,
+! Met Office and NERC 2014.
+! However, it has been created with the help of the GungHo Consortium,
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-------------------------------------------------------------------------------
+
+!>@brief A wrapper to enable invoke of kernels with long names
+module map_rho_to_theta_mod
+       			     
+  use constants_mod,                   only: r_def, i_def
+  use operator_mod,                    only: operator_type
+  use field_mod,                       only: field_type
+  use function_space_mod,              only: function_space_type
+  use function_space_collection_mod,   only: function_space_collection
+  use quadrature_mod,                  only: quadrature_type, GAUSSIAN 
+  use finite_element_config_mod,             only: element_order, wtheta_on
+  use galerkin_projection_algorithm_mod,     only: galerkin_projection_algorithm
+  ! PsyKAl-lite kernels
+  use psykal_lite_mod,                 only: invoke_copy_field_data
+  use compute_mass_matrix_kernel_wtheta_mod, only: compute_mass_matrix_kernel_wtheta_type
+  use compute_mass_matrix_kernel_w0_mod,     only: compute_mass_matrix_kernel_w0_type
+
+  implicit none
+
+  private
+
+  public :: map_rho_to_theta
+
+contains
+
+  subroutine map_rho_to_theta(rho, theta, rho_in_wth, chi)
+    
+    ! Prognostic fields
+    type( field_type ), intent( inout ) :: rho, theta
+    type( field_type ), intent( inout ) :: rho_in_wth
+    ! Coordinate fields
+    type( field_type ), intent( inout ) :: chi(3)
+    ! mass matrix
+    type( operator_type )    ::  mm_wtheta
+    ! quatrature rule
+    type( quadrature_type )  :: qr
+    type( field_type )       :: projected_field(1)
+    type(function_space_type), pointer  :: theta_fs   => null()
+
+    integer(i_def)            :: fs_handle, mesh_id
+
+    qr = quadrature_type( element_order + 3, GAUSSIAN )
+    mesh_id =  theta%get_mesh_id()
+    fs_handle = theta%which_function_space()
+    theta_fs => function_space_collection%get_fs(mesh_id,element_order,fs_handle) 
+    projected_field(1) = field_type( vector_space = theta_fs)
+    mm_wtheta = operator_type( theta_fs, theta_fs )
+    if (wtheta_on)then
+      call invoke(compute_mass_matrix_kernel_wtheta_type(mm_wtheta, chi, qr))
+    else
+      call invoke(compute_mass_matrix_kernel_w0_type(mm_wtheta, chi, qr))
+    end if
+    call galerkin_projection_algorithm(projected_field, rho, mesh_id, chi, &
+       1, qr, mm=mm_wtheta) 
+    call invoke_copy_field_data(projected_field(1), rho_in_wth)
+
+  end subroutine map_rho_to_theta
+  
+end module map_rho_to_theta_mod

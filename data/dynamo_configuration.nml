@@ -27,6 +27,7 @@
   rotating       = .true.
   supg           = .false.
   eliminate_p    = .false.
+  use_moisture   = .false.
 /
 
 &idealised

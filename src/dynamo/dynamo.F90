@@ -32,7 +32,7 @@ program dynamo
   use field_io_mod,                   only : write_state_netcdf
   use field_mod,                      only : field_type
   use finite_element_config_mod,      only : element_order
-  use formulation_config_mod,         only : nonlinear, transport_only
+  use formulation_config_mod,         only : nonlinear, transport_only, use_moisture
   use function_space_collection_mod,  only : function_space_collection
   use iter_timestep_alg_mod,          only : iter_alg_init, &
                                              iter_alg_step
@@ -69,7 +69,7 @@ program dynamo
                                              get_geopotential
   use checksum_alg_mod,               only : checksum_alg
   use diagnostic_alg_mod,             only : divergence_diagnostic_alg
-
+  use mr_indices_mod,                 only : imr_v, imr_c, imr_r, imr_nc, imr_nr, nummr
   implicit none
 
   type(ESMF_VM)      :: vm
@@ -85,7 +85,7 @@ program dynamo
   type( field_type ) :: chi(3)
 
   ! prognostic fields
-  type( field_type ) :: u, rho, theta, xi
+  type( field_type ) :: u, rho, theta, xi, mr(nummr), rho_in_wth
 
   ! Array to hold fields for checkpoint output
   type( field_type ), allocatable   :: checkpoint_output(:)
@@ -96,7 +96,9 @@ program dynamo
 
 
   integer                          :: timestep, ts_init
-
+  
+  integer :: i
+  character(5) :: name
 
   !-----------------------------------------------------------------------------
   ! Driver layer init
@@ -130,7 +132,7 @@ program dynamo
   call init_gungho(mesh_id, local_rank, total_ranks, function_space_collection)
 
   ! Create and initialise prognostic fields
-  call init_dynamo(mesh_id, chi, u, rho, theta, xi, restart)
+  call init_dynamo(mesh_id, chi, u, rho, theta, rho_in_wth, mr, xi, restart)
 
   ! Create runtime_constants object. This in turn creates various things
   ! needed by the timestepping algorithms such as mass matrix operators, mass
@@ -148,6 +150,14 @@ program dynamo
   call output_alg('rho',   ts_init, rho,   mesh_id)
   call divergence_diagnostic_alg(u, ts_init, mesh_id)
 
+  if (use_moisture)then
+    call output_alg('m_v',   ts_init, mr(imr_v),   mesh_id)
+    call output_alg('m_c',   ts_init, mr(imr_c),   mesh_id)
+    call output_alg('m_r',   ts_init, mr(imr_r),   mesh_id)
+    call output_alg('m_nc',   ts_init, mr(imr_nc),   mesh_id)
+    call output_alg('m_nr',   ts_init, mr(imr_nr),   mesh_id)
+  end if
+  
   !-----------------------------------------------------------------------------
   ! model step 
   !-----------------------------------------------------------------------------
@@ -189,11 +199,12 @@ program dynamo
            case( timestepping_method_semi_implicit )  ! Semi-Implicit 
              ! Initialise and output initial conditions on first timestep
              if (timestep == restart%ts_start()) then 
+               call runge_kutta_init()
                call iter_alg_init(mesh_id, u, rho, theta)
                call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
                call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
              end if
-             call iter_alg_step(chi, u, rho, theta, xi)
+             call iter_alg_step(chi, u, rho, theta, mr, xi)
 
            case( timestepping_method_rk )             ! RK
              ! Initialise and output initial conditions on first timestep
@@ -252,6 +263,13 @@ program dynamo
       call output_alg('u',     timestep, u,     mesh_id)
       call output_alg('rho',   timestep, rho,   mesh_id)
       call divergence_diagnostic_alg(u, timestep, mesh_id)
+      if (use_moisture)then
+        call output_alg('m_v',    timestep, mr(imr_v),   mesh_id)
+        call output_alg('m_c',    timestep, mr(imr_c),   mesh_id)
+        call output_alg('m_r',    timestep, mr(imr_r),   mesh_id)
+        call output_alg('m_nc',    timestep, mr(imr_nc),   mesh_id)
+        call output_alg('m_nr',    timestep, mr(imr_nr),   mesh_id)
+      end if
     end if
 
 
@@ -296,6 +314,17 @@ program dynamo
      call log_event(log_scratch_space,LOG_LEVEL_INFO)
      checkpoint_output(4) = xi
      call write_state_netcdf( 1, checkpoint_output(4), trim(restart%endfname("xi")) )
+
+     if (use_moisture)then
+       do i=1,nummr
+         write(name, '(A,I2.2)') 'mr_', i
+         write(log_scratch_space,'(A,A)') "writing file:",  &
+            trim(restart%endfname(name))
+         call log_event(log_scratch_space,LOG_LEVEL_INFO)
+         checkpoint_output(1) = mr(i)
+         call write_state_netcdf( 1, checkpoint_output(1), trim(restart%endfname(name)) )
+       end do
+     end if
   end if
 
   ! Call timestep finalizers

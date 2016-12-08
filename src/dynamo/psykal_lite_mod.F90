@@ -163,6 +163,99 @@ contains
     call theta_proxy%set_dirty()
   end subroutine invoke_initial_theta_kernel
 
+  !------------------------------------------------------------------------------
+  !> invoke_initial_mr_kernel: invoke the moisture initialization
+  subroutine invoke_initial_mr_kernel( theta, rho_in_wth, mr, chi, evaluator )
+
+    use initial_mr_kernel_mod, only : initial_mr_code
+    use mr_indices_mod,        only : imr_v, imr_c, imr_r, imr_nc, imr_nr, nummr
+    use mesh_mod,              only : mesh_type
+    implicit none
+
+    type( field_type ), intent( inout ) :: mr(nummr)
+    type( field_type ), intent( in ) :: theta, rho_in_wth
+    type( field_type ), intent( in ) :: chi(3)
+    type(evaluator_xyz_type), intent(in) :: evaluator
+
+    integer          :: cell
+    integer          :: ndf_wtheta, undf_wtheta, &
+                        ndf_chi, undf_chi, dim_chi
+    integer, pointer :: map_wtheta(:) => null()
+    integer, pointer :: map_chi(:)    => null()
+
+    type( field_proxy_type ) :: mr_proxy(nummr)
+    type( field_proxy_type ) :: theta_proxy, rho_proxy
+    type( field_proxy_type ) :: chi_proxy(3)
+
+    real(kind=r_def), allocatable :: basis_chi(:,:,:)
+
+    type(mesh_type), pointer :: mesh => null()
+
+    integer :: imr
+
+    do imr = 1,nummr
+      mr_proxy(imr)  = mr(imr)%get_proxy()
+    end do
+    chi_proxy(1) = chi(1)%get_proxy()
+    chi_proxy(2) = chi(2)%get_proxy()
+    chi_proxy(3) = chi(3)%get_proxy()
+
+    theta_proxy = theta%get_proxy()
+    rho_proxy = rho_in_wth%get_proxy()
+
+    ndf_wtheta  = theta_proxy%vspace%get_ndf( )
+    undf_wtheta = theta_proxy%vspace%get_undf( )
+
+    ndf_chi  = chi_proxy(1)%vspace%get_ndf( )
+    undf_chi = chi_proxy(1)%vspace%get_undf( )
+    dim_chi  = chi_proxy(1)%vspace%get_dim_space( )
+
+    allocate( basis_chi(dim_chi, ndf_chi, ndf_wtheta) )
+
+    call evaluator%compute_evaluate( BASIS, chi_proxy(1)%vspace, dim_chi, ndf_chi, basis_chi)
+
+    if (chi_proxy(1)%is_dirty(depth=1)) call chi_proxy(1)%halo_exchange(depth=1)
+    if (chi_proxy(2)%is_dirty(depth=1)) call chi_proxy(2)%halo_exchange(depth=1)
+    if (chi_proxy(3)%is_dirty(depth=1)) call chi_proxy(3)%halo_exchange(depth=1)
+    do imr = 1,nummr
+      if (mr_proxy(imr)%is_dirty(depth=1))  call mr_proxy(imr)%halo_exchange(depth=1)
+    end do
+
+    mesh => theta%get_mesh()
+    do cell = 1, mesh%get_last_halo_cell(1)
+
+      map_wtheta => theta_proxy%vspace%get_cell_dofmap( cell )
+      map_chi    => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+
+      !!todo: nummr must be 5 for this to work, since we currently cant
+      ! pass variable sized vectors into a kernel
+      call initial_mr_code(       &
+        theta_proxy%vspace%get_nlayers(),   &
+        ndf_wtheta,                         &
+        undf_wtheta,                        &
+        map_wtheta,                         &
+        theta_proxy%data,                   &
+        rho_proxy%data,                     &
+        mr_proxy(imr_v)%data,               &
+        mr_proxy(imr_c)%data,               &
+        mr_proxy(imr_r)%data,               &
+        mr_proxy(imr_nc)%data,              &
+        mr_proxy(imr_nr)%data,              &
+        ndf_chi,                            &
+        undf_chi,                           &
+        map_chi,                            &
+        basis_chi,                          &
+        chi_proxy(1)%data,                  &
+        chi_proxy(2)%data,                  &
+        chi_proxy(3)%data                   &
+        )
+    end do
+    do imr = 1,nummr
+       call mr_proxy(imr)%set_dirty()
+    end do
+
+  end subroutine invoke_initial_mr_kernel
+
   !-------------------------------------------------------------------------------
   !> Computation of 2d quadrature on faces not currently supported PSyClone,
   !> will be introduced in #793  by modifying quadrature tools developed in ticket #761.

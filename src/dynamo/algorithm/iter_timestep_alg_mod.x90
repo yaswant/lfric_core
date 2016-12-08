@@ -18,6 +18,7 @@ module iter_timestep_alg_mod
   ! Configuration options
   use finite_element_config_mod, only: element_order
   use restart_control_mod,       only: restart_type
+  use formulation_config_mod,    only: use_moisture
   use output_config_mod,         only: diagnostic_frequency
   use solver_config_mod,         only: method, helmholtz_solve, use_operators
   use timestepping_config_mod,   only: dt, alpha, beta, &
@@ -31,7 +32,9 @@ module iter_timestep_alg_mod
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                   only: invoke_copy_field_data,  &
-                                               invoke_set_field_scalar
+                                               invoke_set_field_scalar, &
+                                               invoke_axpby
+
 
   use field_bundle_mod,                  only: clone_bundle, & 
                                                bundle_axpy, & 
@@ -55,10 +58,13 @@ module iter_timestep_alg_mod
   use solver_mod,                        only: solver_algorithm
   use conservation_algorithm_mod,        only: conservation_algorithm
   use rhs_alg_mod,                       only: rhs_alg
-  use advection_alg_mod,                 only: advection_alg, advection_alg_init
+  use advection_alg_mod,                 only: advection_alg, advection_alg_init, advection_mr_alg
   use si_solver_alg_mod,                 only: si_solver_alg, si_solver_init
   use si_operators_alg_mod,              only: create_si_operators, compute_si_operators
   use helmholtz_solver_alg_mod,          only: helmholtz_solver_init, helmholtz_solver_alg
+
+  ! Moisture species
+  use mr_indices_mod,                    only: nummr
   implicit none
 
   private
@@ -68,6 +74,7 @@ module iter_timestep_alg_mod
   type( field_type ), allocatable :: state(:), state_n(:), state_adv(:)
   type( field_type ), allocatable :: rhs_n(:), rhs_np1(:), rhs_adv(:)
   type( field_type ), allocatable :: rhs_heldsuarez(:)
+  type( field_type ) :: u_adv   ! Advective wind (centered in time)
 
 
   public :: iter_alg_init
@@ -144,6 +151,8 @@ contains
     call si_solver_init(state)
     call advection_alg_init(mesh_id)
 
+    u_adv = field_type( vector_space = u_fs ) 
+
     call log_event( "Dynamo: initialised timestepping algorithm", LOG_LEVEL_INFO )
 
 
@@ -166,7 +175,7 @@ contains
   !> @param[inout] theta Potential temperature
   !> @param[inout] xi Vorticity field
 
-  subroutine iter_alg_step(chi, u, rho, theta, xi)
+  subroutine iter_alg_step(chi, u, rho, theta, mr, xi)
 
     implicit none
 
@@ -176,6 +185,7 @@ contains
 
     ! Prognostic fields    
     type( field_type ), intent( inout ) :: u, rho, theta, xi
+    type( field_type ), intent( inout ) :: mr(nummr)
 
     ! quadrature object
     type(quadrature_type)       :: qr
@@ -183,6 +193,7 @@ contains
     integer            :: outer, inner
 
     qr = get_qr()
+
 
     !=== Do a single timestep ==============================================!
     call copy_bundle(state, state_n, bundle_size)
@@ -227,8 +238,14 @@ contains
       !=== End Section 3.2 =================================================!
     end do ! OUTER
     !=== End Section 3.1 ===================================================!
-
-       
+    
+    ! Now advect the tracers using a time centered wind
+    
+    if (use_moisture)then
+      call invoke_axpby(alpha, state_n(1), beta, state(1), u_adv)
+      call advection_mr_alg(mr, u_adv)
+    end if
+    
     ! Return fields in u, theta, rho arrays
     call invoke_copy_field_data(state(1), u)
     call invoke_copy_field_data(state(2), theta)

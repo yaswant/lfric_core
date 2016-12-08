@@ -6,4 +6,5 @@ namelist formulation
   supg            : logical ! Use Streamline-Upwind-Petrov-Galerkin method for
                             ! stabilisation of CG advection
   eliminate_p     : logical ! Eliminate p from the si solver
+  use_moisture    : logical ! Use moisture variables.
 end namelist formulation
