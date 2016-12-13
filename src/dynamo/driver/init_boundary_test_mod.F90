@@ -17,7 +17,7 @@ module init_boundary_test_mod
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W0, W1, W2, W3, Wtheta
-  use init_prognostic_fields_alg_mod, only : init_prognostic_fields_alg
+  use boundary_test_init_fields_alg_mod, only : boundary_test_init_fields_alg
   use log_mod,                        only : log_event,         &
                                              LOG_LEVEL_INFO
   use restart_control_mod,            only : restart_type
@@ -40,7 +40,6 @@ module init_boundary_test_mod
     integer(i_def)                           :: coord, imr
 
     type( field_type )                       :: theta, rho
-    type( field_type )                       :: mr(nummr), rho_in_wth
 
     call log_event( 'boundary test: initialisation...', LOG_LEVEL_INFO )
 
@@ -66,16 +65,8 @@ module init_boundary_test_mod
     rho   = field_type( vector_space = &
                        function_space_collection%get_fs(mesh_id, element_order, W3) )
 
-    rho_in_wth = field_type( vector_space = & 
-       function_space_collection%get_fs(mesh_id, element_order, theta%which_function_space()))
-
-    do imr = 1,nummr
-      mr(imr) = field_type( vector_space = &
-         function_space_collection%get_fs(mesh_id, element_order, Wtheta) )
-    end do
-
     ! Initialise prognostic fields
-    call init_prognostic_fields_alg( mesh_id, chi, u, rho, theta, rho_in_wth, mr, xi, restart)
+    call boundary_test_init_fields_alg( u, rho, theta, xi)
 
     call log_event( 'boundary test initialised', LOG_LEVEL_INFO )
 

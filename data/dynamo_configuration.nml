@@ -22,7 +22,6 @@
 /
 
 &formulation
-  nonlinear      = .true.
   transport_only = .false.
   rotating       = .true.
   supg           = .false.

@@ -32,12 +32,10 @@ program dynamo
   use field_io_mod,                   only : write_state_netcdf
   use field_mod,                      only : field_type
   use finite_element_config_mod,      only : element_order
-  use formulation_config_mod,         only : nonlinear, transport_only, use_moisture
+  use formulation_config_mod,         only : transport_only, use_moisture
   use function_space_collection_mod,  only : function_space_collection
   use iter_timestep_alg_mod,          only : iter_alg_init, &
                                              iter_alg_step
-  use lin_rk_alg_timestep_mod,        only : lin_rk_alg_init, &
-                                             lin_rk_alg_step
   use runge_kutta_init_mod,           only : runge_kutta_init
   use rk_alg_timestep_mod,            only : rk_alg_init, &
                                              rk_alg_step
@@ -192,57 +190,33 @@ program dynamo
          stop
       end select
     else
+       select case( method )
+         case( timestepping_method_semi_implicit )  ! Semi-Implicit 
+           ! Initialise and output initial conditions on first timestep
+           if (timestep == restart%ts_start()) then 
+             call runge_kutta_init()
+             call iter_alg_init(mesh_id, u, rho, theta)
+             call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
+             call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
+           end if
+           call iter_alg_step(chi, u, rho, theta, mr, xi)
 
-       if ( nonlinear ) then    ! Nonlinear timestepping options
+         case( timestepping_method_rk )             ! RK
+           ! Initialise and output initial conditions on first timestep
+           if (timestep == restart%ts_start()) then
+             call runge_kutta_init()
+             call rk_alg_init( mesh_id, u, rho, theta)
+             call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
+             call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
+           end if
+           call rk_alg_step( mesh_id, chi, u, rho, theta, xi)
+         case default
+           call log_event("Dynamo: Incorrect time stepping option chosen, "// &
+                          "stopping program! ",LOG_LEVEL_ERROR)
+           stop
+       end select
 
-         select case( method )
-           case( timestepping_method_semi_implicit )  ! Semi-Implicit 
-             ! Initialise and output initial conditions on first timestep
-             if (timestep == restart%ts_start()) then 
-               call runge_kutta_init()
-               call iter_alg_init(mesh_id, u, rho, theta)
-               call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
-               call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
-             end if
-             call iter_alg_step(chi, u, rho, theta, mr, xi)
-
-           case( timestepping_method_rk )             ! RK
-             ! Initialise and output initial conditions on first timestep
-             if (timestep == restart%ts_start()) then
-               call runge_kutta_init()
-               call rk_alg_init( mesh_id, u, rho, theta)
-               call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO )
-               call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
-             end if
-             call rk_alg_step( mesh_id, chi, u, rho, theta, xi)
-           case default
-             call log_event("Dynamo: Incorrect time stepping option chosen, "// &
-                            "stopping program! ",LOG_LEVEL_ERROR)
-             stop
-         end select
-
-         call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
-
-       else                       ! Linear timestepping options
-
-         select case( method )
-           case( timestepping_method_rk )        ! RK 
-             ! Initialise and output initial conditions on first timestep
-             if (timestep == restart%ts_start()) then
-               call runge_kutta_init()
-               call lin_rk_alg_init( mesh_id, u, rho, theta)
-               call log_event( "Dynamo: Outputting initial fields", LOG_LEVEL_INFO ) 
-             end if
-               call lin_rk_alg_step( mesh_id, chi, u, rho, theta)
-           case default
-             call log_event("Dynamo: Only RK available for linear equations. ", &
-                             LOG_LEVEL_INFO )
-             call log_event("Dynamo: Incorrect time stepping option chosen, "// &
-                            "stopping program! ",LOG_LEVEL_ERROR)
-             stop
-         end select
-
-       end if
+       call conservation_algorithm(timestep, mesh_id, rho, u, theta, xi, geopotential, chi)
 
     end if
 

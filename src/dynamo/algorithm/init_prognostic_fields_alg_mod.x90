@@ -19,7 +19,7 @@ module init_prognostic_fields_alg_mod
 
   ! Configuration and restart/checkpoint options
   use finite_element_config_mod,       only: element_order, wtheta_on
-  use formulation_config_mod,          only: nonlinear, transport_only, use_moisture
+  use formulation_config_mod,          only: use_moisture
   use transport_config_mod,            only: scheme, &
                                              operators, &
                                              transport_scheme_method_of_lines, &
@@ -108,32 +108,25 @@ contains
       call invoke_initial_theta_kernel( theta, chi, evaluator )
       
       ! Initialise U and Rho according to formulation
-      if (  nonlinear .OR. transport_only ) then
-        r_u = field_type( vector_space =                                           &
-                    function_space_collection%get_fs(mesh_id, element_order, W2) )
-        call invoke_set_field_scalar(0.0_r_def, u)
-        call invoke_set_field_scalar(0.0_r_def, r_u)
-        call invoke( initial_u_kernel_type( r_u, chi, qr ) )
-        w2_fs    => function_space_collection%get_fs(mesh_id, &
-                                                     element_order, &
-                                                     W2)
+      r_u = field_type( vector_space =                                           &
+                  function_space_collection%get_fs(mesh_id, element_order, W2) )
+      call invoke_set_field_scalar(0.0_r_def, u)
+      call invoke_set_field_scalar(0.0_r_def, r_u)
+      call invoke( initial_u_kernel_type( r_u, chi, qr ) )
+      w2_fs    => function_space_collection%get_fs(mesh_id, &
+                                                   element_order, &
+                                                   W2)
 
-        mm_w2 = operator_type( w2_fs, w2_fs )
-        call invoke( compute_mass_matrix_kernel_w2_type(mm_w2, chi, qr) )
-        call solver_algorithm(u, r_u, mesh_id, chi, method, mm=mm_w2)
+      mm_w2 = operator_type( w2_fs, w2_fs )
+      call invoke( compute_mass_matrix_kernel_w2_type(mm_w2, chi, qr) )
+      call solver_algorithm(u, r_u, mesh_id, chi, method, mm=mm_w2)
 
-        call invoke( initial_rho_kernel_type ( rho, chi, qr ) )
-
-      else
-        call invoke_set_field_scalar(0.0_r_def, u)
-        call invoke_set_field_scalar(0.0_r_def, rho)
-      end if
+      call invoke( initial_rho_kernel_type ( rho, chi, qr ) )
 
       call log_event( "Dynamo: Mapping rho->rho_in_wth in same space as theta..", LOG_LEVEL_INFO )
 
-      call map_rho_to_theta(rho, theta, rho_in_wth, chi)
-      
-      if (use_moisture)call invoke_initial_mr_kernel( theta, rho_in_wth, mr(:), chi, evaluator )
+      call map_rho_to_theta(rho, theta, rho_in_wth, chi)      
+      if (use_moisture) call invoke_initial_mr_kernel( theta, rho_in_wth, mr(:), chi, evaluator )
 
       call log_event( "Dynamo: Initialised prognostic fields", LOG_LEVEL_INFO )
 

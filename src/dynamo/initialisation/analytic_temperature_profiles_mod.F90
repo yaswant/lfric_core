@@ -28,7 +28,6 @@ use base_mesh_config_mod,          only : geometry, &
                                           base_mesh_geometry_spherical
 use planet_config_mod,             only : p_zero, Rd, kappa, scaled_radius
 use reference_profile_mod,         only : reference_profile_wtheta
-use formulation_config_mod,        only : nonlinear
 use generate_global_gw_fields_mod, only : generate_global_gw_pert
 
 implicit none
@@ -75,8 +74,7 @@ function analytic_temperature(chi, choice, chi_surf) result(temperature)
   end if
 
   temperature = 0.0_r_def
-  if ( nonlinear ) &
-    call reference_profile_wtheta(pressure, density, temperature, chi, choice, chi_surf)
+  call reference_profile_wtheta(pressure, density, temperature, chi, choice, chi_surf)
 
   select case( choice ) 
   

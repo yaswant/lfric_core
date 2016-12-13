@@ -127,35 +127,12 @@ Rewriting these equations in the vector invariant form yields
 \end{eqnarray}
 where $\bm{\xi}\equiv\nabla\times\mathbf{u}$ is the relative vorticity,
 $K\equiv\frac{1}{2}\mathbf{u}.\mathbf{u}$ is the kinetic energy per
-unit mass and $\mathbf{F}=\rho\mathbf{u}$ is the mass flux. To simplify
-the problem the nonlinear equations \eqref{eq:nonlinear_mom-1}-\eqref{eq:nonlinear_eos-1}
-are linearised about a hydrostatically balanced state $\left(\rho_{s},\theta_{s},\Pi_{s}\right)$
-that is a function of $\chi_{3}$ only, with a zero advecting wind
-$\mathbf{u}_{s}\equiv\bm{0}$. Using $N^{2}=\left(g/\theta_{s}\right)\partial\theta_{s}/\partial\chi_{3},$~$\partial\Pi_{s}/\partial\chi_{3}=-g/\left(c_{pd}\theta_{s}\right),$
-and $\left(1/\rho_{s}\right)\partial\rho_{s}/\partial\chi_{3}=-N^{2}/g$
-gives
-\begin{eqnarray}
-\frac{\partial\mathbf{u}'}{\partial t} & = & -c_{pd}\theta_{s}\nabla\Pi'+\frac{\theta'}{\theta_{s}}\mathbf{g}-2\bm{\Omega}\times\mathbf{u},\label{eq:linear_mom}\\
-\frac{\partial\rho'}{\partial t} & = & \frac{N^{2}\rho_{s}}{g}\mathbf{u}'.\mathbf{k}-\rho_{s}\nabla.\mathbf{u}',\label{eq:linear_continuity}\\
-\frac{\partial\theta'}{\partial t} & = & -N^{2}\frac{\theta_{s}}{g}\mathbf{u}'.\mathbf{k},\label{eq:linear_thermo}
-\end{eqnarray}
-where the linear equation of state is
-\begin{equation}
-\left(\frac{1-\kappa_{d}}{\kappa_{d}}\right)\frac{\Pi'}{\Pi_{s}}=\frac{\rho'}{\rho_{s}}+\frac{\theta'}{\theta_{s}},\label{eq:linear_eos}
-\end{equation}
-and $\mathbf{k}$ is a unit vector normal to the surface of the domain,
-i.e. aligned along the positive $z$ direction for a Cartesian domain
-and in the radial direction for a spherical domain.
-
+unit mass and $\mathbf{F}=\rho\mathbf{u}$ is the mass flux. 
 
 \section{\label{sec:FEM-Discretisation}Finite Element Discretisation}
 
 Equations \eqref{eq:nonlinear_mom}-\eqref{eq:nonlinear_eos} constitute
 a set of coupled nonlinear equations for the unknowns $\theta\,,\bm{\xi},\,\mathbf{u},\,\rho,\,\Pi.$
-Alternatively \eqref{eq:linear_mom}-\eqref{eq:linear_eos} constitute
-a set of coupled linear equations for the same unknowns (without the
-vorticity term $\bm{\xi}$) which represent small perturbations from
-the reference state $\left(\theta_{s},\,\rho_{s},\,\Pi_{s}\right).$
 The chosen set of equations are discretised using a mixed finite element
 method on quadrilateral elements, see Appendix \ref{sec:Reference-Element};
 this method implies a set of four function spaces denoted by $\mathbb{W}_{i},\, i=0..3$,
@@ -200,9 +177,9 @@ pointwise scalar functions; $\bm{\xi}\in\mathbb{W}_{1}$, vector functions
 corresponding to circulations; $\mathbf{u}\in\mathbb{W}_{2}$, vector
 functions corresponding to fluxes and $\rho\in\mathbb{W}_{3}$, scalar
 functions corresponding to volume integrals. $\Pi$ will be computed
-from either \eqref{eq:nonlinear_eos} or \eqref{eq:linear_eos} as
+from \eqref{eq:nonlinear_eos} as
 a pointwise value wherever it is needed and so it is not placed in
-any function space. Additionally the form of the reference state,
+any function space. Additionally the form of the 
 rotation vector and geopotential is assumed to be know analytically
 and so will also be computed where needed.
 
@@ -218,25 +195,6 @@ and integrating over the domain
 \end{equation}
  where the ordering makes it clear that $t$ is the test function
 and $s$ is the trial function.
-
-
-\subsection{\label{sub:Linear-Equations-weak}Linear Equations}
-
-Multiplying \eqref{eq:linear_mom}-\eqref{eq:linear_eos} by test
-functions from the appropriate space and integrating over the domain
-$\Omega\in\mathbb{R}^{3}$ gives the weak form of the equations
-\begin{eqnarray}
-\left\langle \mathbf{v},\frac{\partial\mathbf{u}'}{\partial t}\right\rangle  & = & -\left\langle \mathbf{v},c_{pd}\theta_{s}\tilde{\nabla}\Pi-\frac{\theta'}{\theta_{s}}\mathbf{g}+2\bm{\Omega}\times\mathbf{u}\right\rangle ,\label{eq:linear_mom_vec_invariant-weak}\\
-\left\langle \sigma,\frac{\partial\rho'}{\partial t}\right\rangle  & = & \left\langle \sigma,\frac{N^{2}}{g}\rho_{s}\mathbf{k}.\mathbf{u}'-\rho_{s}\nabla.\mathbf{u}'\right\rangle ,\label{eq:linear_continuity-weak}\\
-\left\langle \gamma,\frac{\partial\theta'}{\partial t}\right\rangle  & = & -\left\langle \gamma,\frac{N^{2}}{g}\theta_{s}\mathbf{k}.\mathbf{u}'\right\rangle ,\label{eq:linear_thermo-weak}
-\end{eqnarray}
-where the inner product takes its usual form $\left\langle f,g\right\rangle \equiv\int_{\Omega}f\left(\bm{\chi}\right)g\left(\bm{\chi}\right)d\bm{\chi}.$
-Replacing the weak operators in \eqref{eq:linear_mom_vec_invariant-weak}
-through integrating by parts gives
-\begin{eqnarray}
-\left\langle \mathbf{v},\frac{\partial\mathbf{u}'}{\partial t}\right\rangle  & = & c_{pd}\left\langle \nabla.\left(\mathbf{v}\theta_{s}\right),\Pi'\right\rangle +\left\langle \mathbf{v},\frac{\theta'}{\theta_{s}}\mathbf{g}\right\rangle -\left\langle \mathbf{v},2\bm{\Omega}\times\mathbf{u}\right\rangle .\label{eq:linear_mom_vec_invariant-weak-1}
-\end{eqnarray}
-
 
 
 \subsection{\label{sub:Nonlinear-Equations-weak}Nonlinear Equations}
@@ -415,21 +373,6 @@ domain.
 \subsection{Discrete equations in the reference domain}
 
 
-\subsubsection{Linear equations}
-
-Applying these transformations to the linear equations \eqref{eq:linear_mom_vec_invariant-weak}-\eqref{eq:linear_mom_vec_invariant-weak-1}
-gives
-
-\begin{eqnarray}
-\left\langle J\hat{\mathbf{v}},\frac{J}{\det\left(J\right)}\frac{\partial\hat{\mathbf{u}}'}{\partial t}\right\rangle  & = & c_{pd}\left\langle \theta_{s}\left(\nabla.\hat{\mathbf{v}}\right)+\frac{N^{2}}{g}\mathbf{k}.\hat{\mathbf{v}},\Pi'\right\rangle +\left\langle J\hat{\mathbf{v}},\frac{\hat{\theta}'}{\theta_{s}}\mathbf{g}\right\rangle -\left\langle \frac{J\hat{\bm{\mathbf{v}}}}{\det\left(J\right)},2\bm{\Omega}\times\left(J\hat{\mathbf{u}}\right)\right\rangle \equiv R_{u},\label{eq:linear_mom_vec_invariant-weak-pullback}\\
-\left\langle \hat{\sigma},\frac{\partial\hat{\rho}'}{\partial t}\det\left(J\right)\right\rangle  & = & \left\langle \hat{\sigma},\frac{N^{2}}{g}\rho_{s}\mathbf{k}.J\hat{\mathbf{u}}'-\rho_{s}\nabla.\hat{\mathbf{u}}'\right\rangle \equiv R_{\rho},\label{eq:linear_continuity-weak-pullback}\\
-\left\langle \hat{\gamma},\frac{\partial\hat{\theta}'}{\partial t}\det\left(J\right)\right\rangle  & = & -\left\langle \hat{\gamma},\frac{N^{2}}{g}\theta_{s}\mathbf{k}.J\hat{\mathbf{u}}'\right\rangle \equiv R_{\theta}.\label{eq:linear_thermo-weak-pullback}
-\end{eqnarray}
-
-
-
-\subsubsection{Nonlinear equations}
-
 Applying these coordinate transformations to the nonlinear equations
 \eqref{eq:nonlinear_mom-1-1}-\eqref{eq:voticity_projection} yields
 
@@ -460,7 +403,7 @@ error in the integration is small, Appendix \ref{sec:Quadrature}.
 
 \section{\label{sec:Timestepping}Timestepping Schemes}
 
-Equations \eqref{eq:linear_mom_vec_invariant-weak-pullback}-\eqref{eq:linear_thermo-weak-pullback}
+Equations \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:nonlinear_thermo-pullback}
 constitute three prognostic equations for the velocity vector $\hat{\mathbf{u}}$,
 the density $\hat{\rho}$ and the potential temperature $\hat{\theta}$
 along with a diagnostic equation the equation of state relating Exner
@@ -501,8 +444,7 @@ $1/2$ & $1/4$ & $1/4$ & $0$\tabularnewline
 \par\end{centering}
 
 \end{table}
- Equations \eqref{eq:linear_mom_vec_invariant-weak-pullback}-\eqref{eq:linear_thermo-weak-pullback}
-(or alternatively \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:nonlinear_thermo-pullback})
+ Equations \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:nonlinear_thermo-pullback}
 can be reformulated into a form appropriate for applying \eqref{eq:RK-1}
 and \eqref{eq:RK-2}
 \begin{equation}
@@ -533,8 +475,7 @@ M_{2}=\left\langle \frac{J\hat{\mathbf{v}}}{\det\left(J\right)},J\hat{\mathbf{v}
 \begin{equation}
 M_{3}=\left\langle \hat{\sigma},\hat{\sigma}\det\left(J\right)\right\rangle ,\label{eq:M3_mass_matrix}
 \end{equation}
-and the right hand sides are given by equations \eqref{eq:linear_mom_vec_invariant-weak-pullback}-\eqref{eq:linear_thermo-weak-pullback}.
-The same method can be applied to the nonlinear equations \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:vorticity_pullback}.
+and the right hand sides are given by equations \eqref{eq:nonlinear_mom-pullback}-\eqref{eq:vorticity_pullback}.
 
 
 \subsection{\label{sec:SI_timestepping}Semi-Implicit Timestepping}
@@ -1220,77 +1161,7 @@ by $6x^{2}y\left(z+1\right)^{3}$ which for the example above is $4320$
 dofs.
 
 
-\subsection{Linear Results}
-
-
-\subsubsection{Vertical Slice Tests}
-
-\begin{figure}
-\begin{centering}
-\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx6Dz2_theta}}\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx3Dz1_theta}}
-\par\end{centering}
-
-\begin{centering}
-\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx6Dz2_u}}\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx3Dz1_u}}
-\par\end{centering}
-
-\centering{}\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx6Dz2_w}}\subfloat[]{\includegraphics[scale=0.5]{GW_k0_Dx3Dz1_w}}\protect\caption{\label{fig:Gravity_wave_k0_results}Results for the 2D gravity wave
-test simulated using the linear equations with $\Delta x=6\,{\rm km},$
-and  $\Delta z=2\,{\rm km}$ (left panels) and $\Delta x=3\,{\rm km},$
-and  $\Delta z=1\,{\rm km}$ (right panels) all for $3000$ s with
-$\Delta t=1$ s using lowest order $k=0$ quadrilateral elements.
-(a) and (b) $\theta'$, contour intervals $5\times10^{-4}$ K ranging
-from $-10^{-3}$ K to $2.5\times10^{-3}$ K, (c) and (d) $u'$, contour
-intervals $10^{-3}\,{\rm ms}^{-1}$ ranging from $-10^{-2}\,{\rm ms}^{-1}$
-to $10^{-2}\,{\rm ms}^{-1}$ , (e) and (f) $w'$, contour intervals
-$4\times10^{-4}\,{\rm ms}^{-1}$ ranging from $-2\times10^{-3}\,{\rm ms}^{-1}$
-to $2\times10^{-3}\,{\rm ms}^{-1}$. }
-\end{figure}
-
-
-To simulate a Cartesian vertical slice model Dynamo is run on a biperiodic
-domain and all fields are initiated so that there is no variation
-in the $y$ direction and so the results remain 2-dimensional (for
-various technical reasons Dynamo cannot be run in a true 2D mode,
-each horizontal direction requires an even number of cells > 2, i.e.
-the minimum sized permissible domain is 4x4x1 cells). Results for
-the non-hydrostatic gravity wave test \citep{skamarock94} are shown
-in Figure \ref{fig:Gravity_wave_k0_results} for lowest order ($k=0$)
-elements on a domain of size 300x10 km and Figure \ref{fig:Gravity_wave_k1_results}
-for order $k=1$ elements with a domain size of 480x10 km; the horizontal
-domain size has been increased to stop interference from the spuriously
-fast gravity waves wrapping around the domain and interfering with
-the results. For comparison the results using the full nonlinear ENDGame
-vertical slice model can be found in \citet{meldubwsz09} (their Figure
-2).
-
-\begin{figure}
-\begin{centering}
-\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx6Dz2_theta}}\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx3Dz1_theta}}
-\par\end{centering}
-
-\begin{centering}
-\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx6Dz2_u}}\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx3Dz1_u}}
-\par\end{centering}
-
-\centering{}\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx6Dz2_w}}\subfloat[]{\includegraphics[scale=0.5]{GW_k1_Dx3Dz1_w}}\protect\caption{\label{fig:Gravity_wave_k1_results}Results for the 2D gravity wave
-test simulated using the linear equations with $\Delta x=6\,{\rm km},$
-$\Delta z=2\,{\rm km}$ and  $\Delta t=1$ s (left panels) and $\Delta x=3\,{\rm km},$
-$\Delta z=1\,{\rm km}$ and $\Delta t=2/5$ s (right panels) all for
-$3000$ s using order $k=1$ quadrilateral elements. (a) and (b) $\theta'$,
-contour intervals $5\times10^{-4}$ K ranging from $-10^{-3}$ K to
-$2.5\times10^{-3}$ K, (c) and (d) $u'$, contour intervals $10^{-3}\,{\rm ms}^{-1}$
-ranging from $-10^{-2}\,{\rm ms}^{-1}$ to $10^{-2}\,{\rm ms}^{-1}$,
-(e) and (f) $w'$, contour intervals $4\times10^{-4}\,{\rm ms}^{-1}$
-ranging from $-2\times10^{-3}\,{\rm ms}^{-1}$ to $2\times10^{-3}\,{\rm ms}^{-1}.$}
-\end{figure}
-
-
-
-\subsection{Nonlinear Results}
-
-
-\subsubsection{Vertical Slice Tests}
+\subsection{Vertical Slice Tests}
 
 Figure \eqref{fig:Density-current-test} shows the results after $900$s
 for the Density current test \citet{straka93} at $200$m resolution
@@ -1318,7 +1189,7 @@ $\Delta t=1/8$s.}
 
 
 
-\subsubsection{Spherical Tests}
+\subsection{Spherical Tests}
 
 \begin{figure}
 \begin{centering}

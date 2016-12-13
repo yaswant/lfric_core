@@ -1,0 +1,55 @@
+!-------------------------------------------------------------------------------
+! (c) The copyright relating to this work is owned jointly by the Crown,
+! Met Office and NERC 2014.
+! However, it has been created with the help of the GungHo Consortium,
+! whose members are identified at https://puma.nerc.ac.uk/trac/GungHo/wiki
+!-------------------------------------------------------------------------------
+
+!>@brief Initialisation of fields for boundary test
+module boundary_test_init_fields_alg_mod
+
+  use log_mod,                         only: log_event,         &
+                                             log_scratch_space, &
+                                             LOG_LEVEL_INFO,    &
+                                             LOG_LEVEL_TRACE
+  use constants_mod,                   only: r_def, i_def
+
+  ! PsyKAl-lite kernels
+  use psykal_lite_mod,                 only: invoke_set_field_scalar
+
+  ! Derived Types
+  use field_mod,                       only: field_type
+
+  implicit none
+
+  private
+  public :: boundary_test_init_fields_alg
+
+contains
+  !> @details An algorithm for initialising prognostic fields for 
+  !>          all solvers.
+  !> @param[inout] u  The 3D wind field
+  !> @param[inout] rho The density
+  !> @param[inout] theta The potential temperature
+  !> @param[inout] xi The vorticity field 
+  subroutine boundary_test_init_fields_alg(u, rho, theta, xi)
+
+    implicit none
+
+    type( field_type ), intent( inout ) :: u, rho, theta, xi
+
+    !=== Initialise fields ==================================!
+
+    call log_event( "Boundary test: Initialising fields", LOG_LEVEL_INFO )
+
+    call invoke_set_field_scalar(0.0_r_def, xi) 
+    call invoke_set_field_scalar(0.0_r_def, u) 
+    call invoke_set_field_scalar(0.0_r_def, rho) 
+    call invoke_set_field_scalar(0.0_r_def, theta) 
+    call log_event( "Boundary test: Initialised fields", LOG_LEVEL_INFO )
+
+    !==========================================================================!
+
+  end subroutine boundary_test_init_fields_alg
+
+end module boundary_test_init_fields_alg_mod

@@ -1,6 +1,5 @@
 namelist formulation
 
-  nonlinear       : logical ! Solve the full nonlinear equation set
   transport_only  : logical ! Solve the transport equation only
   rotating        : logical ! Turn on/off Coriolis terms
   supg            : logical ! Use Streamline-Upwind-Petrov-Galerkin method for
