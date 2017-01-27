@@ -88,7 +88,7 @@ csar-suite:
 	fi
 	@for target in $(DYNAMO_TEST_SUITE_TARGETS) ; do \
 	    echo Launching csar test suite against $$target ; \
-	    rose stem --name=$(shell basename `pwd`)-$$target --group=csar --opt-conf-key=$$target ; \
+	    rose stem --name=$(shell basename `pwd`)-$$target-csar --group=csar --opt-conf-key=$$target ; \
 	done
 
 # Build the projects documentation. This includes both API and design documents.

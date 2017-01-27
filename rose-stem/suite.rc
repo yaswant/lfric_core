@@ -16,26 +16,26 @@
                                 'miniapp(boundary_test)',
                                 'check_compilers(fast-debug)',
                                 'canned_test',
+                                'science(robert, crun=3, env={"nrun":5})',	
                                 'godlines',
                                 'cleanlines'],
-		  'csar':    ['science(robert)',
-                              'science(robert, crun=3, env={"nrun":50})',
-                              'science(robert-moist)',
-                              'science(biperiodic_p0_gw)',
-                              'science(dcmip301)',
-                              'science(sbr, True, T000060)',
-			      'science(sbr_spinupwinds, True, T000060)',
-			      'science(sbr_spinupalpha, True, T000060)',],
-                  'nightly': ['science(semi-implicit-360ts, True, T000360)',
-                              'science(dcmip301, True, T000018)',
-                              'science(sbr, False, T000060)',
+		  'csar':    ['science(robert, crun=3, env={"nrun":50}, checkkgo=False)',
+                              'science(robert-moist, checkkgo=False)',
+                              'science(biperiodic_p0_gw, checkkgo=False)',
+                              'science(dcmip301, checkkgo=False)',
+                              'science(sbr, checkkgo=False, plotstr="create_plots $NODAL_DATA_DIR theta:rho T000060 $PLOT_DIR")',
+			      'science(sbr_spinupwinds, checkkgo=False, plotstr="create_plots $NODAL_DATA_DIR theta:rho T000060 $PLOT_DIR")',
+			      'science(sbr_spinupalpha, checkkgo=False, plotstr="create_plots $NODAL_DATA_DIR theta:rho T000060 $PLOT_DIR")'],
+                  'nightly': ['science(semi-implicit-360ts, plotstr="create_plots $NODAL_DATA_DIR theta:rho T000360 $PLOT_DIR" )',
+                              'science(dcmip301, plotstr="create_plots $NODAL_DATA_DIR theta:rho T000018 $PLOT_DIR")',
+                              'science(sbr)',
                               'miniapp(gravity_wave)',
                               'check_compilers(full-debug, True)',
                               'godlines(True)',
                               'publish_commit']} %}
-{%- set maxnrun = 3 %}
+
 {%- set mesh_types = ['cubedsphere', 'biperiodic'] %}
-{%- set ts_config = {} %}
+{%- set plot_config = {} %}
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
 {%-     do compiler_setup.update({compiler : [setup]}) -%}
@@ -57,31 +57,51 @@
 
 {#- #########################################################################}
 {%-   set SCIENCE_LABEL =  TARGET_SCIENCE_COMPILER + '_fast-debug' %}
-{%- macro science( configuration, plotting=False, timestep='T000360', crun=0, env=None ) %}
+{%- macro science( configuration, checkkgo=True, plotstr="None", crun=0, env=None) %}
 {%-   set label = SCIENCE_LABEL %}
-{%- if crun > 1 %}
-            run_{{configuration}}_{{label}}[-P1]:finish => run_{{configuration}}_{{label}}
-            run_{{configuration}}_{{label}}[{{crun}}]:finish => !run_{{configuration}}_{{label}}
-{%- else %}
+{%- if crun > 1  %}
+         [[[R{{crun}}/P1/{{crun}}]]]
+            graph = """
+            run_{{configuration}}_{{label}}[-P1] => run_{{configuration}}_{{label}}
+                 """
+         [[[R1/P{{crun}}/{{crun}}]]]
+            graph = """
+{%-     if checkkgo %}
+{%-        if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS  %}
+            run_{{configuration}}_{{label}} => check_{{configuration}}_{{label}}
+{%-        endif %}
+{%-     endif %}
+{%-   if plotstr != "None" %}
+{%-     do plot_config.update( {configuration : plotstr} ) %}
+            run_{{configuration}}_{{label}}:finish => plot_{{configuration}}_{{label}}
+            plot_{{configuration}}_{{label}}:finish  => publish_{{configuration}}_{{label}}_plots
+{%-   endif %}
+                 """
+{%- endif %}
+        [[[R1]]]
+            graph = """
             purge_local => purge_target
             purge_target => export_for_{{label}}
             export_for_{{label}} => compile_with_{{label}}
 {%-   if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
             compile_with_{{label}} => run_{{configuration}}_{{label}}
-{%-     if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS %}
+{%-     if checkkgo  %}
+{%-     if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS and crun < 2  %}
             run_{{configuration}}_{{label}} => check_{{configuration}}_{{label}}
 {%-     endif %}
+{%-     endif %}
 {%-   endif %}
-{%-   if plotting %}
+{%-   if plotstr != "None" and crun < 2 %}
             run_{{configuration}}_{{label}} => publish_{{configuration}}_{{label}}
-{%-     do ts_config.update( {configuration : timestep} ) %}
+{%-     do plot_config.update( {configuration : plotstr} ) %}
             run_{{configuration}}_{{label}} => plot_{{configuration}}_{{label}}
             plot_{{configuration}}_{{label}} => publish_{{configuration}}_{{label}}_plots
 {%-   endif %}
-{%-   endif %}
+                 """
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro canned_test() %}
+      [[[R1]]] 
 {%-   set label = TARGET_SCIENCE_COMPILER | lower + '_' + 'fast-debug' %}
 {%-   if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
             purge_local => purge_target
@@ -92,6 +112,7 @@
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro miniapp( appname ) %}
+      [[[R1]]] 
 {%-   set label = TARGET_SCIENCE_COMPILER|lower + '_fast-debug' %}
             purge_local => purge_target
             purge_target => export_for_{{label}}
@@ -105,6 +126,7 @@
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro cleanlines() %}
+      [[[R1]]] 
 {%-   set label =  TARGET_TECHNICAL_COMPILER | lower + '_fast-debug' %}
 {%-   if 'cleanliness' in TECHNICAL_DEVELOPER_TESTS %}
             purge_local => purge_target
@@ -117,6 +139,7 @@
 {%- endmacro %}
 {#- Documentation, it's next to cleanlines ##################################}
 {%- macro godlines(publish=False) %}
+      [[[R1]]] 
 {%-   set label =  TARGET_TECHNICAL_COMPILER | lower + '_fast-debug' %}
 {%-   if 'documentation' in TECHNICAL_DEVELOPER_TESTS %}
             purge_local => purge_target
@@ -132,6 +155,7 @@
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro publish_commit() %}
+      [[[R1]]] 
             PUBLISH:finish-all => publish_index
             publish_index      => mirror_results_local
 {%- if MIRROR_UPLOAD_URL %}
@@ -140,6 +164,7 @@
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro check_compilers( build, publish=False ) %}
+      [[[R1]]] 
 {%-   for compiler in compiler_setup.keys() %}
 {%-     set label = compiler | lower + '_' + build | lower%}
 {%-     set perform_run = TARGET_PERFORM_RUN %}
@@ -176,10 +201,10 @@
 {%-   endfor %}
 {%- endmacro %}
 {#- #########################################################################}
-{%- macro schedule(is_crun=False) %}
+{%- macro schedule() %}
 {%-   for group in groupsToRun %}
 {%-       for mission in groups[group] %}
-{{          mission | executeMacro(is_crun) }}
+{{          mission | executeMacro() }}
 {%-       endfor %}
 {%-   endfor %}
 {%- endmacro %}
@@ -195,7 +220,33 @@
 {%-       endfor %}
 {%-   endfor %}
 {%- endmacro %}
+{#- #########################################################################}
+{%- macro setCrunInfo(crunInfo) %}
+{%-   for group in groupsToRun %}
+{%-       for mission in groups[group] %}
+{%-           set missionCrunInfo = mission | getCrunInfo()  %}
+{%-           if 'crun' in missionCrunInfo.keys() %}
+{%-              set missionCrun = missionCrunInfo['crun'] %}
+{%-              if missionCrun > crunInfo['maxcrun']  %}
+{%-                do crunInfo.update({'maxcrun':missionCrun})  -%}
+{%-              endif  -%}
+{%-           endif  -%}
+{%-       endfor %}
+{%-   endfor %}
+{%- endmacro %}
 
+{#
+# crunInfo is dictionary containing variables needed to dynamically 
+# construct the graph for cruns:
+#     maxcrun specifies the maximum number of cycles
+# scheduledTasksEnv is a dictionary of environment variables to be 
+# passed from the mission to the task.
+# These are updated from the mission calls
+#}
+{%- set crunInfo = {'maxcrun':1} %} 
+{%- set dummy = setCrunInfo(crunInfo) -%}
+{%- set scheduledTasksEnv = {} %}
+{%- set dummy = setTaskEnv(scheduledTasksEnv) -%}
 
 [cylc]
     UTC mode = True
@@ -210,22 +261,17 @@
 [scheduling]
     cycling mode        = integer
     initial cycle point = 1
-    final cycle point   = {{ maxnrun }}
+    final cycle point   = {{ crunInfo['maxcrun'] }}
     [[queues]]
         [[[host_throttle]]]
-            limit = {{ TARGET_THROTTLE }}
+            limit = 10
             members = root
     [[dependencies]]
-        [[[R1]]]
-            graph = """
-{%- set scheduledTasks = schedule(is_crun=false) | deduplicateSchedule() %}
+{%- set scheduledTasks = schedule() | deduplicateSchedule()%}
 {{scheduledTasks}}
-                    """
-        [[[P1]]]
-            graph = """
-{%- set scheduledCrunTasks = schedule(is_crun=true) | deduplicateSchedule() %}
-{{scheduledCrunTasks}}
-                    """
+
+{%- set allTasks = scheduledTasks  %}
+
 [runtime]
     [[root]]
         initial scripting = """
@@ -256,8 +302,6 @@
         [[[job]]]
             batch system = {{TARGET_BATCHER}}
 
-{%- set scheduledTasksEnv = {} %}
-{%- set dummy = setTaskEnv(scheduledTasksEnv) -%}
 {%- macro ensureDestination() %}
                      mkdir -p $DESTINATION
 {%- endmacro %}
@@ -281,7 +325,7 @@
             {{DIRECTIVE}}
 {%- endfor %}
 
-{%- if 'publish_index' in scheduledTasks %}
+{%- if 'publish_index' in allTasks %}
     # This task can not be part of the PUBLISH family as a prerequisite of
     # running it is that the PUBLISH family have completed. i.e. A circular
     # dependency. This means it can not take advantage of the environment set
@@ -296,7 +340,7 @@
 {%-   endif %}
 {%- endif %}
 
-{%- if 'mirror_results_local' in scheduledTasks %}
+{%- if 'mirror_results_local' in allTasks %}
     # Again, something which happens after publishing and so cannot be in the
     # PUBLISH family.
     [[mirror_results_local]]
@@ -308,7 +352,7 @@
             TARGET  = file:///$HOME/public_html/dynamo-{{TARGET_OPT}}
 {%- endif %}
 
-{%- if 'mirror_results_remote' in scheduledTasks %}
+{%- if 'mirror_results_remote' in allTasks %}
     # Again, something which happens after publishing and so cannot be in the
     # PUBLISH family.
     [[mirror_results_remote]]
@@ -327,7 +371,7 @@
             DYNAMO_DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
             DYNAMO_BUILD_ROOT            = {{TARGET_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
 
-{%- if 'check_for_unused_source' in scheduledTasks %}
+{%- if 'check_for_unused_source' in allTasks %}
     [[check_for_unused_source]]
         inherit = None, TARGET, TECHNICAL
         pre-script = """
@@ -342,7 +386,7 @@
 {%- endif %}
 
     # Run locally as they need workstation tools such as Doxygen.
-{%- if 'api_documentation' in scheduledTasks %}
+{%- if 'api_documentation' in allTasks %}
     [[api_documentation]]
         inherit = None, LOCAL, TECHNICAL
         pre-script = """
@@ -355,7 +399,7 @@
                       """
 {%- endif %}
 
-{%- if 'publish_api_log' in scheduledTasks %}
+{%- if 'publish_api_log' in allTasks %}
     [[publish_api_log]]
         inherit = PUBLISH, TECHNICAL, LOCAL
         pre-script = """
@@ -369,7 +413,7 @@
             LOG_ERR = $DYNAMO_DESTINATION_DIRECTORY/api.doxygen.err
 {%- endif %}
 
-{%- if 'publish_api_documentation' in scheduledTasks %}
+{%- if 'publish_api_documentation' in allTasks %}
     [[publish_api_documentation]]
         inherit = PUBLISH, LOCAL, TECHNICAL
         pre-script = """
@@ -381,7 +425,7 @@
 {%- endif %}
 
     # Run locally as they need workstation tools like Inkscape.
-{%- if 'design_documentation' in scheduledTasks %}
+{%- if 'design_documentation' in allTasks %}
     [[design_documentation]]
         inherit = None, LOCAL, TECHNICAL
         pre-script = """
@@ -390,7 +434,7 @@
         script = make -C $DYNAMO_SOURCE_DIRECTORY/documentation design-documents.tar
 {%- endif %}
 
-{%- if 'publish_design_documentation' in scheduledTasks %}
+{%- if 'publish_design_documentation' in allTasks %}
     [[publish_design_documentation]]
         inherit = PUBLISH, LOCAL, TECHNICAL
         pre-script = """
@@ -419,7 +463,7 @@
     # Export must be performed locally as it needs access to any working copy
     # involved. Such a working copy may well be on a local disc.
     #
-{%- if 'export_for_' + label in scheduledTasks %}
+{%- if 'export_for_' + label in allTasks %}
     [[export_for_{{label}}]]
         inherit = {{family}}, LOCAL
         script = """
@@ -432,7 +476,7 @@
                  """
 {%- endif %}
 
-{%- if 'compile_with_' + label in scheduledTasks %}
+{%- if 'compile_with_' + label in allTasks %}
     [[compile_with_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -455,7 +499,7 @@
 {%-   endfor %}
 {%- endif %}
 
-{%- if 'publish_' + label + '_compile' in scheduledTasks %}
+{%- if 'publish_' + label + '_compile' in allTasks %}
     [[publish_{{label}}_compile]]
         inherit = PUBLISH, {{family}}, LOCAL
         pre-script = """
@@ -474,7 +518,7 @@
             LOG_ERR  = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{compiler}}.err
 {%- endif %}
 
-{%-     if 'run_canned_test_' + label in scheduledTasks %}
+{%-     if 'run_canned_test_' + label in allTasks %}
     [[run_canned_test_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -493,7 +537,7 @@
 
 {%-     for configuration in science_configurations %}
 {%-       set configuration_label = configuration|lower + '_' + label %}
-{%-       if 'run_' + configuration_label in scheduledTasks %}
+{%-       if 'run_' + configuration_label in allTasks %}
     [[run_{{configuration_label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -526,7 +570,7 @@
 {%-         endfor %}
 {%-       endif %}
 
-{%-       if 'publish_' + configuration_label in scheduledTasks %}
+{%-       if 'publish_' + configuration_label in allTasks %}
     [[publish_{{configuration_label}}]]
         inherit = PUBLISH, {{family}}, LOCAL
         pre-script = """
@@ -546,8 +590,8 @@
             LOG_ERR       = $DYNAMO_DESTINATION_DIRECTORY/dynamo.{{configuration}}.{{compiler}}.err
 {%-       endif %}
 
-{%-       if 'plot_' + configuration_label in scheduledTasks %}
-{%-         set ts_label = configuration %}
+{%-       if 'plot_' + configuration_label in allTasks %}
+{%-         set plot_label = configuration %}
     [[plot_{{configuration_label}}]]
         inherit = PUBLISH, {{family}}, TARGET
         pre-script = """
@@ -560,11 +604,10 @@
         [[[environment]]]
              NODAL_DATA_DIR = $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/results
              PLOT_DIR = $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/plots
-             FIELDS = theta,rho
-             TS = {{ts_config[ts_label]}}
+             PLOT_CONFIG = {{plot_config[plot_label]}}
 {%-       endif %}
 
-{%-       if 'publish_' + configuration_label + '_plots' in scheduledTasks %}
+{%-       if 'publish_' + configuration_label + '_plots' in allTasks %}
     [[publish_{{configuration_label}}_plots]]
         inherit = PUBLISH, {{family}}, LOCAL
         script = """
@@ -574,7 +617,7 @@
                  """
 {%-       endif %}
 
-{%-       if 'check_' + configuration_label in scheduledTasks %}
+{%-       if 'check_' + configuration_label in allTasks %}
     [[check_{{configuration_label}}]]
         inherit = {{family}}, TARGET
         script = rose task-run --app-key=check_dynamo
@@ -588,7 +631,7 @@
 {%-       endif %}
 {%-     endfor %}{# science configurations #}
 
-{%-     if 'run_' + label + '_boundary_test' in scheduledTasks %}
+{%-     if 'run_' + label + '_boundary_test' in allTasks %}
     [[run_{{label}}_boundary_test]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -604,13 +647,13 @@
 {%-         endfor %}
 {%-       endif %}
 
-{%-     if 'check_' + label + '_boundary_test' in scheduledTasks %}
+{%-     if 'check_' + label + '_boundary_test' in allTasks %}
     [[check_{{label}}_boundary_test]]
         inherit = {{family}}, TARGET
         script = rose task-run --app-key=check_boundary
 {%-       endif %}
 
-{%-     if 'run_' + label + '_gravity_wave' in scheduledTasks %}
+{%-     if 'run_' + label + '_gravity_wave' in allTasks %}
     [[run_{{label}}_gravity_wave]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -626,7 +669,7 @@
 {%-         endfor %}
 {%-       endif %}
 
-{%-     if 'check_' + label + '_gravity_wave' in scheduledTasks %}
+{%-     if 'check_' + label + '_gravity_wave' in allTasks %}
     [[check_{{label}}_gravity_wave]]
         inherit = {{family}}, TARGET
         script = rose task-run --app-key=check_gravity_wave
@@ -638,7 +681,7 @@
 {%-         endfor %}
 {%-       endif %}
 
-{%-     if 'unit_test_with_' + label in scheduledTasks %}
+{%-     if 'unit_test_with_' + label in allTasks %}
     [[unit_test_with_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -656,7 +699,7 @@
 {%-       endfor %}
 {%-     endif %}
 
-{%-     if 'functional_test_with_' + label in scheduledTasks %}
+{%-     if 'functional_test_with_' + label in allTasks %}
     [[functional_test_with_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -675,7 +718,7 @@
 {%-     endif %}
 
 {%-     for mesh in mesh_types %}
-{%-       if 'generate_mesh_' + mesh + '_' + label in scheduledTasks %}
+{%-       if 'generate_mesh_' + mesh + '_' + label in allTasks %}
     [[generate_mesh_{{mesh}}_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -690,7 +733,7 @@
 {%-         endfor %}
 {%-       endif %}
 
-{%-       if 'check_mesh_' + mesh + '_' + label in scheduledTasks %}
+{%-       if 'check_mesh_' + mesh + '_' + label in allTasks %}
     [[check_mesh_{{mesh}}_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """

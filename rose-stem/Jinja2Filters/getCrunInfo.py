@@ -7,31 +7,20 @@
 # https://puma.nerc.ac.uk/trac/GungHo/wiki
 ##############################################################################
 '''
-Implements a Jinja2 filter to run a macro specified by a string.
+Implements a Jinja2 filter to strip the crun info.
 '''
 from jinja2 import contextfilter
 import re
-
-def checkBoolean(string):
-    ''' If string is a boolean or None, i.e. "False", "True" or "None", then
-    return the appropriate boolean value or None rather than the string '''
-    if string=="True": string=True
-    if string=="False": string=False
-    if string=="None": string=None
-    return string
+import ast
 
 @contextfilter
-def executeMacro(context, call):
+def getCrunInfo(context, call):
     '''
-    Takes a string and executes it as though it were a Jinja2 macro call
-
-    The call string has the syntax <macro name>([<argument>]...).
-
-    Arguments can be either position or keyword based.
-
-    @param [inout] context Jinja2 instance to run macro against.
-    @param [in]    call    Invokation string.
-    @return String resulting from calling the macro.
+    Takes a string return dictionary values related to crunning:
+        crun: Number of runs to do in the crun.
+        ...
+    @param [in] context Jinja2 instance to run macro against.
+    @return String resulting from setting the environment.
     '''
     if call.find('(') == -1:
         macroName = call
@@ -48,13 +37,18 @@ def executeMacro(context, call):
     argumentList = []
     for argument in normalArguments:
         if argument[0] == '"':
-            argumentList.append( checkBoolean(argument[1:-2]) )
+            argumentList.append( argument[1:-1] )
         else:
-            argumentList.append( checkBoolean(argument) )
+            argumentList.append( argument )
 
     argumentDictionary = {}
     for argument in keywordArguments:
         key, value = re.split(' *= *', argument)
-        argumentDictionary[key] = checkBoolean(value)
+        argumentDictionary[key] = value
 
-    return context.vars[macroName]( *argumentList, **argumentDictionary )
+    # Return info about the crun arguments
+    return_value={}
+    if 'crun' in argumentDictionary.keys():
+        return_value.update({'crun':argumentDictionary['crun']})
+
+    return return_value
