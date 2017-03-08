@@ -557,7 +557,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         [[[environment]]]
             DYNAMO_SOURCE_DIRECTORY = $SOURCE_ROOT/{{label}}
         [[[environment]]]
-            OMP_NUM_THREADS=2
+            OMP_NUM_THREADS=1
         [[[directives]]]
 {%-       for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
             {{DIRECTIVE}}
@@ -582,7 +582,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                       echo $CYLC_TASK_LOG_ROOT > $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/dynamo.{{compiler}}.log.path
                       """
         [[[environment]]]
-            OMP_NUM_THREADS=2
+            OMP_NUM_THREADS=1
 {% if configuration_label in scheduledTasksEnv.keys() %}
 {{          scheduledTasksEnv[configuration_label] }}
 {% endif %}
@@ -678,7 +678,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                       cp $CYLC_TASK_WORK_DIR/*.m $DYNAMO_DESTINATION_DIRECTORY/{{configuration}}/results/
                       """
         [[[environment]]]
-            OMP_NUM_THREADS=2
+            OMP_NUM_THREADS=1
         [[[directives]]]
 {%-         for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
             {{DIRECTIVE}}
