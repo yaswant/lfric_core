@@ -627,7 +627,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
  {{ensureDestination()}}
                      mkdir -p $PLOT_DIR
                      # remove old plots before running new ones
-                     test -w $PLOT_DIR && rm -rf $PLOT_DIR/*.png || echo Unable to delete "$PLOT_DIR/*.png", not writable; false
+                     test -w $PLOT_DIR && rm -rf $PLOT_DIR/*.png || ( echo Unable to delete "$PLOT_DIR/*.png", not writable; false )
                      """
         script = rose task-run --app-key=plot
         [[[environment]]]
@@ -701,7 +701,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
  {{ensureDestination()}}
                      mkdir -p $PLOT_DIR
                      # remove old plots before running new ones
-                     test -w $PLOT_DIR && rm -rf $PLOT_DIR/*.png || echo Unable to delete "$PLOT_DIR/*.png", not writable; false
+                     test -w $PLOT_DIR && rm -rf $PLOT_DIR/*.png || ( echo Unable to delete "$PLOT_DIR/*.png", not writable; false )
                      """
         script = rose task-run --app-key=plot
         [[[environment]]]
