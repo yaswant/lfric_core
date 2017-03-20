@@ -5,7 +5,8 @@ namelist initial_wind
                                constant_shear_uv,
                                dcmip301,
                                deep_baroclinic_steady,
-                               deep_baroclinic_perturbed]
+                               deep_baroclinic_perturbed,
+                               vortex]
   u0             : real
   v0             : real
   rotation_angle : real
