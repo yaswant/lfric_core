@@ -1,9 +1,16 @@
 Testing
 =======
 
-A number of different mechanisms and approaches are provided within the Dynamo
+A number of different mechanisms and approaches are provided within the LFRic
 build system for testing. Each is discussed here giving details on how to make
 use of it and in which circumstances you may wish to do so.
+
+.. note::
+   The canonical version of this document is held as reStructured text in
+   the repository at `source:LFRic/trunk/documentation/testing.rst`:trac:.
+   Any changes in a branch which render this document inaccurate should also
+   include updates to the version of this document on that branch. The version
+   displayed on the wiki is generated from the head of trunk.
 
 Unit Testing
 ^^^^^^^^^^^^
@@ -16,8 +23,8 @@ Tests of this kind are found under ``src/test`` in a tree which mirrors
 that in ``src/dynamo``. This is intended to make it easy to find the tests
 corresponding to a particular piece of functionality.
 
-We use the pFUnit framework, documentation for which may be found at
-`https://sourceforge.net/projects/pfunit/files/Documentation/pFUnit3-ReferenceManual.pdf`_.
+We use the pFUnit framework. Sourceforge holds some
+`documentation <https://sourceforge.net/projects/pfunit/files/Documentation/pFUnit3-ReferenceManual.pdf>`_.
 
 Tests are identified with the ``.pf`` extension while support code in normal
 ``.[fF]90`` files may also be included. ``.pf`` files are normal Fortran files
@@ -68,8 +75,9 @@ There are a number of things to note here:
   * Inputs to the procedure under test should be provided as constants. This
     prevents them changing unexpectedly. Do not rely on configuration values as
     these can change.
-  * If the unit under test makes use of configuration, use the "frig" functions
-    provided by "frig_config_mod" to explicitly set the values needed.
+  * If the unit under test makes use of configuration, use the "freign"
+    functions provided by "freign_config_mod" to explicitly set the values
+    needed.
   * The expected result given to assertions should be constants or calculated
     from constants. Try to avoid calculations so as to avoid the possibility
     that the same (flawed) algorithm is used in test and unit under test.
@@ -200,7 +208,7 @@ Sadly robust mode is rather flawed at the moment. There is leakage between
 tests which should theoretically be isolated. This leads to nasty side-effects
 between tests.
 
-Also MPI tests, which need now and hope to implement soon, are not allowed in
+Also MPI tests, which we need now and hope to implement soon, do not work in
 robust mode.
 
 There is also an odd behaviour where errors are reported, then you are told
@@ -231,10 +239,10 @@ instance things which halt execution or interact with command line arguments.
 In these cases "functional" tests (which may need a more suitable group name)
 may be appropriate.
 
-These tests live in ``src/functional-test``. Each test comprises two parts::
+These tests live in ``src/functional-test``. Each test comprises two parts:
 
     * A Fortran source file which implements a ``PROGRAM`` which may be
-      compiled and linked against Dynamo code
+      compiled and linked against model code
     * A Python script which executes the program and validates the results
 
 A simple framework is provided to aid in writing the test script. Its use is
@@ -249,7 +257,7 @@ shown in this example::
     class simple_test( Test ):
     def test( self ):
         question = 'How much wood would a Woodchuck chuck if a Woodchuck could chuck wood'
-        expectedTranscript = 'You asked "{}"\nI answer "A Woodchuck would chuck no amount of wood as a Woodchuck can't chuck wood"'.format( question)
+        expectedTranscript = 'A Woodchuck would chuck no amount of wood as a Woodchuck can't chuck wood'
 
         out, err = process.communicate( question )
 
@@ -293,13 +301,19 @@ multiple times, once for each platform listed in the
 ``DYNAMO_TEST_SUITE_TARGETS`` environment variable. This variable is set up for
 you by the LFRic module system.
 
-During development it is often useful to target a single platform. If the test
-suite is invoked using ``rose stem`` this will target the default platform.
-Out-of-the-box this is the Met Office SPICE server farm. To change the default
-target modify ``opts = meto-desktop`` in "rose-stem/rose-suite.conf".
+During development it is often useful to target a single platform.
+
+If the test suite is invoked using ``rose stem`` this will target the default
+platform. Out-of-the-box this is the Met Office SPICE server farm. To change
+the default target modify ``opts = meto-desktop`` in
+"rose-stem/rose-suite.conf".
 
 Developers and reviewers should remember not to allow changes to this default
 on to trunk.
+
+Most of the time it is more convenient to leave the default as it is and just
+specify the desired target on the command line. i.e.
+``rose stem --opt-conf-key=meto-xc40``
 
 Test Suite on MONSooN
 ~~~~~~~~~~~~~~~~~~~~~
@@ -351,6 +365,7 @@ should give you some pointers::
   DATADIR = /data/users/jbloggs
   TMPDIR = /var/tmp
   ROSE_BUSH_URL = http://fcm1/rose-bush
+  TROUBLE_EMAIL_ADDRESS=meto-lfric@metoffice.gov.uk
   # Minute # Hour # Day of Month # Month # Day of Week # Command
   21 03 * * 1-5 $HOME/local/bin/run-nightly-test
 
@@ -359,7 +374,7 @@ Where the ``run-nightly-test`` script looks like this::
   #!/bin/sh
 
   rm -rf /data/local/jbloggs/dynamo-nightly
-  fcm checkout fcm:dynamo.xm-br/dev/joebloggs/r9999_SpecialBranch /data/local/jbloggs/dynamo-nightly
+  fcm checkout fcm:lfric.xm-br/dev/joebloggs/r9999_SpecialBranch /data/local/jbloggs/dynamo-nightly
   rose stem --group=nightly --source=/data/local/jbloggs/dynamo-nightly --no-gcontrol
 
 Test Suite Development
@@ -430,7 +445,6 @@ in this example ``new_task`` will run after ``some_other_task`` completes.
 where ``<new_task>`` is the app name and ``<command>`` is the name of a command in
 ``rose-stem/app/<new_task>/rose-app.conf``. 
 
-
 suite.rc
 --------
 
@@ -494,4 +508,3 @@ log.
 
 You can define pre- and post-script commands for tasks to do things like copy
 files or create directories. There are many examples of these in the LFRic suite.rc.   
-  

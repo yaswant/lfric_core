@@ -1,15 +1,26 @@
-The Dynamo Build System
+The LFRic Build System
 =======================
 
-This is a quick introduction to Dynamo's build system. Such a system is
-intended to make developers' lives easier but to do so it requires a few
+This is a quick introduction to the LFRic project's build system. Such a system
+is intended to make developers' lives easier but to do so it requires a few
 conventions to be followed.
 
 .. note::
+   The first LFRic application was and is developed in close collaboration with
+   GungHo dynamical core developments, and is called `Dynamo`. As a result
+   there are frequent references to `Dynamo` within the code base, the
+   documentation and the Wiki pages. Such references will generally apply both
+   to the development of the Dynamo application and to other applications
+   (sometimes referred to as mini-apps) that use the LFRic infrastructure and
+   LFRic build system.
+
+.. note::
    The canonical version of this document exists as a reStructured text file
-   in the repository. Branches which render it inaccurate should
-   update the version of this document on that branch. The version
-   displayed in the wiki is generated from the head of trunk.
+   in the repository at
+   `source:LFRic/trunk/documentation/buildsystem.rst`:trac:. Branches which
+   render it inaccurate should update the version of this document on that
+   branch. The version displayed in the wiki is generated from the head of
+   trunk.
 
 Targets
 -------
@@ -111,8 +122,8 @@ with dynamic linking.
 Cleaning
 ^^^^^^^^
 
-As with many build systems it is possible to ``make clean`` to delete Dynamo
-and all its build artefacts.
+As with many build systems it is possible to ``make clean`` to delete all build
+artefacts. These include working files and complete executable binaries.
 
 Testing
 ^^^^^^^
@@ -133,11 +144,10 @@ Configurations are held in ``rose-stem/opt``. Each filename has the form
 ``rose-suite-<name>.conf`` and it is these names which should be used in the
 list.
 
-For those using a Met Office module collection the core dynamo module will set
-this up for you. e.g. On the desktop do
-``module load base-environment/dynamo/base``.
+For those using a Met Office module collection the core module will set this up
+for you. e.g. On the desktop do ``module load base-environment/dynamo/base``.
 
-For further information an testing see `DynamoTesting`:trac:.
+For further information an testing see `Dynamo/Testing`:trac:.
 
 
 Choosing a Compiler
@@ -145,7 +155,7 @@ Choosing a Compiler
 
 A number of compilers are supported by the build system. To choose between them
 simply set the ``FC`` environment variable. e.g. ``export FC=ifort`` This is
-often done by an automated system, as it is for users of the Met Office Dynamo
+often done by an automated system, as it is for users of the Met Office LFRic
 module system.
 
 Each compiler needs a different set of arguments. These are defined in an
@@ -161,6 +171,7 @@ Variable                   Purpose
 =========================  =================================================================================
 ``<compiler>_VERSION``     Holds the version of the running compiler. This is held as a zero padded integer. e.g. 4.9.2 becomes 040902
 ``F_MOD_DESTINATION_ARG``  The argument to be used to tell the compiler where to put ``.mod`` files.
+``OPENMP_ARG``             The argument passed to enable interpretation of OpenMP directives.
 =========================  =================================================================================
 
 src/dynamo/make/fortran/<compiler>.mk
@@ -175,7 +186,7 @@ brought together in ``FFLAGS`` in the end.
 =============================  ===========================================================================================================
 Argument Group                 Purpose
 =============================  ===========================================================================================================
-``FFLAGS_COMPILER``            Control the way the compiler works. Examples include turning on OpenMP.
+``FFLAGS_COMPILER``            Control the way the compiler works. For instance mdoifying unexpected behavior.
 ``FFLAGS_NO_OPTIMISATION``     Turn off all optimisation.
 ``FFLAGS_SAFE_OPTIMISATION``   Enable only bit reproducibility safe optimisation.
 ``FFLAGS_RISKY_OPTIMISATION``  Enable optimisations which may affect bit reproducibility.
@@ -190,7 +201,7 @@ The same is done with ``LDFLAGS``.
 ====================  =======================================================================================================
 Argument Group        Purpose
 ====================  =======================================================================================================
-``LDFLAGS_COMPILER``  Some linkers need to be told to link an OpenMP executable. This is where to specify things of that ilk.
+``LDFLAGS_COMPILER``  Some linkers need to be told to retain debug symbols. That could be done here.
 ====================  =======================================================================================================
 
 Sometimes the link stage needs special libraries. To specify these use
@@ -232,8 +243,8 @@ There are two critical variables: ``IGNORE_DEPENDENCIES`` and
 ``IGNORE_DEPENDENCIES`` is a space-separated list of modules which should be
 ignored by the dependency analyser when discovered in ``use`` statements. This
 prevents the dependency analysis trying to rebuild your library. For example,
-Dynamo uses the ESMF library: the name to add would be "esmf" since we
-``use esmf``.
+the infrastructure makes use of the ESMF library: the name to add would be
+"esmf" since we ``use esmf``.
 
 ``EXTERNAL_*_LIBRARIES`` is a space-separated list of library names to be passed
 to the linker using "little ell" arguments. Libraries which are available as a
@@ -243,9 +254,9 @@ to the ESMF example, the library file is ``libesmf.so`` so the string ``esmf``
 would be added to ``EXTERNAL_DYNAMIC_LIBRARIES``.
 
 In addition to adding knowledge of the library to the build system you have to
-make it findable. If you are using a package from the Met Office's Dynamo
-module collection then this is handled for you automatically. If you are not
-then you will need to do a little additional work.
+make it findable. If you are using a module from the Met Office module
+collection then this is handled for you automatically. If you are not then you
+will need to do a little additional work.
 
 The path to the directory containing the ``mod`` files should be added to
 ``FFLAGS`` in "big I" notation. e.g. ``export FFLAGS="$FFLAGS -I/path/to/mods"``
@@ -263,10 +274,10 @@ e.g. ``export LD_LIBRARY_PATH=/path/to/libs:$LD_LIBRARY_PATH``
 Automatically Generated Code
 ----------------------------
 
-Dynamo uses the PSyclone tool, created as part of the GungHo project,
-to automatically generate some of the code. PSyclone is designed to generate the
-Parallel Systems layer (PSy-layer) code, but it also modifies the
-algorithm code as written by science developers.
+The LFRic infrastrucuture make use of the PSyclone tool, created as part of the
+GungHo project, to automatically generate some of the code. PSyclone is
+designed to generate the Parallel Systems layer (PSy-layer) code, but it also
+modifies the algorithm code as written by science developers.
 
 Algorithm routines in "src/dynamo/algorithm" are written with a ``.x90``
 extension. From these both compilable Fortran source for the algorithm and

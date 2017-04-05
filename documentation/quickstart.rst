@@ -1,14 +1,14 @@
-Quick Start Guide for Dynamo
-============================
+Quick Start Guide for LFRic
+===========================
 
-So you want to play with Dynamo? These instructions should get you up and
+So you want to play with LFRic models? These instructions should get you up and
 running quickly and easily.
 
 .. contents:: Table of Contents
 
 .. note::
    The canonical version of this document is held as reStructured text in
-   the repository at `source:Dynamo/trunk/documentation/quickstart.rst`:trac:.
+   the repository at `source:LFRic/trunk/documentation/quickstart.rst`:trac:.
    Any changes in a branch which render this document inaccurate should also
    include updates to the version of this document on that branch. The version
    displayed on the wiki is generated from the head of trunk.
@@ -21,23 +21,27 @@ Within the Met Office (and on certain external machines) we make use of the
 development environment. If you do not have access to this skip to the
 `Outwith the Met Office`_ section for more details.
 
-Met Office Dynamo Environment
+Met Office LFRic Environment
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In a terminal window you need to source the module setup script and load the
-Dynamo environment to set up libraries and compiler:
+LFRic environment to set up libraries and compiler:
 
  1. Source the setup script
  
-      +--------------------+----------------------------------------------+
-      | Met Office Desktop | ``. /data/users/lfric/modules/setup``        |
-      +--------------------+----------------------------------------------+
-      | Met Office XC-40   | ``. /data/d03/lfric/modules/setup``          |
-      +--------------------+----------------------------------------------+
-      | MONSooN            | ``. /projects/umadmin/mhambl/modules/setup`` |
-      +--------------------+----------------------------------------------+
-      | ARCHER             | ``. /fs2/n02/n02/mhambley/modules/setup``    |
-      +--------------------+----------------------------------------------+
+      +--------------------+---------------------------------------------------+
+      | Met Office Desktop | ``source /data/users/lfric/modules/setup``        |
+      +--------------------+---------------------------------------------------+
+      | Met Office XC-40   | ``source /data/d03/lfric/modules/setup``          |
+      +--------------------+---------------------------------------------------+
+      | MONSooN            | ``source /common/lfric/modules/setup``            |
+      +--------------------+---------------------------------------------------+
+      | ARCHER             | ``source /fs2/n02/n02/mhambley/modules/setup``    |
+      +--------------------+---------------------------------------------------+
+
+    .. note::
+      The script must be executed in-line using the ``source`` command, not in
+      a sub-shell as would normally happen by simply running it.
 
  #. Load the modules
 
@@ -50,15 +54,21 @@ Dynamo environment to set up libraries and compiler:
       |                    +------------------------------------------------+
       |                    | ``module load meto-environment/dynamo/intel``  |
       +--------------------+------------------------------------------------+
-      | MONSooN            | ``module load meto-environment/dynamo/intel``  |
+      | MONSooN            | ``module load meto-environment/lfric/cray``    |
+      |                    +------------------------------------------------+
+      |                    | ``module load meto-environment/lfric/intel``   |
       +--------------------+------------------------------------------------+
-      | ARCHER             | ``module load lfric-environment/dynamo/intel`` |
+      | ARCHER             | ``module load lfric-environment/dynamo/cce``   |
+      |                    +------------------------------------------------+
+      |                    | ``module load lfric-environment/dynamo/intel`` |
       +--------------------+------------------------------------------------+
 
-Render your own video using the "gource" documentation target is only available
-on the Met Office desktop. You will need to do the following::
+Rendering your own video using the "gource" documentation target is only
+available on the Met Office desktop. You will need to do the following::
 
   module load base-environment/gource
+
+This will conflict with the compile environment.
 
 Outwith the Met Office
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -66,8 +76,8 @@ Outwith the Met Office
 The "extra" directory contains a script which will construct a self-contained
 development environment on a Debian Linux system. It is run as a script to
 build the environment and then sourced to set up the required environment
-variables. It is not guaranteed to work although it is tested. If nothing else
-it should codify the requirements outlined below.
+variables. It is not guaranteed to work although it did at one point. If
+nothing else it should codify the requirements outlined below.
 
 The build system makes use of environment variables to understand the system on
 which it finds itself.
@@ -85,33 +95,37 @@ which it finds itself.
 The build system expects paths to libraries to be presented in compiler
 environment variables.
 
-+---------------+-----------------------------------+--------------------------+--------------------------------------------------------+
-| Variable Name | Prepend with                      | Purpose                  | Example                                                |
-+===============+===================================+==========================+========================================================+
-| ``FFLAGS``    | ``-I<path to module directory>``  | Point to ``.mod`` files. | ``-I/opt/esmf/mod/mod0/Linux.ifort.64.mpich2.default`` |
-+---------------+-----------------------------------+--------------------------+--------------------------------------------------------+
-| ``LDFLAGS``   | ``-L<path to library directory>`` | Point to ``.so`` files.  | ``-L/opt/esmf/lib/lib0/Linux.ifort.64.mpich2.default`` |
-+---------------+-----------------------------------+--------------------------+--------------------------------------------------------+
++---------------+-----------------------------------+------------------------------------+--------------------------------------------------------+
+| Variable Name | Prepend with                      | Purpose                            | Example                                                |
++===============+===================================+====================================+========================================================+
+| ``FFLAGS``    | ``-I<path to module directory>``  | Point to ``.mod`` files.           | ``-I/opt/esmf/mod/mod0/Linux.ifort.64.mpich2.default`` |
++---------------+-----------------------------------+------------------------------------+--------------------------------------------------------+
+| ``LDFLAGS``   | ``-L<path to library directory>`` | Point to ``.so`` or ``.a`` files.  | ``-L/opt/esmf/lib/lib0/Linux.ifort.64.mpich2.default`` |
++---------------+-----------------------------------+------------------------------------+--------------------------------------------------------+
 
-Since Dynamo is dynamically linked the directory in which the ``.so`` files are
-found must be included in the ``LD_LIBRARY_PATH`` variable.
+When LFRic models are dynamically linked the directory in which the ``.so``
+files are found must be included in the ``LD_LIBRARY_PATH`` variable.
 
 Normally the build system suppresses much output in order to reduce clutter.
 While getting an initial build to work some of the suppressed output can be
 invaluable in making sure the correct paths are being searched. To get this
 output use ``make VERBOSE=1``
 
-Currently the following compilers are supported:
+Currently the following compilers are used at the Met Office:
 
-+---------------+-----------------+
-| Compiler      | Minimum Version |
-+===============+=================+
-| Intel Fortran | 15.0.0          |
-+---------------+-----------------+
-| GNU Fortran   | 4.9.2           |
-+---------------+-----------------+
++------------------+-----------------+------------------------------+
+| Compiler         | Version         | Notes                        |
++==================+=================+==============================+
+| Intel Fortran    | 16.0.1 (15.0.1) |                              |
++------------------+-----------------+------------------------------+
+| GNU Fortran      | 6.1.0           |                              |
++------------------+-----------------+------------------------------+
+| Cray Fortran     | 8.4.3           | Compile only. No unit tests. |
++------------------+-----------------+------------------------------+
+| Portland Fortran | 15.7            | Compile only. No unit tests. |
++------------------+-----------------+------------------------------+
 
-The minimum requirements for building Dynamo are:
+The minimum requirements for building LFRic models are:
 
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
 | Package  | Version  | Dependency Type | Purpose                               | Pointed to by...                         |
@@ -120,17 +134,17 @@ The minimum requirements for building Dynamo are:
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
 | GMake    | 3.81     | Build           | GNU's version of "make"               | PATH                                     |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
-| HDF5     | 1.8.12   | Build, Run      | Parallel filesystem used by NetCDF    | FFLAGS, LDFLAGS, LD_LIBRARY_PATH         |
+| HDF5     | 1.8.16   | Build, Run      | Parallel filesystem used by NetCDF    | FFLAGS, LDFLAGS, LD_LIBRARY_PATH         |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
 | Jinja2   | 2.6      | Build           | Required by configuration handler     | PYTHONPATH                               |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
-| MPICH    | 3.1      | Build, Run      | MPI library used by NetCDF            | FFLAGS, LDFLAGS, PATH, LD_LIBRARY_PATH   |
+| MPICH    | 3.2      | Build, Run      | MPI library used by NetCDF            | FFLAGS, LDFLAGS, PATH, LD_LIBRARY_PATH   |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
 | NetCDF   | 4.3.1.1  | Build, Run      | File I/O                              | FFLAGS, LDFLAGS, LD_LIBRARY_PATH         |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
-| pFUnit   | 3.2.7    | Build           | Unit testing framework                | PATH, FFLAGS, LDFLAGS, PFUNIT            |
+| pFUnit   | 3.2.8    | Build           | Unit testing framework                | PATH, FFLAGS, LDFLAGS, PFUNIT            |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
-| PSyclone | 1.2.4    | Build           | PSy layer generator                   | PATH, PYTHONPATH                         |
+| PSyclone | 1.3.2    | Build           | PSy layer generator                   | PATH, PYTHONPATH                         |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
 | Python   | 2.7      | Build           | Required by the dependency analyser   | PATH                                     |
 +----------+----------+-----------------+---------------------------------------+------------------------------------------+
@@ -139,73 +153,79 @@ The minimum requirements for building Dynamo are:
 
 To build the documentation you will need:
 
-+---------+----------+-----------------------------------------------------------+
-| Package | Version  | Purpose                                                   |
-+=========+==========+===========================================================+
-| Doxygen | 1.8.7    | API documentation                                         |
-+---------+----------+-----------------------------------------------------------+
-| LyX     | 2.0.7    | Some of the developer documentation is prepared using LyX |
-+---------+----------+-----------------------------------------------------------+
++----------+----------+-------------------------------------------------------------+
+| Package  | Version  | Purpose                                                     |
++==========+==========+=============================================================+
+| Doxygen  | 1.8.12   | API documentation                                           |
++----------+----------+-------------------------------------------------------------+
+| Inkscape | 0.47     | Used to convert vector graphic formats                      |
++----------+----------+-------------------------------------------------------------+
+| LaTeX    | 2e       | Technical and science documentation is prepared using LaTeX |
++----------+----------+-------------------------------------------------------------+
 
 Gource is just a bit of fun so it gets a separate section:
 
 +-----------+---------+---------------------------------+-----------------------------------------------------+
 | Package   | Version | Note                            | Purpose                                             |
 +===========+=========+=================================+=====================================================+
-| Boost     | 1.55.0  |                                 | C++ template library used by Gource                 |
+| Boost     | 1.60.0  |                                 | C++ template library used by Gource                 |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
-| GLEW      | 1.10.0  |                                 | OpenGL Extension Wrangler used by SDL               |
+| GLEW      | 1.13.0  |                                 | OpenGL Extension Wrangler used by SDL               |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
-| SDL       | 2.0.3   |                                 | Simple Directmedia Layer used by Gource             |
+| SDL       | 2.0.4   |                                 | Simple Directmedia Layer used by Gource             |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
-| SDL Image | 2.0.0   |                                 | Image loading component of SDl, used by Gource      |
+| SDL Image | 2.0.1   |                                 | Image loading component of SDl, used by Gource      |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
-| FFMPEG    | 2.1.4   |                                 | Video transcoding tool, used to create video output |
+| FFMPEG    | 3.0     |                                 | Video transcoding tool, used to create video output |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
-| Gource    | 0.40    | `Hosted on GitHub`__            | Repository visualisation tool                       |
+| Gource    | 0.43    | `Hosted on GitHub`__            | Repository visualisation tool                       |
 +-----------+---------+---------------------------------+-----------------------------------------------------+
 
 __ https://github.com/acaudwell/Gource
 
-Checkout Dynamo
----------------
+Checkout a Working Copy
+-----------------------
 
 To checkout a working copy of the code to a new directory, named 'trunk' in
-this example, run one of the following commands::
+this example, run this command::
 
-  svn co https://code.metoffice.gov.uk/svn/lfric/Dynamo/trunk trunk
-  svn co $REPO/trunk trunk # Alternative once environment/dynamo/base module is loaded
+  svn co https://code.metoffice.gov.uk/svn/lfric/LFRic/trunk trunk
 
-or::
+Users of FCM may take advantage of its support for keywords to shorten this.
 
-  fcm co https://code.metoffice.gov.uk/svn/lfric/Dynamo/trunk trunk
+Met Office developers should find they can use a site-wide keyword "lfric.x"::
 
-FCM users, particularly developers, may want to set up a suitable keyword to
-make this easier. In ``~/.metomi/fcm/keyword.cfg`` add the following lines::
+  fcm co fcm:lfric.x-tr
 
-  # Gung-Ho / LFRic : Dynamo project
-  location{primary}[Dynamo] = https://code.metoffice.gov.uk/svn/lfric/Dynamo
+Those without these site-wide keywords can set up their own locally. In
+``~/.metomi/fcm/keyword.cfg`` just add the following lines::
 
-This would allow the URL for the trunk in an fcm command to be specified as
-``fcm:Dynamo_tr`` and the root of the path to all branches to be
-``fcm:Dynamo_br``
+  # LFRic repository
+  location{primary}[lfric] = https://code.metoffice.gov.uk/svn/lfric/LFRic
 
-To work in the working copy, change directory to the working copy you've just
-checked out. ('trunk' in our example)::
+You may now use the shortened URL::
 
-  cd trunk
+  fcm co fcm:lfric-tr
+
+The ``-br`` postfix may be used to access the branches directory::
+
+  fmc co fcm:lfric.x-br/dev/joebloggs/r1234_MyBranch
+
+To work in a working copy just change into the directory::
+
+  cd r1234_MyBrancyh
 
 
 Running Make
 ------------
 
-The current build system used for Dynamo is "Make". Makefiles have been set up
+The current LFRic build system uses "Make". Makefiles have been set up
 such that by running ``make`` in top level of a working copy will build the
 executable, build the unit tests and execute the unit tests::
 
   make
 
-It must be GNU make and a sufficiently modern version must be used. The build
+It must be GNU make and a sufficiently modern version is needed. The build
 system will check and complain if the version isn't up to scratch but will just
 fail if a non-GNU version is used.
 
@@ -230,10 +250,10 @@ n the same form as used for `DYNAMO_TEST_SUITE_TARGETS`, described below.
 
 This is done for Met Office users by the LFRic module system.
 
-Run ``make clean`` to remove all compiled application and unit test output
-should make fail to perform a rebuild and try again.
+Run ``make clean`` to remove all compiled application and unit test output,
+should make fail to perform a rebuild, and try again.
 
-The binary for Dynamo can be found in the ``bin`` directory in the top level of
+LFRic model binaries may be found in the ``bin`` directory in the top level of
 your working copy.
 
 Makefiles exist in several subdirectories so individual parts can be built by
@@ -244,8 +264,8 @@ running make in those subdirectories:
  * ``src/test/Makefile`` - to build and run the unit tests
 
 .. NOTE::
-   At present the unit tests are only know to compile with Intel Fortran and
-   CMake. If not using these running ``make`` in the top level of
+   At present the unit tests are only know to compile with Intel and GNU
+   Fortrans. If you are not using these, running ``make`` in the top level of
    the working copy will produce errors which can be ignored if you're not
    interested in the unit tests.
 
@@ -262,8 +282,8 @@ directory. The quickest way to execute it is as follows::
 Explicitly Running The Unit Tests
 ---------------------------------
 
-The unit tests can be built and run by from the top level directory ('trunk')
-with the following::
+The unit tests can be built and run by from the top level directory with the
+following::
 
   make test
 
