@@ -85,17 +85,18 @@ contains
         implicit none
 
         !Arguments
-        integer(kind=i_def), intent(in) :: nlayers, ndf_wtheta, ndf_chi, undf_wtheta, undf_chi
+        integer(kind=i_def),                        intent(in) :: nlayers, ndf_wtheta, ndf_chi, undf_wtheta, undf_chi
         integer(kind=i_def), dimension(ndf_wtheta), intent(in) :: map_wtheta
-        integer(kind=i_def), dimension(ndf_chi), intent(in) :: map_chi
-        real(kind=r_def), dimension(undf_wtheta),          intent(out) :: theta
-        real(kind=r_def), dimension(undf_chi),              intent(in)    :: chi_1, chi_2, chi_3
-        real(kind=r_def), dimension(1,ndf_chi,ndf_wtheta),  intent(in)    :: chi_basis
+        integer(kind=i_def), dimension(ndf_chi),    intent(in) :: map_chi
+
+        real(kind=r_def),    dimension(undf_wtheta),           intent(out) :: theta
+        real(kind=r_def),    dimension(undf_chi),              intent(in)  :: chi_1, chi_2, chi_3
+        real(kind=r_def),    dimension(1,ndf_chi,ndf_wtheta),  intent(in)  :: chi_basis
 
         !Internal variables
-        integer(kind=i_def)                 :: df, dfc, k
-        real(kind=r_def), dimension(ndf_chi) :: chi_1_e, chi_2_e, chi_3_e
-        real(kind=r_def)                    :: x(3), x_surf(3)
+        integer(kind=i_def)                    :: df, dfc, k
+        real(kind=r_def),   dimension(ndf_chi) :: chi_1_e, chi_2_e, chi_3_e
+        real(kind=r_def)                       :: x(3), x_surf(3)
 
         ! compute the pointwise theta profile
 

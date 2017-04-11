@@ -14,8 +14,8 @@ module si_operators_alg_mod
   use log_mod,                   only: log_event,      &
                                        LOG_LEVEL_INFO, &
                                        LOG_LEVEL_ERROR
-  use solver_config_mod,         only: si_preconditioner,                    &
-                                       solver_si_preconditioner_tridiagonal, &
+  use solver_config_mod,         only: si_pressure_preconditioner, &
+                                       solver_si_pressure_preconditioner_tridiagonal, &
                                        normalise
   implicit none
   private
@@ -24,6 +24,7 @@ module si_operators_alg_mod
   ! functions returning pointers to them 
   type(operator_type), target :: m3_rho_star
   type(operator_type), target :: m3_exner_star
+  type(operator_type), target :: m3_exner_star_inv
   type(operator_type), target :: div_star
   type(operator_type), target :: p2theta
   type(operator_type), target :: ptheta2
@@ -39,6 +40,7 @@ module si_operators_alg_mod
   public :: compute_si_operators
   public :: get_m3_rho_star
   public :: get_m3_exner_star 
+  public :: get_m3_exner_star_inv 
   public :: get_div_star
   public :: get_p2theta
   public :: get_ptheta2 
@@ -77,18 +79,19 @@ subroutine create_si_operators(mesh_id)
   end if
   ! Should change 0 to theta
  
-  m3_rho_star   = operator_type( w3_fs, w3_fs )
-  m3_exner_star = operator_type( w3_fs, w3_fs )
-  div_star      = operator_type( w3_fs, w2_fs )
-  p2theta       = operator_type( w2_fs, wtheta_fs )
-  ptheta2       = operator_type( wtheta_fs, w2_fs )
-  p3theta       = operator_type( w3_fs, wtheta_fs )
-  compound_div  = operator_type( w3_fs, w2_fs )
+  m3_rho_star       = operator_type( w3_fs, w3_fs )
+  m3_exner_star     = operator_type( w3_fs, w3_fs )
+  m3_exner_star_inv = operator_type( w3_fs, w3_fs )
+  div_star          = operator_type( w3_fs, w2_fs )
+  p2theta           = operator_type( w2_fs, wtheta_fs )
+  ptheta2           = operator_type( wtheta_fs, w2_fs )
+  p3theta           = operator_type( w3_fs, wtheta_fs )
+  compound_div      = operator_type( w3_fs, w2_fs )
 
   rho_at_u  = field_type(vector_space = w2_fs)
   mt_lumped = field_type(vector_space = wtheta_fs)
 
-  if ( si_preconditioner == solver_si_preconditioner_tridiagonal ) then
+  if ( si_pressure_preconditioner == solver_si_pressure_preconditioner_tridiagonal ) then
     if ( element_order /= 0 ) then
       call log_event( "tridiagonal precon only valid for order 0", &
                       LOG_LEVEL_ERROR )
@@ -109,6 +112,8 @@ subroutine compute_si_operators(ref_state)
   use weighted_div_kernel_mod,         only: weighted_div_kernel_type
   use weighted_proj_2theta_kernel_mod, only: weighted_proj_2theta_kernel_type
   use weighted_proj_theta2_kernel_mod, only: weighted_proj_theta2_kernel_type
+  use weighted_proj_theta2_wt_kernel_mod, &
+                                       only: weighted_proj_theta2_wt_kernel_type
   use weighted_proj_3theta_kernel_mod, only: weighted_proj_3theta_kernel_type
   use compound_operator_kernel_mod,    only: compound_operator_kernel_type
   use psykal_lite_mod,                 only: invoke_sample_flux_kernel,                  &
@@ -122,10 +127,11 @@ subroutine compute_si_operators(ref_state)
   use function_space_mod,              only: function_space_type
   use function_space_collection_mod,   only: function_space_collection
   use matrix_vector_kernel_mod,        only: matrix_vector_kernel_type
-  use runtime_constants_mod,           only: get_coordinates, &
-                                             get_div, &
+  use runtime_constants_mod,           only: get_coordinates,                  &
+                                             get_div,                          &
                                              get_mass_matrix
   use derived_config_mod,              only: bundle_size
+  use invert_local_operator_kernel_mod,only: invert_local_operator_kernel_type
   implicit none
 
   type(field_type), target, intent(in) :: ref_state(bundle_size) ! (u, theta, rho)
@@ -149,7 +155,8 @@ subroutine compute_si_operators(ref_state)
   div    => get_div()
 
   call invoke( weighted_m3_rho_kernel_type(m3_rho_star, rho, chi, qr) )
-  call invoke( weighted_m3_exner_kernel_type(m3_exner_star, rho, theta, chi, qr) )
+  call invoke( weighted_m3_exner_kernel_type(m3_exner_star, rho, theta, chi, qr), &
+               invert_local_operator_kernel_type(m3_exner_star_inv, m3_exner_star) )
 
   ! Split off due to use of any_space for chi
   ! Weighted operator from W2 to W3
@@ -159,10 +166,12 @@ subroutine compute_si_operators(ref_state)
     call invoke_weighted_div_bd_kernel_type(div_star, theta, qr)
   end if
   ! Weighted operator from W2 to Wtheta
-  call invoke( weighted_proj_theta2_kernel_type(ptheta2, theta, qr) )
-  ! And its boundary part in the case of horizontally discontinuous theta
-  if (wtheta_on) then
+  if (wtheta_on .and. .false.) then
+    ! Operator is integrated by parts
+    call invoke( weighted_proj_theta2_wt_kernel_type(ptheta2, theta, qr) )
     call invoke_weighted_proj_theta2_bd_kernel_type(ptheta2, theta, qr)
+  else
+    call invoke( weighted_proj_theta2_kernel_type(ptheta2, theta, qr) )
   end if
   ! Weighted operator from Wtheta to W2
   call invoke( weighted_proj_2theta_kernel_type(p2theta, theta, rho, qr) )
@@ -199,13 +208,13 @@ subroutine compute_si_operators(ref_state)
                set_field_scalar(0.0_r_def,  mt_lumped) )
   call invoke( matrix_vector_kernel_type(mt_lumped, ones, mt) )
 
-  ! Compute terms for tridiagonal preconditioner
-  if ( si_preconditioner == solver_si_preconditioner_tridiagonal ) then
+  ! compute terms for tridiagonal preconditioner
+  if ( si_pressure_preconditioner == solver_si_pressure_preconditioner_tridiagonal ) then
     fs_handle = ref_state(3)%which_function_space()
     call invoke_compute_tri_precon_kernel(tri_precon, theta, rho, chi)
   end if
   if ( normalise ) then
-    if ( si_preconditioner == solver_si_preconditioner_tridiagonal) then
+    if ( si_pressure_preconditioner == solver_si_pressure_preconditioner_tridiagonal) then
       Helm_diag = tri_precon(1)
       call invoke_divide_field_data(tri_precon(1), Helm_diag)
       call invoke_divide_field_data(tri_precon(2), Helm_diag)
@@ -235,6 +244,14 @@ end subroutine compute_si_operators
     type(operator_type), pointer ::op
     op => m3_exner_star
   end function get_m3_exner_star
+
+ !> Function to return a pointer to the m3_exner_star_inv
+ !> @return The operator
+  function get_m3_exner_star_inv() result(op)
+    implicit none
+    type(operator_type), pointer ::op
+    op => m3_exner_star_inv
+  end function get_m3_exner_star_inv
 
  !> Function to return a pointer to the div_star
  !> @return The operator

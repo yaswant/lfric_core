@@ -43,9 +43,9 @@ real(kind=r_def), intent(in)     :: x(3)
 integer(kind=i_def), intent(in)  :: itest_option
 real(kind=r_def), intent(out)    :: exner_s, rho_s, theta_s
 
-real(kind=r_def), parameter :: THETA_SURF = 300.0_r_def
-real(kind=r_def), parameter :: THETA_SURF_HOT = 303.05_r_def
-real(kind=r_def), parameter :: EXNER_SURF = 1.0_r_def
+real(kind=r_def), parameter :: theta_surf = 300.0_r_def
+real(kind=r_def), parameter :: theta_surf_hot = 303.05_r_def
+real(kind=r_def), parameter :: exner_surf = 1.0_r_def
 real(kind=r_def)            :: nsq_over_g, z, u_s(3), lat, lon, r
 
 if ( geometry == base_mesh_geometry_spherical ) then  ! SPHERICAL DOMAIN
@@ -65,16 +65,16 @@ else                     ! BIPERIODIC PLANE DOMAIN
   select case( itest_option )
     case( idealised_test_gravity_wave,idealised_test_held_suarez)
       nsq_over_g = bvf_square/gravity
-      theta_s = THETA_SURF * exp ( nsq_over_g * z )
-      exner_s = EXNER_SURF - gravity**2/(Cp*THETA_SURF*bvf_square)   &
+      theta_s = theta_surf * exp ( nsq_over_g * z )
+      exner_s = exner_surf - gravity**2/(Cp*theta_surf*bvf_square)   &
                 * (1.0_r_def - exp ( - nsq_over_g * z ))
     case( idealised_test_cold_bubble_x, &
           idealised_test_cold_bubble_y )   ! Density current test
       theta_s = theta_surf
-      exner_s = exner_surf - gravity/(Cp*THETA_SURF)*z
+      exner_s = exner_surf - gravity/(Cp*theta_surf)*z
     case( idealised_test_warm_bubble )   ! Warm bubble test
-      theta_s = THETA_SURF_HOT
-      exner_s = exner_surf - gravity/(Cp*THETA_SURF_HOT)*z
+      theta_s = theta_surf_hot
+      exner_s = exner_surf - gravity/(Cp*theta_surf_hot)*z
   end select
   ! Calculate rho for all biperiodic tests
   rho_s   = p_zero/(Rd*theta_s) * exner_s ** ((1.0_r_def - kappa)/kappa)
@@ -99,9 +99,9 @@ real(kind=r_def), intent(in)     :: x(3), x_surf(3)
 integer(kind=i_def), intent(in)  :: itest_option
 real(kind=r_def), intent(out)    :: exner_s, rho_s, theta_s
 
-real(kind=r_def), parameter :: THETA_SURF = 300.0_r_def
-real(kind=r_def), parameter :: THETA_SURF_HOT = 303.05_r_def
-real(kind=r_def), parameter :: EXNER_SURF = 1.0_r_def
+real(kind=r_def), parameter :: theta_surf     = 300.0_r_def
+real(kind=r_def), parameter :: theta_surf_hot = 303.05_r_def
+real(kind=r_def), parameter :: exner_surf     = 1.0_r_def
 real(kind=r_def)            :: nsq_over_g, z, u_s(3), lat, lon, r, lon_surf, lat_surf, r_surf
 
 
@@ -121,20 +121,21 @@ if ( geometry == base_mesh_geometry_spherical ) then  ! SPHERICAL DOMAIN
 else                     ! BIPERIODIC PLANE DOMAIN
 
   z = x(3)
+
   ! Calculate theta and exner for each biperiodic test
   select case( itest_option )
     case( idealised_test_gravity_wave,idealised_test_held_suarez)
       nsq_over_g = bvf_square/gravity
-      theta_s = THETA_SURF * exp ( nsq_over_g * z )
-      exner_s = EXNER_SURF - gravity**2/(Cp*THETA_SURF*bvf_square)   &
-                * (1.0_r_def - exp ( - nsq_over_g * z ))
+      theta_s = theta_surf * exp ( nsq_over_g * z )
+      exner_s = exner_surf - gravity**2/(Cp*theta_surf*bvf_square)   &
+                   * (1.0_r_def - exp ( - nsq_over_g * z ))
     case( idealised_test_cold_bubble_x, &
           idealised_test_cold_bubble_y  )   ! Density current test
       theta_s = theta_surf
-      exner_s = exner_surf - gravity/(Cp*THETA_SURF)*z
+      exner_s = exner_surf - gravity/(Cp*theta_surf)*z
     case( idealised_test_warm_bubble )   ! Warm bubble test
-      theta_s = THETA_SURF_HOT
-      exner_s = exner_surf - gravity/(Cp*THETA_SURF_HOT)*z
+      theta_s = theta_surf_hot
+      exner_s = exner_surf - gravity/(Cp*theta_surf_hot)*z
   end select
   ! Calculate rho for all biperiodic tests
   rho_s   = p_zero/(Rd*theta_s) * exner_s ** ((1.0_r_def - kappa)/kappa)

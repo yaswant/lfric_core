@@ -1,17 +1,19 @@
 namelist solver
 
-  method             : enumeration[ cg, bicgstab, jacobi, gmres, gcr ]
-  maximum_iterations : integer  ! Iteration limit for solver
-  tolerance          : real     ! Relative tolerance of solver
-  preconditioner     : enumeration[ none, diagonal]
-  si_tolerance       : real     ! Relative tolerance of semi-implicit solver
-  si_preconditioner  : enumeration[ none, diagonal, tridiagonal, pressure]
-  si_postconditioner : enumeration[ none, diagonal]
-  gcrk               : integer  ! Dimension of the approximate Krylov subspace.
-                                ! In other words, it is the number of potential
-                                ! residual vectors to calculate at each
-                                ! iteration of the solver.
-  helmholtz_solve    : logical  ! Use Helmholtz (Schur complement solve)
-  use_operators      : logical  ! Use locally assembled operators (or compute on the fly)
-  normalise          : logical  ! Normalise Helmholtz matrix by its approximate diagonal 
+  method                     : enumeration[ cg, bicgstab, jacobi, gmres, gcr ]
+  maximum_iterations         : integer  ! Iteration limit for solver
+  tolerance                  : real     ! Relative tolerance of solver
+  preconditioner             : enumeration[ none, diagonal]
+  si_tolerance               : real     ! Relative tolerance of semi-implicit solver
+  si_preconditioner          : enumeration[ none, diagonal, tridiagonal, pressure]
+  si_postconditioner         : enumeration[ none, diagonal, pressure]
+  si_pressure_tolerance      : real     ! Relative tolerance of semi-implicit pressure solver
+  si_pressure_preconditioner : enumeration[ none, diagonal, tridiagonal]
+  gcrk                       : integer  ! Dimension of the approximate Krylov subspace.
+                                        ! In other words, it is the number of potential
+                                        ! residual vectors to calculate at each
+                                        ! iteration of the solver.
+  helmholtz_solve            : logical  ! Use Helmholtz (Schur complement solve)
+  use_operators              : logical  ! Use locally assembled operators (or compute on the fly)
+  normalise                  : logical  ! Normalise Helmholtz matrix by its approximate diagonal 
 end namelist solver

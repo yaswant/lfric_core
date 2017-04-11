@@ -25,6 +25,7 @@ module lhs_alg_mod
   type(field_type),              private :: w2_multiplicity, f_star, r_rho
   type(field_type), allocatable, private :: lhs_tmp(:)
   type(field_type)                       :: mt_lumped
+  type( field_type ), target             :: exner_inc
   type(function_space_type), pointer     :: u_fs => null()
 
   private
@@ -84,6 +85,9 @@ contains
     call invoke( set_field_scalar(0.0_r_def, w2_multiplicity) )
     call invoke( multiplicity_kernel_type(w2_multiplicity) )
     f_star = field_type( vector_space = u_fs )
+
+    ! For computing lhs u with operators and diagnostic exner
+    exner_inc = field_type( vector_space = rho_fs )
 
   end subroutine lhs_init
   !============================================================================!
@@ -268,26 +272,34 @@ contains
                                                 get_ptheta2,       &
                                                 get_m3_rho_star,   &
                                                 get_m3_exner_star, &
-                                                get_p3theta,       &
+                                                get_m3_exner_star_inv, &
+                                                get_p3theta, &
                                                 get_rho_at_u
-  use planet_config_mod,                  only: cp, kappa
+  use planet_config_mod,                  only: cp
   use transpose_matrix_vector_kernel_mod, only: transpose_matrix_vector_kernel_type
   use dg_matrix_vector_kernel_mod,        only: dg_matrix_vector_kernel_type
+  use formulation_config_mod,             only: eliminate_p
 
   implicit none
 
-  ! Form of state and lhs is [u,theta,rho,exner]
+  ! Form of state and lhs is [u,theta,rho]       if eliminate_p
+  ! Form of state and lhs is [u,theta,rho,exner] if not eliminate_p
   type(field_type), target,        intent(inout) :: state(si_bundle_size)
   type(field_type),                intent(inout) :: lhs(si_bundle_size)
   real(kind=r_def),                intent(in)    :: tau_dt
 
-  type(operator_type), pointer :: mm_w2, mm_w3_inv, mm_wtheta => null()
+  type(operator_type), pointer :: mm_w2 => null(), mm_w3_inv => null(), mm_wtheta => null()
   type(operator_type), pointer :: div => null()
   type(field_type),    pointer :: u ,theta, rho, exner => null()
-  type(operator_type), pointer :: p2theta, div_star, ptheta2, m3_rho_star, &
-                                  m3_exner_star, p3theta => null()
+  type(operator_type), pointer :: p2theta => null(), &
+                                  div_star => null(), &
+                                  ptheta2 => null(), &
+                                  m3_rho_star => null(), &
+                                  m3_exner_star => null(), &
+                                  p3theta => null(), &
+                                  m3_exner_star_inv => null()
   type(field_type),    pointer :: rho_at_u => null()
-  
+
   mm_w2        => get_mass_matrix(2)
   mm_w3_inv    => get_mass_matrix(4)
   if(wtheta_on) then
@@ -300,7 +312,6 @@ contains
   u     => state(1)
   theta => state(2)
   rho   => state(3)
-  exner => state(4)
 
   p2theta       => get_p2theta()
   div_star      => get_div_star()
@@ -309,6 +320,18 @@ contains
   m3_exner_star => get_m3_exner_star()
   p3theta       => get_p3theta()
   rho_at_u      => get_rho_at_u()
+
+  if ( eliminate_p ) then
+    ! Recompute exner' from linear eos
+    m3_exner_star_inv => get_m3_exner_star_inv()
+    call invoke( dg_matrix_vector_kernel_type(lhs(3), rho, m3_rho_star) )
+    call invoke( matrix_vector_kernel_type(lhs(3), theta, p3theta) )
+    call invoke( dg_matrix_vector_kernel_type( exner_inc, lhs(3), m3_exner_star_inv ) )
+    call invoke( set_field_scalar( 0.0_r_def, lhs(3) ) )
+    exner => exner_inc
+  else
+    exner => state(4)
+  end if
 
   ! Use operators
   ! Initialise lhs_u and lhs_theta to 0
@@ -331,13 +354,14 @@ contains
   call invoke( dg_matrix_vector_kernel_type(lhs_tmp(3), f_star, div) )
   call invoke( dg_matrix_vector_kernel_type(lhs(3), lhs_tmp(3), mm_w3_inv) )
   call invoke_inc_axpy(tau_dt, lhs(3), rho)  
-  ! L_pi 
-  call invoke( dg_matrix_vector_kernel_type(lhs(4), rho, m3_rho_star) )
-  call invoke( matrix_vector_kernel_type(lhs(4), theta, p3theta) )
-  call invoke( dg_matrix_vector_kernel_type(lhs_tmp(4), exner, m3_exner_star) )
-  call invoke_inc_axpby(((1.0_r_def-kappa)/kappa), lhs_tmp(4), -1.0_r_def, lhs(4))
-  call invoke( dg_matrix_vector_kernel_type( lhs(4), lhs_tmp(4), mm_w3_inv) )
-
+  if ( .not. eliminate_p ) then
+    ! L_pi 
+    call invoke( dg_matrix_vector_kernel_type(lhs(4), rho, m3_rho_star) )
+    call invoke( matrix_vector_kernel_type(lhs(4), theta, p3theta) )
+    call invoke( dg_matrix_vector_kernel_type(lhs_tmp(4), exner, m3_exner_star))
+    call invoke_inc_axpby(1.0_r_def, lhs_tmp(4), -1.0_r_def, lhs(4))
+    call invoke( dg_matrix_vector_kernel_type( lhs(4), lhs_tmp(4), mm_w3_inv) )
+  end if
   end subroutine operator_lhs_alg
   !============================================================================!
 

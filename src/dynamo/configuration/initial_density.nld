@@ -1,4 +1,5 @@
 namelist initial_density
+    sample_init_rho   : logical ! Use sampling initialize rho true/false
     tracer_max        : real ! Maximum value of tracer
     tracer_background : real ! Background value of tracer
     PI : constant

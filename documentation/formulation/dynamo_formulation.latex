@@ -543,10 +543,10 @@ the increment to the state vector, $J$ is the system Jacobian and
 $k$ is the iteration index of the Newton loop, at convergence this
 recovers the Crank-Nicolson discretisation \eqref{eq:residual}. In
 practice $J$ is a large matrix and its inverse is dense, therefore
-so it is desirable to use a method that avoids the explicit computation
+it is desirable to use a method that avoids the explicit computation
 of $J$. 
 
-The avoid the difficulties in computing the full Jacobian matrix
+To avoid the difficulties in computing the full Jacobian matrix
 an approach based upon
 some understanding of the physics of the equations being solved is used.
 This method approximates the Jacobian $J$ by a linear system 
@@ -583,26 +583,8 @@ terms these are computed outside of the Newton loop and are therefore
 assumed fixed inside of it. The advective terms are recomputed as
 part of an outer advective loop using the latest estimate for the
 advecting wind field. The timestepping process is summarised in Table
-\ref{tab:Iterative-timestepping-algorithm}. As a result of keeping
-the advective terms constant in the Newton loop (i.e. the advection
-is treated explicitly) the traditional JFNK method will not see any
-of the buoyancy and divergence terms for the $\theta$ and $\rho$
-equations respectively and hence will be unstable for the acoustic
-CFL number $\frac{a\Delta t}{\Delta x}>1$ greatly restricting the
-timestep. To get around this, inside the Krylov solver the residual
-$\mathbf{R}$ is evaluated as $\mathbf{R}=\left[R_{\mathbf{u}}^{n+1},\,R_{\theta}^{*},\,R_{\rho}^{*}\right]^{T}$
-where 
-\begin{eqnarray}
-R_{\theta}^{*} & = & \theta^{n+1}+\tau\Delta t\mathbf{u}^{n+1}.\nabla\mathbf{\theta}^{n+1},\label{eq:Rtheta_jfnk}\\
-R_{\rho}^{*} & = & \rho^{n+1}+\tau\Delta t\nabla.\left(\rho^{n+1}\mathbf{u}^{n+1}\right).\label{eq:Rrho_jfnk}
-\end{eqnarray}
-These terms can be seen as a approximation to the Newton correction
-to the advective terms. In fact they need not (and for efficiency
-should probably not) be computed using the same method, i.e the advective
-terms in the outer loop could be computed using some high order finite
-volume method, but in the Newton loop they would be computed using
-the standard FEM or even a simple low order FV/FD method.
-
+\ref{tab:Iterative-timestepping-algorithm}.
+ 
 \begin{table}
 
 
@@ -628,7 +610,15 @@ algorithm}
 
 \end{table}
 
-\subsubsection{Forming a Helmholtz Equation\label{sub:Helmholtz}}
+The method used to solve \eqref{eq:Newton} uses a number of different solvers and methods:
+\begin{enumerate}
+\item Outer solve on the full mixed system \eqref{eq:L} which is preconditioned by the inner solver
+\item Inner (Helmholtz) solve for the pressure system formed from the Schur complement, which is itself preconditioned by the vertical solver
+\item Vertical solve for the vertical component of the pressure system
+\end{enumerate}
+There are a number of options for types of solvers  to used in each of stages 1-3. Dynamo currently uses flexible GMRES for 1, BiCGstab for 2 and Gaussian elimination for 3. It is also possible to turn off any of the three components of the solve that will help reduce the complexity of the solver but at the cost of possibly slower convergence.
+
+\subsubsection{Outer Solve\label{sub:OuterSolve}}
 The continuous in space equations that we wish to solve (motivated by the form used in the ENDGame incremental formulation) are
 \begin{eqnarray}
 \mathbf{u}' + \tau_{u}\Delta t c_{pd} \left(\theta'\nabla\Pi^{*} + \theta^{*}\nabla\Pi'\right) & = & R_{\mathbf{u}},\label{eq:si_u_continuous}\\
@@ -636,12 +626,12 @@ The continuous in space equations that we wish to solve (motivated by the form u
 \rho' + \tau_{\rho}\Delta t\nabla.\left(\rho^{*}\mathbf{u}'\right) & = & R_{\rho},\label{eq:si_rho_continuous}\\
 \frac{1-\kappa}{\kappa}\frac{\Pi'}{\Pi^{*}} - \frac{\rho'}{\rho^{*}} - \frac{\theta'}{\theta^{*}} & = & R_{\Pi}.\label{eq:si_exner_continuous}
 \end{eqnarray}
-And we seek to create a single equation for the pressure increment $\Pi'$ from \eqref{eq:si_u_continuous}-\eqref{eq:si_exner_continuous} via eliminating the other prognostic increments $\mathbf{u}',\rho',\theta'$. First the finite element discretisation is applied to  \eqref{eq:si_u_continuous}-\eqref{eq:si_exner_continuous} and they are rewritten in operator format
+Optionally the diagnostic equation for the pressure increment $\Pi'$ \eqref{eq:si_exner_continuous} can be dropped and the pressure increment computed pointwise from the lhs of \eqref{eq:si_exner_continuous} where ever it is needed. The finite element discretisation is applied to  \eqref{eq:si_u_continuous}-\eqref{eq:si_exner_continuous} and they are rewritten in operator format
 \begin{eqnarray}
 M_{2}u' - \tau_{u}\Delta t c_{pd} \left[P_{2\theta}^{\Pi^{*}}\theta' + \left(D^{\theta^{*}}\right)^{T}\Pi'\right] & = & R_{\mathbf{u}},\label{eq:si_u_discrete}\\
 M_{\theta}\theta' + \tau_{\theta}\Delta tP_{\theta2}^{\theta^{*}}u' & = & R_{\theta},\label{eq:si_theta_discrete}\\
 M_{3}\rho' + \tau_{\rho}\Delta tD\left(\rho^{*}u'\right) & = & R_{\rho},\label{eq:si_rho_discrete}\\
-\frac{1-\kappa}{\kappa}M_{3}^{\Pi^{*}}\Pi' - M_{3}^{\rho^{*}}\rho' - P_{3\theta}^{*}\theta' & = & R_{\Pi}.\label{eq:si_exner_discrete}
+M_{3}^{\Pi^{*}}\Pi' - M_{3}^{\rho^{*}}\rho' - P_{3\theta}^{*}\theta' & = & R_{\Pi}.\label{eq:si_exner_discrete}
 \end{eqnarray}
 where now the primed variables correspond to the degree of freedom vectors and the right hand side arrays are the integrated residual terms  \eqref{eq:Ru_combined}-\eqref{eq:Rrho_combined} with 
 \begin{equation}
@@ -654,13 +644,12 @@ D & = & \left<\sigma,\nabla.\mathbf{v}\right>,\label{eq:divergence_operator}\\
 D^{\theta^{*}} & = & \left<\sigma,\nabla.\left(\theta^{*}\mathbf{v}\right)\right> \equiv \left<\sigma,\theta^{*}\nabla.\mathbf{v} + \nabla\theta^{*}.\mathbf{v} \right>,\label{eq:div_theta_star_operator}\\
 P_{2\theta}^{\Pi^{*}} & = & \left<\Pi^{*},\nabla.\left(\gamma\mathbf{v}\right)\right> \equiv \left<\nabla.\mathbf{v},\Pi^{*}\gamma\right> + \left<\mathbf{v},\Pi^{*}\nabla\gamma \right>,\label{eq:Ptheta2_star_operator}\\
 M_{3}^{\rho^{*}} & = & \left<\sigma,\frac{\sigma}{\rho^{*}}\det\left(J\right)\right>,\label{eq:M3_rho_star_operator}\\
-M_{3}^{\Pi^{*}} & = & \left<\sigma,\frac{\sigma}{\Pi^{*}}\det\left(J\right)\right>,\label{eq:M3_p_star_operator}\\
+M_{3}^{\Pi^{*}} & = & \frac{1-\kappa}{\kappa}\left<\sigma,\frac{\sigma}{\Pi^{*}}\det\left(J\right)\right>,\label{eq:M3_p_star_operator}\\
 P_{\theta2}^{\theta^{*}} & = & \left<\gamma,\left(\nabla\theta^{*}\right)\cdot\mathbf{v} \right>,\label{eq:P2theta_operator}\\
 P_{3\theta}^{*} & = & \left<\sigma,\frac{\gamma}{\theta^{*}}\det\left(J\right)\right>,\label{eq:Ptheta3_operator}
 \end{eqnarray}
 and all integrals and functions are evaluated in the computational domain. Where subscripted an operator $P_{ij}$ maps from $\mathbb{W}_j$ to $\mathbb{W}_i$ and a single subscript denotes a mass matrix $M_{i}$ that maps from $\mathbb{W}_{i}$ to itself, finally the $D$ operators are divergence mappings that map from $\mathbb{W}_{2}$ to $\mathbb{W}_{3}$. Whenever it is needed $\Pi^{*}$ is computed from the equation of state using $\rho^{*}$ and $\theta^{*}$.
 \smallskip{}
-
 
 \fbox{\begin{minipage}[t]{1\columnwidth}%
 \textit{Aside: As an alternative to solving the equation of state in the weak form \eqref{eq:si_exner_discrete} it has been suggested that it be solved pointwise on some suitable set of nodes, the most natural of which are the $\mathbb{W}_3$ nodes. In which case  \eqref{eq:si_exner_discrete} would be replaced by
@@ -671,7 +660,12 @@ where $i$ is the index of the degree of freedom and $E_i$ is some averaging oper
 }%
 \end{minipage}}
 
-The elimination procedure is as follows: first eliminate $\theta'$ from \eqref{eq:si_u_discrete} using \eqref{eq:si_theta_discrete}
+Equations \eqref{eq:si_u_continuous}-\eqref{eq:si_exner_continuous} are solved using a Krylov subspace solver such as GMRES that only needs the application of the left hand side which reduces to a large number matrix vector multiplications.
+
+
+
+\subsubsection{Inner (Pressure) Solve\label{sub:Helmholtz}}
+To precondition the outer solve, an inner system is formed for the pressure increment, this is equivalent to the Helmholtz equation used in ENDGame, however, since it is only used as a preconditioner, where an inverse operator is required only their lumped form, which is trivial to invert, is used. The elimination procedure is as follows: first eliminate $\theta'$ from \eqref{eq:si_u_discrete} using \eqref{eq:si_theta_discrete}
 \begin{equation}
 H_{B}u' - \tau_{u}\Delta tc_{pd}\left(D^{\theta{*}}\right)^T\Pi' = \mathfrak{R}_u \equiv R_u + \tau_{u}\Delta tc_{pd}P_{2\theta}^{\Pi^*}M_{\theta}^{-1}R_{\theta},\label{eq:si_u_discrete_theta_elim}
 \end{equation}
@@ -711,15 +705,15 @@ and the right hand side becomes
 \begin{equation}
 \mathfrak{R} \equiv \mathfrak{R}_{\Pi} - \Delta t H\left(H_{B}^{-1}\mathfrak{R}_{u}\right).\label{eq:helmholtz_rhs_simplified}
 \end{equation}
-In order to construct \eqref{eq:helmholtz_lhs} and \eqref{eq:helmholtz_rhs} and a number of operator invereses are needed: $M_{3}^{-1}, M_{\theta}^{-1}$ and $H_{B}^{-1}$. The inverse of the $\mathbb{W}_3$ mass matrix is simple to compute since it is in a discontinuous space and so the element inverse can be cheaply computed and stored. The mass matrix for the $\theta$ space is either a global matrix (if $\theta\in\mathbb{W}_{0}$) or is a column matrix (if $\theta\in\mathbb{W}_{\theta}$) and it is therefore unlikely to be feasible to compute and store the exact inverse and instead it must be approximated such as using the diagonal $M_{\theta}^{-1} \approx 1/\mathrm{diag}\left(M_{\theta}\right)$. Lastly the inverse of the $H_{B}$ operator is needed. It is unlikely the diagonal of this will be accurate enough as this would lose the orographic terms (contained in the off-diagonal elements of $M_{2}$), the proposal here is to use a small number of  iterations of a cheap iterative method, such as conjugate gradient or Jacobi to invert $H_{B}$, i.e. obtain $y$ such that $H_{B}y = x$. To solve the Helmholtz equation \eqref{eq:helmholtz_lhs} a Krylov method can be used, such as bicgstab or GMRes which only requires the application of the left hand side of \eqref{eq:helmholtz_lhs}. Once the pressure increment is obtained the other prognostic variables can be obtained by a back substituion process, $u'$ is obtained from
+In order to construct \eqref{eq:helmholtz_lhs} and \eqref{eq:helmholtz_rhs} a number of operator inverses are needed: $M_{3}^{-1}, M_{\theta}^{-1}$ and $H_{B}^{-1}$. The inverse of the $\mathbb{W}_3$ mass matrix is simple to compute since it is in a discontinuous space and so the element inverse can be cheaply computed and stored. The mass matrix for the $\theta$ space is either a global matrix (if $\theta\in\mathbb{W}_{0}$) or is a column matrix (if $\theta\in\mathbb{W}_{\theta}$) and it is therefore unlikely to be feasible to compute and store the exact inverse and instead it must be approximated, here by using the diagonal $M_{\theta}^{-1} \approx 1/\mathrm{diag}\left(M_{\theta}\right)$. Lastly the inverse of the $H_{B}$ operator is needed and again instead of computing the exact inverse, a lumped diagonal inverse is used. It should be noted that the diagonal will be inaccurate over orography as this would lose the orographic terms contained in the off-diagonal elements of $M_{2}$, In which case it may be better to form a sparse approximate inverse or use a small number of  iterations of a cheap iterative method, such as conjugate gradient or Jacobi to invert $H_{B}$, i.e. obtain $y$ such that $H_{B}y = x$. To solve the Helmholtz equation \eqref{eq:helmholtz_lhs} a Krylov method can be used, such as bicgstab or GMRes which only requires the application of the left hand side of \eqref{eq:helmholtz_lhs}. Once the pressure increment is obtained the other prognostic variables can be obtained by a back substitution process, $u'$ is obtained from
 \begin{equation}
 u' =  H_{B}^{-1}\left[\mathfrak{R}_u + \tau_{u}\Delta tc_{pd}\left(D^{\theta^{*}}\right)^T\Pi'\right] ,\label{eq:si_u_backsub}
 \end{equation}
 which requires one more inversion of $H_{B}$. $\theta'$ is obtained from \eqref{eq:si_theta_discrete}
 \begin{equation}
-\theta' =  M_{\theta}^{-1}\left(R_{\theta} - \tau_{\theta}\Delta tP_{\theta2}^{\theta^{*}}u'\right),\label{eq:si_theta_backsub}\\
+\theta' =  M_{\theta}^{-1}\left(R_{\theta} - \tau_{\theta}\Delta tP_{\theta2}^{\theta^{*}}u'\right).\label{eq:si_theta_backsub}\\
 \end{equation}
-where a more accurate inversion of $M_{\theta}$ can be used if it proves beneficial, $\rho'$ can be obtained from \eqref{eq:si_rho_discrete}
+$\rho'$ can be obtained from \eqref{eq:si_rho_discrete}
 \begin{equation}
 \rho' = M_{3}^{-1}\left[R_{\rho} - \tau_{\rho}\Delta tD\left(\rho^{*}u'\right)\right].\label{eq:si_rho_backsub}
 \end{equation}
@@ -731,20 +725,7 @@ u^{\left(k+1\right)} & = & u^{\left(k\right)} + u',\label{eq:u_inc}\\
 \end{eqnarray}
 and $\Pi^{\left(k+1\right)}$ will be diagnosed from the equation of state using $\rho^{\left(k+1\right)}$ and $\theta^{\left(k+1\right)}$.
 
-\smallskip{}
-\fbox{\begin{minipage}[t]{1\columnwidth}%
-\textit{Aside: In addition to solving either the mixed set of equations \eqref{eq:L} and/or the Helmholtz equation \eqref{eq:helmholtz_lhs} it is expected that for any non-trivial runs that a preconditioner will be needed which solves the vertical coupling either, exactly or to some high precision, this process will need detailing here.
-}%
-\end{minipage}}
-
-
-\smallskip{}
-\fbox{\begin{minipage}[t]{1\columnwidth}%
-\textit{Aside: The two options presented here involve using an iterative solver to invert a large system of equations \eqref{eq:L} with little approximation to the operators, or inverting a much smaller system of equations \eqref{eq:helmholtz_lhs} but using a number of approximated inverse operators (for $H_B^{-1}$ and $M_{\theta}^{-1}$) It is not obvious which approach will be quicker. The cost in \eqref{eq:L} is likely to come from carrying a system of 3-4 fields ($u',\theta',\rho'$ and optionally $\Pi'$) and the memory cost associated with this. The cost in \eqref{eq:helmholtz_lhs} is likely to come from having to accurately invert $H_{B}$ using an iterative apporach and possibly an increase in iteration cost due to solving a more approximated system, that is the increment from the Helmholtz equation only approximately solves the full linear system \eqref{eq:helmholtz_lhs}. It has been proposed that the best approach may be a mix of solving \eqref{eq:L} in a outer loop and solving  \eqref{eq:helmholtz_lhs} in a inner loop with a diagonal inversion of $H_B$.
-}%
-\end{minipage}}
-
-\subsection{\label{sub:preconditioner}Preconditioner}
+\subsection{\label{sub:preconditioner}Vertical Preconditioner}
 Inspired by the vertical preconditioner used in ENDGame we seek to form a vertical tridiagonal preconditioner to be used for Gung-Ho. For lowest order elements the layout of dof's is the same as ENDGame and so we can use a form similar to that for a finite difference model. The goal is to seek pressure increments $\Pi'$ that solve the tridiagonal system of equations
 \begin{equation}
 A^{+}_{ij,k}\left(\Pi'\right)_{ij}^{k+1} + A^{0}_{ij,k}\left(\Pi'\right)_{ij}^{k} + A^{-}_{ij,k}\left(\Pi'\right)_{ij}^{k-1} = \left(R_{\Pi}\right)_{ij,k},\label{eq:tri_precon}

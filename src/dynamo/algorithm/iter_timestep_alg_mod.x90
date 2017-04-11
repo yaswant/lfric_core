@@ -61,7 +61,8 @@ use psykal_lite_mod,                   only: invoke_axpby, &
   use advection_alg_mod,                 only: advection_alg, advection_alg_init, advection_mr_alg
   use si_solver_alg_mod,                 only: si_solver_alg, si_solver_init
   use si_operators_alg_mod,              only: create_si_operators, compute_si_operators
-  use helmholtz_solver_alg_mod,          only: helmholtz_solver_init, helmholtz_solver_alg
+  use helmholtz_solver_alg_mod,          only: helmholtz_solver_init, &
+                                               compute_inv_hb
 
   ! Moisture species
   use mr_indices_mod,                    only: nummr
@@ -222,6 +223,7 @@ contains
     !=== Do a single timestep ==============================================!
     call copy_bundle(state, state_n, bundle_size)
     if ( helmholtz_solve .or. use_operators ) call compute_si_operators(state_n)
+    if ( helmholtz_solve ) call compute_inv_hb()
     call rhs_alg(rhs_n, varbeta*dt, state_n)
     !=== Section 3.1:  Outer (advection loop) ==============================!
     do outer = 1,outer_iterations
@@ -253,11 +255,7 @@ contains
         write( log_scratch_space, '(A,2I3)' ) 'loop indices (o, i): ', &
                                                   , outer, inner
         call log_event( log_scratch_space, LOG_LEVEL_INFO )
-        if ( helmholtz_solve ) then
-          call helmholtz_solver_alg(state, rhs_np1)
-        else          
-          call si_solver_alg(state, rhs_np1, state_n)
-        end if
+        call si_solver_alg(state, rhs_np1, state_n)
         !=== End Section 3.3 ===============================================!
       end do ! INNER
       !=== End Section 3.2 =================================================!

@@ -103,97 +103,68 @@ contains
         integer(kind=i_def), intent(in) :: ndf_wtheta, undf_wtheta, ndf_w2
         integer(kind=i_def), intent(in) :: stencil_wtheta_size
 
-        integer(kind=i_def), dimension(ndf_wtheta, stencil_wtheta_size),  intent(in) :: stencil_wtheta_map
+        integer(kind=i_def), dimension(ndf_wtheta, stencil_wtheta_size), intent(in) :: stencil_wtheta_map
+        integer(kind=i_def), dimension(nfaces_h),                        intent(in) :: adjacent_face
 
-        real(kind=r_def), dimension(ndf_wtheta,ndf_w2,ncell_3d), intent(inout) :: projection
-        real(kind=r_def), dimension(undf_wtheta),                intent(in)    :: theta
-
-        real(kind=r_def), dimension(4,3,ndf_w2,nqp_h_1d,nqp_v), intent(in)     :: w2_basis_face
-        real(kind=r_def), dimension(4,1,ndf_wtheta,nqp_h_1d,nqp_v), intent(in) :: wtheta_basis_face
-
-        integer(kind=i_def), dimension(nfaces_h), intent(in) :: adjacent_face
-
-        real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
+        real(kind=r_def), dimension(ndf_wtheta,ndf_w2,ncell_3d),    intent(inout) :: projection
+        real(kind=r_def), dimension(undf_wtheta),                   intent(in)    :: theta
+        real(kind=r_def), dimension(3,ndf_w2,    nqp_h_1d,nqp_v,4), intent(in)    :: w2_basis_face
+        real(kind=r_def), dimension(1,ndf_wtheta,nqp_h_1d,nqp_v,4), intent(in)    :: wtheta_basis_face
+        real(kind=r_def), dimension(nqp_v),                         intent(in)    :: wqp_v
 
         !Internal variables
-        integer(kind=i_def)               :: df, k, ik, face, face_next, dft, df2
-        integer(kind=i_def)               :: qp1, qp2
+        integer(kind=i_def) :: df, k, ik, face, face_next, dft, df2
+        integer(kind=i_def) :: qp1, qp2
 
-        real(kind=r_def), dimension(ndf_wtheta)      :: theta_e, theta_next_e
+        real(kind=r_def), dimension(ndf_wtheta) :: theta_e, theta_next_e
 
-        real(kind=r_def) :: theta_at_fquad, theta_next_at_fquad, v_at_fquad(3), v_next_at_fquad(3)
-        real(kind=r_def) :: bdary_term, gamma_wtheta, sign_face_next_outward, flux_term
-        real(kind=r_def) :: face_next_inward_normal(3)
+        real(kind=r_def) :: theta_at_fquad, theta_next_at_fquad, v_dot_n
+        real(kind=r_def) :: flux_term, theta_av
 
         logical, parameter :: upwind = .false.
 
+
         ! Assumes same number of horizontal qp in x and y
-
         do k = 0, nlayers-1
-            ik = k + 1 + (cell-1)*nlayers
-            do face = 1, nfaces_h
+          ik = k + 1 + (cell-1)*nlayers
+          do face = 1, nfaces_h
+            ! Storing opposite face number on neighbouring cell
+            face_next = adjacent_face(face)
 
-              ! Storing opposite face number on neighbouring cell
+            ! Computing theta in adjacent cells
+            do df = 1, ndf_wtheta
+              theta_e(df)      = theta(stencil_wtheta_map(df, 1) + k )
+              theta_next_e(df) = theta(stencil_wtheta_map(df, face+1) + k )
+            end do
 
-              face_next = adjacent_face(face)
+            do qp2 = 1, nqp_v
+              do qp1 = 1, nqp_h_1d
 
-              sign_face_next_outward = (-1.0_r_def)**(int(floor(real(mod(face_next, 4))/2.0) + 1.0_r_def))
-              face_next_inward_normal(:) = -sign_face_next_outward * normal_to_face(face_next, :)
+                theta_at_fquad = 0.0_r_def
+                theta_next_at_fquad = 0.0_r_def
+                do df = 1, ndf_wtheta
+                  theta_at_fquad       = theta_at_fquad      + theta_e(df)     *wtheta_basis_face(1,df,qp1,qp2,face)
+                  theta_next_at_fquad  = theta_next_at_fquad + theta_next_e(df)*wtheta_basis_face(1,df,qp1,qp2,face_next)
+                end do
+                theta_av = 0.5_r_def * (theta_at_fquad + theta_next_at_fquad)
 
-              ! Computing theta in adjacent cells
+                do df2 = 1,ndf_w2
+                  v_dot_n = dot_product(w2_basis_face(:,df2,qp1,qp2,face),out_face_normal(:, face))
+                  flux_term = wqp_v(qp1)*wqp_v(qp2) * theta_av * v_dot_n
+                  if (upwind) then                      
+                    flux_term = flux_term + 0.5_r_def * abs(v_dot_n) * &
+                              (theta_at_fquad - theta_next_at_fquad)       
+                  end if
+                  do dft = 1,ndf_wtheta
+                    projection(dft,df2,ik) = projection(dft,df2,ik) &
+                                           + wtheta_basis_face(1,dft,qp1,qp2,face) * flux_term
 
-              do df = 1, ndf_wtheta
-                theta_e(df)      = theta(stencil_wtheta_map(df, 1) + k )
-                theta_next_e(df) = theta(stencil_wtheta_map(df, face+1) + k )
-              end do
-
-              do df2 = 1,ndf_w2
-                do dft = 1,ndf_wtheta
-                  do qp2 = 1, nqp_v
-                    do qp1 = 1, nqp_h_1d
-
-                      theta_at_fquad = 0.0_r_def
-                      theta_next_at_fquad = 0.0_r_def
-
-                      do df = 1, ndf_wtheta
-                        theta_at_fquad       = theta_at_fquad + theta_e(df)*wtheta_basis_face(face,1,df,qp1,qp2)
-                        theta_next_at_fquad  = theta_next_at_fquad + theta_next_e(df)*wtheta_basis_face(face_next,1,df,qp1,qp2)
-                      end do
-
-                      v_at_fquad(:)   = 0.0_r_def
-                      v_next_at_fquad = 0.0_r_def
-
-                      do df = 1, ndf_w2
-                        v_at_fquad(:)       = v_at_fquad(:) + w2_basis_face(face,:,df,qp1,qp2)
-                        v_next_at_fquad(:)  = v_next_at_fquad(:) + w2_basis_face(face_next,:,df,qp1,qp2)
-                      end do
-
-
-                      flux_term = 0.5_r_def * (theta_next_at_fquad * dot_product(v_next_at_fquad(:), face_next_inward_normal) + &
-                                    theta_at_fquad * dot_product(v_at_fquad(:), out_face_normal(:, face)))
-
-                      if (upwind) then
-                        flux_term = flux_term + 0.5_r_def * abs(dot_product(v_at_fquad(:), out_face_normal(:, face))) * &
-                                            (dot_product( theta_at_fquad * out_face_normal(:, face), out_face_normal(:, face)) - &
-                                                dot_product(theta_next_at_fquad * face_next_inward_normal , face_next_inward_normal))
-                      end if
-
-                      do df = 1, ndf_wtheta
-                        gamma_wtheta  = wtheta_basis_face(face,1,df,qp1,qp2)
-
-                        bdary_term = wqp_v(qp1)*wqp_v(qp2) * gamma_wtheta * flux_term
-
-                        projection(dft,df2,ik) = projection(dft,df2,ik) + bdary_term
-
-                      end do
-
-                    end do ! qp1
-                  end do ! qp2
-                end do ! dft
-             end do ! df2
-           end do ! faces
-        end do ! layers
-
+                  end do ! dft
+                end do ! df2
+              end do ! qp1
+           end do ! qp2
+         end do ! faces
+      end do ! layers
     end subroutine weighted_proj_theta2_bd_code
 
 

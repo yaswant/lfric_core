@@ -24,6 +24,7 @@ module init_prognostic_fields_alg_mod
                                              operators, &
                                              transport_scheme_method_of_lines, &
                                              transport_operators_fv
+  use initial_density_config_mod,      only: sample_init_rho
   use restart_control_mod,             only: restart_type
   use timestepping_config_mod,         only: dt
   ! I/O tools
@@ -31,7 +32,8 @@ module init_prognostic_fields_alg_mod
 
   ! PsyKAl-lite kernels
   use psykal_lite_mod,                 only: invoke_initial_mr_kernel, &
-                                             invoke_initial_theta_kernel
+                                             invoke_initial_theta_kernel, &
+                                             invoke_initial_rho_sample_kernel
 
   ! PsyKAl PSYClone kernels
   use set_rho_kernel_mod,              only: set_rho_kernel_type
@@ -73,7 +75,7 @@ contains
     ! Coordinate fields
     type( field_type ), intent( inout ) :: chi(3)
     ! Prognostic fields
-    type( field_type ), intent( inout ) :: u, rho, theta, xi, mr(nummr),rho_in_wth
+    type( field_type ), intent( inout ) :: u, rho, theta, xi, mr(nummr), rho_in_wth
     ! Control
     type( restart_type ), intent(in)    :: restart
 
@@ -81,7 +83,9 @@ contains
     type( field_type ), allocatable     :: state(:)
     type( field_type )                  :: r_u
     type( operator_type )               :: mm_w2
-    type(function_space_type), pointer  :: w2_fs => null()
+    type(function_space_type), pointer  :: w2_fs => null(),    &
+                                           w3_fs => null(),    &
+                                           wtheta_fs => null()
 
     integer                             :: n_fields
 
@@ -119,11 +123,15 @@ contains
       call solver_algorithm(u, r_u, mesh_id, chi, method, mm=mm_w2)
 
       initial_time = 0.0_r_def
-      call invoke( set_rho_kernel_type (rho, chi, initial_time, qr) )
+      if(sample_init_rho) then
+        call invoke_initial_rho_sample_kernel( rho, chi, initial_time )
+      else
+        call invoke( set_rho_kernel_type ( rho, chi, initial_time, qr ) )
+      end if
 
       call log_event( "Dynamo: Mapping rho->rho_in_wth in same space as theta..", LOG_LEVEL_INFO )
-
-      call map_rho_to_theta(rho, theta, rho_in_wth, chi)      
+      call map_rho_to_theta(rho, theta, rho_in_wth, chi)     
+ 
       if (use_moisture) call invoke_initial_mr_kernel( theta, rho_in_wth, mr(:), chi )
 
       call log_event( "Dynamo: Initialised prognostic fields", LOG_LEVEL_INFO )

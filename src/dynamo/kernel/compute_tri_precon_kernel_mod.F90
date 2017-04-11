@@ -163,7 +163,7 @@ subroutine compute_tri_precon_code(nlayers,                             &
                   + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df)+k-1)
     end do
 
-    dthetadz(k) = (theta_p - theta_m)
+    dthetadz(k) = (theta_p - theta_m)/2.0_r_def
     dpdz = (exner(k) - exner(k-1))
    
     jac_av = 0.5_r_def*(jac(:,:,k-1) + jac(:,:,k))

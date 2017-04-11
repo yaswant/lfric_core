@@ -131,6 +131,7 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,             &
   real(kind=r_def)                     :: integrand
   real(kind=r_def)                     :: div_gamma_v
   real(kind=r_def)                     :: theta_quad, rho_quad, exner_quad
+  real(kind=r_def)                     :: i1
 
   do k = 0, nlayers - 1
     ik = k + 1 + (cell-1)*nlayers
@@ -140,29 +141,27 @@ subroutine weighted_proj_2theta_code(cell, nlayers, ncell_3d,             &
     do df = 1,ndf_w3
       rho_e(df) = rho(map_w3(df) + k)
     end do
-
-    do df0 = 1, ndf_wtheta
-      do df2 = 1, ndf_w2
-        projection(df2,df0,ik) = 0.0_r_def
-        do qp2 = 1, nqp_v
-          do qp1 = 1, nqp_h
-            theta_quad = 0.0_r_def            
-            do df = 1, ndf_wtheta
-              theta_quad = theta_quad                                      &
-                         + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
-            end do
-            rho_quad = 0.0_r_def
-            do df = 1, ndf_w3
-              rho_quad = rho_quad                                      &
-                       + rho_e(df)*basis_w3(1,df,qp1,qp2)
-            end do
-
-            exner_quad = calc_exner_pointwise(rho_quad, theta_quad)
-
+    projection(:,:,ik) = 0.0_r_def
+    do qp2 = 1, nqp_v
+      do qp1 = 1, nqp_h
+        theta_quad = 0.0_r_def            
+        do df = 1, ndf_wtheta
+          theta_quad = theta_quad                                      &
+                     + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
+        end do
+        rho_quad = 0.0_r_def
+        do df = 1, ndf_w3
+          rho_quad = rho_quad                                      &
+                   + rho_e(df)*basis_w3(1,df,qp1,qp2)
+        end do
+        exner_quad = calc_exner_pointwise(rho_quad, theta_quad)
+        i1 = exner_quad* wqp_h(qp1)*wqp_v(qp2)
+        do df0 = 1, ndf_wtheta
+          do df2 = 1, ndf_w2
             div_gamma_v = diff_basis_w2(1,df2,qp1,qp2)*basis_wtheta(1,df0,qp1,qp2) &
                         + dot_product(basis_w2(:,df2,qp1,qp2), &
                                       diff_basis_wtheta(:,df0,qp1,qp2))
-            integrand = wqp_h(qp1)*wqp_v(qp2)*exner_quad*div_gamma_v 
+            integrand = i1*div_gamma_v 
             projection(df2,df0,ik) = projection(df2,df0,ik) + integrand
           end do
         end do

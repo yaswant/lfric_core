@@ -153,6 +153,7 @@ contains
     use weighted_m3_exner_kernel_mod, only : weighted_m3_exner_code
     use calc_exner_pointwise_mod,     only : calc_exner_pointwise
     use mesh_mod,                     only : mesh_type 
+    use planet_config_mod,            only : kappa
     implicit none
 
     class(weighted_m3_exner_test_type), intent(inout) :: this
@@ -270,10 +271,9 @@ contains
                                  wv                                 &
                                  )
    
-    exner = calc_exner_pointwise(rho_p%data(1), theta_p%data(1))
-    mm_p%local_stencil(:,:,:) = dx*dy*dz/exner
-    answer = 1.0_r_def/exner
-    @assertEqual(answer, mm_p%local_stencil(1, 1, 1 )/(dx*dy*dz), tol)
+    exner = calc_exner_pointwise(rho_p%data(1), theta_p%data(1))    
+    answer = ((1.0_r_def-kappa)/kappa) /exner
+    @assertEqual(answer, mm_p%local_stencil(1, 1, 13 )/(dx*dy*dz), tol)
     
   end subroutine test_all
 

@@ -184,6 +184,90 @@ contains
   end subroutine invoke_initial_theta_kernel
 
   !------------------------------------------------------------------------------
+  !> invoke_initial_rho_sample_kernel: invoke the density initialization for a generic space
+  !> Computation of nodal basis function for coordinates chi not currently supported PSyClone,
+  !> will be introduced in modification of quadrature strategy, see ticket #723.
+
+  subroutine invoke_initial_rho_sample_kernel( rho, chi, time )
+
+    use initial_rho_sample_kernel_mod, only : initial_rho_sample_code
+    use mesh_mod,                      only : mesh_type
+    implicit none
+
+    type( field_type ), intent( inout )  :: rho
+    type( field_type ), intent( in )     :: chi(3)
+    real(kind=r_def),   intent( in )     :: time
+
+    integer          :: cell
+    integer          :: ndf_w3, undf_w3, &
+                        ndf_chi, undf_chi, dim_chi
+    integer, pointer :: map_w3(:) => null()
+    integer, pointer :: map_chi(:)    => null()
+
+    type( field_proxy_type ) :: rho_proxy
+    type( field_proxy_type ) :: chi_proxy(3)
+
+    real(kind=r_def), allocatable :: basis_chi(:,:,:)
+
+    type(mesh_type), pointer :: mesh => null()
+
+    integer          :: df_w3, df_chi
+    real(kind=r_def), pointer :: nodes_w3(:,:) => null()
+
+    rho_proxy    = rho%get_proxy()
+    chi_proxy(1) = chi(1)%get_proxy()
+    chi_proxy(2) = chi(2)%get_proxy()
+    chi_proxy(3) = chi(3)%get_proxy()
+
+    ndf_w3       = rho_proxy%vspace%get_ndf( )
+    undf_w3      = rho_proxy%vspace%get_undf( )
+
+    ndf_chi  = chi_proxy(1)%vspace%get_ndf( )
+    undf_chi  = chi_proxy(1)%vspace%get_undf( )
+    dim_chi  = chi_proxy(1)%vspace%get_dim_space( )
+
+    allocate( basis_chi(dim_chi, ndf_chi, ndf_w3) )
+
+    nodes_w3 => rho_proxy%vspace%get_nodes()
+    do df_w3 = 1, ndf_w3
+      do df_chi = 1, ndf_chi
+        basis_chi(:,df_chi,df_w3) = &
+                  chi_proxy(1)%vspace%evaluate_function(BASIS,df_chi,nodes_w3(:,df_w3))
+      end do
+    end do
+
+    if (chi_proxy(1)%is_dirty(depth=1)) call chi_proxy(1)%halo_exchange(depth=1)
+    if (chi_proxy(2)%is_dirty(depth=1)) call chi_proxy(2)%halo_exchange(depth=1)
+    if (chi_proxy(3)%is_dirty(depth=1)) call chi_proxy(3)%halo_exchange(depth=1)
+
+    mesh => rho%get_mesh()
+    do cell = 1, mesh%get_last_halo_cell(1)
+
+      map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
+      map_chi => chi_proxy(1)%vspace%get_cell_dofmap( cell )
+
+      call initial_rho_sample_code(         &
+        rho_proxy%vspace%get_nlayers(),     &
+        ndf_w3,                             &
+        undf_w3,                            &
+        map_w3,                             &
+        rho_proxy%data,                     &
+        ndf_chi,                            &
+        undf_chi,                           &
+        map_chi,                            &
+        basis_chi,                          &
+        chi_proxy(1)%data,                  &
+        chi_proxy(2)%data,                  &
+        chi_proxy(3)%data,                  &
+        time                                &
+        )
+    end do
+
+    call rho_proxy%set_dirty()
+  end subroutine invoke_initial_rho_sample_kernel
+
+
+  !------------------------------------------------------------------------------
   !> invoke_initial_mr_kernel: invoke the moisture initialization
   subroutine invoke_initial_mr_kernel( theta, rho_in_wth, mr, chi )
 
@@ -1251,30 +1335,30 @@ contains
       ! Assumes same number of horizontal qp in x and y
       nqp_h_1d = int(sqrt(real(nqp_h)))  ! use sqrt
 
-      allocate(xp_f(nfaces_h, nqp_h_1d, 2))
+      allocate(xp_f(nqp_h_1d, 2, nfaces_h))
 
       ndf_w2      = ptheta2_proxy%fs_from%get_ndf( )
       dim_w2      = ptheta2_proxy%fs_from%get_dim_space( )
-      allocate(basis_w2_face(nfaces_h,dim_w2,ndf_w2,nqp_h_1d,nqp_v))
+      allocate(basis_w2_face(dim_w2,ndf_w2,nqp_h_1d,nqp_v,nfaces_h))
 
       ndf_wtheta      = ptheta2_proxy%fs_to%get_ndf( )
       dim_wtheta      = ptheta2_proxy%fs_to%get_dim_space( )
       undf_wtheta     = ptheta2_proxy%fs_to%get_undf()
-      allocate(basis_wtheta_face(nfaces_h,dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v))
+      allocate(basis_wtheta_face(dim_wtheta,ndf_wtheta,nqp_h_1d,nqp_v,nfaces_h))
 
       ! Quadrature points on horizontal faces
 
-      xp_f(1, :, :) = xp(1:nqp_h_1d, :)
-      xp_f(1, :, 1) = 0.0_r_def
+      xp_f(:, :, 1) = xp(1:nqp_h_1d, :)
+      xp_f(:, 1, 1) = 0.0_r_def
 
-      xp_f(2, :, :) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
-      xp_f(2, :, 2) = 0.0_r_def
+      xp_f(:, :, 2) = xp(1:nqp_h - nqp_h_1d + 1:nqp_h_1d, :)
+      xp_f(:, 2, 2) = 0.0_r_def
 
-      xp_f(3, :, :) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
-      xp_f(3, :, 1) = 1.0_r_def
+      xp_f(:, :, 3) = xp(nqp_h - nqp_h_1d + 1:nqp_h, :)
+      xp_f(:, 1, 3) = 1.0_r_def
 
-      xp_f(4, :, :) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
-      xp_f(4, :, 2) = 1.0_r_def
+      xp_f(:, :, 4) = xp(nqp_h_1d:nqp_h:nqp_h_1d, :)
+      xp_f(:, 2, 4) = 1.0_r_def
 
       ! Stencil maps
       cross_stencil_wtheta => ptheta2_proxy%fs_to%get_stencil_dofmap(STENCIL_CROSS, 1)
@@ -1286,10 +1370,10 @@ contains
       do ff = 1, nfaces_h
 
         call ptheta2_proxy%fs_from%compute_basis_function( &
-          basis_w2_face(ff,:,:,:,:), ndf_w2, nqp_h_1d, nqp_v, xp_f(ff, :, :), zp)
+          basis_w2_face(:,:,:,:,ff), ndf_w2, nqp_h_1d, nqp_v, xp_f(:, :, ff), zp)
 
         call ptheta2_proxy%fs_to%compute_basis_function( &
-          basis_wtheta_face(ff,:,:,:,:), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(ff, :,:), zp)
+          basis_wtheta_face(:,:,:,:,ff), ndf_wtheta, nqp_h_1d, nqp_v, xp_f(:, :, ff), zp)
 
       end do
       !

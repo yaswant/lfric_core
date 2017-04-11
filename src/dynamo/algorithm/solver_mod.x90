@@ -49,6 +49,7 @@ module solver_mod
   implicit none
 
   private
+  real(r_def), parameter :: sc_err_min = 1.0e-16_r_def
   public :: solver_algorithm
 
 contains
@@ -187,7 +188,7 @@ contains
 
     ! compute the residual this is a global sum to the PSy ---
     call invoke_inner_prod(rhs,rhs,sc_err)
-    sc_err = max(sqrt(sc_err), 0.001_r_def)
+    sc_err = max(sqrt(sc_err), sc_err_min)
     write( log_scratch_space, '(A,E15.8)' ) &
          "solver_algorithm: bicgstab starting ... ||b|| = ", sc_err
     call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
@@ -343,7 +344,7 @@ contains
 
     call invoke_inner_prod( res, z, rs_old )
     err = sqrt(rs_old)
-    sc_err = max(err, 0.1_r_def)
+    sc_err = max(err, sc_err_min)
     init_err=sc_err
     write( log_scratch_space, '(A,E15.8)' ) &
          "cg solver_algorithm: starting ... ||b|| = ", sc_err
@@ -508,7 +509,7 @@ contains
     end do
 
     call invoke_inner_prod( rhs, rhs, err )
-    sc_err = max( sqrt(err), 0.01_r_def )
+    sc_err = max( sqrt(err), sc_err_min )
     init_err = sc_err
 
     if (err < tolerance) then
@@ -670,7 +671,7 @@ contains
       v(iter)  = field_type (vector_space = rhs_fs)
     end do
     call invoke_inner_prod( rhs, rhs, err )
-    sc_err = max( sqrt(err), 0.01_r_def )
+    sc_err = max( sqrt(err), sc_err_min )
     init_err = sc_err
 
     if (err < tolerance) then

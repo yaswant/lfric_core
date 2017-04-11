@@ -37,8 +37,10 @@ module si_solver_alg_mod
                                        si_postconditioner, &
                                        solver_si_preconditioner_none, &
                                        solver_si_preconditioner_diagonal, &
+                                       solver_si_preconditioner_pressure, &
                                        solver_si_postconditioner_none, &
                                        solver_si_postconditioner_diagonal, &
+                                       solver_si_postconditioner_pressure, &
                                        gcrk
 
   use timestepping_config_mod,   only: dt
@@ -48,9 +50,9 @@ module si_solver_alg_mod
   type(field_type), allocatable, private :: mm_diagonal(:)
   type(field_type), allocatable, private :: dx(:), Ax(:), residual(:), s(:), &
                                             w(:)
-  type(field_type), allocatable, private :: v(:,:)
+  type(field_type), allocatable, private :: v(:,:), Pv(:,:)
   type(field_type), allocatable, private :: x0_ext(:), rhs0_ext(:)
-
+  real(r_def),      parameter,   private :: sc_err_min = 1.0e-16_r_def
 private
   public  :: si_solver_alg
   public  :: si_solver_init
@@ -130,7 +132,8 @@ contains
               x0_ext     (si_bundle_size), &
               rhs0_ext   (si_bundle_size), &
               mm_diagonal(si_bundle_size), &
-              v          (si_bundle_size,gcrk) )
+              v          (si_bundle_size,gcrk), &
+              Pv         (si_bundle_size,gcrk) )
  
 
     mm_diagonal(1) = get_mass_matrix_diagonal(2)
@@ -164,7 +167,8 @@ contains
     call clone_bundle(x0_ext, w,        si_bundle_size)
     call clone_bundle(x0_ext, residual, si_bundle_size)   
     do iter = 1,gcrk
-      call clone_bundle(x0_ext, v(:,iter), si_bundle_size)
+      call clone_bundle(x0_ext,  v(:,iter), si_bundle_size)
+      call clone_bundle(x0_ext, Pv(:,iter), si_bundle_size)
     end do
     ! Intitialise lhs fields
     call lhs_init(x0_ext)
@@ -207,19 +211,19 @@ contains
       call rhs0(4)%log_minmax(LOG_LEVEL_DEBUG,'max/min r_p = ')
 
     err = bundle_inner_product(rhs0, rhs0, si_bundle_size)
-    sc_err = max( sqrt(err), 1.0e-5_r_def )
+    sc_err = max( sqrt(err), sc_err_min )
     init_err = sc_err
 
     if (err < si_tolerance) then
-      write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
-           "gmres solver_algorithm:converged in ", 0,           &
-           " iters, init=", init_err,                           &
+      write( log_scratch_space, '(A,I3,A,E12.4,A,E15.8)' ) &
+           "gmres solver_algorithm:converged in ", 0,      &
+           " iters, init=", init_err,                      &
            " final=", err
       call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
       return
     else
-      write( log_scratch_space, '(A,I2,A, 2E15.8)' ) "solver_algorithm[", 0, &
-                                                    "]: residual = ", init_err
+      write( log_scratch_space, '(A,I3,A,2E15.8)' )        &
+             "solver_algorithm[", 0, "]: residual = ", init_err
       call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
     end if
 
@@ -244,9 +248,9 @@ contains
 
       do j = 1, gcrk
 
-        call bundle_preconditioner(w, v(:,j), si_postconditioner, mm_diagonal, si_bundle_size)
+        call bundle_preconditioner(Pv(:,j), v(:,j), si_postconditioner, mm_diagonal, si_bundle_size)
 
-        call lhs_alg(s, w, x_ref, tau_dt)
+        call lhs_alg(s, Pv(:,j), x_ref, tau_dt)
         call bundle_preconditioner(w, s, si_preconditioner, mm_diagonal, si_bundle_size )
         do k = 1, j
           h(k,j) =  bundle_inner_product( v(:,k), w, si_bundle_size )
@@ -285,8 +289,7 @@ contains
       end do
 
       do i = 1, gcrk
-        call bundle_preconditioner(s, v(:,i), si_postconditioner, mm_diagonal, si_bundle_size)
-        call bundle_axpy( u(i), s, dx, dx, si_bundle_size )
+        call bundle_axpy( u(i), Pv(:,i), dx, dx, si_bundle_size )
       end do
 
       ! Check for convergence
@@ -297,15 +300,14 @@ contains
       beta = sqrt(bundle_inner_product(residual, residual, si_bundle_size))
 
       err = beta/sc_err
-      write( log_scratch_space, '(A,I2,A, E15.8)' ) "solver_algorithm[", iter, &
-                                                    "]: residual = ", err
+      write( log_scratch_space, '(A,I3,A,E15.8)' ) &
+             "solver_algorithm[", iter, "]: residual = ", err
       call log_event(log_scratch_space, LOG_LEVEL_INFO)
 
       if( err <  si_tolerance ) then
-        write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
+        write( log_scratch_space, '(A,I3,A,E12.4,A,E15.8)' )      &
              "GMRES solver_algorithm:converged in ", iter,        &
-             " iters, init=", init_err,                           &
-             " final=", err
+             " iters, init=", init_err, " final=", err
         call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
         exit
       end if
@@ -321,7 +323,7 @@ contains
     if ((iter >= max_gmres_iter .and. err >  si_tolerance) &
         .or. ieee_is_nan(err)) then
       write( log_scratch_space, '(A, I3, A, E15.8)') &
-           "GMRES solver_algorithm: NOT converged in", max_gmres_iter, &
+           "GMRES solver_algorithm: NOT converged in ", max_gmres_iter, &
            " iters, Res=", err
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
@@ -337,7 +339,9 @@ contains
 !>@param[in]    mm Arrays containing diagonal approximation to mass matrices
 !>@param[in]    si_bundle_size Number of fields the state arrays
   subroutine bundle_preconditioner(y, x, option, mm, si_bundle_size)
-    use psykal_lite_mod, only: invoke_copy_field_data
+    use psykal_lite_mod,          only: invoke_copy_field_data
+    use helmholtz_solver_alg_mod, only: helmholtz_solver_alg
+
     implicit none
     integer(kind=i_def), intent(in)    :: si_bundle_size
     type(field_type),    intent(inout) :: y(si_bundle_size)
@@ -360,6 +364,9 @@ contains
 !           call invoke( copy_field(x(i), y(i)) )
         end do
         call bundle_divide(y, mm, si_bundle_size)
+      case ( solver_si_preconditioner_pressure, solver_si_postconditioner_pressure )
+        call set_bundle_scalar(0.0_r_def, y, bundle_size)
+        call helmholtz_solver_alg(y, x)
       case default
         call log_event( 'Invalid si pre/postconditioner', LOG_LEVEL_ERROR )
     end select

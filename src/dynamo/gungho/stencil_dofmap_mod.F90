@@ -124,7 +124,7 @@ function stencil_dofmap_constructor( st_shape, st_extent, ndf, mesh, master_dofm
     allocate( self%dofmap( ndf, self%dofmap_size, ncells ) )
 
     ! Compute the dofmap
-    select case ( st_shape ) 
+    select case ( st_shape )
       case ( STENCIL_POINT )
         do cell = 1,ncells
           map => master_dofmap%get_master_dofmap(cell)

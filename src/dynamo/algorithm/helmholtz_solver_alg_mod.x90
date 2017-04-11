@@ -26,24 +26,18 @@ module helmholtz_solver_alg_mod
                                        get_mass_matrix_diagonal, &
                                        get_div
   use solver_config_mod,         only: normalise
+  use derived_config_mod,        only: si_bundle_size, bundle_size
   implicit none
 
-  private
-  real(kind=r_def), private, parameter :: tau_u = 0.5_r_def
-  real(kind=r_def), private, parameter :: tau_t = 0.5_r_def
-  real(kind=r_def), private, parameter :: tau_r = 1.0_r_def
-  integer(kind=i_def), private :: bundle_size = 3
-  integer(kind=i_def), private :: si_bundle_size = 3
-  logical, parameter :: diag_inv_mt = .true.
-  integer, parameter :: inverse_preconditioner = 1
-  integer, parameter :: no_preconditioner = 0
-  type(field_type), public :: helmholtz_rhs
-  type(field_type), public :: exner_increment
+  private 
+  real(kind=r_def),    private, parameter :: tau_u = 0.5_r_def
+  real(kind=r_def),    private, parameter :: tau_t = 0.5_r_def
+  real(kind=r_def),    private, parameter :: tau_r = 0.5_r_def
+  real(kind=r_def),    private, parameter :: sc_err_min = 1.0e-5_r_def
+  type(field_type),    private            :: helmholtz_rhs
+  type(field_type),    private            :: exner_increment
 
-  ! Temporary fields needed for 
-  ! Fields for invert H_B (all W2)
-  type(field_type), private :: cg_res, cg_p, cg_Ap, cg_z
-  type(field_type), private :: cg0_res, cg0_p, cg0_Ap, cg0_z, r_t
+  ! Temporary fields needed for: 
   ! Fields for bicgstab (all W3)
   type(field_type), private :: res, p, v, s, t, z, y
   ! For building rhs
@@ -55,14 +49,15 @@ module helmholtz_solver_alg_mod
   type(field_type), private, allocatable :: rhs_inc(:)
   type(field_type), private :: rho_inc, u_inc, theta_inc
 
+  type(field_type) :: hb_inv
+
 
   ! Sub algorithms used for solving the helmholtz equation
   public  :: helmholtz_solver_init
   public  :: helmholtz_solver_alg
   private :: apply_variable_helmholtz
   private :: build_helmholtz_rhs
-  private :: invert_h_b
-  private :: apply_h_b
+  public  :: compute_inv_hb
   private :: apply_helmholtz_lhs
   private :: bicgstab
   private :: back_substitute 
@@ -101,20 +96,10 @@ contains
     flux           = field_type(vector_space = w2)
     theta_adv_term = field_type(vector_space = wtheta)
     m2_u           = field_type(vector_space = w2)
-    mt_r_t     = field_type(vector_space = wtheta)
+    mt_r_t         = field_type(vector_space = wtheta)
 
-    ! Create invert_h_b fields ( cg temporary fields )
-    cg_res = field_type(vector_space = w2)
-    cg_p   = field_type(vector_space = w2)
-    cg_Ap  = field_type(vector_space = w2)
-    cg_z   = field_type(vector_space = w2)
-
-    ! Create invert_M_theta fields ( cg temporary fields )
-    cg0_res = field_type(vector_space = wtheta)
-    cg0_p   = field_type(vector_space = wtheta)
-    cg0_Ap  = field_type(vector_space = wtheta)
-    cg0_z   = field_type(vector_space = wtheta)
-    r_t     = field_type(vector_space = wtheta)
+    ! Create invert_h_b fields
+    hb_inv = field_type(vector_space = w2)
 
     ! Create bicgstab fields
     v   = field_type( vector_space = w3)
@@ -149,7 +134,7 @@ contains
     implicit none
 
     type(field_type), intent(inout) :: x0(si_bundle_size)
-    type(field_type), intent(inout) :: rhs0(si_bundle_size) ! Should be intent(in), but psyclone doesnt support this
+    type(field_type), intent(in)    :: rhs0(si_bundle_size)
 
     ! Build Helmholtz RHS
     call build_helmholtz_rhs(helmholtz_rhs, rhs0)
@@ -177,7 +162,7 @@ contains
 
     implicit none
     type(field_type), intent(inout) :: Hx
-    type(field_type), intent(inout) :: x ! Should be intent(in), but psyclone doesnt support this
+    type(field_type), intent(in)    :: x
    
     type(operator_type), pointer :: compound_div, ptheta2, p3theta => null()
     type(field_type),    pointer :: mt_diag, rho_at_u => null()
@@ -193,13 +178,8 @@ contains
     call invoke( dg_matrix_vector_kernel_type(Hx, flux, compound_div) )
     call invoke_scale_field_data(tau_r,Hx)
 
-    call invoke( matrix_vector_kernel_type(theta_adv_term, x, ptheta2) ) 
-    if ( diag_inv_mt ) then
-      call invoke_divide_field_data(theta_adv_term, mt_diag)
-    else  
-      call invoke( copy_field(theta_adv_term, r_t) )
-      call invert_mt(theta_adv_term, r_t)
-    end if
+    call invoke(matrix_vector_kernel_type(theta_adv_term, x, ptheta2)) 
+    call invoke_divide_field_data(theta_adv_term, mt_diag)
     ! Multiply theta_adv_term by tau_theta
     call invoke_scale_field_data(tau_t,theta_adv_term)
     call invoke( matrix_vector_kernel_type(Hx, theta_adv_term, p3theta) )    
@@ -210,18 +190,20 @@ contains
   subroutine build_helmholtz_rhs(helmholtz_rhs, rhs0)
     use psykal_lite_mod,          only: invoke_divide_field,      &
                                         invoke_divide_field_data, &
-                                        invoke_inc_axpy
+                                        invoke_inc_axpy, &
+                                        invoke_multiply_field_data, &
+                                        invoke_scale_field_data
     use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
     use dg_matrix_vector_kernel_mod, only: dg_matrix_vector_kernel_type
     use timestepping_config_mod,  only: dt
     use planet_config_mod,        only: cp
     use operator_mod,             only: operator_type
     use enforce_bc_kernel_mod,    only: enforce_bc_kernel_type
-    use log_mod,                  only: LOG_LEVEL_INFO
+    use log_mod,                  only: LOG_LEVEL_DEBUG
 
     implicit none
     type(field_type),                intent(inout) :: helmholtz_rhs
-    type(field_type),                intent(inout) :: rhs0(si_bundle_size) ! Should be intent(in), but psyclone doesnt support this
+    type(field_type),                intent(in)    :: rhs0(si_bundle_size)
 
     type(operator_type), pointer :: m3_rho_star, m3_inv, &
                                     p2theta, p3theta => null()
@@ -235,20 +217,15 @@ contains
     m3_inv      => get_mass_matrix(4)
     
     ! r_u = rhs_u + tau*dt*cp*P02*M0^-1*rhs_t       
-    if ( diag_inv_mt ) then
-      call invoke_divide_field(rhs0(2), mt_diag, mt_r_t)
-    else 
-      call invert_mt(mt_r_t, rhs0(2))
-    end if
+    call invoke_divide_field(rhs0(2), mt_diag, mt_r_t)
     call invoke( set_field_scalar(0.0_r_def, r_u) )
     call invoke( matrix_vector_kernel_type(r_u, mt_r_t, p2theta) )
     call invoke_inc_axpy(tau_u*dt*cp, r_u, rhs0(1)) 
     ! Compute H_B * u_term = r_u
-    call invoke( enforce_bc_kernel_type(r_u) ) ! Not sure if this needed? 
-    call invert_h_b(u_term, r_u)
+    call invoke( enforce_bc_kernel_type( r_u ) )
+    call invoke_multiply_field_data(r_u, hb_inv, u_term)
 
     ! Compute H(u_term)
-    call invoke( enforce_bc_kernel_type(u_term) )
     call apply_variable_helmholtz(helmholtz_rhs, u_term)
 
     ! r_pi = rhs_pi + P03*M0^-1*rhs_t + M3rho*M3^-1*rhs_r
@@ -263,115 +240,37 @@ contains
       H_diag => get_helm_diag()
       call invoke_divide_field_data(helmholtz_rhs, H_diag)
     end if
-    call helmholtz_rhs%log_minmax(LOG_LEVEL_INFO,  'helmholtz_rhs ')
+
+    call helmholtz_rhs%log_minmax(LOG_LEVEL_DEBUG, 'helmholtz_rhs')
 
   end subroutine build_helmholtz_rhs
 
 !=============================================================================!
-!>@brief Solve H_B * u = r_u to give u using CG iteration
-!>@details Use conjugate gradient method to approximately invert the H_B
-!>         operator which consists of the velocity mass matrix and 
-!>         bouyancy terms
-  subroutine invert_h_b(u, r_u, tol, max_iter)
-    use psykal_lite_mod,       only: invoke_inner_prod,       &
-                                     invoke_divide_field,     &
-                                     invoke_minus_field_data, &
-                                     invoke_axpy,             &
-                                     invoke_inc_xpby
-    use log_mod,               only: log_event,         &
-                                     log_scratch_space, &
-                                     LOG_LEVEL_ERROR,   &
-                                     LOG_LEVEL_TRACE,   &
-                                     LOG_LEVEL_DEBUG,   &
-                                     LOG_LEVEL_INFO
+!>@brief Compute the lumped inverse H_B operator
+  subroutine compute_inv_hb
+    use timestepping_config_mod,       only: dt
+    use planet_config_mod,             only: cp
+    use psykal_lite_mod,               only: invoke_divide_field_data,     &
+                                             invoke_inc_axpy,              &
+                                             invoke_raise_field
+    use matrix_vector_nobc_kernel_mod, only: matrix_vector_nobc_kernel_type
+    use operator_mod,                  only: operator_type
+    use enforce_bc_kernel_mod,         only: enforce_bc_kernel_type
+    use function_space_mod,            only: function_space_type
+    use finite_element_config_mod,     only: element_order
+    use function_space_collection_mod, only: function_space_collection
 
     implicit none
-    type(field_type),             intent(inout) :: u
-    type(field_type),             intent(in)    :: r_u
-    real(kind=r_def), optional :: tol
-    integer,          optional :: max_iter
-
-    ! the scalars
-    real(kind=r_def)               :: alpha, beta
-    real(kind=r_def)               :: rs_new, rs_old
-    ! others
-    real(kind=r_def)               :: err,sc_err, init_err
-    integer(kind=i_def)            :: iter
-    integer(kind=i_def)            :: maximum_iterations = 5
-    real(kind=r_def)               :: tolerance = 1.0e-1_r_def
-    type(field_type), pointer      :: m2_diag => null()
-
-    if ( present(tol) ) tolerance = tol
-    if ( present(max_iter) ) maximum_iterations = max_iter
-
-    m2_diag => get_mass_matrix_diagonal(2)
-
-    ! Precondition with mass matrix diagonal
-    call invoke_divide_field(r_u, m2_diag, u)
-    call apply_h_b(cg_Ap, u)
-
-    call invoke_minus_field_data( r_u, cg_Ap, cg_res )
-    call invoke_divide_field( cg_res, m2_diag, cg_z )
-    call invoke( copy_field(cg_z, cg_p) )
-
-    call invoke_inner_prod( cg_res, cg_z, rs_old )
-    err = sqrt(rs_old)
-    sc_err = max(err, 0.001_r_def)
-    init_err=sc_err
-    write( log_scratch_space, '(A, I2, A, E15.8)' ) &
-         "cg solver_algorithm[", 0, "]: res = ", err
-    call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-    if (err < tolerance) then
-      return
-    end if
-
-    do iter = 1, maximum_iterations
-      call apply_h_b(cg_Ap, cg_p)
-
-      call invoke_inner_prod( cg_p, cg_Ap, rs_new )
-      alpha = rs_old/rs_new
-
-      call invoke_inc_xpby(u, alpha, cg_p)
-      call invoke_inc_xpby(cg_res, -alpha, cg_Ap)
-
-      ! Check for convergence
-      call invoke_inner_prod(cg_res, cg_res, rs_new)
-      err = sqrt(rs_new)/sc_err
-
-      write( log_scratch_space, '(A, I2, A, E15.8)' ) &
-           "cg solver_algorithm[", iter, "]: res = ", err
-      call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-      if (err < tolerance) exit
-
-      ! Precondition with mass matrix diagonal
-      call invoke_divide_field(cg_res, m2_diag, cg_z)
-      call invoke_inner_prod(cg_z, cg_res, rs_new)
-      beta = rs_new/rs_old
-      rs_old = rs_new
-      call invoke_axpy(beta, cg_p, cg_z, cg_p)
-
-    end do
-
-  end subroutine invert_h_b
-
-!=============================================================================!
-!>@brief Apply the H_B operator to a field u in the velocity space
-  subroutine apply_h_b(hb_u, u)
-    use timestepping_config_mod,  only: dt
-    use planet_config_mod,        only: cp
-    use psykal_lite_mod,          only: invoke_divide_field_data, &
-                                        invoke_inc_axpy
-    use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
-    use operator_mod,             only: operator_type
-    use enforce_bc_kernel_mod,    only: enforce_bc_kernel_type
-
-    implicit none
-    type(field_type),                intent(inout) :: hb_u
-    type(field_type),                intent(inout) :: u ! Should be intent(in), but psyclone doesnt support this
-    type(operator_type), pointer                   :: m2, p2theta, &
+    type(operator_type), pointer                   :: m2, p2theta,         &
                                                       ptheta2 => null()
     type(field_type),    pointer                   :: mt_diag => null()
     real(kind=r_def)                               :: timestep_term
+    type(field_type)                               :: ones
+    type(function_space_type), pointer             :: w2 => null()
+    integer(kind=i_def)                            :: mesh
+    integer(kind=i_def)                            :: fs_handle
+
+    ! Get needed function spaces
 
     timestep_term = cp*tau_u*tau_t*dt**2
 
@@ -380,50 +279,52 @@ contains
     ptheta2 => get_ptheta2()
     mt_diag => get_mt_lumped()
 
-    call invoke( set_field_scalar(0.0_r_def, hb_u), &
-                 set_field_scalar(0.0_r_def, m2_u), &
-                 set_field_scalar(0.0_r_def, theta_adv_term) )
-    call invoke( matrix_vector_kernel_type(m2_u, u, m2) )
-    call invoke( matrix_vector_kernel_type(theta_adv_term, u, ptheta2) )
-    if ( diag_inv_mt ) then
-      call invoke_divide_field_data(theta_adv_term, mt_diag)
-    else 
-      call invoke( copy_field(theta_adv_term, r_t) )
-      call invert_mt(theta_adv_term, r_t)
-    end if
-    call invoke( matrix_vector_kernel_type(hb_u, theta_adv_term, p2theta) )  
-    call invoke_inc_axpy( timestep_term, hb_u, m2_u )
+    mesh = hb_inv%get_mesh_id()
+    fs_handle = hb_inv%which_function_space()
+    w2 => function_space_collection%get_fs(mesh, element_order, fs_handle)
+    ones = field_type( vector_space = w2 )
 
-    call invoke( enforce_bc_kernel_type(hb_u) ) ! Not sure if this needed?
-
-  end subroutine apply_h_b
+    call invoke(set_field_scalar(1.0_r_def, ones), &
+                set_field_scalar(0.0_r_def, hb_inv), &
+                set_field_scalar(0.0_r_def, m2_u), &
+                set_field_scalar(0.0_r_def, theta_adv_term) )
+    call invoke( matrix_vector_nobc_kernel_type(m2_u, ones, m2), &
+                 matrix_vector_nobc_kernel_type(theta_adv_term, ones, ptheta2) )
+    call invoke_divide_field_data(theta_adv_term, mt_diag)
+    call invoke( matrix_vector_nobc_kernel_type(hb_inv, theta_adv_term, p2theta) )  
+    call invoke_inc_axpy( timestep_term, hb_inv, m2_u )
+    call invoke_raise_field(hb_inv, -1_i_def)
+ 
+  end subroutine compute_inv_hb
 
 !=============================================================================!
 !>@brief Apply the full Helmholtz lhs to a pressure field p, this is the Ax
 !>       routine called from the Krylov solver 
   subroutine apply_helmholtz_lhs(Hp, p)
     use timestepping_config_mod,  only: dt
-    use planet_config_mod,        only: cp, kappa
+    use planet_config_mod,        only: cp
     use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
     use dg_matrix_vector_kernel_mod, &
                                   only: dg_matrix_vector_kernel_type
     use transpose_matrix_vector_kernel_mod, &
                                   only: transpose_matrix_vector_kernel_type
     use psykal_lite_mod,          only: invoke_divide_field_data, &
-                                        invoke_inc_axpby
+                                        invoke_inc_axpby, &
+                                        invoke_multiply_field_data
     use operator_mod,             only: operator_type
     use enforce_bc_kernel_mod,    only: enforce_bc_kernel_type
+
     implicit none
     type(field_type),                intent(inout) :: Hp
-    type(field_type),                intent(inout) :: p ! Should be intent(in), but psyclone doesnt support this
+    type(field_type),                intent(in)    :: p
 
     type(operator_type), pointer :: m3_exner_star, div_star => null()
-    real(kind=r_def)             :: kappa_term, timestep_term
+    real(kind=r_def)             :: timestep_term
     type(field_type),    pointer :: H_diag => null()
+
     m3_exner_star => get_m3_exner_star()
     div_star      => get_div_star()
 
-    kappa_term = (1.0_r_def - kappa)/kappa
     timestep_term = cp*tau_u*dt**2
 
     ! Initialise fields
@@ -434,16 +335,15 @@ contains
     call invoke( transpose_matrix_vector_kernel_type(grad_p, p, div_star) )
 
     ! Compute H_B * u_term = grad_p
-    call invoke( enforce_bc_kernel_type(grad_p) ) ! Not sure if this needed?
-    call invert_h_b(u_term, grad_p)
+    call invoke( enforce_bc_kernel_type( grad_p ) )   
+    call invoke_multiply_field_data(grad_p, hb_inv, u_term)
 
     ! Compute H(u_term)
-    call invoke( enforce_bc_kernel_type(u_term) )
     call apply_variable_helmholtz(Hp, u_term )
        
     ! Add (1-k)/k * Pi'
     call invoke( dg_matrix_vector_kernel_type(pi_term, p, m3_exner_star) )    
-    call invoke_inc_axpby( timestep_term, Hp, kappa_term, pi_term)
+    call invoke_inc_axpby( timestep_term, Hp, 1.0_r_def, pi_term)
 
     if ( normalise ) then 
       H_diag => get_helm_diag()
@@ -456,7 +356,7 @@ contains
 !>@brief Krylov solver specifically for solving the Helmholtz equation 
   subroutine bicgstab(lhs, rhs)
     use solver_config_mod,     only: maximum_iterations, &
-                                     si_tolerance
+                                     si_pressure_tolerance
     use psykal_lite_mod,       only: invoke_inner_prod, &
                                      invoke_axpy,       &
                                      invoke_inc_axpy,   &
@@ -480,10 +380,10 @@ contains
     
     ! compute the residual this is a global sum to the PSy ---
     call invoke_inner_prod(rhs,rhs,sc_err)
-    sc_err = max(sqrt(sc_err), 0.001_r_def)
+    sc_err = max(sqrt(sc_err), sc_err_min)
     write( log_scratch_space, '(A,E15.8)' ) &
          "solver_algorithm: bicgstab starting ... ||b|| = ", sc_err
-    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
 
     alpha  = 1.0_r_def
     omega  = 1.0_r_def
@@ -495,12 +395,11 @@ contains
     call invoke_inner_prod(res,res,err)
     err = sqrt(err)/sc_err
     init_err=err
-    if (err < si_tolerance) then
-      write( log_scratch_space, '(A, I2,A,E12.4,A,E15.8)') &
+    if (err < si_pressure_tolerance) then
+      write( log_scratch_space, '(A,I3,A,E12.4,A,E15.8)') &
            "helmholtz solver_algorithm:converged in ", 0,  &
-           " iters, init=", init_err,                      &
-           " final=", err
-      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+           " iters, init=", init_err," final=", err
+      call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
       return
     end if
 
@@ -539,15 +438,14 @@ contains
       call invoke_inner_prod(res,res,err)
       err = sqrt(err)/sc_err
 
-      write( log_scratch_space, '(A,I2,A, E15.8)' ) "solver_algorithm[", iter, &
-                                                    "]: res = ", err
-      call log_event(log_scratch_space, LOG_LEVEL_INFO)
+      write( log_scratch_space, '(A,I3,A,E15.8)' ) &
+             "solver_algorithm[", iter, "]: res = ", err
+      call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
 
-      if (err < si_tolerance) then
-        write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
+      if (err < si_pressure_tolerance) then
+        write( log_scratch_space, '(A,I3,A,E12.4,A,E15.8)' )      &
              "Helmholtz solver_algorithm:converged in ", iter,    &
-             " iters, init=", init_err,                           &
-             " final=", err
+             " iters, init=", init_err, " final=", err
         call log_event( log_scratch_space, LOG_LEVEL_INFO )
         exit
       end if
@@ -564,38 +462,30 @@ contains
 !>@brief Obtain the increments to each field from the pressure field given by
 !>       the helmholtz equation
   subroutine back_substitute( state, exner_inc, rhs)
-    use finite_element_config_mod, only: wtheta_on
-    use log_mod,                  only: LOG_LEVEL_DEBUG, &
-                                        LOG_LEVEL_INFO
-    use timestepping_config_mod,  only: dt
-    use planet_config_mod,        only: cp
+    use log_mod,                     only: LOG_LEVEL_DEBUG,                    &
+                                           LOG_LEVEL_INFO
+    use timestepping_config_mod,     only: dt
+    use planet_config_mod,           only: cp
     use psykal_lite_mod,          only: invoke_inc_axpy,            &
                                         invoke_divide_field,        &
                                         invoke_multiply_field_data, &
                                         invoke_increment_field
-    use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
-    use dg_matrix_vector_kernel_mod, &
-                                  only: dg_matrix_vector_kernel_type
+    use matrix_vector_kernel_mod,    only: matrix_vector_kernel_type
+    use dg_matrix_vector_kernel_mod, only: dg_matrix_vector_kernel_type
     use transpose_matrix_vector_kernel_mod, &
-                                  only: transpose_matrix_vector_kernel_type
-    use operator_mod,             only: operator_type  
-    use enforce_bc_kernel_mod,    only: enforce_bc_kernel_type
-
-    use solver_config_mod,        only: method, preconditioner
-    use solver_mod,               only: solver_algorithm
+                                     only: transpose_matrix_vector_kernel_type
+    use operator_mod,                only: operator_type
+    use enforce_bc_kernel_mod,       only: enforce_bc_kernel_type
+    use formulation_config_mod,      only: eliminate_p
 
     implicit none
     type(field_type),                intent(inout) :: state(si_bundle_size)
-    type(field_type),                intent(inout) :: exner_inc! Should in intent(in), but psyclone doesnt support this
+    type(field_type),                intent(in)    :: exner_inc
     type(field_type),                intent(in)    :: rhs(si_bundle_size)
 
-    type(field_type),    pointer :: mt_diag, rho_at_u => null()
-    type(operator_type), pointer :: div_star, ptheta2, div, &
-                                    m3_inv => null()
-
-    type(field_type),    pointer :: chi(:) => null()
-    integer(i_def)               :: mesh
-    type(operator_type), pointer :: mm_wtheta => null()
+    type(field_type),    pointer :: mt_diag => null(), rho_at_u => null()
+    type(operator_type), pointer :: div_star => null(), ptheta2 => null(), &
+                                    div => null(), m3_inv => null()
 
     ! Need to pass in mathfrak{R}_u
     mt_diag      => get_mt_lumped()
@@ -612,42 +502,29 @@ contains
     ! u increment
     call invoke( transpose_matrix_vector_kernel_type(rhs_inc(1), exner_inc, div_star) )
     call invoke_inc_axpy((tau_u*dt*cp), rhs_inc(1), r_u)
-    call invoke( enforce_bc_kernel_type(rhs_inc(1)) ) ! Not sure if this needed?
-    call invert_h_b(u_inc, rhs_inc(1), 1.0e-5_r_def, 100)
-    call invoke( enforce_bc_kernel_type(u_inc) ) ! Not sure if this needed?
+    call invoke( enforce_bc_kernel_type( rhs_inc(1) ) )
+    call invoke_multiply_field_data(rhs_inc(1), hb_inv, u_inc)
 
     ! theta increment
     call invoke( matrix_vector_kernel_type(rhs_inc(2), u_inc, ptheta2) )
     call invoke_inc_axpy(-(tau_t*dt), rhs_inc(2), rhs(2) )  
-    if ( diag_inv_mt .and. .false. ) then
-      call invoke_divide_field(rhs_inc(2), mt_diag, theta_inc)
-    else
-      call invoke( set_field_scalar(0.0_r_def, theta_inc) )
-      mesh = theta_inc%get_mesh_id()
-      chi => get_coordinates()
-      if(wtheta_on) then
-        mm_wtheta => get_mass_matrix(5)
-      else
-        mm_wtheta => get_mass_matrix(0)
-      end if
-      call solver_algorithm( theta_inc, rhs_inc(2),       &
-                             mesh, chi, method, mm=mm_wtheta,&
-                             mmd=mt_diag, &
-                             preconditioner_choice=preconditioner )
-    end if
+    call invoke_divide_field(rhs_inc(2), mt_diag, theta_inc)
+
     ! rho increment
     call invoke_multiply_field_data(rho_at_u, u_inc, flux)
     call invoke( dg_matrix_vector_kernel_type(rhs_inc(3), flux, div) )
     call invoke( dg_matrix_vector_kernel_type(rho_inc, rhs_inc(3), m3_inv) )
     call invoke_inc_axpy( -(tau_r*dt), rho_inc, rhs(3))
-    call exner_inc%log_minmax(LOG_LEVEL_INFO, 'exner increment ') 
-    call u_inc    %log_minmax(LOG_LEVEL_INFO, 'u increment     ') 
-    call theta_inc%log_minmax(LOG_LEVEL_INFO, 'theta increment ') 
-    call rho_inc  %log_minmax(LOG_LEVEL_INFO, 'rho increment   ') 
+
+    call exner_inc%log_minmax(LOG_LEVEL_DEBUG, 'exner increment ') 
+    call u_inc    %log_minmax(LOG_LEVEL_DEBUG, 'u increment     ') 
+    call theta_inc%log_minmax(LOG_LEVEL_DEBUG, 'theta increment ') 
+    call rho_inc  %log_minmax(LOG_LEVEL_DEBUG, 'rho increment   ') 
 
     call invoke_increment_field(u_inc,     state(1))
     call invoke_increment_field(theta_inc, state(2))
     call invoke_increment_field(rho_inc,   state(3))
+    if ( .not. eliminate_p ) call invoke_increment_field(exner_inc, state(4))
   
   end subroutine back_substitute
 !=============================================================================!
@@ -658,30 +535,30 @@ contains
     use dg_matrix_vector_kernel_mod, only: dg_matrix_vector_kernel_type
     use operator_mod,             only: operator_type 
     use tri_solve_kernel_mod,     only: tri_solve_kernel_type
-    use solver_config_mod,        only: si_preconditioner, &
-                                        solver_si_preconditioner_tridiagonal, & 
-                                        solver_si_preconditioner_diagonal 
+    use solver_config_mod,        only: si_pressure_preconditioner, &
+                                        solver_si_pressure_preconditioner_tridiagonal, & 
+                                        solver_si_pressure_preconditioner_diagonal 
 
     implicit none
-    type(field_type),             intent(inout) :: y
-    type(field_type),             intent(inout) :: x! Should in intent(in), but psyclone doesnt support this
-    integer, intent(in), optional :: prec
+    type(field_type),  intent(inout) :: y
+    type(field_type),  intent(in)    :: x
+    integer, optional, intent(in)    :: prec
 
     integer                      :: precon
     type(operator_type), pointer :: m3_inv => null()
     type(field_type)             :: z
-    type(field_type),   pointer  :: tri(:) => null()
+    type(field_type),    pointer :: tri(:) => null()
 
     if ( .not. present(prec) ) then
-      precon = si_preconditioner
+      precon = si_pressure_preconditioner
     else
       precon = prec
     end if
     select case ( precon )
-      case ( solver_si_preconditioner_diagonal )       
+      case ( solver_si_pressure_preconditioner_diagonal )       
         m3_inv   => get_mass_matrix(4)
         call invoke( dg_matrix_vector_kernel_type(y, x, m3_inv) )     
-      case ( solver_si_preconditioner_tridiagonal )
+      case ( solver_si_pressure_preconditioner_tridiagonal )
         z = y
         tri => get_tri_precon()
         m3_inv   => get_mass_matrix(4)
@@ -692,96 +569,5 @@ contains
     end select
   end subroutine helmholtz_precondition
 !=============================================================================!
-!>@brief Solve M0 * t = r_t to give t using CG iteration
-!>@details Invert the mass matrix for the temperature space using a conjugate
-!>         gradient method
-  subroutine invert_mt(t, r_t)
-    use finite_element_config_mod, only: wtheta_on
-    use psykal_lite_mod,           only: invoke_inner_prod,       &
-                                         invoke_divide_field,     &
-                                         invoke_minus_field_data, &
-                                         invoke_axpy
-    use log_mod,                   only: log_event,         &
-                                         log_scratch_space, &
-                                         LOG_LEVEL_ERROR,   &
-                                         LOG_LEVEL_TRACE,   &
-                                         LOG_LEVEL_DEBUG,   &
-                                         LOG_LEVEL_INFO
-    use matrix_vector_kernel_mod, only: matrix_vector_kernel_type
-    use operator_mod,             only: operator_type
-
-    implicit none
-    type(field_type),             intent(inout) :: t
-    type(field_type),             intent(in)    :: r_t
-
-    ! The scalars
-    real(kind=r_def)               :: alpha, beta
-    real(kind=r_def)               :: rs_new, rs_old
-    ! Others
-    real(kind=r_def)               :: err,sc_err, init_err
-    integer(kind=i_def)            :: iter
-    integer(kind=i_def), parameter :: maximum_iterations = 5
-    real(kind=r_def),    parameter :: tolerance = 1.0e-2_r_def
-    type(field_type),    pointer   :: mt_diag => null()
-    type(operator_type), pointer   :: mt => null()
-
-    if(wtheta_on) then
-      mt_diag => get_mass_matrix_diagonal(4)
-      mt      => get_mass_matrix(5)
-    else
-      mt_diag => get_mass_matrix_diagonal(0)
-      mt      => get_mass_matrix(0)
-    end if
-    ! Precondition with mass matrix diagonal
-    call invoke_divide_field(r_t, mt_diag, t)
-    
-    call invoke( set_field_scalar(0.0_r_def, cg0_Ap) )
-    call invoke( matrix_vector_kernel_type(cg0_Ap, t, mt) )
-
-    call invoke_minus_field_data( r_t, cg0_Ap, cg0_res )
-    call invoke_divide_field(cg0_res, mt_diag, cg0_z)
-    call invoke( copy_field(cg0_z, cg0_p) )
-
-    call invoke_inner_prod( cg0_res, cg0_z, rs_old )
-    err = sqrt(rs_old)
-    sc_err = max(err, 0.001_r_def)
-    init_err=sc_err
-    write( log_scratch_space, '(A, I2, A, E15.8)' ) &
-         "cg solver_algorithm[", 0, "]: res = ", err
-    call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-    if (err < tolerance) return
-
-    do iter = 1, maximum_iterations
-      
-     call invoke( set_field_scalar(0.0_r_def, cg0_Ap) )
-     call invoke( matrix_vector_kernel_type(cg0_Ap, cg0_p, mt) )
-
-      call invoke_inner_prod( cg0_p, cg0_Ap, rs_new )
-      alpha = rs_old/rs_new
-
-      call invoke_axpy( alpha, cg0_p, t, t )
-      call invoke_axpy( -alpha, cg0_Ap, cg0_res, cg0_res )
-
-      ! Check for convergence
-      call invoke_inner_prod(cg0_res, cg0_res, rs_new)
-      err = sqrt(rs_new)/sc_err
-
-      write( log_scratch_space, '(A, I2, A, E15.8)' ) &
-           "cg solver_algorithm[", iter, "]: res = ", err
-      call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
-      if (err < tolerance) exit
-
-      ! Precondition with mass matrix diagonal
-      call invoke_divide_field(cg0_res, mt_diag, cg0_z)
-      call invoke_inner_prod(cg0_z, cg0_res, rs_new)
-      beta = rs_new/rs_old
-      rs_old = rs_new
-      call invoke_axpy(beta, cg0_p, cg0_z, cg0_p)
-
-    end do
-
-  end subroutine invert_mt
-!=============================================================================!
-
 end module helmholtz_solver_alg_mod
 

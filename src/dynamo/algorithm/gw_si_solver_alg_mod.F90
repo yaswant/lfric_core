@@ -11,34 +11,35 @@ module gw_si_solver_alg_mod
   use, intrinsic :: ieee_arithmetic
 
   use constants_mod,           only: r_def, str_def, i_def
-  use field_bundle_mod,        only: clone_bundle, &
-                                     set_bundle_scalar, &
-                                     bundle_axpy, &
-                                     copy_bundle, &
-                                     minus_bundle, &
-                                     bundle_ax, &
-                                     bundle_divide, &
-                                     bundle_minmax, &
+  use field_bundle_mod,        only: clone_bundle,                        &
+                                     set_bundle_scalar,                   &
+                                     bundle_axpy,                         &
+                                     copy_bundle,                         &
+                                     minus_bundle,                        &
+                                     bundle_ax,                           &
+                                     bundle_divide,                       &
+                                     bundle_minmax,                       &
                                      bundle_inner_product
   use runtime_constants_mod,   only: get_mass_matrix_diagonal
   use field_mod,               only: field_type
   use formulation_config_mod,  only: eliminate_p
   use gw_lhs_alg_mod,          only: gw_lhs_alg
-  use log_mod,                 only: log_event,         &
-                                     log_scratch_space, &
-                                     LOG_LEVEL_ERROR,   &
-                                     LOG_LEVEL_DEBUG,   &
-                                     LOG_LEVEL_TRACE,   &
+  use log_mod,                 only: log_event,                          &
+                                     log_scratch_space,                  &
+                                     LOG_LEVEL_ERROR,                    &
+                                     LOG_LEVEL_DEBUG,                    &
+                                     LOG_LEVEL_TRACE,                    &
                                      lOG_LEVEL_INFO
   use operator_mod,            only: operator_type
-  use solver_config_mod,       only: maximum_iterations, &
-                                     si_tolerance, &
-                                     si_preconditioner, &
-                                     si_postconditioner, &
-                                     solver_si_preconditioner_none, &
-                                     solver_si_preconditioner_diagonal, &
-                                     solver_si_preconditioner_pressure, &
-                                     solver_si_postconditioner_none, &
+  use solver_config_mod,       only: maximum_iterations,                 &
+                                     si_tolerance,                       &
+                                     si_preconditioner,                  &
+                                     si_postconditioner,                 &
+                                     solver_si_preconditioner_none,      &
+                                     solver_si_preconditioner_diagonal,  &
+                                     solver_si_preconditioner_pressure,  &
+                                     solver_si_postconditioner_pressure, &
+                                     solver_si_postconditioner_none,     &
                                      solver_si_postconditioner_diagonal, &
                                      gcrk
 
@@ -50,7 +51,7 @@ module gw_si_solver_alg_mod
 
   private
   type(field_type), allocatable :: mm_diagonal(:)
-  type(field_type), allocatable :: dx(:), Ax(:), residual(:), s(:), &
+  type(field_type), allocatable :: dx(:), Ax(:), residual(:), s(:),      &
                                    w(:)
   type(field_type), allocatable :: v(:,:)
 
@@ -72,14 +73,14 @@ contains
                                                gw_miniapp_constants_b_space_w3, &
                                                gw_miniapp_constants_b_space_wtheta
     use mm_diagonal_kernel_mod,          only: mm_diagonal_kernel_type
-    use runtime_constants_mod,           only: get_mass_matrix
     use gw_pressure_solver_alg_mod,      only: gw_pressure_solver_init
     implicit none
 
     type(field_type),             intent(in) :: x0(bundle_size)
     integer                                  :: iter
 
-    if ( si_preconditioner == solver_si_preconditioner_pressure .or. &
+    if ( si_preconditioner  == solver_si_preconditioner_pressure .or.  &
+         si_postconditioner == solver_si_postconditioner_pressure .or. &
          helmholtz_solve ) call gw_pressure_solver_init(x0)
 
     allocate( dx         (bundle_size), &
@@ -196,7 +197,7 @@ contains
     max_gmres_iter = maximum_iterations
 
     err = bundle_inner_product(rhs0, rhs0, bundle_size)
-    sc_err = max( sqrt(err), 1.0e-8_r_def )
+    sc_err = max( sqrt(err), 1.0e-16_r_def )
     init_err = sc_err
 
     if (err < si_tolerance) then
@@ -207,8 +208,8 @@ contains
       call log_event( log_scratch_space, LOG_LEVEL_DEBUG )
       return
     else
-      write( log_scratch_space, '(A,I2,A, 2E15.8)' ) "solver_algorithm[", 0, &
-                                                    "]: residual = ", init_err
+      write( log_scratch_space, '(A,I2,A, 2E15.8)' ) &
+             "solver_algorithm[", 0,"]: residual = ", init_err
       call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
     end if
 
@@ -286,8 +287,8 @@ contains
       beta = sqrt(bundle_inner_product(residual, residual, bundle_size))
 
       err = beta/sc_err
-      write( log_scratch_space, '(A,I2,A, E15.8)' ) "solver_algorithm[", iter, &
-                                                    "]: residual = ", err
+      write( log_scratch_space, '(A,I2,A, E15.8)' ) &
+             "solver_algorithm[", iter, "]: residual = ", err
       call log_event(log_scratch_space, LOG_LEVEL_INFO)
 
       if( err <  si_tolerance ) then
@@ -299,7 +300,8 @@ contains
         exit
       end if
 
-      call bundle_preconditioner(s, residual, si_preconditioner, mm_diagonal, bundle_size)
+      call bundle_preconditioner(s, residual, si_preconditioner, mm_diagonal, &
+                                 bundle_size)
       call bundle_ax(1.0_r_def/beta, s, v(:,1), bundle_size)
 
       g(:) = 0.0_r_def
@@ -337,17 +339,18 @@ contains
     integer(kind=i_def), intent(in)    :: option
     integer(kind=i_def)                :: i
 
-    if (  option == solver_si_preconditioner_pressure ) then
+    if (  option == solver_si_preconditioner_pressure .or.           &
+          option == solver_si_postconditioner_pressure ) then
       call set_bundle_scalar(0.0_r_def, y, bundle_size)
       call gw_pressure_solver_alg(y, x)
     else
       do i = 1,bundle_size
         call invoke_copy_field_data( x(i), y(i) )
-! PSyclone built-ins support (v.1.3.1) fails for changing index in a loop, so the
-! call below is a placeholder for when it becomes available
-!        call invoke( copy_field(x(i), y(i)) )
+        ! PSyclone built-ins support (v.1.3.1) fails for changing index in a loop, so the
+        ! call below is a placeholder for when it becomes available
+        !        call invoke( copy_field(x(i), y(i)) 
       end do
-      if ( option == solver_si_preconditioner_diagonal .or. &
+      if ( option == solver_si_preconditioner_diagonal .or.          &
            option == solver_si_postconditioner_diagonal) then
         call bundle_divide(y, mm, bundle_size)
       end if

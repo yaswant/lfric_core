@@ -22,6 +22,8 @@ use argument_mod,            only: arg_type, func_type,                      &
                                    GH_BASIS, GH_DIFF_BASIS,                  &
                                    CELLS, QUADRATURE_XYoZ
 use coordinate_jacobian_mod, only: coordinate_jacobian
+use planet_config_mod,       only: kappa
+
 implicit none
 
 !-------------------------------------------------------------------------------
@@ -139,7 +141,9 @@ subroutine weighted_m3_exner_code(cell, nlayers, ncell_3d,                      
   real(kind=r_def)                             :: integrand
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
-
+  real(kind=r_def)                             :: one_m_kappa_over_kappa
+  
+  one_m_kappa_over_kappa = (1.0_r_def-kappa)/kappa
   do k = 0, nlayers - 1
     ik = 1 + k + (cell-1)*nlayers
      
@@ -160,25 +164,25 @@ subroutine weighted_m3_exner_code(cell, nlayers, ncell_3d,                      
       rho_e(df) = rho(map_w3(df) + k)
     end do
 
-    do df2 = 1, ndf_w3
-      do df1 = 1, ndf_w3 
-        mm(df1,df2,ik) = 0.0_r_def
-        do qp2 = 1, nqp_v
-          do qp1 = 1, nqp_h 
-            theta_quad = 0.0_r_def
-            do df = 1,ndf_wtheta
-              theta_quad = theta_quad + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
-            end do
-            rho_quad = 0.0_r_def
-            do df = 1,ndf_w3
-              rho_quad = rho_quad + rho_e(df)*basis_w3(1,df,qp1,qp2)
-            end do
-            exner_quad = calc_exner_pointwise(rho_quad, theta_quad)
-
-            integrand = wqp_h(qp1)*wqp_v(qp2) & 
-                       *basis_w3(1,df1,qp1,qp2)*basis_w3(1,df2,qp1,qp2)  &
-                       /exner_quad*dj(qp1,qp2) 
-            mm(df1,df2,ik) = mm(df1,df2,ik) + integrand
+    mm(:,:,ik) = 0.0_r_def
+    do qp2 = 1, nqp_v
+      do qp1 = 1, nqp_h 
+        theta_quad = 0.0_r_def
+        do df = 1,ndf_wtheta
+          theta_quad = theta_quad + theta_e(df)*basis_wtheta(1,df,qp1,qp2)
+        end do
+        rho_quad = 0.0_r_def
+        do df = 1,ndf_w3
+          rho_quad = rho_quad + rho_e(df)*basis_w3(1,df,qp1,qp2)
+        end do
+        exner_quad = calc_exner_pointwise(rho_quad, theta_quad)
+        integrand = wqp_h(qp1)*wqp_v(qp2)*one_m_kappa_over_kappa  &
+                   *dj(qp1,qp2)/exner_quad
+        do df2 = 1, ndf_w3
+          do df1 = 1, ndf_w3 
+            mm(df1,df2,ik) = mm(df1,df2,ik)                       &
+                           + basis_w3(1,df1,qp1,qp2)              &
+                           * basis_w3(1,df2,qp1,qp2)*integrand
           end do
         end do
       end do
