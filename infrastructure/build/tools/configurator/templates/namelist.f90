@@ -46,11 +46,13 @@ module {{listname}}_config_mod
 {{-'\n'}}
 {%-   for enumeration, pairs in enumerations | dictsort %}
   character(str_def), parameter :: {{enumeration}}_key({{pairs | length()}}) &
-{%      set indent = '          = [character(len=str_def) :: ' %}
-{%-       for pair in pairs %}
-{%-         if not loop.first %}, &{{'\n'}}{% endif %}
+{%         set indent = '          = [character(len=str_def) :: ' %}
+{%-     for pair in pairs %}
+{%-       if not loop.first %}
+{%-         set indent = ' ' * indent | length() -%}
+, &{{'\n'}}
+{%-        endif %}
 {{- indent }}'{{ pair.key }}'
-{%-       set indent = ' ' * indent | length() %}
 {%-     endfor %}]
 {%-   endfor %}
 {%- endif %}
