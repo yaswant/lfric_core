@@ -49,6 +49,7 @@ contains
                                                   u,                    &
                                                   dep_pts,              &
                                                   cell_orientation,     &
+                                                  detj_at_w2,           &
                                                   rho_in,               &
                                                   rho_out)
 
@@ -58,6 +59,7 @@ contains
     type(field_type),    intent(in)     :: u
     type(field_type),    intent(in)     :: dep_pts
     type(field_type),    intent(in)     :: cell_orientation
+    type(field_type),    intent(in)     :: detj_at_w2
     type(field_type),    intent(in)     :: rho_in
     type(field_type),    intent(inout)  :: rho_out
 
@@ -94,7 +96,7 @@ contains
 
     call invoke_conservative_fluxes(  rho_in, dep_pts, u, mass_flux,  &
                                       a0, a1, a2, direction, dep_pt_stencil_extent )
-    call density_update_alg(rho_in, mass_flux, rho_adv_np1)
+    call density_update_alg(rho_in, mass_flux, rho_adv_np1, detj_at_w2)
 
     ! Calculate the fluxes for rho=1
     call invoke( set_field_scalar(0.0_r_def,mass_flux), &
@@ -108,7 +110,7 @@ contains
     call invoke_conservative_fluxes(  rho_constant_1, dep_pts, u, mass_flux,  &
                                       a0, a1, a2, direction, dep_pt_stencil_extent )
 
-    call density_update_alg(rho_constant_1, mass_flux, rho_constant_np1)
+    call density_update_alg(rho_constant_1, mass_flux, rho_constant_np1, detj_at_w2)
 
     ! Perform multiplicative correction to obtain the advective update of density
     call invoke_divide_field(rho_adv_np1,rho_constant_np1,rho_out)

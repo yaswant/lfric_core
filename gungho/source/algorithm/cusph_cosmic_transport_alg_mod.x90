@@ -94,7 +94,7 @@ contains
 
     ! Call algorithm to calculate mass fluxes using COSMIC scheme
     call cusph_split_transport_alg( u_n, u_np1, rho, chi, cell_orientation,  &
-                                                            mesh_id, mass_flux )
+                                                            mesh_id, mass_flux, detj_at_w2 )
 
     ! These lines are commented out on purpose as this code is not yet ready
     ! Update density field using rho_n+1 = rho_n + dt * div(mass_flux)

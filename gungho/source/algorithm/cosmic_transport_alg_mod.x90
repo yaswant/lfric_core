@@ -77,22 +77,23 @@ contains
 !>          the horizontal direction only. The wind profile is defined
 !>          analytically.
 !> @param[inout] rho Density field
-  subroutine cosmic_transport_step( rho)
+  subroutine cosmic_transport_step( rho, detj_at_w2)
 
     implicit none
 
     type(field_type),    intent(inout) :: rho
     type(field_type), pointer :: chi(:) => null()
+    type(field_type),    intent(in)    :: detj_at_w2
 
     chi => get_coordinates()
 
     call invoke( copy_field(rho,rho_n) )
 
     ! Call algorithm to calculate mass fluxes using COSMIC scheme
-    call split_transport_alg( u_n, u_np1, rho_n, chi, mass_flux)
+    call split_transport_alg( u_n, u_np1, rho_n, chi, detj_at_w2, mass_flux)
 
     ! Update density field using rho_n+1 = rho_n + dt * div(mass_flux)
-    call density_update_alg(rho_n, mass_flux, rho_np1)
+    call density_update_alg(rho_n, mass_flux, rho_np1, detj_at_w2)
 
     call rho_np1%log_minmax(LOG_LEVEL_INFO, 'min max rho_np1')
 

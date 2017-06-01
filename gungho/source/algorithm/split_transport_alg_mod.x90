@@ -51,6 +51,7 @@ contains
                                   u_np1,          &
                                   rho,            &
                                   chi,            &
+                                  detj_at_w2,     &
                                   mass_flux )
 
     implicit none
@@ -59,6 +60,7 @@ contains
     type(field_type),    intent(in)     :: u_np1
     type(field_type),    intent(in)     :: chi(3)
     type(field_type),    intent(in)     :: rho
+    type(field_type),    intent(in)     :: detj_at_w2
     type(field_type),    intent(inout)  :: mass_flux
 
     type( field_type ) :: departure_wind_n, departure_wind_np1, dep_pts_x, dep_pts_y
@@ -102,8 +104,8 @@ contains
     call invoke_calc_deppts(departure_wind_n,departure_wind_np1,dep_pts_y,cell_orientation,y_direction,method,dep_pt_stencil_extent)
 
     ! Perform two 1D advective updates in the x and y directions (horizontal)
-    call oned_advective_density_update_alg(x_direction,u_n, dep_pts_x, cell_orientation, rho_n, rho_adv_x)
-    call oned_advective_density_update_alg(y_direction,u_n, dep_pts_y, cell_orientation, rho_n, rho_adv_y)
+    call oned_advective_density_update_alg(x_direction,u_n, dep_pts_x, cell_orientation, detj_at_w2, rho_n, rho_adv_x)
+    call oned_advective_density_update_alg(y_direction,u_n, dep_pts_y, cell_orientation, detj_at_w2, rho_n, rho_adv_y)
 
     ! Average the two advective density updates with the density at timestep level n
     call invoke_axpby(0.5_r_def,rho_n,0.5_r_def,rho_adv_x,rho_hat_adv_x)
