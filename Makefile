@@ -51,19 +51,6 @@ build: build-gungho build-mesh_tools
 .PHONY: test
 test: test-infrastructure test-gungho test-mesh_tools
 
-.PHONY: test-gungho-suite
-test-gungho-suite: SUITE_GROUP ?= developer
-test-gungho-suite:
-	$(Q)if [ -z "$(TEST_SUITE_TARGETS)" ] ; then \
-	    echo *** Please set the DYNAMO_TEST_SUITE_TARGETS environment variable. ; \
-	    exit 1 ; \
-	fi
-	$(Q)umask 022; for target in $(DYNAMO_TEST_SUITE_TARGETS) ; do \
-	    echo Launching test suite against $$target ; \
-	    rose stem --name=$(shell basename `pwd`)-gungho-$$target-$(SUITE_GROUP) --config=gungho/rose-stem --opt-conf-key=$$target --group=$(SUITE_GROUP); \
-	done
-
-
 .PHONY: test-suite
 test-suite: SUITE_GROUP ?= developer
 test-suite:

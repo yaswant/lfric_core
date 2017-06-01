@@ -126,7 +126,7 @@ program gungho
   ! initialised.
   call log_event( 'gungho running...', LOG_LEVEL_INFO )
 
-  allocate( filename, source='configuration.nml' )
+  allocate( filename, source='dynamo_configuration.nml' )
   call get_initial_filename( filename )
   call load_configuration( filename )
   call set_derived_config()
