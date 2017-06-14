@@ -8,7 +8,7 @@
                                  'straka_x', 'straka_y', 'straka_200m',
                                  'biperiodic-cosmic',
                                  'baroclinic'%}
-{%- set miniapp_configurations = ['gravity_wave'] %}
+{%- set miniapp_configurations = ['gravity_wave', 'umphysics_testbuild'] %}
 {%- set groups = {'developer': ['science(semi-implicit, env={"nrun":3})',
                                 'science(runge-kutta, env={"nrun":30})',
                                 'science(transport-rk)',
@@ -37,6 +37,7 @@
                               'godlines(True)',
                               'publish_commit']} %}
 
+
 {# The csar groups are now included in the following #}
 %include inc/csar.rc
 {%- do groups.update(csar_groups) %}
@@ -57,7 +58,6 @@
 {%- else %}
 {%-   set groupsToRun = ['developer'] %}
 {%- endif %}
-
 
 {%- if MIRROR_UPLOAD_URL and MIRROR_UPLOAD_URL|list|last != '/' %}
 {%-   set MIRROR_UPLOAD_URL = MIRROR_UPLOAD_URL + '/' %}
@@ -146,7 +146,7 @@
 {%-   endif %}
 {%- endmacro %}
 {#- #########################################################################}
-{%- macro miniapp( appname, plotstr="None" ) %}
+{%- macro miniapp( appname, plotstr="None", env=None, checkkgo=True ) %}
       [[[R1]]] 
 {%-   set label = TARGET_SCIENCE_COMPILER|lower + '_fast-debug' %}
             purge_local => purge_target
@@ -154,9 +154,11 @@
             export_for_{{label}} => compile_with_{{label}}
 {%-   if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
             compile_with_{{label}} => run_{{label}}_{{appname}}
+{%-    if checkkgo  %}
 {%-     if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS %}
             run_{{label}}_{{appname}} => check_{{label}}_{{appname}}
 {%-     endif %}
+{%-    endif %}
 {%-   endif %}
 {%-   if plotstr != "None" %}
 {%-     do plot_config.update( {appname : plotstr} ) %}
@@ -585,6 +587,9 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 	    MESH_TARGET          = build-mesh_tools
             PROFILE              = {{build}}
             OPTIMISATION_PROFILE = {{TARGET_OPT}}
+{% if UM_PHYSICS is defined %}
+	    UM_PHYSICS           = {{UM_PHYSICS}}
+{% endif %}
         [[[directives]]]
 {%-   for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
             {{DIRECTIVE}}
@@ -817,6 +822,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         script = rose task-run --app-key='check_'{{configuration}}
         [[[environment]]]
             TARGET_OPT = {{TARGET_OPT}}
+            CONFIG = {{configuration}}
 {%-       endif %}
 
 {%-       if 'plot_' + configuration_label in allTasks %}

@@ -31,8 +31,9 @@
 #
 ##############################################################################
 
-export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod
+export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod qsat
 export EXTERNAL_DYNAMIC_LIBRARIES = esmf netcdff netcdf hdf5
+export IGNORE_PROGRAMS = umphysics_testbuild
 
 export ROOT := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
@@ -40,8 +41,12 @@ ifdef UM_PHYSICS
   export UMPHYSICS_TARGETS = extract-um-physics
   export UMPHYSICS_CLEAN   = clean-um-physics
   export UM_PHYS_DIR=$(ROOT)/um_physics
-  export UM_ENV=$(UM_PHYS_DIR)/set_environment.sh
+# Note that this defaults to the xcr0 build, but will be 
+# set to the appropriate target if using the test-umphysics suites
+  export UM_ENV=$(UM_PHYS_DIR)/set_environment-xc40.sh
   export UM_FCM=$(UM_PHYS_DIR)/
+  export IGNORE_PROGRAMS := $(filter-out umphysics_testbuild, $(IGNORE_PROGRAMS))
+  export IGNORE_DEPENDENCIES := $(filter-out qsat, $(IGNORE_DEPENDENCIES))
 endif
 ifdef OPTIMISATION_PROFILE
   export OPTIMISATION_PATH = gungho/optimisation/$(OPTIMISATION_PROFILE)
@@ -76,6 +81,19 @@ test-suite:
 	    rose stem --name=$(shell basename `pwd`)-infrastructure-$$target-$(SUITE_GROUP) --config=infrastructure/rose-stem --opt-conf-key=$$target --group=$(SUITE_GROUP); \
 	    rose stem --name=$(shell basename `pwd`)-gungho-$$target-$(SUITE_GROUP) --config=gungho/rose-stem --opt-conf-key=$$target --group=$(SUITE_GROUP); \
 	    rose stem --name=$(shell basename `pwd`)-mesh_tools-$$target-$(SUITE_GROUP) --config=mesh_tools/rose-stem --opt-conf-key=$$target --group=$(SUITE_GROUP); \
+	done
+
+.PHONY: test-umphysics
+test-umphysics: SUITE_GROUP ?= csar-umbuild
+test-umphysics: 
+	$(Q)if [ -z "$(TEST_SUITE_TARGETS)" ] ; then \
+	    echo *** Please set the DYNAMO_TEST_SUITE_TARGETS environment variable. ; \
+	    exit 1 ; \
+	fi
+	$(Q)umask 022; for target in $(DYNAMO_TEST_SUITE_TARGETS) ; do \
+	    echo Launching test suite against $$target ; \
+	    export UM_ENV=$(UM_PHYS_DIR)/set_environment-$$target.sh; \
+	    rose stem --name=$(shell basename `pwd`)-gungho-$$target-$(SUITE_GROUP) --config=gungho/rose-stem --opt-conf-key=$$target --group=$(SUITE_GROUP) --opt-conf-key=umphysics; \
 	done
 
 include $(ROOT)/infrastructure/build/lfric.mk
@@ -180,6 +198,7 @@ build-gungho: export WORKING_DIR := $(WORKING_DIR)/gungho
 build-gungho: export DATABASE     = $(abspath $(WORKING_DIR)/dependencies.db)
 build-gungho: export BIN_DIR      = $(ROOT)/bin
 build-gungho: export PROGRAMS    := $(basename $(notdir $(shell find $(SOURCE_DIR) -maxdepth 1 -name '*.[Ff]90' -print)))
+build-gungho: export PROGRAMS    := $(filter-out $(IGNORE_PROGRAMS), $(PROGRAMS))
 build-gungho: generate-configuration-gungho generate-psykal-gungho
 	$(MAKE) -f $(LFRIC_BUILD)/lfric.mk compile
 
@@ -192,7 +211,7 @@ extract-um-physics:
 	# Copy (sync)  extracted, preprocessed code to somewhere in the gungho working directory
 	# Note that if wanting to modify UM source this should be done via the UM
 	# repository either through a working copy or branch 
-	$(Q)rsync -r $(UM_PHYS_DIR)/preprocess-atmos/src $(WORKING_DIR)/um_physics
+	$(Q)rsync --checksum -r $(UM_PHYS_DIR)/preprocess-atmos/src $(WORKING_DIR)/um_physics
 	$(call MESSAGE,Done building with, UM physics codes)
 
 .PHONY: generate-configuration-gungho

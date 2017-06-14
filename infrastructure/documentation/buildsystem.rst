@@ -335,17 +335,17 @@ invocation to indicate this process is wanted, e.g.
 
 The make procedure will then carry out the ``fcm make`` invocation and then 
 subsequently rsync the extracted and preprocessed code to the ``working`` directory 
-tree. It is the intention that the UM code for the build is kept separate from the main
- LFRic source and any modifications on the UM side should be made through the branches
- incorporated at the fcm make stage (these could be a separate working copy). To change the 
+tree. It is the intention that the UM code for the build is kept separate from the main 
+LFRic source and any modifications on the UM side should be made through the branches 
+incorporated at the fcm make stage (these could be a separate working copy). To change the 
 UM branches incorporated into the build, modify the ``um_sources`` environment variable in the 
 ``set_environment.sh`` file.
 
 Since the UM code will continue to evolve and we will want to source difference 
 versions/branches from the UM repository, the environment variables needed by the fcm make
 command (including the paths to the repository/branches/working) are set in 
-``um_physics/set_environment.sh``.  Typically, this script will be maintained in the
- LFRic repository in but can be overridden if a different UM source/configuration is required.
+``um_physics/set_environment.sh``.  Typically, this script will be maintained in the 
+LFRic repository in but can be overridden if a different UM source/configuration is required.
 
 fcm-make
 ~~~~~~~~

@@ -385,6 +385,17 @@ Where the ``run-nightly-test`` script looks like this::
   fcm checkout fcm:lfric.xm-br/dev/joebloggs/r9999_SpecialBranch /data/local/jbloggs/lfric-nightly
   rose stem --group=nightly --source=/data/local/jbloggs/lfric-nightly --no-gcontrol
 
+Testing build with UM Physics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+LFRic is currently set to be able to compile with the UM physics codes in order that science 
+development can continue with a single code source. This involves extracting the UM code with 
+fcm and then building with the native LFRic build system.  A test is provided to ensure this 
+build process, but since the analysis of the UM code takes considerably longer than the GungHo
+core alone, it is currently separated from the standard developer tests. To run this test use
+``make test-umphysics``. 
+
+
 Test Suite Development
 ~~~~~~~~~~~~~~~~~~~~~~
 
