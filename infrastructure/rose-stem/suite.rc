@@ -2,9 +2,8 @@
 {%- set groups = {'developer': ['check_compilers(fast-debug)',
                                 'documentation'],
                   'nightly': ['check_compilers(full-debug, True)',
-                              'documentation(True)']} %}
-
-{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-infrastructure-' + TARGET_OPT %}
+                              'documentation(True)',
+                              'publish_commit']} %}
 
 {%- set compiler_setup = {} -%}
 {%- for compiler, setup in TARGET_COMPILER_SETUP|batch(2) -%}
@@ -47,11 +46,21 @@
             purge_target => export_for_{{label}}
             export_for_{{label}} => api_documentation
             export_for_{{label}} => uml_documentation
+            uml_documentation    => publish_uml_documentation
 {%-     if publish %}
             api_documentation => publish_api_documentation
             api_documentation => publish_api_log
 
 {%-     endif %}
+{%-   endif %}
+{%- endmacro %}
+{#- #########################################################################}
+{%- macro publish_commit() %}
+            purge_target => publish_nothing
+            PUBLISH:finish-all => publish_index
+            publish_index      => mirror_results_local
+{%-   if MIRROR_UPLOAD_URL %}
+            publish_index      => mirror_results_remote
 {%-   endif %}
 {%- endmacro %}
 {#- #########################################################################}
@@ -77,9 +86,9 @@
   [[events]]
     mail events = timeout
     abort on timeout = True
-{%- if 'nightly' in groupsToRun %}
+#{%- if 'nightly' in groupsToRun %}
     abort on stalled = True
-{%- endif %}
+#{%- endif %}
     timeout = PT3H
 
 [scheduling]
@@ -123,6 +132,7 @@
     [[[job]]]
       batch system = {{TARGET_BATCHER}}
 
+{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-' + TARGET_OPT %}
   [[PUBLISH]]
     [[[environment]]]
       DESTINATION = {{publish_destination}}
@@ -150,6 +160,13 @@
       {{DIRECTIVE}}
 {%- endfor %}
 
+{%- if 'publish_nothing' in scheduledTasks %}
+  # This task exists purely to ensure that the PUBLISH family has something in it.
+  [[publish_nothing]]
+    inherit = PUBLISH
+    script = true
+{%- endif %}
+
 {%- if 'publish_index' in scheduledTasks %}
   # This task can not be part of the PUBLISH family as a prerequisite of
   # running it is that the PUBLISH family have completed. i.e. A circular
@@ -157,7 +174,7 @@
   # up by the family. That is why some items are duplicated.
   [[publish_index]]
     inherit = None, LOCAL
-    script = rose task-run --app-key=publish --command-key=index
+    script = mkdir -p $DESTINATION; rose task-run --app-key=publish --command-key=index
     [[[environment]]]
       DESTINATION = {{publish_destination}}
 {%-   if ROSE_BUSH_URL %}
@@ -195,7 +212,7 @@
         [[[environment]]]
             SOURCE_DIRECTORY      = $SOURCE_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
-            WORKING_DIR           = {{TARGET_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
+            WORKING_DIR           = {{LOCAL_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
 
     # Run locally as they need workstation tools such as Doxygen.
 {%- if 'api_documentation' in scheduledTasks %}
@@ -207,8 +224,39 @@
         script = make -C $SOURCE_DIRECTORY document-api-infrastructure
         post-script = """
                       # Future publisher stages need this information
-                      echo $CYLC_TASK_LOG_ROOT > $DESTINATION_DIRECTORY/api.doxygen.log.path
+                      cd `dirname $CYLC_TASK_LOG_ROOT`
+                      LEAFNAME=`basename $CYLC_TASK_LOG_ROOT    `
+                      pax -wf $DESTINATION_DIRECTORY/api.pax \
+                          $LEAFNAME.status $LEAFNAME.err $LEAFNAME.out
                       """
+{%- endif %}
+
+{%- if 'publish_api_log' in scheduledTasks %}
+    [[publish_api_log]]
+        inherit = PUBLISH, TECHNICAL, LOCAL
+        pre-script = """
+{{                   ensureDestination()}}
+                     mkdir -p $DESTINATION_DIRECTORY/api
+                     cd $DESTINATION_DIRECTORY/api
+                     RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
+                     ssh {{TARGET_HOST}} "cat $RELATIVE_DESTINATION_DIRECTORY/api.pax" | pax -r
+                     """
+        script = rose task-run --app-key=publish --command-key=doxygen
+        [[[environment]]]
+            LOG_STATUS = $DESTINATION_DIRECTORY/api/job.status
+            LOG_ERR    = $DESTINATION_DIRECTORY/api/job.err
+{%- endif %}
+
+{%- if 'publish_api_documentation' in scheduledTasks %}
+    [[publish_api_documentation]]
+        inherit = PUBLISH, LOCAL, TECHNICAL
+        pre-script = """
+{{ensureDestination()}}
+                     """
+        script = rose task-run --app-key=publish --command-key=directory
+        [[[environment]]]
+            DIRECTORY   = $SOURCE_DIRECTORY/documentation/infrastructure-api/
+            DESTINATION = {{publish_destination}}/documentation/api
 {%- endif %}
 
 {%- if 'uml_documentation' in scheduledTasks %}
@@ -220,29 +268,16 @@
         script = make -C $SOURCE_DIRECTORY document-uml-infrastructure
 {%- endif %}
 
-{%- if 'publish_api_log' in scheduledTasks %}
-    [[publish_api_log]]
-        inherit = PUBLISH, TECHNICAL, LOCAL
+{%- if 'publish_uml_documentation' in scheduledTasks %}
+    [[publish_uml_documentation]]
+      inherit = PUBLISH, LOCAL, TECHNICAL
         pre-script = """
-{{ensureDestination()}}
-                     cp `cat $DESTINATION_DIRECTORY/api.doxygen.log.path`.out $DESTINATION_DIRECTORY/api.doxygen.out
-                     cp `cat $DESTINATION_DIRECTORY/api.doxygen.log.path`.err $DESTINATION_DIRECTORY/api.doxygen.err
-                     """
-        script = rose task-run --app-key=publish --command-key=doxygen
-        [[[environment]]]
-            LOG_OUT = $DESTINATION_DIRECTORY/api.doxygen.out
-            LOG_ERR = $DESTINATION_DIRECTORY/api.doxygen.err
-{%- endif %}
-
-{%- if 'publish_api_documentation' in scheduledTasks %}
-    [[publish_api_documentation]]
-        inherit = PUBLISH, LOCAL, TECHNICAL
-        pre-script = """
-{{ensureDestination()}}
+{{                   ensureDestination()}}
                      """
         script = rose task-run --app-key=publish --command-key=directory
         [[[environment]]]
-            DIRECTORY = $SOURCE_DIRECTORY/documentation/api
+            DIRECTORY = $SOURCE_DIRECTORY/documentation/infrastructure-uml/
+            DESTINATION = {{publish_destination}}/documentation/uml
 {%- endif %}
 
 ##############################################################################

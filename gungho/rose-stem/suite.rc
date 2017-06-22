@@ -109,8 +109,11 @@
             purge_local => purge_target
             purge_target => export_for_{{label}}
             export_for_{{label}} => compile_with_{{label}}
+{%- if plotstr != "None" %}
+            compile_with_{{label}}:finish => publish_{{label}}_compile
+{%- endif %}
 {%- if do_meshes %}
-	    compile_with_{{label}} => GENERATE_MESHES_{{label|upper}}
+            compile_with_{{label}} => GENERATE_MESHES_{{label|upper}}
 {%-   if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
             GENERATE_MESHES_{{label|upper}}:finish-all=> run_{{configuration}}_{{label_res}}
 {%-   endif %}
@@ -147,7 +150,7 @@
 {%- endmacro %}
 {#- #########################################################################}
 {%- macro miniapp( appname, plotstr="None", env=None, checkkgo=True ) %}
-      [[[R1]]] 
+      [[[R1]]]
 {%-   set label = TARGET_SCIENCE_COMPILER|lower + '_fast-debug' %}
             purge_local => purge_target
             purge_target => export_for_{{label}}
@@ -188,6 +191,7 @@
             purge_target => export_for_{{label}}
             export_for_{{label}} => api_documentation
             export_for_{{label}} => uml_documentation
+            uml_documentation    => publish_uml_documentation
             export_for_{{label}} => design_documentation
 {%-     if publish %}
             api_documentation    => publish_api_documentation
@@ -208,12 +212,14 @@
 {#- #########################################################################}
 {%- macro check_compilers( build, publish=False ) %}
       [[[R1]]] 
+{%-   set perform_run = [] %}
+{%-   if build == 'fast-debug' %}
+{%-     do perform_run.extend( TARGET_PERFORM_RUN ) %}
+{%-   elif build == 'full-debug' %}
+{%-     do perform_run.extend( TARGET_PERFORM_DEBUG_RUN ) %}
+{%-   endif %}
 {%-   for compiler in compiler_setup.keys() %}
 {%-     set label = compiler | lower + '_' + build | lower%}
-{%-     set perform_run = TARGET_PERFORM_RUN %}
-{%-     if build == 'full-debug' and TARGET_PERFORM_DEBUG_RUN is defined %}
-{%-       set perform_run = TARGET_PERFORM_DEBUG_RUN %}
-{%-     endif %}
             purge_local => purge_target
             purge_target => export_for_{{label}}
             export_for_{{label}} => compile_with_{{label}}
@@ -333,7 +339,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
     initial cycle point = 1
     final cycle point   = {{ crunInfo['maxcrun'] }}
     max active cycle points = {{ crunInfo['maxcrun'] if crunInfo['maxcrun'] < MAXRUNAHEAD else MAXRUNAHEAD  }}
-    
+
     [[queues]]
         [[[host_throttle]]]
             limit = {{ TARGET_THROTTLE }}
@@ -342,14 +348,12 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%- set scheduledTasks = schedule() | deduplicateSchedule()%}
 {{scheduledTasks}}
 
-{%- set allTasks = scheduledTasks  %}
-
 [runtime]
     [[root]]
-        initial scripting = """
-                            export CYLC_VERSION={{CYLC_VERSION}}
-                            export ROSE_VERSION={{ROSE_VERSION}}
-                            """
+        init-script = """
+                      export CYLC_VERSION={{CYLC_VERSION}}
+                      export ROSE_VERSION={{ROSE_VERSION}}
+                      """
         script = "rose task-run"
         [[[events]]]
 {%- if TROUBLE_MAIL_ADDRESS is defined %}
@@ -386,6 +390,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
     [[purge_local]]
         inherit = None, LOCAL
         script = '''
+                 {{deleteDirectory( LOCAL_BUILD_ROOT )}}
                  {{deleteDirectory( "$OUTPUT_ROOT" )}}
                  {{deleteDirectory( "$SOURCE_ROOT" )}}
                  '''
@@ -404,13 +409,16 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
             {{DIRECTIVE}}
 {%- endfor %}
 
-{%- if 'publish_index' in allTasks %}
+{%- if 'publish_index' in scheduledTasks %}
     # This task can not be part of the PUBLISH family as a prerequisite of
     # running it is that the PUBLISH family have completed. i.e. A circular
     # dependency. This means it can not take advantage of the environment set
     # up by the family. That is why some items are duplicated.
     [[publish_index]]
         inherit = None, LOCAL
+        pre-script = """
+                     {{'\n'|commandList( LOCAL_BASE_SETUP, LOCAL_TECHNICAL_SETUP, LOCAL_REVEAL_SETUP) }}
+                     """
         script = rose task-run --app-key=publish --command-key=index
         [[[environment]]]
             DESTINATION = $CYLC_SUITE_SHARE_DIR/publish-{{TARGET_OPT}}
@@ -419,19 +427,18 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-   endif %}
 {%- endif %}
 
-{%- if 'mirror_results_local' in allTasks %}
+{%- if 'mirror_results_local' in scheduledTasks %}
     # Again, something which happens after publishing and so cannot be in the
     # PUBLISH family.
     [[mirror_results_local]]
         inherit = None, LOCAL
         script = rose task-run --app-key=publish --command-key=mirror
         [[[environment]]]
-            REWRITE = ''
             SOURCE  = $CYLC_SUITE_SHARE_DIR/publish-{{TARGET_OPT}}
             TARGET  = file:///$HOME/public_html/lfric-gungho-{{TARGET_OPT}}
 {%- endif %}
 
-{%- if 'mirror_results_remote' in allTasks %}
+{%- if 'mirror_results_remote' in scheduledTasks %}
     # Again, something which happens after publishing and so cannot be in the
     # PUBLISH family.
     [[mirror_results_remote]]
@@ -448,9 +455,9 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         [[[environment]]]
             SOURCE_DIRECTORY      = $SOURCE_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
-            WORKING_DIR           = {{TARGET_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
+            WORKING_DIR           = {{LOCAL_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
 
-{%- if 'check_for_unused_source' in allTasks %}
+{%- if 'check_for_unused_source' in scheduledTasks %}
     [[check_for_unused_source]]
         inherit = None, TARGET, TECHNICAL
         pre-script = """
@@ -465,7 +472,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%- endif %}
 
     # Run locally as they need workstation tools such as Doxygen.
-{%- if 'api_documentation' in allTasks %}
+{%- if 'api_documentation' in scheduledTasks %}
     [[api_documentation]]
         inherit = None, LOCAL, TECHNICAL
         pre-script = """
@@ -474,11 +481,43 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         script = make -C $SOURCE_DIRECTORY document-api-gungho
         post-script = """
                       # Future publisher stages need this information
-                      echo $CYLC_TASK_LOG_ROOT > $DESTINATION_DIRECTORY/api.doxygen.log.path
+                      RELATIVE_LOG_ROOT=$(echo $CYLC_TASK_LOG_ROOT | sed "s|$HOME/||")
+                      echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/api.log.path
                       """
 {%- endif %}
 
-{%- if 'uml_documentation' in allTasks %}
+{%- if 'publish_api_log' in scheduledTasks %}
+    [[publish_api_log]]
+        inherit = PUBLISH, TECHNICAL, LOCAL
+        pre-script = """
+{{                   ensureDestination()}}
+                     mkdir -p $DESTINATION_DIRECTORY/api
+                     cd $DESTINATION_DIRECTORY/api
+                     RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/api.log.path .
+                     scp {{TARGET_HOST}}:$(cat api.log.path).status .
+                     scp {{TARGET_HOST}}:$(cat api.log.path).out .
+                     scp {{TARGET_HOST}}:$(cat api.log.path).err .
+                     """
+        script = rose task-run --app-key=publish --command-key=doxygen
+        [[[environment]]]
+            LOG_STATUS = $DESTINATION_DIRECTORY/api/job.status
+            LOG_ERR    = $DESTINATION_DIRECTORY/api/job.err
+{%- endif %}
+
+{%- if 'publish_api_documentation' in scheduledTasks %}
+    [[publish_api_documentation]]
+        inherit = PUBLISH, LOCAL, TECHNICAL
+        pre-script = """
+{{                   ensureDestination()}}
+                     """
+        script = rose task-run --app-key=publish --command-key=directory
+        [[[environment]]]
+            DIRECTORY   = $SOURCE_DIRECTORY/documentation/gungho-api/
+            DESTINATION = {{publish_destination}}/documentation/api
+{%- endif %}
+
+{%- if 'uml_documentation' in scheduledTasks %}
     [[uml_documentation]]
       inherit = None, LOCAL, TECHNICAL
         pre-script = """
@@ -487,51 +526,38 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         script = make -C $SOURCE_DIRECTORY document-uml-gungho
 {%- endif %}
 
-{%- if 'publish_api_log' in allTasks %}
-    [[publish_api_log]]
-        inherit = PUBLISH, TECHNICAL, LOCAL
+{%- if 'publish_uml_documentation' in scheduledTasks %}
+    [[publish_uml_documentation]]
+      inherit = PUBLISH, LOCAL, TECHNICAL
         pre-script = """
-{{ensureDestination()}}
-                     cp `cat $DESTINATION_DIRECTORY/api.doxygen.log.path`.out $DESTINATION_DIRECTORY/api.doxygen.out
-                     cp `cat $DESTINATION_DIRECTORY/api.doxygen.log.path`.err $DESTINATION_DIRECTORY/api.doxygen.err
+{{                   ensureDestination()}}
                      """
-        script = rose task-run --app-key=publish --command-key=doxygen
+        script = rose task-run --app-key=publish --command-key=directory
         [[[environment]]]
-            LOG_OUT = $DESTINATION_DIRECTORY/api.doxygen.out
-            LOG_ERR = $DESTINATION_DIRECTORY/api.doxygen.err
+            DIRECTORY = $SOURCE_DIRECTORY/documentation/gungho-uml/
+            DESTINATION = {{publish_destination}}/documentation/uml
 {%- endif %}
 
-{%- if 'publish_api_documentation' in allTasks %}
-    [[publish_api_documentation]]
+    # Run locally as they need workstation tools like Inkscape.
+{%- if 'design_documentation' in scheduledTasks %}
+    [[design_documentation]]
+        inherit = None, LOCAL, TECHNICAL
+        pre-script = """
+                     {{'\n'|commandList( LOCAL_BASE_SETUP, LOCAL_TECHNICAL_SETUP, LOCAL_REVEAL_SETUP) }}
+                     """
+        script = make -dr -C $SOURCE_DIRECTORY document-latex-gungho
+{%- endif %}
+
+{%- if 'publish_design_documentation' in scheduledTasks %}
+    [[publish_design_documentation]]
         inherit = PUBLISH, LOCAL, TECHNICAL
         pre-script = """
 {{ensureDestination()}}
                      """
         script = rose task-run --app-key=publish --command-key=directory
         [[[environment]]]
-            DIRECTORY = $SOURCE_DIRECTORY/documentation/api
-{%- endif %}
-
-    # Run locally as they need workstation tools like Inkscape.
-{%- if 'design_documentation' in allTasks %}
-    [[design_documentation]]
-        inherit = None, LOCAL, TECHNICAL
-        pre-script = """
-                     {{'\n'|commandList( LOCAL_BASE_SETUP, LOCAL_TECHNICAL_SETUP, LOCAL_REVEAL_SETUP) }}
-                     """
-        script = make -C $SOURCE_DIRECTORY document-latex-gungho
-{%- endif %}
-
-{%- if 'publish_design_documentation' in allTasks %}
-    [[publish_design_documentation]]
-        inherit = PUBLISH, LOCAL, TECHNICAL
-        pre-script = """
-{{ensureDestination()}}
-                     """
-        script = rose task-run --app-key=publish --command-key=tar-file
-        [[[environment]]]
-            FILE = $SOURCE_DIRECTORY/documentation/design-documents.tar
-            DESTINATION = {{publish_destination}}/design
+            DIRECTORY = $SOURCE_DIRECTORY/documentation/*.pdf
+            DESTINATION = {{publish_destination}}/documentation/design
 {%- endif %}
 
 ##############################################################################
@@ -551,7 +577,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
     # Export must be performed locally as it needs access to any working copy
     # involved. Such a working copy may well be on a local disc.
     #
-{%- if 'export_for_' + label in allTasks %}
+{%- if 'export_for_' + label in scheduledTasks %}
     [[export_for_{{label}}]]
         inherit = {{family}}, LOCAL
         script = """
@@ -564,7 +590,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                  """
 {%- endif %}
 
-{%- if 'compile_with_' + label in allTasks %}
+{%- if 'compile_with_' + label in scheduledTasks %}
     [[compile_with_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -578,16 +604,18 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
         post-script = """
                       {{deleteDirectory("$WORKING_DIR")}}
                       # Future publisher stages need this information
-                      echo $CYLC_TASK_LOG_ROOT > $DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.log.path
+                      RELATIVE_LOG_ROOT=$(echo $CYLC_TASK_LOG_ROOT | sed "s|$HOME/||")
+                      echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/compile.log.path
                       """
         [[[environment]]]
             WORKING_DIR          = {{TARGET_BUILD_ROOT}}/{{label}}
             TARGET               = build-gungho
-	    MESH_TARGET          = build-mesh_tools
+            OTHER_TARGET         = build-mesh_tools
             PROFILE              = {{build}}
             OPTIMISATION_PROFILE = {{TARGET_OPT}}
+            MAKE_THREADS         = 4
 {% if UM_PHYSICS is defined %}
-	    UM_PHYSICS           = {{UM_PHYSICS}}
+            UM_PHYSICS           = {{UM_PHYSICS}}
 {% endif %}
         [[[directives]]]
 {%-   for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
@@ -595,26 +623,29 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-   endfor %}
 {%- endif %}
 
-{%- if 'publish_' + label + '_compile' in allTasks %}
+{%- if 'publish_' + label + '_compile' in scheduledTasks %}
     [[publish_{{label}}_compile]]
         inherit = PUBLISH, {{family}}, LOCAL
         pre-script = """
-{{ensureDestination()}}
-                     mkdir -p $DESTINATION_DIRECTORY
+{{                   ensureDestination()}}
+                     mkdir -p $DESTINATION_DIRECTORY/compile
                      RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
-                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.log.path .
-                     scp {{TARGET_HOST}}:`cat lfric.gungho.{{compiler}}.log.path`.out $DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.out
-                     scp {{TARGET_HOST}}:`cat lfric.gungho.{{compiler}}.log.path`.err $DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.err
+                     cd $DESTINATION_DIRECTORY/compile
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/compile.log.path .
+                     scp {{TARGET_HOST}}:$(cat compile.log.path).status .
+                     scp {{TARGET_HOST}}:$(cat compile.log.path).out .
+                     scp {{TARGET_HOST}}:$(cat compile.log.path).err .
                      """
         script = rose task-run --app-key=publish --command-key=compile
         [[[environment]]]
             CONTEXT  = {{build}}
             COMPILER = {{compiler}}
-            LOG_OUT  = $DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.out
-            LOG_ERR  = $DESTINATION_DIRECTORY/lfric.gungho.{{compiler}}.err
+            LOG_STATUS = $DESTINATION_DIRECTORY/compile/job.status
+            LOG_OUT    = $DESTINATION_DIRECTORY/compile/job.out
+            LOG_ERR    = $DESTINATION_DIRECTORY/compile/job.err
 {%- endif %}
 
-{%-     if 'run_canned_test_' + label in allTasks %}
+{%-     if 'run_canned_test_' + label in scheduledTasks %}
     [[run_canned_test_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -642,8 +673,9 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-         set resname = resolution if resolution is string else (resolution[0] if resolution|length>1 else '') %}
 {%-         set dt_vals = [''] if (resolution is string or (resolution|length<2)) else resolution[1:] %}
 {%-         for dt in dt_vals %} {# resolutions timestep values #}
-{%-           set configuration_label_res = configuration_label + ('' if resname=='' else '_') + resname + ('' if dt=='' else '_dt-') ~ (dt|replace('.','p')) %}
-{%-        if 'run_' + configuration_label_res in allTasks %}
+{%-           set configuration_res = ('' if resname=='' else '_') + resname + ('' if dt=='' else '_dt-') ~ (dt|replace('.','p')) %}
+{%-           set configuration_label_res = configuration_label + configuration_res %}
+{%-        if 'run_' + configuration_label_res in scheduledTasks %}
 {% if configuration_label in scheduledTasksDict.keys() %}
    {%- set command_key = TARGET_NORMAL_RUN_METHOD if 'directives' in scheduledTasksDict[configuration_label].keys() else TARGET_RUN_METHOD%}
 {% else  %}
@@ -672,7 +704,8 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                       mkdir -p $DESTINATION_DIRECTORY/{{configuration}}/results
                       cp $CYLC_TASK_WORK_DIR/diagDynamo*.m $DESTINATION_DIRECTORY/{{configuration}}/results/
                       # Future publisher stages need this information
-                      echo $CYLC_TASK_LOG_ROOT > $DESTINATION_DIRECTORY/{{configuration}}/lfric.gungho.{{compiler}}.log.path
+                      RELATIVE_LOG_ROOT=$(echo $CYLC_TASK_LOG_ROOT | sed "s|$HOME/||")
+                      echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/{{configuration}}.log.path
                       """
         [[[environment]]]
 {# If the mpi is configured by the suite, then we will use the setcores optional configuration, so let's check that here #}
@@ -695,7 +728,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%    endif %}
 {%  endif %}{# configuration_label in scheduledTasksDict #}
             DT            = {{dt}}
-	    CRUN_LENGTH   = $(echo ${crun:-1})
+            CRUN_LENGTH   = $(echo ${crun:-1})
             OMP_NUM_THREADS=$(echo ${threads:-1})
             MPI_PARTS     = $(echo ${mpi_parts:-})  # We leave this empty if we want the default value from the .conf file
             RESTART_NTS   = $(echo ${nrun:-1})
@@ -727,27 +760,29 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-         endfor %}
 {%-       endif %} {# configuration_label in scheduledTasksDict #}
 
-{%-       if 'publish_' + configuration_label_res in allTasks %}
+{%-       if 'publish_' + configuration_label_res in scheduledTasks %}
     [[publish_{{configuration_label_res}}]]
         inherit = PUBLISH, {{family}}, LOCAL
         pre-script = """
-{{ensureDestination()}}
-                     mkdir -p $DESTINATION_DIRECTORY
+{{                   ensureDestination()}}
+                     mkdir -p $DESTINATION_DIRECTORY/{{configuration}}
                      RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
-                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}/lfric.gungho.{{compiler}}.log.path lfric.gungho.{{configuration}}.{{compiler}}.log.path
-                     scp {{TARGET_HOST}}:`cat lfric.gungho.{{configuration}}.{{compiler}}.log.path`.out $DESTINATION_DIRECTORY/lfric.gungho.{{configuration}}.{{compiler}}.out
-                     scp {{TARGET_HOST}}:`cat lfric.gungho.{{configuration}}.{{compiler}}.log.path`.err $DESTINATION_DIRECTORY/lfric.gungho.{{configuration}}.{{compiler}}.err
+                     cd $DESTINATION_DIRECTORY/{{configuration}}
+                     scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}.log.path .
+                     scp {{TARGET_HOST}}:$(cat {{configuration}}.log.path).status .
+                     scp {{TARGET_HOST}}:$(cat {{configuration}}.log.path).out .
+                     scp {{TARGET_HOST}}:$(cat {{configuration}}.log.path).err .
                      """
         script = rose task-run --app-key=publish --command-key=run
         [[[environment]]]
             CONTEXT       = {{build}}
             CONFIGURATION = {{configuration}}
             COMPILER      = {{compiler}}
-            LOG_OUT       = $DESTINATION_DIRECTORY/lfric.gungho.{{configuration}}.{{compiler}}.out
-            LOG_ERR       = $DESTINATION_DIRECTORY/lfric.gungho.{{configuration}}.{{compiler}}.err
+            LOG_STATUS    = $DESTINATION_DIRECTORY/{{configuration}}/job.status
+            LOG_ERR       = $DESTINATION_DIRECTORY/{{configuration}}/job.err
 {%-       endif %}
 
-{%-       if 'plot_' + configuration_label_res in allTasks %}
+{%-       if 'plot_' + configuration_label_res in scheduledTasks %}
 {%-         set plot_label = configuration %}
     [[plot_{{configuration_label_res}}]]
         inherit = PUBLISH, {{family}}, TARGET
@@ -764,17 +799,17 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
              PLOT_CONFIG = {{plot_config[plot_label]}}
 {%-       endif %}
 
-{%-       if 'publish_' + configuration_label_res + '_plots' in allTasks %}
+{%-       if 'publish_' + configuration_label_res + '_plots' in scheduledTasks %}
     [[publish_{{configuration_label_res}}_plots]]
         inherit = PUBLISH, {{family}}, LOCAL
         script = """
-                 mkdir -p $DESTINATION/model_output/{{configuration_label_res}}/plots
+                 mkdir -p $DESTINATION/{{compiler}}/{{build}}/{{configuration}}{{configuration_res}}
                  RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
-                 scp -r {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}/plots $DESTINATION/model_output/{{configuration_label_res}}
+                 rsync -avz {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}/plots/ $DESTINATION/{{compiler}}/{{build}}/{{configuration}}{{configuration_res}}/
                  """
 {%-       endif %}
 
-{%-       if 'check_' + configuration_label_res in allTasks %}
+{%-       if 'check_' + configuration_label_res in scheduledTasks %}
     [[check_{{configuration_label_res}}]]
         inherit = {{family}}, TARGET
         script = rose task-run --app-key=check_gungho
@@ -794,7 +829,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 
 {%-     for configuration in miniapp_configurations %}
 {%-       set configuration_label = configuration|lower + '_' + label %}
-{%-       if 'run_' + label + '_' + configuration in allTasks %}
+{%-       if 'run_' + label + '_' + configuration in scheduledTasks %}
     [[run_{{label}}_{{configuration}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -815,7 +850,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-         endfor %}
 {%-       endif %}
 
-{%-     if 'check_' + label + '_' + configuration in allTasks %}
+{%-     if 'check_' + label + '_' + configuration in scheduledTasks %}
     [[check_{{label}}_{{configuration}}]]
         inherit = {{family}}, TARGET
         script = rose task-run --app-key='check_'{{configuration}}
@@ -824,7 +859,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
             CONFIG = {{configuration}}
 {%-       endif %}
 
-{%-       if 'plot_' + configuration_label in allTasks %}
+{%-       if 'plot_' + configuration_label in scheduledTasks %}
 {%-         set plot_label = configuration %}
     [[plot_{{configuration_label}}]]
         inherit = PUBLISH, {{family}}, TARGET
@@ -841,13 +876,13 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
              PLOT_CONFIG = {{plot_config[plot_label]}}
 {%-       endif %}
 
-{%-       if 'publish_' + configuration_label + '_plots' in allTasks %}
+{%-       if 'publish_' + configuration_label + '_plots' in scheduledTasks %}
     [[publish_{{configuration_label}}_plots]]
         inherit = PUBLISH, {{family}}, LOCAL
         script = """
-                 mkdir -p $DESTINATION/model_output/{{configuration_label}}/plots
+                 mkdir -p $DESTINATION/{{compiler}}/{{build}}/{{configuration}}
                  RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
-                 scp -r {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}/plots $DESTINATION/model_output/{{configuration_label}}
+                 rsync -avz {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/{{configuration}}/plots/ $DESTINATION/{{compiler}}/{{build}}/{{configuration}}/
                  """
 {%-       endif %}
 
@@ -855,7 +890,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 
 ########################################################################################
 
-{%-     if 'unit_test_with_' + label in allTasks %}
+{%-     if 'unit_test_with_' + label in scheduledTasks %}
     [[unit_test_with_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -874,7 +909,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-     endif %}
 
 {%-     for mesh in mesh_types %}
-{%-       if 'generate_mesh_' + mesh + '_' + label in allTasks %}
+{%-       if 'generate_mesh_' + mesh + '_' + label in scheduledTasks %}
     [[generate_mesh_{{mesh}}_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """
@@ -889,7 +924,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%-         endfor %}
 {%-       endif %}
 
-{%-       if 'check_mesh_' + mesh + '_' + label in allTasks %}
+{%-       if 'check_mesh_' + mesh + '_' + label in scheduledTasks %}
     [[check_mesh_{{mesh}}_{{label}}]]
         inherit = {{family}}, TARGET
         pre-script = """

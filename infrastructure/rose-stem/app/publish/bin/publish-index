@@ -20,27 +20,34 @@ import parserender.indexer  as indexer
 import parserender.renderer as renderer
 
 if __name__ == '__main__':
-    cliParser = argparse.ArgumentParser( add_help=False, \
-   description='Generate an index page for Dynamo nightly test suite results' )
+    cliParser = argparse.ArgumentParser( add_help=False,
+   description='Generate an index page for LFRic nightly test suite results' )
     cliParser.add_argument( 'output', help='HTML output file.' )
     cliParser.add_argument( '-bush', help='Rose Bush URL.' )
+    cliParser.add_argument( '-ignore', action='append',
+                            help='Ignore files with this prefix' )
     cliParser.add_argument( '-help', '-h', '--help', action='help', \
                             help='Show this help message and exit' )
     arguments = cliParser.parse_args()
 
-    dynamoIndexer = indexer.DynamoIndexer( os.path.dirname( arguments.output ) )
-    dynamoIndexer.examine()
+    ignore   = ['./index.html', './hashes.txt']
+    if arguments.ignore: ignore.extend( arguments.ignore )
+
+    lfricIndexer = indexer.LFRicIndexer( os.path.dirname( arguments.output ),
+                                         ignorePrefixes=ignore )
+    lfricIndexer.examine()
 
     hashFilename = os.path.join( os.path.dirname( arguments.output ), 'hashes.txt' )
+
     if os.path.exists( hashFilename ):
         with open( hashFilename, 'r' ) as hashFile:
             for line in hashFile:
                 filename, digest = line.split()
-                dynamoIndexer.pages[filename].previousDigest = digest
+                lfricIndexer.addPreviousHash( filename, digest )
+
     with open( hashFilename, 'w' ) as hashFile:
-        for url, details in dynamoIndexer.pages.iteritems():
-            print( '{} {}'.format( url, details.digest ), \
-                   file=hashFile )
+        for filename, digest in lfricIndexer.getCurrentHashes():
+            print( '{} {}'.format( filename, digest ), file=hashFile )
 
     workingFilename = arguments.output + '.work'
     if not os.path.exists( os.path.dirname( workingFilename ) ):
@@ -52,7 +59,8 @@ if __name__ == '__main__':
                                                os.environ['CYLC_SUITE_NAME'] )
         else:
             suiterun = None
-        pageRenderer = renderer.HtmlSiteIndexRenderer( dynamoIndexer, suiterun )
+
+        pageRenderer = renderer.HtmlSiteIndexRenderer( lfricIndexer, suiterun )
         pageRenderer.render( outfile )
 
     os.rename( workingFilename, arguments.output )

@@ -23,6 +23,8 @@ if __name__ == '__main__':
     cliParser = argparse.ArgumentParser( add_help=False, \
                       description='Render Dynamo build output to a web page' )
     cliParser.add_argument( 'output', help='HTML output file.' )
+    cliParser.add_argument( 'statusfile',
+                            help='Cylc status file from the build.' )
     cliParser.add_argument( 'outfile', \
                             help='Standard output from the build.' )
     cliParser.add_argument( 'errfile', \
@@ -45,15 +47,19 @@ if __name__ == '__main__':
     workingFilename = arguments.output + '.work'
     if not os.path.exists( os.path.dirname( workingFilename ) ):
       os.makedirs( os.path.dirname( workingFilename ) )
-    with open( arguments.outfile, 'r' ) as outfile, \
-         open( arguments.errfile, 'r' ) as errfile, \
+    with open( arguments.statusfile, 'r' ) as statusfile, \
+         open( arguments.outfile, 'r' ) as outfile,       \
+         open( arguments.errfile, 'r' ) as errfile,       \
          open( workingFilename, 'w' ) as workingFile:
 
+        statusParser = parser.CylcParser( statusfile )
         outParser = parser.BuildParser( outfile )
         errParser = errParserMap[outParser.compiler]( errfile )
 
-        pageRenderer = renderer.HtmlCompileRenderer( arguments.context, \
-                                                     outParser, errParser )
+        pageRenderer = renderer.HtmlCompileRenderer( arguments.context,
+                                                     statusParser,
+                                                     outParser,
+                                                     errParser )
         pageRenderer.render( errIgnoreMap[outParser.compiler], workingFile )
 
     os.rename( workingFilename, arguments.output )

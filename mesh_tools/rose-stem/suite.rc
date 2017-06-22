@@ -1,6 +1,7 @@
 #!jinja2
 {%- set groups = {'developer': ['check_compilers(fast-debug)'],
-                  'nightly'  : ['check_compilers(full-debug, True)']} %}
+                  'nightly'  : ['check_compilers(full-debug, True)',
+                                'publish_commit']} %}
 
 {%- set mesh_types = ['cubedsphere', 'biperiodic'] %}
 
@@ -242,6 +243,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
       OPTIMISATION_PROFILE = {{PLATFORM_OPT}}
       PROFILE              = {{build}}
       TARGET               = build-mesh_tools
+      MAKE_THREADS         = 4
     [[[directives]]]
 {%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
       {{DIRECTIVE}}
@@ -252,10 +254,11 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
   [[publish_{{label}}_compile]]
     inherit = PUBLISH, {{family}}, LOCAL
     pre-script = """
-{{               ensureDestination()}}
+                 {{ensureDestination()}}
                  mkdir -p $DESTINATION_DIRECTORY
                  RELATIVE_DESTINATION_DIRECTORY=`echo $DESTINATION_DIRECTORY | sed "s|$HOME/||"`
                  scp {{TARGET_HOST}}:$RELATIVE_DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.log .
+                 scp {{TARGET_HOST}}:`cat lfric.mesher.{{compiler}}.log`.status $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.status
                  scp {{TARGET_HOST}}:`cat lfric.mesher.{{compiler}}.log`.out $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.out
                  scp {{TARGET_HOST}}:`cat lfric.mesher.{{compiler}}.log`.err $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.err
                  """
@@ -263,8 +266,9 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
     [[[environment]]]
       CONTEXT  = {{build}}
       COMPILER = {{compiler}}
-      LOG_OUT  = $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.out
-      LOG_ERR  = $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.err
+      LOG_STATUS = $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.status
+      LOG_OUT    = $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.out
+      LOG_ERR    = $DESTINATION_DIRECTORY/lfric.mesher.{{compiler}}.err
 {%-     endif %} {#- if 'publish_' + label + '_compile' in scheduledTasks #}
 
 {%-     if 'unit_test_with_' + label in scheduledTasks %}

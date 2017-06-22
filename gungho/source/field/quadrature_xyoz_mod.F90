@@ -278,13 +278,14 @@ subroutine compute_function(self, function_to_call, function_space, &
                             fspace_dim, ndf, basis)
 
   implicit none
-  class(quadrature_xyoz_type),                  intent(in)  :: self
-  type(function_space_type),                    intent(in)  :: function_space
-  integer(kind=i_def),                          intent(in)  :: function_to_call
-  integer(kind=i_def),                          intent(in)  :: fspace_dim
-  integer(kind=i_def),                          intent(in)  :: ndf
-  real(kind=r_def), dimension(fspace_dim,ndf,&
-                    self%np_xy,self%np_z),      intent(out) :: basis
+  class(quadrature_xyoz_type), intent(in)  :: self
+  type(function_space_type),   intent(in)  :: function_space
+  integer(kind=i_def),         intent(in)  :: function_to_call
+  integer(kind=i_def),         intent(in)  :: fspace_dim
+  integer(kind=i_def),         intent(in)  :: ndf
+  real(kind=r_def),            intent(out) :: basis(fspace_dim,ndf, &
+                                                    self%np_xy,     &
+                                                    self%np_z)
 
   ! Local variables - loop counters
   integer(kind=i_def) :: df

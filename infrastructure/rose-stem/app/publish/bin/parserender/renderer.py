@@ -64,26 +64,26 @@ class HtmlSiteIndexRenderer(SiteIndexRenderer):
     Render the index page to an HTML document.
     '''
     def __init__( self, indexer, suiteUrl ):
-        self._indexer   = indexer
+        self._indexer  = indexer
         self._suiteUrl = suiteUrl
 
+        if suiteUrl is not None:
+          if self._suiteUrl.endswith('/'):
+            self._suiteUrl = self._suiteURL[:-1]
+
     def render( self, stream ):
-        if self._suiteUrl.endswith('/'):
-          suiteUrl = self._suiteURL[:-1]
-        else:
-          suiteUrl = self._suiteUrl
+        variables = {'cronout'       : self._indexer.cronOut,
+                     'crontimestamp' : self._indexer.cronTimestamp,
+                     'oldthreshold'  : datetime.datetime.utcnow()
+                                       - datetime.timedelta( hours=48 ),
+                     'suiteurl'      : self._suiteUrl,
+                     'tree'          : self._indexer.getTree()}
 
-        variables = {'cronout'       : self._indexer.cronOut,       \
-                     'crontimestamp' : self._indexer.cronTimestamp, \
-                     'pages'         : self._indexer.pages,         \
-                     'subsites'      : self._indexer.subsites,      \
-                     'oldthreshold'  : datetime.datetime.utcnow()   \
-                                       - datetime.timedelta( hours=48 ), \
-                     'suiteurl'      : suiteUrl}
-
-        environment = Environment( loader=PackageLoader( 'parserender', \
+        environment = Environment( extensions=['jinja2.ext.do',
+                                               'jinja2.ext.loopcontrols'],
+                                   loader=PackageLoader( 'parserender',
                                                          'templates' ) )
-        template = environment.get_template( 'siteindex.html' )
+        template = environment.get_template( 'siteindex.html.jinja' )
         print( template.render( variables ), file=stream )
 
 ##############################################################################
@@ -107,10 +107,11 @@ class HtmlCompileRenderer(CompileRenderer):
     '''
     Render the results of a compile to an HTML document.
     '''
-    def __init__( self, context, outParser, errParser ):
-        self._context   = context
-        self._outParser = outParser
-        self._errParser = errParser
+    def __init__( self, context, statusParser, outParser, errParser ):
+        self._context      = context
+        self._statusParser = statusParser
+        self._outParser    = outParser
+        self._errParser    = errParser
 
     def render( self, ignoreCodes, stream ):
         if ignoreCodes:
@@ -121,7 +122,7 @@ class HtmlCompileRenderer(CompileRenderer):
 
         variables = {'context'      : self._context, \
                      'compiler'     : self._outParser.compiler,  \
-                     'timestamp'    : self._outParser.started, \
+                     'timestamp'    : self._statusParser.started, \
                      'eventBuckets' : eventBuckets}
 
         environment = Environment(loader=PackageLoader('parserender', \

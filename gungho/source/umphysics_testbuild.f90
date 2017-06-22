@@ -33,11 +33,11 @@ program umphysics_testbuild
     print*, "Unable to open checksum file"
   end if
   write(funit, '(A)' ) 'UM physics build test program successful'
-  write(funit, '(A,I)' ) 'LFRic defined precision reals have kind: ', kind(x1)
-  write(funit, '(A,I)' ) 'LFRic single precision reals have kind:  ', kind(x2)
-  write(funit, '(A,I)' ) 'LFRic double precision reals have kind:  ', kind(x3)
-  write(funit, '(A,I)' ) 'LFRic default precision reals have kind: ', kind(x4)
-  write(funit, '(A,I)' ) 'UM default precision reals have kind:    ', kind(g)
+  write(funit, '(A40,I13)' ) 'LFRic defined precision reals have kind: ', kind(x1)
+  write(funit, '(A40,I13)' ) 'LFRic single precision reals have kind:  ', kind(x2)
+  write(funit, '(A40,I13)' ) 'LFRic double precision reals have kind:  ', kind(x3)
+  write(funit, '(A40,I13)' ) 'LFRic default precision reals have kind: ', kind(x4)
+  write(funit, '(A40,I13)' ) 'UM default precision reals have kind:    ', kind(g)
 
   close(funit)
 

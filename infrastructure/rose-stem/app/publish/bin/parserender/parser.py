@@ -213,31 +213,29 @@ class Parser(object):
 ##############################################################################
 class CylcParser(Parser):
     '''
-    Parse the standard output from a Cylc task.
+    Parse the status file from a Cylc task.
 
     This picks up the start and completion timestamps.
     '''
-    timestampFragment = r'\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ'
-    cylcPattern = re.compile( r'cylc \(scheduler - ({timestamp})\): (\S+) at ({timestamp})'.format( timestamp=timestampFragment ) )
+    startTimePattern = re.compile( r'CYLC_JOB_INIT_TIME=(\S+)' )
+    endTimePattern = re.compile( r'CYLC_JOB_EXIT_TIME=(\S+)' )
 
-    def __init__( self, outfile, compiler=None ):
+    def __init__( self, statusfile, compiler=None ):
         self.started   = None
         self.completed = None
         self.compiler  = compiler
-        super(CylcParser, self).__init__( outfile )
+        super(CylcParser, self).__init__( statusfile )
 
     def acceptLine( self, line ):
-            match = BuildParser.cylcPattern.match( line )
+            match = BuildParser.startTimePattern.match( line )
             if match:
-                occurrence = match.group( 2 )
-                occurred  = match.group( 3 )
+              self.started = match.group( 1 )
+              return None, None
 
-                if occurrence == 'started':
-                    self.started = occurred
-                elif occurrence == 'succeeded':
-                    self.completed = occurred
-                else:
-                    raise Exception( 'Unrecognised Cylc event: {}'.format( occurrence ) )
+            match = BuildParser.endTimePattern.match( line )
+            if match:
+              self.completed = match.group( 1 )
+              return None, None
 
             return None, None
 

@@ -39,7 +39,9 @@ if __name__ == '__main__':
 
   treeTransforms = []
   if arguments.treeindex:
-    treeTransforms.append( parserender.mirrorer.GenerateTreeIndeces(parserender.renderer.HtmlIndexRenderer()) )
+    renderer = parserender.renderer.HtmlIndexRenderer()
+    indexer = parserender.mirrorer.GenerateTreeIndeces( renderer )
+    treeTransforms.append( indexer )
 
   mirrorEngine = parserender.mirrorer.Mirrorer( arguments.target, \
                                                 fileTransforms,   \

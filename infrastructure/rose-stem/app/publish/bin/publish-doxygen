@@ -40,8 +40,8 @@ if __name__ == '__main__':
     cliParser = argparse.ArgumentParser( add_help=False, \
                       description='Render Dynamo build output to a web page' )
     cliParser.add_argument( 'output', help='HTML output file.' )
-    cliParser.add_argument( 'outfile', \
-                            help='Standard output from the build.' )
+    cliParser.add_argument( 'statusfile', \
+                            help='Cylc status file from the build.' )
     cliParser.add_argument( 'errfile', \
                             help='Standard error from the build.' )
     cliParser.add_argument( '-help', '-h', '--help', action='help', \
@@ -49,18 +49,21 @@ if __name__ == '__main__':
     arguments = cliParser.parse_args()
 
     workingFilename = arguments.output + '.work'
-    if not os.path.exists( os.path.dirname( workingFilename ) ):
+    workingDirectory = os.path.dirname( workingFilename )
+    if workingDirectory and not os.path.exists( workingDirectory ):
       os.makedirs( os.path.dirname( workingFilename ) )
-    with open( arguments.outfile, 'r' ) as outfile, \
+    with open( arguments.statusfile, 'r' ) as statusfile, \
          open( arguments.errfile, 'r' ) as errfile, \
          open( workingFilename, 'w' ) as workingFile:
 
-        outParser = parser.CylcParser( outfile )
+        statusParser = parser.CylcParser( statusfile, 'Doxygen' )
         errParser = parser.DoxygenParser( errfile )
         errParser.processEvents( massageMessage )
 
-        pageRenderer = renderer.HtmlCompileRenderer( None, \
-                                                     outParser, errParser )
+        pageRenderer = renderer.HtmlCompileRenderer( None,
+                                                     statusParser,
+                                                     statusParser,
+                                                     errParser )
         pageRenderer.render( None, workingFile )
 
     os.rename( workingFilename, arguments.output )

@@ -326,6 +326,8 @@ class Mirrorer:
     '''
     url = urlparse.urlparse( destination )
 
+    ET.register_namespace( '', 'http://www.w3.org/1999/xhtml' )
+
     if url.scheme == 'file':
       self._uploader = UploaderFile()
       self._uploader.prepare( url.path )
@@ -355,9 +357,9 @@ class Mirrorer:
         absoluteFilename = os.path.join( root, filename )
         with open( absoluteFilename, 'r' ) as fileStream:
           transformedStream = self._transformFile( absoluteFilename, \
-                                                   fileStream )
+                                                  fileStream )
           self._uploader.upload( transformedStream, \
-                                 os.path.relpath( absoluteFilename, source ) )
+                                os.path.relpath( absoluteFilename, source ) )
           transformedStream.close()
 
     for transformation in self._treeTransforms:
@@ -393,7 +395,7 @@ class Mirrorer:
         transformation.transform( treeRoot )
 
       content = StringIO.StringIO()
-      tree.write( content )
+      tree.write( content, method='html' )
       content.seek( 0, os.SEEK_SET )
 
       return content
