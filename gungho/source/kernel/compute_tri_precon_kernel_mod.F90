@@ -21,7 +21,7 @@ use argument_mod,            only: arg_type, func_type,                      &
                                    GH_BASIS, GH_DIFF_BASIS,                  &
                                    CELLS, GH_EVALUATOR, EVALUATOR
 use planet_config_mod,       only : kappa, cp
-use timestepping_config_mod, only : dt, alpha
+use timestepping_config_mod, only : dt, tau_u, tau_t
 
 implicit none
 
@@ -177,7 +177,7 @@ subroutine compute_tri_precon_code(cell, nlayers,                       &
    
     jac_av = 0.5_r_def*(jac(:,:,k-1) + jac(:,:,k))
     JTJ = jac_av(1,3)**2 + jac_av(2,3)**2 + jac_av(3,3)**2
-    HB_inv = 1.0_r_def/max(0.1_r_def,JTJ-cp*alpha*dt*dthetadz(k)*dpdz)
+    HB_inv = 1.0_r_def/max(0.1_r_def,JTJ-cp*tau_u*dt*dthetadz(k)*dpdz)
   end do
   HB_inv(nlayers)   = 1.0
   dthetadz(nlayers) = 0.0
@@ -191,8 +191,8 @@ subroutine compute_tri_precon_code(cell, nlayers,                       &
                     + 2.0_r_def/real(ndf_wtheta) * theta(map_wtheta(df) + k)
     end do
 
-    Pw(k) = -alpha*dt*cp*theta_ref*HB_inv(k)
-    Pt(k) = -alpha*dt*dthetadz(k)*Pw(k)
+    Pw(k) = -tau_u*dt*cp*theta_ref*HB_inv(k)
+    Pt(k) = -tau_t*dt*dthetadz(k)*Pw(k)
   end do
   Pw(nlayers) = 0.0_r_def
   Pt(nlayers) = 0.0_r_def
@@ -212,8 +212,8 @@ subroutine compute_tri_precon_code(cell, nlayers,                       &
     rho_p = 0.5_r_def*(rho(map_w3(1)+k)*dj(k) + rho(map_w3(1)+kp)*dj(kp))
     rho_m = 0.5_r_def*(rho(map_w3(1)+k)*dj(k) + rho(map_w3(1)+km)*dj(km))
 
-    tri_plus(map_w3(1)+k)  = alpha*dt*Pw(k+1)*rho_p/(rho(map_w3(1)+k)*dj(k)) - 0.5_r_def*Pt(k+1)/theta_p
-    tri_minus(map_w3(1)+k) = alpha*dt*Pw(k)  *rho_m/(rho(map_w3(1)+k)*dj(k)) + 0.5_r_def*Pt(k)  /theta_m
+    tri_plus(map_w3(1)+k)  = tau_u*dt*Pw(k+1)*rho_p/(rho(map_w3(1)+k)*dj(k)) - 0.5_r_def*Pt(k+1)/theta_p
+    tri_minus(map_w3(1)+k) = tau_u*dt*Pw(k)  *rho_m/(rho(map_w3(1)+k)*dj(k)) + 0.5_r_def*Pt(k)  /theta_m
     tri_0(map_w3(1)+k) = kappa_term/exner(k) - tri_plus(map_w3(1)+k) - tri_minus(map_w3(1)+k)
 
     ik = (cell-1)*nlayers + k + 1

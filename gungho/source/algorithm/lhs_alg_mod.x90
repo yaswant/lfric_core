@@ -76,20 +76,20 @@ contains
 !>         Jacobian, namely:
 !>         \f[
 !>         \mathbf{L_u} = \mathbf{u}' 
-!>                      + \alpha\Delta t Cp\left( \theta^*\nabla\Pi' 
+!>                      + \tau_u\Delta t Cp\left( \theta^*\nabla\Pi'
 !>                                                +\theta'\nabla\Pi^*\right)
 !>         \f]
 !>         \f[ L_\rho = \rho' 
-!>                    + \alpha\Delta t\nabla.\left(\rho^*\mathbf{u}'\right) \f]
-!>         \f[ L_\theta = \theta' + \alpha\Delta t\mathbf{u}'.\nabla\theta^*\f]
+!>                    + tau_r\Delta t\nabla.\left(\rho^*\mathbf{u}'\right) \f]
+!>         \f[ L_\theta = \theta' + tau_t\Delta t\mathbf{u}'.\nabla\theta^*\f]
 !>
 !>         Where primed terms are increments to the n+1 timelevel field and
 !>         star terms are a reference profile
 !> @param[inout] lhs State vector to compute
-!> @param[in]    tau_dt Relaxation parameter times the timestep
+!> @param[in]    tau_{u,t,r}_dt Relaxation parameter times the timestep
 !> @param[inout] state Current model prognostic state
 !> @param[in] ref_state Reference state of the model fields
-  subroutine lhs_alg(lhs, state, ref_state, tau_dt)
+  subroutine lhs_alg(lhs, state, ref_state, tau_u_dt, tau_t_dt, tau_r_dt)
   use derived_config_mod, only: si_bundle_size, bundle_size
   use solver_config_mod,  only: use_operators
 
@@ -99,20 +99,20 @@ contains
   type(field_type),                  intent(inout) :: state(si_bundle_size)
 
   type(field_type),        optional, intent(in)    :: ref_state(bundle_size)
-  real(kind=r_def),                  intent(in)    :: tau_dt
+  real(kind=r_def),                  intent(in)    :: tau_u_dt, tau_t_dt, tau_r_dt
 
   if ( subroutine_timers ) call timer('lhs_alg')
   if ( use_operators ) then
-    call operator_lhs_alg(lhs, state, tau_dt)
+    call operator_lhs_alg(lhs, state, tau_u_dt, tau_t_dt, tau_r_dt)
   else
-    call on_the_fly_lhs_alg(lhs, state, ref_state, tau_dt)
+    call on_the_fly_lhs_alg(lhs, state, ref_state, tau_u_dt, tau_t_dt, tau_r_dt)
   end if
   if ( subroutine_timers ) call timer('lhs_alg')
 
   end subroutine lhs_alg
   !============================================================================!
   !>@brief Apply LHS terms with operators computed on the fly
-  subroutine on_the_fly_lhs_alg(lhs, state, ref_state, tau_dt)
+  subroutine on_the_fly_lhs_alg(lhs, state, ref_state, tau_u_dt, tau_t_dt, tau_r_dt)
   use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use formulation_config_mod,            only: eliminate_p
   use rtheta_kernel_mod,                 only: rtheta_kernel_type
@@ -137,7 +137,7 @@ contains
 
   implicit none
 
-  real(kind=r_def),             intent(in)    :: tau_dt
+  real(kind=r_def),             intent(in)    :: tau_u_dt, tau_t_dt, tau_r_dt
   ! Form of state and lhs is [u,theta,rho,exner]
   type(field_type), target,     intent(inout) :: state(si_bundle_size)
   type(field_type), target,     intent(in)    :: ref_state(bundle_size)
@@ -202,7 +202,7 @@ contains
                  matrix_vector_kernel_type( lhs(igh_u), u, mm_w2) )
 
   end if
-  call invoke_inc_xpby( lhs(igh_u), -tau_dt, lhs_tmp(igh_u) ) 
+  call invoke_inc_xpby( lhs(igh_u), -tau_u_dt, lhs_tmp(igh_u) )
   call invoke( enforce_bc_kernel_type( lhs(igh_u) ) )
  
   qr = quadrature_type(element_order+1, GAUSSIAN)
@@ -218,7 +218,7 @@ contains
     call invoke( rtheta_kernel_type( lhs_tmp(igh_t), theta_ref, u, qr), &
                  matrix_vector_kernel_type( lhs(igh_t), theta, mm_wtheta ) )
   end if
-  call invoke_inc_xpby( lhs(igh_t), tau_dt, lhs_tmp(igh_t) ) 
+  call invoke_inc_xpby( lhs(igh_t), tau_t_dt, lhs_tmp(igh_t) )
 
   ! Compute lhs_rho
   ! Need to create u*rho^ref \in W2 for lhs_tmp(igh_d) kernel -> sampled mass flux
@@ -229,7 +229,7 @@ contains
   call invoke( matrix_vector_kernel_type(r_rho, f_star, div) )
   call invoke_scale_field_data(-1.0_r_def, r_rho) 
   call invoke( matrix_vector_kernel_type( lhs_tmp(igh_d), r_rho, mm_w3_inv) )
-  call invoke_axpy( -tau_dt, lhs_tmp(igh_d), rho, lhs(igh_d) )
+  call invoke_axpy( -tau_r_dt, lhs_tmp(igh_d), rho, lhs(igh_d) )
 
   ! Compute lhs exner
   if ( .not. eliminate_p ) then
@@ -246,7 +246,7 @@ contains
 
   !============================================================================!
   !>@brief Apply LHS terms with precomputed operators
-  subroutine operator_lhs_alg(lhs, state, tau_dt)
+  subroutine operator_lhs_alg(lhs, state, tau_u_dt, tau_t_dt, tau_r_dt)
 
   use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
   use operator_mod,                       only: operator_type
@@ -269,7 +269,7 @@ contains
   ! Form of state and lhs is [u,theta,rho,exner] if not eliminate_p
   type(field_type), target,        intent(inout) :: state(si_bundle_size)
   type(field_type),                intent(inout) :: lhs(si_bundle_size)
-  real(kind=r_def),                intent(in)    :: tau_dt
+  real(kind=r_def),                intent(in)    :: tau_u_dt, tau_t_dt, tau_r_dt
 
   type(operator_type), pointer :: mm_w2 => null(), mm_w3_inv => null(), mm_wtheta => null()
   type(operator_type), pointer :: div => null()
@@ -318,7 +318,7 @@ contains
   rho_at_u      => get_rho_at_u()
 
   ! Combine constants
-  s1 = -tau_dt*cp
+  s1 = -tau_u_dt*cp
 
   if ( eliminate_p ) then
     ! Recompute exner' from linear eos
@@ -352,12 +352,12 @@ contains
   ! L_theta
                matrix_vector_kernel_type(lhs(igh_t), u, ptheta2),                   &
                matrix_vector_kernel_type(lhs_tmp(igh_t), theta, mm_wtheta),         &
-               inc_axpy(tau_dt,lhs(igh_t), lhs_tmp(igh_t)),                         &
+               inc_axpy(tau_t_dt,lhs(igh_t), lhs_tmp(igh_t)),                         &
   ! L_rho
                multiply_fields(rho_at_u, u, f_star),                                &
                dg_matrix_vector_kernel_type(lhs_tmp(igh_d), f_star, div),           &
                dg_matrix_vector_kernel_type(lhs(igh_d), lhs_tmp(igh_d), mm_w3_inv), &
-               inc_axpy(tau_dt, lhs(igh_d), rho)                                    &
+               inc_axpy(tau_r_dt, lhs(igh_d), rho)                                    &
               )
 
   if ( .not. eliminate_p ) then

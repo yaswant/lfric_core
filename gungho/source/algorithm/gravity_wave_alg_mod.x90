@@ -16,7 +16,7 @@ module gravity_wave_alg_mod
 
   ! Configuration options
   use finite_element_config_mod,      only: element_order
-  use timestepping_config_mod,        only: dt, alpha
+  use timestepping_config_mod,        only: dt, alpha 
   use derived_config_mod,             only: bundle_size
   use runtime_constants_mod,          only: get_div, &
                                             get_mass_matrix, &

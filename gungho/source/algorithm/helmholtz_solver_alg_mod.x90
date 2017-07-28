@@ -30,12 +30,10 @@ module helmholtz_solver_alg_mod
   use field_indices_mod,         only: igh_u, igh_t, igh_d, igh_p
   use output_config_mod,         only: subroutine_timers 
   use timer_mod,                 only: timer
+  use timestepping_config_mod,   only: tau_u, tau_t, tau_r
   implicit none
 
   private 
-  real(kind=r_def),    private, parameter :: tau_u = 0.5_r_def
-  real(kind=r_def),    private, parameter :: tau_t = 0.5_r_def
-  real(kind=r_def),    private, parameter :: tau_r = 0.5_r_def
   real(kind=r_def),    private, parameter :: sc_err_min = 1.0e-5_r_def
   type(field_type),    private            :: helmholtz_rhs
   type(field_type),    private            :: exner_increment
@@ -285,7 +283,7 @@ contains
     mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
     p3theta       => get_p3theta()
 
-    ! Compute M3*p + cp*tau*dt*H[ D{\theta*}*p ]
+    ! Compute M3*p + cp*tau_u*dt*H[ D{\theta*}*p ]
     timestep_term = cp*tau_u*dt**2
     if ( wtheta_on .and. element_order == 0 ) then
       ! Hard wired optimisation for desired configuration

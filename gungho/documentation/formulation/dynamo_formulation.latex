@@ -559,12 +559,12 @@ and then solving $L\mathbf{x}'=-\mathbf{R}\left(\mathbf{x}^{(k)}\right).$
 The form of $L$ implemented in dynamo is 
 \begin{equation}
 L\mathbf{x}'=\begin{cases}
-\mathbf{u}'+\tau\Delta tc_{pd}\left(\theta^{*}\nabla\Pi'+\theta'\nabla\Pi^{*}\right),\\
-\theta'+\tau\Delta t\mathbf{u}'.\nabla\theta^{*},\\
-\rho'+\tau\Delta t\nabla.\left(\rho^{*}\mathbf{u}'\right),
+\mathbf{u}'+\tau_u\Delta tc_{pd}\left(\theta^{*}\nabla\Pi'+\theta'\nabla\Pi^{*}\right),\\
+\theta'+\tau_\theta\Delta t\mathbf{u}'.\nabla\theta^{*},\\
+\rho'+\tau_\rho\Delta t\nabla.\left(\rho^{*}\mathbf{u}'\right),
 \end{cases}\label{eq:L}
 \end{equation}
-where $\tau$ is a relaxation parameter. The reference pressure $\Pi^{*}$
+where $\tau_{u,\theta,\rho}$ are relaxation parameters. The reference pressure $\Pi^{*}$
 is computed from $\rho^{*}$ and $\theta^{*}$ using the equation
 of state and $\Pi'=\frac{\kappa}{1-\kappa}\Pi^{*}\left(\frac{\theta'}{\theta^{*}}+\frac{\rho'}{\rho^{*}}\right)$
 is a pressure increment.
@@ -820,9 +820,9 @@ respectively.
 As for time integration, in the case $\theta\in\mathbb{W}_\theta$ the mass matrix $M_\theta$, defined equivalently to $M_0$ in \eqref{eq:M0_mass_matrix}, replaces $M_0$ in \eqref{eq:theta_RK}.
 Moreover, the expression for the residuals in section \ref{sec:SI_timestepping} are modified as follows
 \begin{eqnarray}
-R_{\mathbf{u}}^{n+1} & = & \left\langle \mathbf{v},\mathbf{u}^{n+1}\right\rangle -\alpha\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n+1}\right\rangle -c_{pd}\llangle\llbracket\theta^{n+1}\mathbf{v}, \Pi^{n+1}\rrbracket\rrangle\right. \label{eq:si_ru_np1_wt}\\
+R_{\mathbf{u}}^{n+1} & = & \left\langle \mathbf{v},\mathbf{u}^{n+1}\right\rangle -\tau_u\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n+1}\right\rangle -c_{pd}\llangle\llbracket\theta^{n+1}\mathbf{v}, \Pi^{n+1}\rrbracket\rrangle\right. \label{eq:si_ru_np1_wt}\\
                      &   & \left.+c_{pd}\left\langle \nabla.\left(\theta^{n+1}\mathbf{v}\right),\Pi^{n+1}\right\rangle -\left\langle \mathbf{v},2\bm{\Omega}\times\mathbf{u}^{n+1}\right\rangle \right],\nonumber\\
-R_{\mathbf{u}}^{n} & = & -\left\langle \mathbf{v},\mathbf{u}^{n}\right\rangle -\left(1-\alpha\right)\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n}\right\rangle -c_{pd}\llangle\llbracket\theta^n\mathbf{v}, \Pi^n\rrbracket\rrangle\right. \label{eq:si_ru_n_wt}\\
+R_{\mathbf{u}}^{n} & = & -\left\langle \mathbf{v},\mathbf{u}^{n}\right\rangle -\left(1-\tau_u\right)\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla.\mathbf{v},K^{n}\right\rangle -c_{pd}\llangle\llbracket\theta^n\mathbf{v}, \Pi^n\rrbracket\rrangle\right. \label{eq:si_ru_n_wt}\\
                    &   & \left.+c_{pd}\left\langle \nabla.\left(\theta^{n}\mathbf{v}\right),\Pi^{n}\right\rangle -\left\langle \mathbf{v},2\mathbf{\Omega}\times\mathbf{u}^{n}\right\rangle \right],  \nonumber\\
 R_{\theta}^{adv} & = & -\Delta t[\llangle\widehat{\theta^n\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}}\cdot\mathbf{n}^-, \gamma\rrangle + \left\langle\nabla_h\cdot\left(\gamma\frac{\widetilde{\mathbf{F}}}{\widetilde{\rho}}\right), \theta^n\right\rangle].\label{eq:si_rtheta_adv_wt}
 \end{eqnarray}

@@ -26,6 +26,9 @@ module departure_point_kernel_mod_test
 
   real(r_def), parameter    :: dt  = 10.0_r_def
   real(r_def), parameter    :: alpha   = 0.5_r_def
+  real(r_def), parameter    :: tau_u   = 0.5_r_def
+  real(r_def), parameter    :: tau_t   = 0.5_r_def
+  real(r_def), parameter    :: tau_r   = 0.5_r_def
   integer(i_def), parameter :: inner_iterations = 0
   integer(i_def), parameter :: outer_iterations = 0
   integer(i_def), parameter :: spinup_period = 0
@@ -49,6 +52,9 @@ contains
     call feign_timestepping_config( timestepping_method_semi_implicit,   &
                                     dt,                                  &
                                     alpha,                               &
+                                    tau_u,                               &
+                                    tau_t,                               &
+                                    tau_r,                               &
                                     outer_iterations,                    &
                                     inner_iterations,                    &
                                     timestepping_runge_kutta_method_ssp3,&

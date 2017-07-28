@@ -223,12 +223,12 @@ contains
     end if
 
     if (spinup_alpha .and. timestep <= spinup_period)then
-      varalpha = alpha + (spinup_period - timestep + 1) * & 
+      varalpha = alpha + (spinup_period - timestep + 1) * &
          (1.0 - alpha)/spinup_period
     else
       varalpha = alpha
     end if
-    varbeta=1.0 - varalpha
+    varbeta = 1.0 - varalpha
 
     !============================================================================
     ! Fields for physics

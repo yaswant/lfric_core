@@ -46,7 +46,7 @@ contains
 !>         (d_adv terms) namely:
 !>         \f[
 !>            \mathbf{R_u} = \mathbf{u} 
-!>                         + \alpha\Delta t\left[ 2\Omega \times \mathbf{u} 
+!>                         + \alpha\Delta t\left[ 2\Omega \times \mathbf{u}
 !>                         + \nabla\left(\Phi + 1/2\mathbf{u}.\mathbf{u}\right)
 !>                         + Cp\theta\nabla\Pi \right]
 !>         \f]
@@ -61,7 +61,8 @@ contains
   
   implicit none
 
-  real(kind=r_def),             intent(in)    :: alpha_dt
+  real(r_def),                  intent(in)    :: alpha_dt
+  
   ! Form of state and rhs is [u,theta,rho,exner] 
   type(field_type), target,     intent(in)    :: state(bundle_size)
   type(field_type),             intent(inout) :: rhs(bundle_size)
@@ -106,12 +107,12 @@ contains
   if ( rotating ) &
     call invoke( rotation_kernel_type( rhs_tmp(igh_u), u, chi, qr ) )
   call invoke( matrix_vector_kernel_type( rhs(igh_u), u, mm_w2) )
-  call invoke_inc_xpby( rhs(igh_u) , alpha_dt, rhs_tmp(igh_u) ) 
+  call invoke_inc_xpby( rhs(igh_u) , alpha_dt, rhs_tmp(igh_u) )
   call invoke( enforce_bc_kernel_type(rhs(igh_u)) )
  
   ! Compute rhs_theta
   call invoke( matrix_vector_kernel_type( rhs(igh_t), theta, mm_wtheta) )
-  call invoke_inc_xpby( rhs(igh_t), alpha_dt, rhs_tmp(igh_t) ) 
+  call invoke_inc_xpby( rhs(igh_t), alpha_dt, rhs_tmp(igh_t) )
 
   ! Compute rhs_rho
   call invoke( copy_field(rho, rhs(igh_d)) )

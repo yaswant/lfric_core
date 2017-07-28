@@ -43,7 +43,7 @@ module si_solver_alg_mod
                                        solver_si_postconditioner_pressure, &
                                        gcrk
 
-  use timestepping_config_mod,   only: dt
+  use timestepping_config_mod,   only: dt, tau_u, tau_t, tau_r
   use derived_config_mod,        only: si_bundle_size, bundle_size
   use field_indices_mod,         only: igh_u, igh_t, igh_d, igh_p
   use output_config_mod,         only: subroutine_timers 
@@ -78,18 +78,20 @@ contains
     type(field_type), intent(in)             :: rhs0(bundle_size), &
                                                 x_ref(bundle_size)
  
-    real(kind=r_def)                         :: tau_dt ! tau_dt would eventually be set globally 
-                                                       ! (probably the same place as alpha)
+    real(kind=r_def)                         :: tau_u_dt, tau_t_dt, tau_r_dt
+
     integer(kind=i_def)                      :: i
 
     if ( subroutine_timers ) call timer('si_solver_alg')
-    ! Set up tau_dt: to be used here and in subsequent algorithms
-    tau_dt = 0.5_r_def*dt
+    ! Set up tau_{u,t,r}_dt: to be used here and in subsequent algorithms
+    tau_u_dt = tau_u*dt
+    tau_t_dt = tau_t*dt
+    tau_r_dt = tau_r*dt
 
 ! PSyclone built-ins support (v.1.3.1) fails for changing index in a loop, so the
 ! calls below are placeholders for when it becomes available
     if ( eliminate_p ) then
-      call mixed_gmres_alg(x0, rhs0, x_ref, tau_dt)      
+      call mixed_gmres_alg(x0, rhs0, x_ref, tau_u_dt, tau_t_dt, tau_r_dt)
     else
       do i = 1,bundle_size
         call invoke_copy_field_data(rhs0(i), rhs0_ext(i))
@@ -102,7 +104,7 @@ contains
       call invoke_set_field_scalar(0.0_r_def, rhs0_ext(si_bundle_size)) 
 !       call invoke( set_field_scalar(0.0_r_def, x0_ext(si_bundle_size)), &     
 !                    set_field_scalar(0.0_r_def, rhs0_ext(si_bundle_size)) )     
-      call mixed_gmres_alg(x0_ext, rhs0_ext, x_ref, tau_dt)
+      call mixed_gmres_alg(x0_ext, rhs0_ext, x_ref, tau_u_dt, tau_t_dt, tau_r_dt)
       do i = 1,bundle_size
         call invoke_copy_field_data(x0_ext(i), x0(i))
 !         call invoke( copy_field(x0_ext(i), x0(i)) )
@@ -171,16 +173,16 @@ contains
 !>@param[inout] x0 State to increment 
 !>@param[in]    rhs0 Fixed rhs so solve for
 !>@param[in]    x_ref Reference state
-!>@param[in]    tau_dt The offcentering parameter times the timestep
+!>@param[in]    tau_{u,t,r}_dt The offcentering parameter times the timestep
 
-  subroutine mixed_gmres_alg(x0, rhs0, x_ref, tau_dt)
+  subroutine mixed_gmres_alg(x0, rhs0, x_ref, tau_u_dt, tau_t_dt, tau_r_dt)
 
     implicit none
 
     type(field_type),             intent(inout) :: x0(si_bundle_size)
     type(field_type),             intent(in)    :: rhs0(si_bundle_size), &
                                                    x_ref(bundle_size)
-    real(kind=r_def),             intent(in)    :: tau_dt
+    real(kind=r_def),             intent(in)    :: tau_u_dt, tau_t_dt, tau_r_dt
 
     ! The scalars
     real(kind=r_def)         :: h(gcrk+1, gcrk), u(gcrk), g(gcrk+1)
@@ -238,7 +240,7 @@ contains
 
         call bundle_preconditioner(Pv(:,j), v(:,j), si_postconditioner, mm_diagonal, si_bundle_size)
 
-        call lhs_alg(s, Pv(:,j), x_ref, tau_dt)
+        call lhs_alg(s, Pv(:,j), x_ref, tau_u_dt, tau_t_dt, tau_r_dt)
         call bundle_preconditioner(w, s, si_preconditioner, mm_diagonal, si_bundle_size )
         do k = 1, j
           h(k,j) =  bundle_inner_product( v(:,k), w, si_bundle_size )
@@ -281,7 +283,7 @@ contains
       end do
 
       ! Check for convergence
-      call lhs_alg(Ax, dx, x_ref, tau_dt)
+      call lhs_alg(Ax, dx, x_ref, tau_u_dt, tau_t_dt, tau_r_dt)
 
       call minus_bundle( rhs0, Ax, residual, si_bundle_size )
 

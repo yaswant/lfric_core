@@ -19,11 +19,10 @@ module si_operators_alg_mod
                                        normalise
   use output_config_mod,         only: subroutine_timers 
   use timer_mod,                 only: timer
+  use timestepping_config_mod,   only: tau_r
 
   implicit none
   private
-
-  real(kind=r_def),    private, parameter :: tau_r = 0.5_r_def
 
   ! Variables private to this module that can only be accessed by public
   ! functions returning pointers to them 

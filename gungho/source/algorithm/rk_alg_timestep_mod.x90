@@ -20,7 +20,7 @@ module rk_alg_timestep_mod
   use finite_element_config_mod, only: element_order, wtheta_on
   use formulation_config_mod,    only: rotating
   use runge_kutta_init_mod,      only: num_rk_stage, ak
-  use timestepping_config_mod,   only: dt, alpha, beta, &
+  use timestepping_config_mod,   only: dt, &
                                        outer_iterations, inner_iterations
   use idealised_config_mod,      only: test, idealised_test_held_suarez
   use derived_config_mod,        only: bundle_size
