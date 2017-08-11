@@ -2544,7 +2544,9 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_app
     type( field_proxy_type )            :: a2_proxy
     type( field_proxy_type )            :: cell_orientation_proxy
 
-    type(stencil_dofmap_type), pointer  :: map => null()
+    type(stencil_dofmap_type), pointer  :: map_x_w3 => null()
+    type(stencil_dofmap_type), pointer  :: map_y_w3 => null()
+    integer, pointer                    :: map_w3(:) => null()
     integer, pointer                    :: stencil_map(:,:) => null()
     integer                             :: rho_stencil_size
     integer                 :: cell
@@ -2572,12 +2574,10 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_app
     ! 1DX --> |4|2|1|3|5|  OR  1DY -->  |1|
     !                                   |2|
     !                                   |4|
-    if (direction == x_direction) then
-      map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DX,rho_approximation_stencil_extent)
-    elseif (direction == y_direction) then
-      map => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DY,rho_approximation_stencil_extent)
-    end if
-    rho_stencil_size = map%get_size()
+    map_x_w3 => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DX,rho_approximation_stencil_extent)
+    map_y_w3 => rho_proxy%vspace%get_stencil_dofmap(STENCIL_1DY,rho_approximation_stencil_extent)
+
+    rho_stencil_size = map_x_w3%get_size()
 
     swap = .false.
     do d = 1,rho_approximation_stencil_extent
@@ -2600,7 +2600,21 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_app
     ! The kernel loops over all core and some halo cells.
     do cell = 1, ncells_to_iterate
 
-      stencil_map => map%get_dofmap(cell)
+      map_w3 => rho_proxy%vspace%get_cell_dofmap(cell)
+
+      if (direction == x_direction) then
+        if (nint(cell_orientation_proxy%data(map_w3(1))) == 2 .or. nint(cell_orientation_proxy%data(map_w3(1))) == 4) then
+          stencil_map => map_y_w3%get_dofmap(cell)
+        else
+          stencil_map => map_x_w3%get_dofmap(cell)
+        end if
+      elseif (direction == y_direction) then
+        if (nint(cell_orientation_proxy%data(map_w3(1))) == 2 .or. nint(cell_orientation_proxy%data(map_w3(1))) == 4) then
+          stencil_map => map_x_w3%get_dofmap(cell)
+        else
+          stencil_map => map_y_w3%get_dofmap(cell)
+        end if
+      end if
 
       call subgrid_coeffs_code( nlayers,                                  &
                                 rho_approximation,                        &
