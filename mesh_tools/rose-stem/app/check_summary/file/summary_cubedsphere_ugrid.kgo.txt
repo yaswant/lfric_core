@@ -1,4 +1,4 @@
-"Mesh2":
+"dynamics":
   Class:               sphere
   Generator inputs:    edge_cells=4;smooth_passes=0
   Nodes:               98

@@ -1,6 +1,6 @@
 &base_mesh
   filename        = 'mesh_C12.nc'
-  prime_mesh_name = 'Mesh2'
+  prime_mesh_name = 'dynamics'
   geometry        = 'spherical'
   partitioner     = 'cubedsphere'
   fplane          = .false.

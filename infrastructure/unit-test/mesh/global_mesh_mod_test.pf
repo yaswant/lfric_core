@@ -37,7 +37,7 @@ module global_mesh_mod_test
     procedure :: test_global_mesh_map_retrival
   end type global_mesh_test_type
 
-  character(str_def),          parameter :: mesh_name = 'Mesh2'
+  character(str_def),          parameter :: mesh_name = 'unit_test'
   character(str_max_filename), parameter :: &
       MultiGridFiles(2) =                   &
                   [ 'data/mesh_C4.nc',      &! 4x4 panel

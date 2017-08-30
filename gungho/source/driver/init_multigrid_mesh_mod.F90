@@ -13,6 +13,7 @@ use mesh_mod,                   only: mesh_type
 use global_mesh_mod,            only: global_mesh_type
 use partition_mod,              only: partition_type, partitioner_interface
 use extrusion_config_mod,       only: number_of_layers, domain_top, method
+use base_mesh_config_mod,       only: prime_mesh_name
 use log_mod,                    only: log_event, log_scratch_space,    &
                                       LOG_LEVEL_INFO, LOG_LEVEL_TRACE, &
                                       LOG_LEVEL_ERROR
@@ -53,8 +54,9 @@ type(mesh_type),        pointer :: prime_mesh => null()
 type(global_mesh_type), pointer :: global_mesh => null()
 type(partition_type) :: partition
 
-character(str_def), parameter :: mesh_name = 'Mesh2'
+character(str_def) :: mesh_name
 
+mesh_name = prime_mesh_name
 global_mesh_ids(:) = 0
 allocate(mesh_ids(multigrid_chain_nitems))
 

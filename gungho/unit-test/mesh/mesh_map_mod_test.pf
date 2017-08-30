@@ -50,7 +50,7 @@ module mesh_map_mod_test
     procedure :: test_fine_to_coarse_map
   end type mesh_map_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
   character(str_max_filename), parameter :: filenames(2) = &
                                     [ 'data/mesh_C4.nc ',  &! 4x4 panel
                                       'data/mesh_C8.nc ']   ! 8x8 panel

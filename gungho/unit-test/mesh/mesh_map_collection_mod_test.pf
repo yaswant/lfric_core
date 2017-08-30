@@ -50,7 +50,7 @@ module mesh_map_collection_mod_test
     procedure :: test_mesh_map_collection
   end type mesh_map_collection_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
   character(str_max_filename), parameter ::                      &
                                coarse_ugrid = 'data/mesh_C4.nc', &! 4x4 panel
                                fine_ugrid   = 'data/mesh_C8.nc'   ! 8x8 panel

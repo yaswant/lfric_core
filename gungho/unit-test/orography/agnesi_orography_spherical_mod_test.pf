@@ -38,7 +38,7 @@ module agnesi_orography_spherical_mod_test
     procedure     :: test_agnesi_orography_spherical
   end type agnesi_orography_spherical_test_type
 
-  character(str_def), parameter   :: mesh_name  = 'Mesh2'
+  character(str_def), parameter   :: mesh_name  = 'unit_test'
   character(len=str_max_filename) :: filename   = "data/mesh_C16.nc"
   real(r_def),        parameter   :: domain_top = 1000.0_r_def
   integer(i_def),     parameter   :: npanels    = 6_i_def

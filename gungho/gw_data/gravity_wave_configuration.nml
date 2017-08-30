@@ -1,6 +1,6 @@
 &base_mesh
   filename        = 'mesh_C24.nc'
-  prime_mesh_name = 'Mesh2'
+  prime_mesh_name = 'dynamics'
   geometry        = 'spherical'
   partitioner     = 'cubedsphere'
   fplane          = .false.
@@ -14,7 +14,7 @@
 /
 
 &finite_element
-  shape         = 'quadrilateral'
+  cellshape     = 'quadrilateral'
   element_order = 0
   coordinate_order = 2
   rehabilitate  = .true.

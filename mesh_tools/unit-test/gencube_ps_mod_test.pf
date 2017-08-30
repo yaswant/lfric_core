@@ -28,7 +28,7 @@ module gencube_ps_mod_test
     procedure test_all
   end type gencube_ps_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
   integer(i_def),     parameter :: edge_cells = 3
   integer(i_def),     parameter :: nsmooth = 1
 

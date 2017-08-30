@@ -57,7 +57,7 @@ module mesh_mod_test
 
   end type mesh_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
   integer(i_def),     parameter :: npanels    = 6_i_def
   integer(i_def),     parameter :: nlayers    = 5_i_def
   real(r_def),        parameter :: domain_top = 10000.0_r_def

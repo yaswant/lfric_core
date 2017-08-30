@@ -14,8 +14,8 @@
    </axis_definition>
    
    <domain_definition>
-      <domain id="node" name="Mesh2" nvertex="1"/>
-      <domain id="face" name="Mesh2" nvertex="4"/>
+      <domain id="node" name="Mesh2d" nvertex="1"/>
+      <domain id="face" name="Mesh2d" nvertex="4"/>
    </domain_definition>
    
    <grid_definition>

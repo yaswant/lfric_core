@@ -104,9 +104,9 @@ contains
     ! Assumes same number of horizontal quad points in x and y
     nqp_h_1d = int(nqp_h**(1./2.))
 
-    call feign_base_mesh_config( filename='foo', prime_mesh_name='Mesh2',  &
-                                 geometry=base_mesh_geometry_planar,       &
-                                 partitioner=base_mesh_partitioner_planar, &
+    call feign_base_mesh_config( filename='foo', prime_mesh_name='unit_test', &
+                                 geometry=base_mesh_geometry_planar,          &
+                                 partitioner=base_mesh_partitioner_planar,    &
                                  fplane=.false., f_lat_deg=0.0_r_def )
 
     call feign_initial_temperature_config( bvf_square )

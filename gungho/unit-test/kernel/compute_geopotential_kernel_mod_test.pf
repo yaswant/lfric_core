@@ -59,9 +59,9 @@ contains
                               scaling_factor=scaling )
 
     ! Base mesh config is needed to ensure spherical geometry is used
-    call feign_base_mesh_config( filename='foo', prime_mesh_name='Mesh2',  &
-                                 geometry=base_mesh_geometry_spherical,       &
-                                 partitioner=base_mesh_partitioner_cubedsphere, &
+    call feign_base_mesh_config( filename='foo', prime_mesh_name='dynamics',   &
+                                 geometry=base_mesh_geometry_spherical,        &
+                                 partitioner=base_mesh_partitioner_cubedsphere,&
                                  fplane=.false., f_lat_deg=f_lat )
 
     ! Formulation config is needed to ensure shallow atmosphere formulation is

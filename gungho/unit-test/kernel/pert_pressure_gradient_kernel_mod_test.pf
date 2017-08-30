@@ -80,9 +80,9 @@ contains
     integer(i_def) :: dim_w0, diff_dim_w0, dim_w2, diff_dim_w2, dim_w3
     integer(i_def) :: mesh_id
 
-    call feign_base_mesh_config( filename='foo', prime_mesh_name='Mesh2',  &
-                                 geometry=base_mesh_geometry_planar,       &
-                                 partitioner=base_mesh_partitioner_planar, &
+    call feign_base_mesh_config( filename='foo', prime_mesh_name='unit_test', &
+                                 geometry=base_mesh_geometry_planar,          &
+                                 partitioner=base_mesh_partitioner_planar,    &
                                  fplane=.false., f_lat_deg=0.0_r_def )
 
     call feign_initial_temperature_config( bvf_square )

@@ -44,7 +44,7 @@ module global_mesh_collection_mod_test
 
   end type global_mesh_collection_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
   character(str_max_filename), parameter :: &
       CubedSphereFile = 'data/mesh_C4.nc'
   character(str_max_filename), parameter :: &

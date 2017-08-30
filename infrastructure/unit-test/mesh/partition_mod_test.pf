@@ -40,7 +40,7 @@ module partition_mod_test
     procedure :: test_partition_BiPeriodic
   end type partition_test_type
 
-  character(str_def), parameter :: mesh_name = 'Mesh2'
+  character(str_def), parameter :: mesh_name = 'unit_test'
 
 contains
 
