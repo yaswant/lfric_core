@@ -95,7 +95,6 @@ program gungho
 
   integer(i_def)     :: comm = -999
 
-
   character(len=*), parameter   :: xios_id   = "lfric_client"
   character(len=*), parameter   :: xios_ctx  = "gungho_atm"
 
@@ -108,7 +107,6 @@ program gungho
 
   ! prognostic fields in non-native spaces (e.g. for physics)
   type( field_type ) :: u1_in_w3, u2_in_w3, u3_in_w3, theta_in_w3, p_in_w3, p_in_wth
-
 
   ! Array to hold cell orientation values in W3 field
   type( field_type )               :: cell_orientation
@@ -133,7 +131,6 @@ program gungho
   call init_wait()
   call xios_initialize(xios_id, return_comm = comm)
 
-
   ! Initialise ESMF using mpi communicator initialised by XIOS
   ! and get the rank information from the virtual machine
   call ESMF_Initialize(vm=vm, &
@@ -156,7 +153,6 @@ program gungho
   ! initialised.
   call log_event( 'gungho running...', LOG_LEVEL_INFO )
 
-  allocate( filename, source='dynamo_configuration.nml' )
   call get_initial_filename( filename )
   call load_configuration( filename )
   call set_derived_config()
@@ -352,7 +348,6 @@ program gungho
     '\****************************************************************************/ ', &
      LOG_LEVEL_INFO)
 
-
     ! Use diagnostic output frequency to determine whether to write diagnostics
     ! on this timestep
 
@@ -392,19 +387,16 @@ program gungho
            call output_xios_nodal('m_nc', mr(imr_nc),   mesh_id)
            call output_xios_nodal('m_nr', mr(imr_nr),   mesh_id)
          end if
-
  
          ! Output vector fields
          call output_xios_nodal("u", u, mesh_id)
          call output_xios_nodal("xi", xi, mesh_id)
-
 
       end if
 
       call pressure_diagnostic_alg(rho, theta, timestep, mesh_id)
       call divergence_diagnostic_alg(u, timestep, mesh_id)
     end if
-
 
   end do ! end ts loop
 
