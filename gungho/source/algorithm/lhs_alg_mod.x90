@@ -13,11 +13,12 @@ module lhs_alg_mod
                                                get_div, &
                                                get_mass_matrix, &
                                                get_rmultiplicity, &
-                                               w2_id, w3inv_id, theta_space_id, &
+                                               w2_id, w3inv_id, theta_space_id, dl_id, &
                                                get_normalisation
   use field_mod,                         only: field_type
   use function_space_mod,                only: function_space_type
   use finite_element_config_mod,         only: element_order, wtheta_on
+  use formulation_config_mod,            only: dlayer_on
   use fs_continuity_mod,                 only: W2
   use field_indices_mod,                 only: igh_u, igh_t, igh_d, igh_p
   use output_config_mod,                 only: subroutine_timers 
@@ -137,8 +138,8 @@ contains
   type( quadrature_xyoz_type )          :: qr
   type( quadrature_rule_gaussian_type ) :: quadrature_rule
 
-  type(field_type),    pointer :: chi(:)=> null()
-  type(operator_type), pointer :: mm_w2 => null(),     &
+  type(field_type),    pointer :: chi(:) => null()
+  type(operator_type), pointer :: mm_vel => null(),    &
                                   mm_w3_inv => null(), &
                                   mm_wtheta => null()
   type(operator_type), pointer :: div => null()
@@ -157,14 +158,20 @@ contains
   real(kind=r_def), parameter  :: minus_one = -1.0_r_def
 
   ! Get operators from runtime constants
-  mm_w2     => get_mass_matrix(w2_id)
   mm_w3_inv => get_mass_matrix(w3inv_id)
   mm_wtheta => get_mass_matrix(theta_space_id)
   chi       => get_coordinates()
   div       => get_div()
   w2_rmultiplicity => get_rmultiplicity( W2 )
 
-  ! Dereference state
+  ! Using modified velocity mass matrix if using damping layer
+  if (dlayer_on) then
+    mm_vel => get_mass_matrix(dl_id)
+  else
+    mm_vel => get_mass_matrix(w2_id)
+  end if
+
+  ! dereference state
   u     => state(igh_u)
   theta => state(igh_t)
   rho   => state(igh_d)
@@ -186,7 +193,7 @@ contains
   end if
   call invoke( exner_gradient_kernel_type( lhs_tmp(igh_u), exner, theta_ref, qr ), &
                exner_gradient_kernel_type( lhs_tmp(igh_u), exner_ref, theta, qr ), &
-               matrix_vector_kernel_type( lhs(igh_u), u, mm_w2 ) )
+               matrix_vector_kernel_type( lhs(igh_u), u, mm_vel ) )
 
   call invoke( inc_X_minus_bY( lhs(igh_u), tau_u_dt, lhs_tmp(igh_u) ), &
                enforce_bc_kernel_type( lhs(igh_u) ) )
@@ -261,7 +268,7 @@ contains
   type(field_type),                intent(inout) :: lhs(bundle_size)
   real(kind=r_def),                intent(in)    :: tau_r_dt
 
-  type(operator_type), pointer :: mm_w2 => null(), mm_w3_inv => null(), mm_wtheta => null()
+  type(operator_type), pointer :: mm_vel => null(), mm_w3_inv => null(), mm_wtheta => null()
   type(operator_type), pointer :: div => null()
   type(field_type),    pointer :: u ,theta, rho, exner => null()
   type(operator_type), pointer :: p2theta => null(), &
@@ -294,12 +301,18 @@ contains
   exner => state(igh_p)
 
   ! Obtain operators from runtime constants
-  mm_w2         => get_mass_matrix(w2_id)
   mm_w3_inv     => get_mass_matrix(w3inv_id)
   mm_wtheta     => get_mass_matrix(theta_space_id)
   div           => get_div()
   mt_lumped_inv => get_normalisation(theta_space_id)
   m2_diag       => get_normalisation(w2_id)
+
+  ! Using modified velocity mass matrix if using damping layer
+  if (dlayer_on) then
+    mm_vel => get_mass_matrix(dl_id)
+  else
+    mm_vel => get_mass_matrix(w2_id)
+  end if
 
   ! Obtain operators from si operators
   p2theta           => get_p2theta()
@@ -321,7 +334,7 @@ contains
   ! L_u
                matrix_vector_kernel_type( lhs(igh_u), theta, p2theta ),               &
                matrix_vector_kernel_type( lhs(igh_u), exner, div_star ),              &
-               matrix_vector_kernel_type( lhs_tmp(igh_u), u, mm_w2 ),                 &
+               matrix_vector_kernel_type( lhs_tmp(igh_u), u, mm_vel ),                &
                inc_aX_plus_Y(minus_one, lhs(igh_u), lhs_tmp(igh_u) ),                 &
                enforce_bc_kernel_type( lhs(igh_u) ),                                  &
   ! L_theta

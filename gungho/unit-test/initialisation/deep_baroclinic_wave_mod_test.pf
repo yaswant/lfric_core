@@ -66,12 +66,14 @@ contains
                                 sbr_angle_lat=0.0_r_def,                     &
                                 sbr_angle_lon=0.0_r_def,                     &
                                 nl_constant = 0.0_r_def,                     &
-                                wind_time_period = 0.0_r_def )
+                                wind_time_period = 0.0_r_def,                &
+                                smp_init_wind = .false. )
 
     call feign_formulation_config(transport_only=.false., rotating=.true., &
                                   use_moisture=.false., &
                                   shallow=.false., use_physics=.false., &
-				  use_wavedynamics=.true.)
+				  dlayer_on = .false., &
+                                  use_wavedynamics=.true.)
 
   end subroutine setUp
 

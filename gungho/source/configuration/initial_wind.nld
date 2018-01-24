@@ -19,4 +19,5 @@ namelist initial_wind
   sbr_angle_lon     : real
   wind_time_period  : real
   NL_constant       : real
+  smp_init_wind     : logical
 end namelist initial_wind

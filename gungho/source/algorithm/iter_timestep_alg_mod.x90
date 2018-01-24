@@ -16,7 +16,7 @@ module iter_timestep_alg_mod
 
   ! Configuration options
   use restart_control_mod,       only: restart_type
-  use formulation_config_mod,    only: use_moisture, use_physics, &
+  use formulation_config_mod,    only: use_moisture, use_physics, dlayer_on, &
                                        use_wavedynamics
   use output_config_mod,         only: diagnostic_frequency, subroutine_timers
   use solver_config_mod,         only: method, helmholtz_solve, use_operators, &
@@ -299,7 +299,7 @@ contains
     if (use_wavedynamics) then
 
       call copy_bundle(state, state_n, bundle_size)
-      call rhs_alg(rhs_n, varbeta*dt, state_n, .false.)
+      call rhs_alg(rhs_n, varbeta*dt, state_n, .false., .false.)
 
       !============================================================================
       ! Start the Outer (advection) loop
@@ -351,7 +351,7 @@ contains
             if ( helmholtz_solve ) call compute_inv_hb()
           end if
 
-          call rhs_alg(rhs_np1, -varalpha*dt, state, .true.)
+          call rhs_alg(rhs_np1, -varalpha*dt, state, .true., dlayer_on)
 
           !--------------------------------------------------------------------
           ! Solve for the increments

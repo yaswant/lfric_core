@@ -64,7 +64,8 @@ contains
                                     sbr_angle_lat=0.0_r_def,                  &
                                     sbr_angle_lon=0.0_r_def,                  &
                                     nl_constant=2.0_r_def,                    &
-                                    wind_time_period=10.0_r_def )
+                                    wind_time_period=10.0_r_def,              &
+                                    smp_init_wind=.false. )
 
     call feign_extrusion_config( extrusion_method_uniform, domain_top, nlayers )
 

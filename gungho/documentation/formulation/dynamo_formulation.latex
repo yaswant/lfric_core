@@ -561,7 +561,7 @@ denoted by fields with a $\widetilde{}$. For each individual component
 of the spatially continuous state the residual components are given
 by
 \begin{eqnarray}
-R_{\mathbf{u}}^{n+1} & = & \mathbf{u}^{n+1}+\alpha\Delta t\left[\nabla\left(\Phi+K^{n+1}\right)+2\bm{\Omega}\times\mathbf{u}^{n+1}+c_{pd}\theta^{n+1}\nabla\Pi^{n+1}\right],\label{eq:Ru_np1_continuous}\\
+R_{\mathbf{u}}^{n+1} & = & \left(1+\mu\Delta t\mathbf{k}\right)\mathbf{u}^{n+1}+\alpha\Delta t\left[\nabla\left(\Phi+K^{n+1}\right)+2\bm{\Omega}\times\mathbf{u}^{n+1}+c_{pd}\theta^{n+1}\nabla\Pi^{n+1}\right],\label{eq:Ru_np1_continuous}\\
 R_{\mathbf{u}}^{n} & = & -\mathbf{u}^{n}+\left(1-\alpha\right)\Delta t\left[\nabla\left(\Phi+K^{n}\right)+2\bm{\Omega}\times\mathbf{u}^{n}+c_{pd}\theta^{n}\nabla\Pi^{n}\right],\label{eq:Ru_n_continuous}\\
 R_{\mathbf{u}}^{adv} & = & \Delta t\frac{\bm{\xi}}{\rho}\times\widetilde{\mathbf{F}}\label{eq:Ru_advective}
 \end{eqnarray}
@@ -582,7 +582,7 @@ R_{\Pi}^{adv} & = & 0\label{eq:Rpi_advective}
 \end{eqnarray}
 and applying the FEM spatial discretisation, yields 
 \begin{eqnarray}
-R_{\mathbf{u}}^{n+1} & = & \left\langle \mathbf{v},\mathbf{u}^{n+1}\right\rangle -\tau_u\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla\cdot\mathbf{v},K^{n+1}\right\rangle -c_{pd}\llangle\llbracket\theta^{n+1}\mathbf{v}, \Pi^{n+1}\rrbracket\rrangle\right. \label{eq:si_ru_np1}\\
+R_{\mathbf{u}}^{n+1} & = & \left\langle \mathbf{v},\left(1+\mu\Delta t\mathbf{k}\right)\mathbf{u}^{n+1}\right\rangle -\tau_u\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla\cdot\mathbf{v},K^{n+1}\right\rangle -c_{pd}\llangle\llbracket\theta^{n+1}\mathbf{v}, \Pi^{n+1}\rrbracket\rrangle\right. \label{eq:si_ru_np1}\\
                      &   & \left.+c_{pd}\left\langle \nabla\cdot\left(\theta^{n+1}\mathbf{v}\right),\Pi^{n+1}\right\rangle -\left\langle \mathbf{v},2\bm{\Omega}\times\mathbf{u}^{n+1}\right\rangle \right],\nonumber\\
 %
 R_{\mathbf{u}}^{n} & = & -\left\langle \mathbf{v},\mathbf{u}^{n}\right\rangle -\left(1-\tau_u\right)\Delta t\left[-\left\langle \mathbf{v},\nabla\Phi\right\rangle +\left\langle \nabla\cdot\mathbf{v},K^{n}\right\rangle -c_{pd}\llangle\llbracket\theta^n\mathbf{v}, \Pi^n\rrbracket\rrangle\right. \label{eq:si_ru_n}\\
@@ -612,7 +612,9 @@ R_{\theta}^{n+1}+R_{\theta}^{n}+R_{\theta}^{adv} & = & 0,\label{eq:Rtheta_combin
 R_{\rho}^{n+1}+R_{\rho}^{n}+R_{\rho}^{adv} & = & 0,\label{eq:Rrho_combined}\\
 R_{\Pi}^{n+1}+R_{\Pi}^{n}+R_{\Pi}^{adv} & = & 0,\label{eq:Rpi_combined}\\
 \end{eqnarray}
-which is a nonlinear set of equations for the unknowns $\mathbf{x}^{n+1}=\left[\mathbf{u}^{n+1},\,\theta^{n+1},\,\rho^{n+1},\,\Pi^{n+1}\right]^{T}$. 
+which is a nonlinear set of equations for the unknowns $\mathbf{x}^{n+1}=\left[\mathbf{u}^{n+1},\,\theta^{n+1},\,\rho^{n+1},\,\Pi^{n+1}\right]^{T}$. An optional Rayleigh damping term of the form
+$-\mu\mathbf{k}\cdot\mathbf{u}$ ($\mathbf{k}$ is the vertical unit vector and $\mu$ the damping coefficient) acting on the vertical velocity has been added to the right hand side of the momentum equation.
+The term is then discretized in a fully implicit fashion to get the first term in \eqref{eq:Ru_np1_continuous} and \eqref{eq:si_ru_np1}.
 
 To solve \eqref{eq:Ru_combined}-\eqref{eq:Rrho_combined} a Newton
 method is used to obtain subsequent estimates $\mathbf{x}^{\left(k\right)}$
@@ -642,7 +644,7 @@ and then solving $L\mathbf{x}'=-\mathbf{R}\left(\mathbf{x}^{(k)}\right).$
 The form of $L$ implemented is 
 \begin{equation}
 L\mathbf{x}'=\begin{cases}
-\mathbf{u}'+\tau_u\Delta tc_{pd}\left(\theta^{*}\nabla\Pi'+\theta'\nabla\Pi^{*}\right),\\
+\left(1+\mu\Delta t\mathbf{k}\right)\mathbf{u}'+\tau_u\Delta tc_{pd}\left(\theta^{*}\nabla\Pi'+\theta'\nabla\Pi^{*}\right),\\
 \theta'+\tau_\theta\Delta t\mathbf{u}'.\nabla\theta^{*},\\
 \rho'+\tau_\rho\Delta t\nabla\cdot\left(\rho^{*}\mathbf{u}'\right),\\
 \frac{1-\kappa_d}{\kappa_d}\frac{\Pi'}{\Pi^*} -\frac{\rho'}{\rho^*} - \frac{\theta'}{\theta^*},\\
@@ -693,7 +695,7 @@ There are a number of options for types of solvers  to used in each of stages 1-
 \subsubsection{Outer (Mixed) Solve\label{sub:OuterSolve}}
 The continuous in space equations that we wish to solve (motivated by the form used in the ENDGame incremental formulation) are
 \begin{eqnarray}
-\mathbf{u}' + \tau_{u}\Delta t c_{pd} \left(\theta'\nabla\Pi^{*} + \theta^{*}\nabla\Pi'\right) & = & R_{\mathbf{u}},\label{eq:si_u_continuous}\\
+\left(1+\mu\Delta t\mathbf{k}\right)\mathbf{u}' + \tau_{u}\Delta t c_{pd} \left(\theta'\nabla\Pi^{*} + \theta^{*}\nabla\Pi'\right) & = & R_{\mathbf{u}},\label{eq:si_u_continuous}\\
 \theta' + \tau_{\theta}\Delta t\mathbf{u}'.\nabla\theta^{*} & = & R_{\theta},\label{eq:si_theta_continuous}\\
 \rho' + \tau_{\rho}\Delta t\nabla\cdot\left(\rho^{*}\mathbf{u}'\right) & = & R_{\rho},\label{eq:si_rho_continuous}\\
 \frac{1-\kappa}{\kappa}\frac{\Pi'}{\Pi^{*}} - \frac{\rho'}{\rho^{*}} - \frac{\theta'}{\theta^{*}} & = & R_{\Pi}.\label{eq:si_exner_continuous}
@@ -705,7 +707,8 @@ N_\theta\left(M_{\theta}\theta' + P_{\theta2}^{\theta^{*}}u'\right) & = & N_\the
 N_\rho \left[M_{3}\rho' + \tau_{\rho}\Delta tD\left(\rho^{*}u'\right)\right] & = & N_\rho R_{\rho},\label{eq:si_rho_discrete}\\
 N_\Pi \left(M_{3}^{\Pi^{*}}\Pi' - M_{3}^{\rho^{*}}\rho' - P_{3\theta}^{*}\theta'\right) & = & N_\Pi R_{\Pi},\label{eq:si_exner_discrete}
 \end{eqnarray}
-where now the primed variables correspond to the degree of freedom vectors and the right hand side arrays are the integrated residual terms  \eqref{eq:Ru_combined}-\eqref{eq:Rpi_combined}. The mass matrices are given by \eqref{eq:M0_mass_matrix} - \eqref{eq:M3_mass_matrix}. The other operators are
+where now the primed variables correspond to the degree of freedom vectors and the right hand side arrays are the integrated residual terms  \eqref{eq:Ru_combined}-\eqref{eq:Rpi_combined}. The mass matrices are given by \eqref{eq:M0_mass_matrix} - \eqref{eq:M3_mass_matrix}. When the Rayleigh damping is active, the bottom $m$ rows
+of $M_2$, where $m$ is the number of degrees of freedom corresponding to the vertical velocity, are multiplied by $(1+\mu\Delta t)$. The other operators are
 \begin{eqnarray}
 D & = & \left<\sigma,\nabla\cdot\mathbf{v}\right>,\label{eq:divergence_operator}\\
 D^{\theta^{*}} & = & \tau_u \Delta t c_{pd}\left[\left<\sigma,\theta^{*}\nabla\cdot\mathbf{v} + \nabla\theta^{*}.\mathbf{v} \right> - \llangle \{\sigma\}, \theta^{*}\mathbf{v}.\mathbf{n}\rrangle\right],\label{eq:div_theta_star_operatort}\\

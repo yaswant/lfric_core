@@ -15,7 +15,7 @@ module rhs_alg_mod
                                                  get_mass_matrix,  &
                                                  w2_id,            &
                                                  theta_space_id,   &
-                                                 w3inv_id
+                                                 w3inv_id, dl_id
   use field_mod,                           only: field_type
   use finite_element_config_mod,           only: element_order, wtheta_on
   use formulation_config_mod,              only: rotating
@@ -58,20 +58,22 @@ contains
   !> @param[inout] rhs The state vector to compute
   !> @param[in]    alpha_dt The offcentering parameter times the timestep
   !> @param[in]    state The current model prognostic state
-  !> @param[in]    compute_eos Flag to control computation of th equation of
+  !> @param[in]    compute_eos Flag to control computation of the equation of
   !!               state
-  subroutine rhs_alg(rhs, alpha_dt, state, compute_eos)
+  !> @param[in]    dlayer_rhs Use damping layer in rhs yes/no
+  subroutine rhs_alg(rhs, alpha_dt, state, compute_eos, dlayer_rhs)
   
     implicit none
 
     real(r_def),                  intent(in)    :: alpha_dt
+    logical,                      intent(in)    :: dlayer_rhs
   
     ! Form of state and rhs is [u,theta,rho,exner] 
     type(field_type), target,     intent(in)    :: state(bundle_size)
     type(field_type),             intent(inout) :: rhs(bundle_size)
     logical,                      intent(in)    :: compute_eos
 
-    type(operator_type), pointer :: mm_w2     => null(), &
+    type(operator_type), pointer :: mm_vel    => null(), &
                                     mm_wtheta => null(), &
                                     mm_w3_inv => null()
     type(field_type), pointer :: chi(:)       => null(), &
@@ -87,10 +89,17 @@ contains
     if ( subroutine_timers ) call timer('rhs_alg')
 
     geopotential => get_geopotential()
-    mm_w2        => get_mass_matrix(w2_id)
     mm_wtheta    => get_mass_matrix(theta_space_id)
     chi          => get_coordinates()
     mm_w3_inv    => get_mass_matrix(w3inv_id)
+   
+    ! Using modified velocity mass matrix if using damping layer
+    if(dlayer_rhs) then
+      mm_vel => get_mass_matrix(dl_id)
+    else
+      mm_vel => get_mass_matrix(w2_id)
+    end if 
+
 
     u     => state(igh_u)
     theta => state(igh_t)
@@ -112,7 +121,7 @@ contains
     call invoke( name = "Compute rhs_u setup",                               &
                  hydrostatic_kernel_type( rhs_tmp, exner, theta, geopotential,qr ),   &
                  kinetic_energy_gradient_kernel_type( rhs_tmp, u, chi, qr ), &
-                 matrix_vector_kernel_type( rhs(igh_u), u, mm_w2 ) )
+                 matrix_vector_kernel_type( rhs(igh_u), u, mm_vel ) )
     if ( rotating ) &
       call invoke( rotation_kernel_type( rhs_tmp, u, chi, qr ) )
 

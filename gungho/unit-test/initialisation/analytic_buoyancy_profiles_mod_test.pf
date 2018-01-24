@@ -71,7 +71,8 @@ contains
                                     u0=0.0_r_def,                   &
                                     v0=0.0_r_def,                   &
                                     nl_constant=0.0_r_def,          &
-                                    wind_time_period=0.0_r_def )
+                                    wind_time_period=0.0_r_def,     &
+                                    smp_init_wind=.false. )
 
   end subroutine setUp
 

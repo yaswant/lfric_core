@@ -44,6 +44,7 @@ module runtime_constants_mod
   use compute_mass_matrix_kernel_w2_mod,     only: compute_mass_matrix_kernel_w2_type
   use compute_mass_matrix_kernel_w3_mod,     only: compute_mass_matrix_kernel_w3_type
   use compute_mass_matrix_kernel_wtheta_mod, only: compute_mass_matrix_kernel_wtheta_type
+  use compute_dl_matrix_kernel_mod,          only: compute_dl_matrix_kernel_type
   use compute_geopotential_kernel_mod,       only: compute_geopotential_kernel_type
   use mm_diagonal_kernel_mod,                only: mm_diagonal_kernel_type
   use invert_local_operator_kernel_mod,      only: invert_local_operator_kernel_type
@@ -78,6 +79,7 @@ module runtime_constants_mod
   type(operator_type), target           :: mm_w3
   type(operator_type), target           :: mm_w3_inv
   type(operator_type), target           :: mm_wtheta
+  type(operator_type), target           :: mm_dl
   type(field_type), target              :: geopotential
   type(field_type), pointer             :: coords(:)
   type(field_type), target              :: temp_w2_field
@@ -106,6 +108,7 @@ module runtime_constants_mod
   integer(i_def), parameter, public :: w3inv_id = 5_i_def
   integer(i_def), parameter, public :: eye_id   = 6_i_def
   integer(i_def), parameter, public :: theta_space_id = 7_i_def
+  integer(i_def), parameter, public :: dl_id = 8_i_def
 
 
   ! Public functions to create and access the module contents
@@ -206,6 +209,7 @@ contains
     mm_w0 = operator_type( w0_fs, w0_fs )
     mm_w1 = operator_type( w1_fs, w1_fs )
     mm_w2 = operator_type( w2_fs, w2_fs )
+    mm_dl = operator_type( w2_fs, w2_fs )
     mm_w3 = operator_type( w3_fs, w3_fs )
     mm_w3_inv = operator_type( w3_fs, w3_fs )
     mm_wtheta = operator_type( wtheta_fs, wtheta_fs )
@@ -216,6 +220,7 @@ contains
                  compute_mass_matrix_kernel_w2_type(mm_w2, chi, qr),         &
                  compute_mass_matrix_kernel_w3_type(mm_w3, chi, qr),         &
                  compute_mass_matrix_kernel_wtheta_type(mm_wtheta, chi, qr), &
+                 compute_dl_matrix_kernel_type(mm_dl, chi, qr),              &
                  invert_local_operator_kernel_type(mm_w3_inv, mm_w3) )
 
     !=================== Create grad, div, curl operators =====================!
@@ -448,6 +453,8 @@ contains
         else
           mm => mm_w0
         end if
+      case (dl_id)
+        mm => mm_dl
       case default
         mm => null()
         call log_event( "Mass matrix operator does not exist", LOG_LEVEL_ERROR)

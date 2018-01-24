@@ -5,6 +5,7 @@ namelist formulation
   use_moisture     : logical ! Use moisture variables.
   use_physics      : logical ! Use subgrid physics parametrizations
   shallow          : logical ! Run in shallow atmosphere mode
+  dlayer_on        : logical ! Use damping layer yes/no
   use_wavedynamics : logical ! Use wave dynamics
 
 end namelist formulation

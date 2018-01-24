@@ -69,7 +69,8 @@ contains
     call feign_formulation_config(transport_only=.false., rotating=.true., &
                                   use_moisture=.false., &
                                   shallow=.true., use_physics=.false., &
-				  use_wavedynamics=.true.)
+				  dlayer_on = .true., &
+                                  use_wavedynamics=.true.)
     allocate( this%map(ndf), &
               this%x(undf),  &
               this%y(undf),  &

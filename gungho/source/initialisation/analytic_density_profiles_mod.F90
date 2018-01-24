@@ -26,7 +26,8 @@ use idealised_config_mod,       only : idealised_test_cold_bubble_x, &
                                        idealised_test_gravity_wave, &
                                        idealised_test_solid_body_rotation, &
                                        idealised_test_deep_baroclinic_wave, &
-                                       idealised_test_isentropic
+                                       idealised_test_isentropic, &
+                                       idealised_test_isot_atm
 use initial_density_config_mod, only : r1, x1, y1, r2, x2, y2,     &
                                        tracer_max, tracer_background
 use base_mesh_config_mod,       only : geometry, &
@@ -144,7 +145,7 @@ function analytic_density(chi, choice, time) result(density)
 
   select case( choice ) 
   
-  case ( idealised_test_gravity_wave, idealised_test_isentropic) 
+  case ( idealised_test_gravity_wave, idealised_test_isentropic, idealised_test_isot_atm )
     call reference_profile(pressure, density, temperature, chi, choice)
  
   case ( idealised_test_cold_bubble_x, idealised_test_cold_bubble_y ) 

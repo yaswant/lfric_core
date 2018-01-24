@@ -25,6 +25,7 @@ module init_prognostic_fields_alg_mod
   use formulation_config_mod,          only: use_moisture
   use initial_density_config_mod,      only: sample_init_rho, &
                                              set_hydrostatic_density
+  use initial_wind_config_mod,         only: smp_init_wind
   use restart_control_mod,             only: restart_type
 
   ! PsyKAl-lite kernels
@@ -45,6 +46,7 @@ module init_prognostic_fields_alg_mod
   use field_mod,                       only: field_type
   use quadrature_xyoz_mod,             only: quadrature_xyoz_type
   use quadrature_rule_gaussian_mod,    only: quadrature_rule_gaussian_type
+  use sample_initial_u_kernel_mod,     only: sample_initial_u_kernel_type 
   use operator_mod,                    only: operator_type
 
   ! Handles
@@ -107,14 +109,20 @@ contains
 
       initial_time = 0.0_r_def
 
-      ! Initialise U and Rho according to formulation
-      r_u = field_type( vector_space = u%get_function_space() )
-      call invoke( name = "Initialise U and Rho",   &
-                   setval_c( u,   0.0_r_def ),      &
-                   setval_c( r_u, 0.0_r_def ),      &
-                   initial_u_kernel_type( r_u, chi, initial_time, qr ), &
-                   enforce_bc_kernel_type( r_u ) )
-      call solver_algorithm(u, r_u)
+      if (smp_init_wind) then
+        call invoke( name = "Initialise U",    &
+                     setval_c( u, 0.0_r_def ), &
+                     sample_initial_u_kernel_type( u, chi ) )
+      else
+        ! Initialise U and Rho according to formulation
+        r_u = field_type( vector_space =  u%get_function_space() )
+        call invoke( name = "Initialise U and Rho",   &
+                     setval_c( u,   0.0_r_def ),      &
+                     setval_c( r_u, 0.0_r_def ),      &
+                     initial_u_kernel_type( r_u, chi, initial_time, qr ), &
+                     enforce_bc_kernel_type( r_u ) )
+        call solver_algorithm(u, r_u)
+     end if
 
       if (set_hydrostatic_density) then
         height_w3 => get_height(W3)
