@@ -3,7 +3,6 @@ namelist initial_density
     set_hydrostatic_density : logical ! hydrostatic initialization of density
     tracer_max        : real ! Maximum value of tracer
     tracer_background : real ! Background value of tracer
-    PI : constant
     r1 : real ! Radius for one of the pair of initial tracer functions
                             ! Biperiodic domain: in metres.
                             ! Cubed sphere domain: in radians.

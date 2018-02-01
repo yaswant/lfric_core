@@ -13,12 +13,13 @@ use base_mesh_config_mod,           only : geometry, &
 use constants_mod,                  only : r_def, i_def
 use coord_transform_mod,            only : xyz2llr
 use generate_global_gw_fields_mod,  only : generate_global_gw_fields
-use idealised_config_mod,           only : idealised_test_gravity_wave, &
-                                           idealised_test_cold_bubble_x,&
-                                           idealised_test_cold_bubble_y,&
-                                           idealised_test_isot_atm,     &
-                                           idealised_test_warm_bubble,  &
-                                           idealised_test_held_suarez,  &
+use idealised_config_mod,           only : idealised_test_gravity_wave,   &
+                                           idealised_test_cold_bubble_x,  &
+                                           idealised_test_cold_bubble_y,  &
+                                           idealised_test_isot_atm,       &
+                                           idealised_test_warm_bubble,    &
+                                           idealised_test_warm_bubble_3d, &
+                                           idealised_test_held_suarez,    &
                                            idealised_test_isentropic
 use initial_temperature_config_mod, only : bvf_square
 use planet_config_mod,              only : scaled_radius, gravity, Cp, Rd, &
@@ -71,6 +72,7 @@ else                     ! BIPERIODIC PLANE DOMAIN
                    * (1.0_r_def - exp ( - nsq_over_g * z ))
     case( idealised_test_cold_bubble_x, &
           idealised_test_cold_bubble_y, &   ! Density current test
+          idealised_test_warm_bubble_3d, &
           idealised_test_isentropic )
       theta_s = theta_surf
       exner_s = exner_surf - gravity/(Cp*theta_surf)*z

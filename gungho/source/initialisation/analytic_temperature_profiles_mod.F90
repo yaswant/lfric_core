@@ -22,6 +22,7 @@ use idealised_config_mod,         only : idealised_test_cold_bubble_x, &
                                          idealised_test_slotted_cylinder, &
                                          idealised_test_gravity_wave, &
                                          idealised_test_warm_bubble, &
+                                         idealised_test_warm_bubble_3d, &
                                          idealised_test_solid_body_rotation, &
                                          idealised_test_deep_baroclinic_wave, &
                                          idealised_test_dry_cbl
@@ -60,6 +61,7 @@ function analytic_temperature(chi, choice) result(temperature)
   real(kind=r_def), parameter  :: XR = 4000.0_r_def, &
                                   ZC_cold = 3000.0_r_def, &
                                   ZC_hot = 260.0_r_def, &
+                                  ZC_3d  = 500.0_r_def, &
                                   ZR = 2000.0_r_def
   real(kind=r_def)             :: long, lat, radius, z
   real(kind=r_def)             :: l1, l2
@@ -114,6 +116,17 @@ function analytic_temperature(chi, choice) result(temperature)
       dt = 0.5_r_def
     else
       dt = 0.5_r_def*exp(-(l-50.0_r_def)**2/(100.0_r_def)**2)
+    end if
+    temperature = temperature + dt
+
+  !> Test from Marras et.al. JCP 236, 2013. Equation (29)
+  case( idealised_test_warm_bubble_3d )  
+    l = sqrt( (chi(1)-XC)**2 + (chi(2)-YC)**2 + (chi(3)-ZC_3d)**2 )
+
+    if ( l <= 250.0_r_def ) then
+      dt = 2.0_r_def*(1.0_r_def - l/250.0_r_def)
+    else
+      dt = 0.0_r_def
     end if
     temperature = temperature + dt
 

@@ -192,6 +192,12 @@
                               'run_application(gungho, biperiodic_p0_gw,
                                          resolutions=[("BiP30x4-12000x2000",10.0)],
                                          checkkgo=False)',
+                              'run_application( gungho, warm3dbubble,
+                                         resolutions=[("BiP80x80-40x40",2.5)], 
+                                         env={"crun":1, "nrun":192,
+                                         "directives":{"default":{"mpi_parts":64,"threads":1,"wallclock":"02:30:00"} } },
+                                         plotstr="warm3dbubble.py $NODAL_DATA_DIR 80 80 theta T000000:T000096:T000192 $PLOT_DIR",
+                                         checkkgo=False)',
                              ],
                   }
 %}
