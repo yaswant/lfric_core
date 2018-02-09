@@ -478,16 +478,19 @@ contains
   type(quadrature_xyoz_type)          :: qr
   type(quadrature_rule_gaussian_type) :: quadrature_rule
   type(field_type), pointer           :: chi(:) => null()
-  integer(i_def)                      :: chi_stencil_extent
+  type(field_type), pointer           :: mt_lumped_inv => null()
+
+  mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
+
   select case(operators)
     case(transport_operators_fv)
      ! Use pointwise fv operators compute u.grad(theta) with high-order 
      ! polynomial interpolation of theta
       chi => get_coordinates()
-      call invoke_sample_poly_adv( rtheta, theta, wind, chi,&
+      call invoke_sample_poly_adv( rtheta, theta, wind, mt_lumped_inv, chi, &
                                    advective_stencil_extent )
       ! Psyclone doesnt call the correct colouring routines yet
-      chi_stencil_extent = advective_stencil_extent
+      !chi_stencil_extent = advective_stencil_extent
       !call invoke( sample_poly_adv_kernel_type( rtheta, theta, advective_stencil_extent,&
       !                                          wind,  &
       !                                          chi(1),chi_stencil_extent, chi(2),chi(3)&

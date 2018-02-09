@@ -271,6 +271,7 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, restart, mesh_id, chi, &
 
   ! Local variables 
   type(xios_duration)                  :: xios_timestep, o_freq, cp_freq
+  type(xios_duration)                  :: av_freq
   type(xios_context)                   :: xios_ctx_hdl
   type(xios_file)                      :: cpfile_hdl, ofile_hdl, rsfile_hdl
   type(xios_fieldgroup)                :: cpfieldgroup_hdl
@@ -284,7 +285,7 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, restart, mesh_id, chi, &
   call xios_set_current_context(xios_ctx_hdl)
 
 
- 
+  
   !!!!!!!!!!!!!!!!!!!!!!!!!!! Setup diagnostic domains !!!!!!!!!!!!!!!!!!!!!!!!!!
 
   call xios_diagnostic_domain_init(mesh_id, chi, vm, local_rank, total_ranks)
@@ -295,11 +296,19 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, restart, mesh_id, chi, &
 
   !!!!!!!!!!!!! Setup diagnostic output context information !!!!!!!!!!!!!!!!!!
 
-  ! Set diagnostic output frequency in seconds
+  ! Set diagnostic output (configured in timesteps) frequency in seconds
   o_freq%second =  diagnostic_frequency*dtime
 
   call xios_get_handle("lfric_diag",ofile_hdl)
   call xios_set_attr(ofile_hdl, output_freq=o_freq)
+
+  ! Set diagnostic output (configured in timesteps) frequency in seconds
+  if (xios_is_valid_file("lfric_averages")) then
+    av_freq%second = restart%ts_end()*dtime
+    
+    call xios_get_handle("lfric_averages",ofile_hdl)
+    call xios_set_attr(ofile_hdl, output_freq=av_freq)
+  end if
 
   !!!!!!!!!!!!! Setup checkpoint / restart context information !!!!!!!!!!!!!!!!!!
 

@@ -20,6 +20,7 @@
   rehabilitate     = .true.
   wtheta_on        = .false.
   supg             = .false.
+  vorticity_in_w1  = .true.
 /
 
 &initial_temperature
@@ -42,8 +43,7 @@
   diag_stem_name            = 'gravity_wave'
   write_xios_output         = .false.
   write_nodal_output        = .true.
-  diagnostic_frequency      =  10
-  nodal_output_on_w3        = .true.
+  diagnostic_frequency      =  36
   subroutine_timers         = .true.
 /
 
@@ -58,7 +58,7 @@
 /
 
 &restart
-  filename = 'gravity_wave_restart.nml'
+  filename = 'dynamo_restart.nml'
 /
 
 &solver
@@ -72,14 +72,14 @@
   si_maximum_iterations          = 20,
   gcrk                           = 4,
   si_tolerance                   = 1.0e-4,
-  guess_np1                      = .T
+  guess_np1                      = .F
   reference_reset_freq           = 1
   si_pressure_method             = 'bicgstab',
   si_pressure_preconditioner     = 'diagonal',
   si_pressure_tolerance          = 1.0e-4,
   si_pressure_maximum_iterations = 199,
   helmholtz_solve                = .F,
-  normalise                      = .F,
+  normalise                      = .true.,
   use_operators                  = .T,
 /
 

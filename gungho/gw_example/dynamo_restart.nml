@@ -1,0 +1,9 @@
+&restart_nml
+checkpoint_frequency=9999,
+checkpoint_read=.F,
+checkpoint_write=.F,
+restart_stem_name="restartDynamo",
+timestep_end=36,
+timestep_start=1,
+xios_checkpoint=.F,
+/

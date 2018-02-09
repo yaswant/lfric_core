@@ -1,5 +1,5 @@
 &base_mesh
-  filename        = 'mesh_C12.nc'
+  filename        = 'mesh_C24.nc'
   prime_mesh_name = 'dynamics'
   geometry        = 'spherical'
   partitioner     = 'cubedsphere'
@@ -29,7 +29,9 @@
   use_moisture   = .false.
   shallow        = .false.
   use_physics    = .false.
-  use_wavedynamics = .true.
+  use_wavedynamics  = .true. 
+  dlayer_on         = .false.
+  dry_static_adjust = .false.
 /
 
 &idealised
@@ -59,6 +61,7 @@
   v0             = 0.0
   sbr_angle_lat  = 0.0
   sbr_angle_lon  = 0.0
+  smp_init_wind=.false.
 /
 
 &output
@@ -71,7 +74,9 @@
 /
 
 &physics
- heldsuarez_placement = -1
+  heldsuarez_thermo_placement = 0
+  heldsuarez_wind_placement   = 0
+  hs_random = .false.
 /
 
 &planet
@@ -85,29 +90,29 @@
 /
 
 &restart
-  filename = 'gungho_restart.nml'
+  filename = 'restart.nml'
 /
 
 &solver
-  method                         = 'bicgstab',
-  preconditioner                 = 'diagonal',
-  maximum_iterations             = 399,
-  tolerance                      = 1.0e-12,
-  si_method                      = 'gcr',
-  si_postconditioner             = 'pressure',
-  si_preconditioner              = 'none',
-  si_maximum_iterations          = 10,
-  gcrk                           = 10,
-  si_tolerance                   = 1.0e-6,
-  guess_np1                      = .T
-  reference_reset_freq           = 1
-  si_pressure_method             = 'bicgstab',
-  si_pressure_preconditioner     = 'tridiagonal',
-  si_pressure_tolerance          = 1.0e-6,
-  si_pressure_maximum_iterations = 100,
-  helmholtz_solve                = .T,
-  normalise                      = .F,
-  use_operators                  = .T,
+  method                         = 'bicgstab'
+  preconditioner                 = 'diagonal'
+  maximum_iterations             = 399
+  tolerance                      = 1.0e-12
+  si_method                      = 'gcr'
+  si_postconditioner             = 'pressure'
+  si_preconditioner              = 'none'
+  si_maximum_iterations          = 10
+  gcrk                           = 18
+  si_tolerance                   = 1.0e-6
+  guess_np1                      = .F
+  reference_reset_freq           = 4
+  si_pressure_method             = 'bicgstab'
+  si_pressure_preconditioner     = 'tridiagonal'
+  si_pressure_tolerance          = 1.0e-6
+  si_pressure_maximum_iterations = 400
+  helmholtz_solve                = .T
+  normalise                      = .T
+  use_operators                  = .T
 /
 
 &subgrid
@@ -118,7 +123,7 @@
 
 &timestepping
   method             = 'semi_implicit'
-  dt                 = 600.0
+  dt                 = 1800.0
   alpha              = 0.5
   tau_u              = 0.5
   tau_t              = 0.5
@@ -126,7 +131,7 @@
   outer_iterations   = 4
   inner_iterations   = 1
   runge_kutta_method = 'ssp3'
-  spinup_period      = 0
+  spinup_period      = 1
   spinup_alpha       = .false.
   spinup_winds       = .false.
 /
@@ -141,6 +146,8 @@
   operators = 'fv'
   fv_flux_order = 2
   fv_advective_order = 3
+  consistent_metric  = .false.
+  enforce_monotonicity = .false.
 /
 
 &partitioning
@@ -203,5 +210,12 @@
   phi_centre_dec    = 0.0
 /
 
+&damping_layer
+  dl_base = 800.0
+  dl_str  = 0.5
+/
 
-
+&checks
+  limit_cfl = .false.
+  max_cfl   = 0.75
+/

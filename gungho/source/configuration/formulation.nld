@@ -1,11 +1,12 @@
 namelist formulation
 
-  transport_only   : logical ! Solve the transport equation only
-  rotating         : logical ! Turn on/off Coriolis terms
-  use_moisture     : logical ! Use moisture variables.
-  use_physics      : logical ! Use subgrid physics parametrizations
-  shallow          : logical ! Run in shallow atmosphere mode
-  dlayer_on        : logical ! Use damping layer yes/no
-  use_wavedynamics : logical ! Use wave dynamics
+  transport_only    : logical ! Solve the transport equation only
+  rotating          : logical ! Turn on/off Coriolis terms
+  use_moisture      : logical ! Use moisture variables.
+  use_physics       : logical ! Use subgrid physics parametrizations
+  shallow           : logical ! Run in shallow atmosphere mode
+  use_wavedynamics  : logical ! Use wave dynamics
+  dry_static_adjust : logical ! Dry static adjustment of reference profile
+  dlayer_on         : logical ! Use damping layer yes/no
 
 end namelist formulation

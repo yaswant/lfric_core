@@ -70,10 +70,11 @@ contains
                                 smp_init_wind = .false. )
 
     call feign_formulation_config(transport_only=.false., rotating=.true., &
-                                  use_moisture=.false., &
-                                  shallow=.false., use_physics=.false., &
-				  dlayer_on = .false., &
-                                  use_wavedynamics=.true.)
+                                  use_moisture=.false.,                    &
+                                  shallow=.false., use_physics=.false.,    &
+				  use_wavedynamics=.true.,                 &
+				  dry_static_adjust=.false.,               &
+				  dlayer_on = .false.)
 
   end subroutine setUp
 

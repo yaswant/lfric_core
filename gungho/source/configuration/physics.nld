@@ -3,7 +3,10 @@ namelist physics
   ! if > 0: then placement is in fast physics
   ! if = 0: then routine is not called
   ! if < 0: then placement is in slow physics
-  heldsuarez_placement : integer ! heldsuarez forcing
+  heldsuarez_thermo_placement : integer ! heldsuarez theta forcing
+  heldsuarez_wind_placement   : integer ! heldsuarez wind forcing
+  hs_random : logical                   ! Add in some random 
+                                        ! perturbations to HS forcing
 
 ! idealised surface options
   l_flux_bc    : logical ! Use fixed surface fluxes

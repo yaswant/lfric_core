@@ -20,11 +20,12 @@ module rk_transport_mod
   use restart_control_mod,               only: restart_type
   use timestepping_config_mod,           only: dt
   use runge_kutta_init_mod,              only: num_rk_stage, ak
-  use runtime_constants_mod,             only: get_mass_matrix, &
-                                               get_mass_matrix_diagonal, &
-                                               get_qr, &
-                                               w2_id, w3_id, w3inv_id, &
-                                               wt_id, theta_space_id, &
+  use runtime_constants_mod,             only: get_mass_matrix,                &
+                                               get_mass_matrix_diagonal,       &
+                                               get_inverse_lumped_mass_matrix, &
+                                               get_qr,                         &
+                                               w2_id, w3_id, w3inv_id,         &
+                                               wt_id, theta_space_id,          &
                                                get_coordinates
 
   use transport_config_mod,              only: operators,              &
@@ -193,6 +194,10 @@ contains
 
     ! Temps for retrieving objects back from runtime constants
     type(operator_type), pointer :: mm_w3_inv => null()
+    type(field_type), pointer    :: mt_lumped_inv => null()
+
+    mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
+
     if ( subroutine_timers ) call timer('rk_transport_alg')
 
     qr = get_qr()
@@ -213,8 +218,8 @@ contains
           ! Use polynomial reconstruction
           call invoke_sample_poly_flux( mass_flux, u, rho, &
                                         flux_stencil_extent )
-          call invoke_sample_poly_adv( rt_prediction(stage), theta, u, chi, &
-                                       advective_stencil_extent )
+          call invoke_sample_poly_adv( rt_prediction(stage), theta, u, mt_lumped_inv, &
+                                       chi, advective_stencil_extent )
         case(transport_operators_fem)      
           ! Use FEM projection
           ! Initialise fields

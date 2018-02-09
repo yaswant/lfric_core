@@ -1,0 +1,188 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> Test the sorting of columns of data to remove static instability
+!>
+module limit_wind_kernel_mod_test
+
+  use constants_mod,                 only: i_def, r_def
+  use function_space_collection_mod, only: function_space_collection_type, &
+                                           function_space_collection
+  use mesh_collection_mod,           only: mesh_collection_type, &
+                                           mesh_collection
+  use field_mod,                     only: field_type,      &
+                                           field_proxy_type
+  use fs_continuity_mod,             only: W2
+  use function_space_mod,            only: function_space_type
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: test_all
+
+  @TestCase
+  type, extends(TestCase), public :: limit_wind_test_type
+    private
+    type(function_space_type), pointer :: w2_fs => null()
+    type(field_type)                   :: wind, dJ_on_w2
+    real(r_def)                        :: answer
+  contains
+    procedure setup
+    procedure tearDown
+    procedure test_all
+  end type limit_wind_test_type
+
+  integer(i_def), parameter :: element_order = 0
+  real(r_def), parameter :: DT = 600.0_r_def
+  real(r_def), parameter :: DX = 1000.0_r_def
+  real(r_def), parameter :: U0 = 1.0
+  real(r_def), parameter :: UFAST = 10.0
+  real(r_def), parameter :: MAX_CFL = 0.75
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use gungho_feign_config_mod,   only : feign_base_mesh_config, &
+                                          feign_timestepping_config, &
+                                          feign_checks_config
+    use timestepping_config_mod,   only : timestepping_method_semi_implicit, &
+                                          timestepping_runge_kutta_method_ssp3
+    use finite_element_config_mod, only : finite_element_cellshape_quadrilateral
+    use function_space_mod,        only : function_space_type
+    use mesh_mod,                  only : PLANE_BI_PERIODIC, PLANE
+    use reference_element_mod,     only : reference_cube,   &
+                                          reference_element
+    implicit none
+
+    class(limit_wind_test_type), intent(inout) :: this
+
+
+    type(field_proxy_type) :: wind_proxy, dJ_on_w2_proxy
+
+    integer(i_def)         :: ndf_w2, undf_w2, dim_w2
+
+    integer(i_def)         :: mesh_id
+
+    call feign_base_mesh_config( filename='foo', prime_mesh_name='unit_test', &
+                                 geometry=base_mesh_geometry_planar,          &
+                                 partitioner=base_mesh_partitioner_planar,    &
+                                 fplane=.false., f_lat_deg=0.0_r_def )
+
+    call feign_checks_config( limit_cfl=.true., max_cfl=MAX_CFL )
+
+    call feign_timestepping_config(method=timestepping_method_semi_implicit,          &
+                                   dt=DT, alpha=0.5_r_def, tau_u=0.5_r_def,           &
+                                   tau_t=0.5_r_def, tau_r=0.5_r_def,                  &
+                                   outer_iterations=1_i_def, inner_iterations=1_i_def,&
+                                   runge_kutta_method=timestepping_runge_kutta_method_ssp3,    &
+                                   spinup_period=0.0_r_def, spinup_alpha=.false.,       &
+                                   spinup_winds=.false.    )
+
+
+    reference_element = finite_element_cellshape_quadrilateral
+    call reference_cube()
+
+    ! Create top level mesh collection
+    mesh_collection = mesh_collection_type()
+    ! Create top level function space collection
+    function_space_collection = function_space_collection_type()
+
+    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
+    mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+
+    this%w2_fs => function_space_collection%get_fs(mesh_id, element_order, W2)
+
+    this%wind  = field_type( vector_space = this%w2_fs )
+    wind_proxy = this%wind%get_proxy()
+    ndf_w2     = wind_proxy%vspace%get_ndf( )
+    dim_w2     = wind_proxy%vspace%get_dim_space( )
+    undf_w2    = wind_proxy%vspace%get_undf()
+
+    this%dJ_on_w2 = field_type( vector_space = this%w2_fs )
+    dJ_on_w2_proxy = this%dJ_on_w2%get_proxy()
+
+  end subroutine setUp
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine tearDown( this )
+
+    use reference_element_mod, only : deallocate_reference
+
+    implicit none
+
+    class(limit_wind_test_type), intent(inout) :: this
+
+    call function_space_collection%clear()
+    call deallocate_reference()
+    call mesh_collection%clear()
+    
+  end subroutine tearDown
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @test
+  subroutine test_all( this )
+
+    use limit_wind_kernel_mod, only: limit_wind_code
+    implicit none
+
+    class(limit_wind_test_type), intent(inout) :: this
+
+    real(r_def) :: tol ! tolerence to default precision
+
+    integer :: cell
+    integer(i_def) :: err
+
+    integer                 :: nlayers
+    integer                 :: ndf_w2, undf_w2
+
+    integer, pointer        :: map_w2(:) => null()
+
+    type(field_proxy_type)  :: wind_proxy, dJ_on_w2_proxy
+
+    integer(i_def)          :: k
+
+    ! Test kernel
+    wind_proxy  = this%wind%get_proxy()
+    nlayers     = wind_proxy%vspace%get_nlayers()
+    ndf_w2      = wind_proxy%vspace%get_ndf( )
+    undf_w2     = wind_proxy%vspace%get_undf()
+
+    dJ_on_w2_proxy = this%dJ_on_w2%get_proxy()
+
+    ! only test interior cell 5
+    cell=5
+    map_w2 => wind_proxy%vspace%get_cell_dofmap( cell )
+
+    ! Create the data, including large magnitude winds
+    wind_proxy%data(:) = U0*DX*DX
+    ! Large vertical wind
+    wind_proxy%data(map_w2(6)) =  10._r_def*DX*DX
+    ! Large and negative horizonal wind
+    wind_proxy%data(map_w2(1)) =  -10._r_def*DX*DX
+
+    ! Get detJ values
+    dJ_on_w2_proxy%data(:) = DX*DX*DX
+
+    call limit_wind_code( nlayers,                   &
+                          wind_proxy%data,           &
+                          dJ_on_w2_proxy%data,       &
+                          ndf_w2, undf_w2, map_w2    &
+                          )
+
+ 
+    ! The answer returns the max wind.  If the kernel is correct, then 
+    ! this should be <= DX*DX*DX*MAX_CFL/DT
+    this%answer = maxval(abs(wind_proxy%data))
+
+    @assertLessThanOrEqual( this%answer, DX*DX*DX*MAX_CFL/DT )
+
+  end subroutine test_all
+
+end module limit_wind_kernel_mod_test

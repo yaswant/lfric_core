@@ -22,7 +22,6 @@ module rk_alg_timestep_mod
   use runge_kutta_init_mod,      only: num_rk_stage, ak
   use timestepping_config_mod,   only: dt, &
                                        outer_iterations, inner_iterations
-  use idealised_config_mod,      only: test, idealised_test_held_suarez
   use derived_config_mod,        only: bundle_size
   use runtime_constants_mod,     only: get_geopotential,         &
                                        get_mass_matrix,          &
@@ -49,7 +48,6 @@ module rk_alg_timestep_mod
                                                set_bundle_scalar
   
   ! PsyKAl PSYClone kernels
-  use held_suarez_kernel_mod,              only: held_suarez_kernel_type
   use enforce_bc_kernel_mod,               only: enforce_bc_kernel_type
   use rotation_kernel_mod,                 only: rotation_kernel_type
   use hydrostatic_kernel_mod,              only: hydrostatic_kernel_type

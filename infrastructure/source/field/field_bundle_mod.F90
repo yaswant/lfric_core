@@ -35,11 +35,7 @@ contains
     integer                   :: i
 
     do i = 1,bundle_size   
-      fs_handle = x(i)%which_function_space()
-      mesh_id = x(i)%get_mesh_id()
-      y(i) = field_type( vector_space = &
-               function_space_collection%get_fs(mesh_id,element_order,fs_handle) )
-
+      call x(i)%copy_field_properties(y(i))
     end do
   end subroutine clone_bundle
 !=============================================================================!

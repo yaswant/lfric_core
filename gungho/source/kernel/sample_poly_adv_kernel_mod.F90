@@ -29,6 +29,9 @@ use kernel_mod,            only: kernel_type
 use reference_element_mod, only: W, E, N, S
 use transport_config_mod,  only: consistent_metric
 
+use transport_config_mod, only: enforce_monotonicity
+use timestepping_config_mod,  only: dt
+
 implicit none
 
 ! Precomputed operators, these are the same for all model columns
@@ -46,10 +49,11 @@ real(kind=r_def), allocatable,    private :: coeff_matrix_v(:,:,:)
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: sample_poly_adv_kernel_type
   private
-  type(arg_type) :: meta_args(6) = (/                                  &
+  type(arg_type) :: meta_args(7) = (/                                  &
        arg_type(GH_FIELD,   GH_WRITE, Wtheta),                         &
        arg_type(GH_FIELD,   GH_READ,  Wtheta, STENCIL(CROSS)),         &
        arg_type(GH_FIELD,   GH_READ,  W2),                             &
+       arg_type(GH_FIELD,   GH_READ,  Wtheta),                         &
        arg_type(GH_FIELD,   GH_READ,  ANY_SPACE_1, STENCIL(CROSS)),    &
        arg_type(GH_FIELD,   GH_READ,  ANY_SPACE_1),                    &
        arg_type(GH_FIELD,   GH_READ,  ANY_SPACE_1)                     &
@@ -87,22 +91,34 @@ end function sample_poly_adv_kernel_constructor
 !> @brief Computes the advective update
 !! @param[in]  nlayers Number of layers
 !! @param[out] advection Advective update to compute 
-!! @param[in]  wind Wind field
 !! @param[in]  tracer Tracer field
-!! @param[in]  undf_wt Number of unique degrees of freedom for the tracer field
-!! @param[in]  ndf_wt Number of degrees of freedom per cell
-!! @param[in]  undf_w2 Number of unique degrees of freedom for the wind field
-!! @param[in]  ndf_w2 Number of degrees of freedom per cell
-!! @param[in]  map_w2 Dofmap for the cell at the base of the column
-!! @param[in]  basis_w2 Basis function array evaluated at wt nodes
 !! @param[in]  stencil_size Size of the stencil (number of cells)
 !! @param[in]  stencil_map Dofmaps for the stencil
+!! @param[in]  wind Wind field
+!! @param[in]  mt_lumped_inv Lumped inverse mass matrix for wtheta
+!! @param[in]  chi1 The physical x coordinate in chi
+!! @param[in]  stencil_size_wx Size of the stencil (number of cells) for chi
+!! @param[in]  stencil_map_wx Dofmaps for the stencil for chi
+!! @param[in]  chi2 The physical y coordinate in chi
+!! @param[in]  chi3 The physical z coordinate in chi
+!! @param[in]  ndf_wt Number of degrees of freedom per cell
+!! @param[in]  undf_wt Number of unique degrees of freedom for the tracer field
+!! @param[in]  ndf_w2 Number of degrees of freedom per cell
+!! @param[in]  undf_w2 Number of unique degrees of freedom for the wind field
+!! @param[in]  map_w2 Dofmap for the cell at the base of the column
+!! @param[in]  basis_w2 Basis function array evaluated at w2 nodes
+!! @param[in]  ndf_wx Number of degrees of freedom per cell
+!! @param[in]  undf_wx Number of unique degrees of freedom for chi 
+!! @param[in]  map_wx Dofmap for the cell at the base of the column
+!! @param[in]  basis_wx Basis function array evaluated at chi nodes
+!! @param[in]  diff_basis_wx Differential basis function array evaluated at chi nodes
 subroutine sample_poly_adv_code( nlayers,              &
                                  advection,            &
                                  tracer,               &
                                  stencil_size,         &
                                  stencil_map,          &
                                  wind,                 &
+                                 mt_lumped_inv,        &
                                  chi1,                 &
                                  stencil_size_wx,      &
                                  stencil_map_wx,       &
@@ -138,7 +154,8 @@ subroutine sample_poly_adv_code( nlayers,              &
   real(kind=r_def), dimension(undf_wt), intent(out)  :: advection
   real(kind=r_def), dimension(undf_w2), intent(in)   :: wind
   real(kind=r_def), dimension(undf_wt), intent(in)   :: tracer
-  real(kind=r_def), dimension(undf_wx), intent(in)   :: chi1, chi2, chi3
+  real(kind=r_def), dimension(undf_wx), intent(in)   :: chi1, chi2, chi3 
+  real(kind=r_def), dimension(undf_wt), intent(in)   :: mt_lumped_inv 
 
   real(kind=r_def), dimension(3,ndf_w2,ndf_wt), intent(in) :: basis_w2
   real(kind=r_def), dimension(1,ndf_wx,ndf_wt), intent(in) :: basis_wx
@@ -150,11 +167,12 @@ subroutine sample_poly_adv_code( nlayers,              &
   integer(kind=i_def), dimension(ndf_wx,stencil_size_wx), intent(in) :: stencil_map_wx
 
   ! Internal variables
-  integer(kind=i_def) :: k, df, dft, p, dir, id, idx
+  integer(kind=i_def) :: k, df, dft, p, dir, id, idx, km1, kp1
   real(kind=r_def)    :: u(3,nlayers+1)
   real(kind=r_def)    :: polynomial_tracer, advection_update, z0 
   real(kind=r_def), allocatable :: x(:,:,:)
   real(kind=r_def)    :: etadot, dzdx_l, dzdx_c, dzdy_l, dzdy_c, dx, dy, dz
+  real(kind=r_def)    :: tracer_min, tracer_max
   real(kind=r_def)    :: coeff(np), tracer_stencil(np)
 
   ! Compute wind at tracer points
@@ -317,6 +335,22 @@ subroutine sample_poly_adv_code( nlayers,              &
     ! out sign of wind - hence presense of abs(w)
 
     advection_update = advection_update + abs(etadot)*polynomial_tracer
+    
+    if (enforce_monotonicity)then
+      km1=max(0,k-1)
+      kp1=min(nlayers, k+1)
+      tracer_min = minval(tracer( stencil_map(dft,1:stencil_size)+k))
+      tracer_min = min(tracer_min, minval(tracer( stencil_map(dft,1)+km1:stencil_map(dft,1)+kp1)) )
+      tracer_max = maxval(tracer( stencil_map(dft,1:stencil_size)+k)) 
+      tracer_max = max(tracer_max, maxval(tracer( stencil_map(dft,1)+km1:stencil_map(dft,1)+kp1)) )
+
+      advection_update = min((tracer(stencil_map(dft,1)+k) - tracer_min)/dt &
+         /mt_lumped_inv(stencil_map(dft,1)+k), &
+         advection_update)
+      advection_update = max((tracer(stencil_map(dft,1)+k) - tracer_max)/dt &
+         /mt_lumped_inv(stencil_map(dft,1)+k), &
+         advection_update)
+    end if
     
     advection(stencil_map(dft,1)+k) = advection_update
   end do

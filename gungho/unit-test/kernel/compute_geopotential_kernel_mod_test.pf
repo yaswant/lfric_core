@@ -67,10 +67,11 @@ contains
     ! Formulation config is needed to ensure shallow atmosphere formulation is
     ! used
     call feign_formulation_config(transport_only=.false., rotating=.true., &
-                                  use_moisture=.false., &
-                                  shallow=.true., use_physics=.false., &
-				  dlayer_on = .true., &
-                                  use_wavedynamics=.true.)
+                                  use_moisture=.false.,                    &
+                                  shallow=.true., use_physics=.false.,     &
+				  use_wavedynamics=.true.,                 &
+				  dry_static_adjust=.false.,               &
+				  dlayer_on = .true.)
     allocate( this%map(ndf), &
               this%x(undf),  &
               this%y(undf),  &

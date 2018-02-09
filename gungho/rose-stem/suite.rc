@@ -11,7 +11,7 @@
                                                               'straka_x', 'straka_y', 'straka_y_ugrid',
                                                               'straka_200m', 'straka_100m', 'straka_50m', 'straka_25m', 
                                                               'biperiodic-cosmic',
-                                                              'weak_hs_short', 'cosine_hill_45deg',
+                                                              'hs', 'hs_short', 'cosine_hill_45deg',
                                                               'divergence_cosmic', 'northpole_cosine_hill',
                                                               'equator_cosine_hill', 'corner_cosine_hill',
                                                               'baroclinic', 'static_isentropic_x', 'static_isentropic_y',
@@ -53,11 +53,12 @@
     'run_application( gungho, transport-rk,           resolutions=[("C12",7200.0)] )',
     'run_application( gungho, robert,                 resolutions=[("BiP50x4-20x20",0.5)], env={"crun":3, "nrun":50} )',
     'run_application( gungho, robert-moist,           resolutions=[("BiP50x4-20x20",0.5)], env={"crun":3, "nrun":50} )',
-    'run_application( gungho, weak_hs_short,          resolutions=[("C24",600.0,900.0)],
+    'run_application( gungho, hs_short,          resolutions=[("C24",600.0,900.0)],
                       env={"crun":3,
-                           "nrun":{("C24",600.0):3,
-                                   ("C24",900.0):2},
-                           "directives":{"default":{"mpi_parts":6,"threads":1,"xios_nodes":1,"wallclock":"00:05:00"}}})',
+                           "nrun":{("C24",600.0):15,
+                                   ("C24",900.0):10},
+                           "directives":{"default":{"mpi_parts":6,"threads":1,"xios_nodes":1,"wallclock":"00:05:00"}}},
+                      plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR")',
     'run_application( gravity_wave, default,          resolutions=[("C24",100.0)], support_meshes=["C12","C6","C3"],
                       plotstr="slices.py gravity_wave $NODAL_DATA_DIR buoyancy T000036 150 0 6 $PLOT_DIR" )',
     'check_compilers( gungho, semi-implicit, fast-debug, resolutions=[("C12",10.0)], publish=False )',
@@ -1087,6 +1088,7 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
                       # Copy XIOS netCDF (if it exists)
                       test -f $CYLC_TASK_WORK_DIR/lfric_diag.nc && cp $CYLC_TASK_WORK_DIR/lfric_diag.nc $DESTINATION_DIRECTORY/{{pathFragment}}/results/
                       test -f $CYLC_TASK_WORK_DIR/lfric_initial.nc && cp $CYLC_TASK_WORK_DIR/lfric_initial.nc $DESTINATION_DIRECTORY/{{pathFragment}}/results/
+                      test -f $CYLC_TASK_WORK_DIR/lfric_averages.nc && cp $CYLC_TASK_WORK_DIR/lfric_averages.nc $DESTINATION_DIRECTORY/{{pathFragment}}/results/
 
                       # Future publisher stages need this information
                       RELATIVE_LOG_ROOT=$(echo $CYLC_TASK_LOG_ROOT | sed "s|$HOME/||")

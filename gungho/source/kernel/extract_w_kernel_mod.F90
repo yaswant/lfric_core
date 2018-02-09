@@ -1,0 +1,101 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> @brief Extracts the vertical component of the wind in w2 and places it in 
+!>        wtheta
+
+!> @detail Extracts the vertical component of the wind in w2 and places it in 
+!>         wtheta
+
+module extract_w_kernel_mod
+  
+use kernel_mod,               only: kernel_type
+use argument_mod,             only: arg_type, func_type,                 &
+                                    GH_FIELD, GH_WRITE, GH_READ, GH_INC, &
+                                    WTHETA, W2,                          &
+                                    GH_BASIS, CELLS
+use constants_mod,            only: r_def
+
+implicit none
+
+!-------------------------------------------------------------------------------
+! Public types
+!-------------------------------------------------------------------------------
+!> The type declaration for the kernel. Contains the metadata needed by the Psy layer
+type, public, extends(kernel_type) :: extract_w_kernel_type
+  private
+  type(arg_type) :: meta_args(2) = (/                                 &
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                      &
+       arg_type(GH_FIELD,   GH_READ,    W2)                           &
+       /)
+  integer :: iterates_over = CELLS
+contains
+  procedure, nopass :: extract_w_code
+end type
+
+!-------------------------------------------------------------------------------
+! Constructors
+!-------------------------------------------------------------------------------
+
+! overload the default structure constructor
+interface extract_w_kernel_type
+   module procedure extract_w_kernel_constructor
+end interface
+
+!-------------------------------------------------------------------------------
+! Contained functions/subroutines
+!-------------------------------------------------------------------------------
+public extract_w_code
+contains
+
+type(extract_w_kernel_type) function extract_w_kernel_constructor() result(self)
+  return
+end function extract_w_kernel_constructor
+
+!> @brief The subroutine which is called directly by the psy layer
+!! @param[in] nlayers Integer the number of layers
+!! @param[inout] w_physics Real array, w component of u_physics
+!! @param[in] u_physics Real array winds for physics
+!! @param[in] ndf_wth The number of degrees of freedom per cell for wth
+!! @param[in] undf_wth The number of unique degrees of freedom for wth
+!! @param[in] map_wth Integer array holding the dofmap for the cell at the 
+!>            base of the column for wth
+!! @param[in] ndf_w2 The number of degrees of freedom per cell for w2
+!! @param[in] undf_w2 The number of unique degrees of freedom for w2
+!! @param[in] map_w2 Integer array holding the dofmap for the cell at the 
+!>            base of the column for w2
+subroutine extract_w_code(nlayers,                   &
+                         w_physics,                  &
+                         u_physics,                  &
+                         ndf_wth, undf_wth, map_wth, &
+                         ndf_w2, undf_w2, map_w2     &
+                         )
+  
+  implicit none
+
+  !Arguments
+  integer, intent(in) :: nlayers
+
+  integer, intent(in) :: ndf_wth, undf_wth  
+  integer, intent(in) :: ndf_w2, undf_w2
+
+  real(kind=r_def), dimension(undf_wth), intent(inout) :: w_physics
+  real(kind=r_def), dimension(undf_w2), intent(in)     :: u_physics
+  integer, dimension(ndf_wth),  intent(in)             :: map_wth
+  integer, dimension(ndf_w2),  intent(in)              :: map_w2
+
+  !Internal variables
+  integer :: k
+
+  do k = 1, nlayers
+
+    w_physics(map_wth(1) + k) = u_physics(map_w2(5) + k )
+
+  end do
+
+end subroutine extract_w_code
+
+end module extract_w_kernel_mod

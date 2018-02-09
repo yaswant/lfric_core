@@ -17,7 +17,8 @@ module iter_timestep_alg_mod
   ! Configuration options
   use restart_control_mod,       only: restart_type
   use formulation_config_mod,    only: use_moisture, use_physics, dlayer_on, &
-                                       use_wavedynamics
+                                       use_wavedynamics,          &
+                                       dry_static_adjust
   use output_config_mod,         only: diagnostic_frequency, subroutine_timers
   use solver_config_mod,         only: method, helmholtz_solve, use_operators, &
                                        guess_np1, &
@@ -27,9 +28,9 @@ module iter_timestep_alg_mod
                                        spinup_period, spinup_alpha, spinup_winds
   use derived_config_mod,        only: bundle_size
   use runtime_constants_mod,     only: get_qr, get_coordinates, get_height, &
-                                       get_mass_matrix, &
-                                       w3inv_id, &
-                                       theta_space_id, w2_id, &
+                                       get_mass_matrix, get_da_at_w2,       &
+                                       w3inv_id,                            &
+                                       theta_space_id, w2_id,               &
                                        get_normalisation
 
   use fs_continuity_mod,         only: W3, Wtheta
@@ -47,22 +48,29 @@ module iter_timestep_alg_mod
                                        bundle_ax 
   ! PsyKAl PSYClone kernels
   use project_pressure_kernel_mod, only: project_pressure_kernel_type
+  use sort_ref_kernel_mod,         only: sort_ref_kernel_type
+  use extract_w_kernel_mod,        only: extract_w_kernel_type
 
   ! Derived Types
   use field_mod,                 only: field_type
   use quadrature_xyoz_mod,       only: quadrature_xyoz_type
   use operator_mod,              only: operator_type
 
+  ! xios output
+  use output_config_mod,         only : write_xios_output
+  use io_mod,                    only : output_xios_nodal
+
   ! Algorithms
-  use solver_mod,                only: solver_algorithm
-  use rhs_alg_mod,               only: rhs_alg
-  use advection_alg_mod,         only: advection_alg, advection_alg_init, advection_mr_alg
-  use si_solver_alg_mod,         only: si_solver_alg, si_solver_init
-  use si_operators_alg_mod,      only: create_si_operators, compute_si_operators
-  use helmholtz_solver_alg_mod,  only: helmholtz_solver_init, &
-                                       compute_inv_hb
-  use fast_physics_alg_mod,      only: fast_physics
-  use slow_physics_alg_mod,      only: slow_physics
+  use solver_mod,                  only: solver_algorithm
+  use rhs_alg_mod,                 only: rhs_alg
+  use advection_alg_mod,           only: advection_alg, advection_alg_init, advection_mr_alg
+  use si_solver_alg_mod,           only: si_solver_alg, si_solver_init
+  use si_operators_alg_mod,        only: create_si_operators, compute_si_operators
+  use helmholtz_solver_alg_mod,    only: helmholtz_solver_init, &
+                                         compute_inv_hb
+  use fast_physics_alg_mod,        only: fast_physics
+  use slow_physics_alg_mod,        only: slow_physics
+  use checks_and_balances_alg_mod, only: check_fields
  
   ! Field mappings
   use map_physics_fields_alg_mod,only: map_physics_fields_alg
@@ -93,6 +101,10 @@ module iter_timestep_alg_mod
   type( field_type ), allocatable :: rhs_n(:), rhs_np1(:), rhs_adv(:)
   type( field_type ), allocatable :: rhs_phys(:), inc(:)
   type( field_type ) :: u_adv   ! Advective wind (centered in time)
+  type( field_type ) :: u_physics ! winds for physics
+  type( field_type ) :: w_physics ! copy of vertical winds for physics
+  type( field_type ) :: dtheta ! increment to theta
+  type( field_type ) :: du ! increment to u
 
 
   public :: iter_alg_init
@@ -152,6 +164,11 @@ contains
     call clone_bundle(state, inc,       bundle_size)
     call clone_bundle(state, reference_state, bundle_size)
 
+    call theta%copy_field_properties(dtheta)
+    call u%copy_field_properties(du)
+    call u%copy_field_properties(u_physics)
+    call theta%copy_field_properties(w_physics)
+
     !--------------------------------------------------------------------
     ! If held-suarez forcing is not used, then we want the following to be 
     ! initialized to zero
@@ -179,7 +196,8 @@ contains
 
     ! Set initial reference state 
     call copy_bundle(state, reference_state, bundle_size)
- 
+    if (dry_static_adjust)call invoke( sort_ref_kernel_type(reference_state(igh_t) ) )  
+
 #ifdef UM_PHYSICS
     if ( use_physics ) then
       ! Initialization for the UM boundary layer
@@ -247,6 +265,7 @@ contains
     type( field_type ), pointer :: t_normalisation => null()
     type( field_type ), pointer :: u_normalisation => null()
     type(operator_type), pointer :: m3_inv => null()
+    type( field_type ), pointer  :: dA => null() ! Areas of faces
 
     integer(kind=i_def):: outer, inner, iter
     real(kind=r_def)   :: varalpha, varbeta ! alpha, beta weight to use
@@ -261,6 +280,7 @@ contains
     chi => get_coordinates()
     height_w3  => get_height(W3)
     height_wth => get_height(Wtheta)
+    dA => get_da_at_w2()
     !--------------------------------------------------------------------
     ! Pass updated fields into state
     !--------------------------------------------------------------------
@@ -280,6 +300,9 @@ contains
     end if
     varbeta = 1.0 - varalpha
 
+    ! Perform some checking on the fields.
+    call check_fields(state)
+
     !============================================================================
     ! Fields for physics
     !============================================================================
@@ -291,8 +314,21 @@ contains
       !--------------------------------------------------------------------
       ! Call the slow physics terms
       !--------------------------------------------------------------------
-      call slow_physics()
-      call exner_in_wth%log_minmax(LOG_LEVEL_INFO, 'exner_in_wth')
+      call invoke( setval_c(dtheta, 0.0_r_def) )
+      call invoke( setval_c(du, 0.0_r_def) )
+      call invoke( X_divideby_Y(u_physics, u, dA) )
+      call invoke( extract_w_kernel_type(w_physics, u_physics) )
+      call u_physics%log_minmax(LOG_LEVEL_INFO, 'u_physics')
+      call w_physics%log_minmax(LOG_LEVEL_INFO, 'w_physics')
+      if (write_xios_output) then
+        call output_xios_nodal("w_physics", w_physics, w_physics%get_mesh_id())
+      end if
+      call slow_physics(chi, du, u_physics, dtheta, theta, exner_in_wth)
+      call invoke(inc_X_times_Y(du,dA)) ! This is the map back
+      call invoke(name="update from slow physics", &
+                  inc_X_plus_Y(state(igh_t), dtheta), &
+                  inc_X_plus_Y(state(igh_u), du), &
+                  )
       call log_event( "slow physics: completed slow physics.", LOG_LEVEL_INFO )
     end if
 
@@ -347,6 +383,7 @@ contains
           iter = inner + (outer-1)*inner_iterations
           if ( mod(iter-1_i_def,reference_reset_freq) == 0_i_def ) then
             call copy_bundle(state, reference_state, bundle_size) 
+            if (dry_static_adjust)call invoke( sort_ref_kernel_type(reference_state(igh_t) ) )  
             if ( helmholtz_solve .or. use_operators ) call compute_si_operators(reference_state)
             if ( helmholtz_solve ) call compute_inv_hb()
           end if

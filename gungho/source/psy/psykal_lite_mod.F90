@@ -3008,21 +3008,24 @@ end subroutine invoke_sample_poly_flux
 !> and requires psyclone to generate the infrastructure correct calls for the 
 !> horizontal looping when coloring is used.
 !> These will be implemented in psyclone issue #127
-subroutine invoke_sample_poly_adv( adv, tracer, wind, chi, stencil_extent )
+subroutine invoke_sample_poly_adv( adv, tracer, wind, mt_lumped_inv, &
+                                   chi, stencil_extent)
 
   use sample_poly_adv_kernel_mod, only: sample_poly_adv_code
-  use stencil_dofmap_mod,          only: stencil_dofmap_type, STENCIL_CROSS
-  use mesh_mod,                    only: mesh_type
+  use stencil_dofmap_mod,         only: stencil_dofmap_type, STENCIL_CROSS
+  use mesh_mod,                   only: mesh_type
 
   implicit none
 
   type(field_type), intent(inout)      :: adv
-  type(field_type), intent(in)         :: wind
   type(field_type), intent(in)         :: tracer
+  type(field_type), intent(in)         :: wind
+  type(field_type), intent(in)         :: mt_lumped_inv
   type(field_type), intent(in)         :: chi(3)
   integer, intent(in)                  :: stencil_extent
 
   type( field_proxy_type )  :: adv_proxy, wind_proxy, tracer_proxy, chi_proxy(3)
+  type( field_proxy_type )  :: mt_lumped_inv_proxy
 
   type(stencil_dofmap_type), pointer :: stencil => null()
   type(stencil_dofmap_type), pointer :: stencil_wx => null()
@@ -3056,6 +3059,7 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, chi, stencil_extent )
   adv_proxy    = adv%get_proxy()
   wind_proxy   = wind%get_proxy()
   tracer_proxy = tracer%get_proxy()
+  mt_lumped_inv_proxy = mt_lumped_inv%get_proxy()
   chi_proxy(1) = chi(1)%get_proxy()
   chi_proxy(2) = chi(2)%get_proxy()
   chi_proxy(3) = chi(3)%get_proxy()
@@ -3138,6 +3142,7 @@ subroutine invoke_sample_poly_adv( adv, tracer, wind, chi, stencil_extent )
                                  stencil_size,                &
                                  stencil_map(:,:,cmap(colour, cell)),       &
                                  wind_proxy%data,             &
+                                 mt_lumped_inv_proxy%data,    &
                                  chi_proxy(1)%data,           &
                                  stencil_size_wx,             &
                                  stencil_map_wx(:,:,cmap(colour, cell)),    &

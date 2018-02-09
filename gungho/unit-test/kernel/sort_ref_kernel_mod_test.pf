@@ -1,0 +1,162 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> Test the sorting of columns of data to remove static instability
+!>
+module sort_ref_kernel_mod_test
+
+  use constants_mod,                 only: i_def, r_def
+  use function_space_collection_mod, only: function_space_collection_type, &
+                                           function_space_collection
+  use mesh_collection_mod,           only : mesh_collection_type, &
+                                            mesh_collection
+  use field_mod,                     only: field_type,      &
+                                           field_proxy_type
+  use fs_continuity_mod,             only: Wtheta
+  use function_space_mod,            only: function_space_type
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: test_all
+
+  @TestCase
+  type, extends(TestCase), public :: sort_ref_test_type
+    private
+    type(function_space_type), pointer :: wth_fs => null()
+    type(field_type)                   :: theta_ref
+    real(r_def)                        :: answer
+  contains
+    procedure setup
+    procedure tearDown
+    procedure test_all
+  end type sort_ref_test_type
+
+  integer(i_def), parameter :: element_order = 0
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    use base_mesh_config_mod,      only : base_mesh_geometry_planar, &
+                                          base_mesh_partitioner_planar
+    use gungho_feign_config_mod,   only : feign_base_mesh_config
+    use finite_element_config_mod, only : finite_element_cellshape_quadrilateral
+    use function_space_mod,        only : function_space_type
+    use mesh_mod,                  only : PLANE_BI_PERIODIC, PLANE
+    use reference_element_mod,     only : reference_cube,   &
+                                          reference_element
+    implicit none
+
+    class(sort_ref_test_type), intent(inout) :: this
+
+
+    type(field_proxy_type) :: theta_proxy
+
+    integer(i_def)                 :: ndf_wth, undf_wth, dim_wth
+
+    integer(i_def)                 :: mesh_id
+
+    call feign_base_mesh_config( filename='foo', prime_mesh_name='unit_test', &
+                                 geometry=base_mesh_geometry_planar,          &
+                                 partitioner=base_mesh_partitioner_planar,    &
+                                 fplane=.false., f_lat_deg=0.0_r_def )
+
+    reference_element = finite_element_cellshape_quadrilateral
+    call reference_cube()
+
+    ! Create top level mesh collection
+    mesh_collection = mesh_collection_type()
+    ! Create top level function space collection
+    function_space_collection = function_space_collection_type()
+
+    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
+    mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
+
+    this%wth_fs => function_space_collection%get_fs(mesh_id, element_order, Wtheta)
+
+    this%theta_ref  = field_type( vector_space = this%wth_fs )
+    theta_proxy = this%theta_ref%get_proxy()
+    ndf_wth     = theta_proxy%vspace%get_ndf( )
+    dim_wth     = theta_proxy%vspace%get_dim_space( )
+    undf_wth    = theta_proxy%vspace%get_undf()
+
+  end subroutine setUp
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine tearDown( this )
+
+    use reference_element_mod, only : deallocate_reference
+
+    implicit none
+
+    class(sort_ref_test_type), intent(inout) :: this
+
+    call function_space_collection%clear()
+    call deallocate_reference()
+    call mesh_collection%clear()
+    
+  end subroutine tearDown
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @test
+  subroutine test_all( this )
+
+    use sort_ref_kernel_mod, only : sort_ref_code
+    implicit none
+
+    class(sort_ref_test_type), intent(inout) :: this
+
+    real(r_def) :: tol ! tolerence to default precision
+
+    real(r_def) :: dth ! Change in theta across a model layer
+
+    integer :: cell
+    integer(i_def) :: err
+
+    integer                 :: nlayers
+    integer                 :: ndf_wth, undf_wth
+
+    integer, pointer        :: map_wth(:) => null()
+
+    type(field_proxy_type)        :: theta_proxy
+
+    integer(i_def)                 :: k
+
+    ! Test kernel
+    theta_proxy  = this%theta_ref%get_proxy()
+    nlayers      = theta_proxy%vspace%get_nlayers()
+    ndf_wth      = theta_proxy%vspace%get_ndf( )
+    undf_wth     = theta_proxy%vspace%get_undf()
+
+    ! only test interior cell 5
+    cell=5
+    map_wth => theta_proxy%vspace%get_cell_dofmap( cell )
+
+    ! Create the data, including some static instability low down
+    theta_proxy%data(:) = 300.0_r_def
+    do k = 1, nlayers/2
+      theta_proxy%data(map_wth(1) + k) =  theta_proxy%data(map_wth(1) + k) + 1.0_r_def
+    end do
+
+    call sort_ref_code( nlayers,                      &
+                        theta_proxy%data,             &
+                        ndf_wth, undf_wth, map_wth    &
+                        )
+
+    ! The answer returns the min dth.  If the kernel is sorts correctly, then 
+    ! this should be 0.0 (otherwise it is negative).
+    this%answer = 0.0_r_def
+    do k = 1, nlayers
+      dth=theta_proxy%data(map_wth(1) + k) - theta_proxy%data(map_wth(1) + k - 1)
+      this%answer = min(this%answer, dth)
+    end do
+    @assertEqual( this%answer, 0.0_r_def )
+
+  end subroutine test_all
+
+end module sort_ref_kernel_mod_test

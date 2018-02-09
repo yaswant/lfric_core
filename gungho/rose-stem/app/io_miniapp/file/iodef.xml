@@ -74,7 +74,7 @@
       <file id="lfric_diag" name="lfric_io_diag" output_freq="1ts" convention="UGRID" enabled=".TRUE.">
         <field field_ref="test_field"/>
       </file> 
- 
+
     </file_definition>
     
   </context>

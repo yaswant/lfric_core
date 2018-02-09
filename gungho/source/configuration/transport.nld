@@ -1,7 +1,8 @@
 namelist transport
-  scheme             : enumeration[ method_of_lines, bip_cosmic, cusph_cosmic ]
-  operators          : enumeration[ fv, fem ]
-  fv_flux_order      : integer
-  fv_advective_order : integer
-  consistent_metric  : logical ! Compute metric terms with the advection scheme
+  scheme               : enumeration[ method_of_lines, bip_cosmic, cusph_cosmic ]
+  operators            : enumeration[ fv, fem ]
+  fv_flux_order        : integer
+  fv_advective_order   : integer
+  consistent_metric    : logical ! Compute metric terms with the advection scheme
+  enforce_monotonicity : logical ! Enforce monotonicity with MOL advection
 end namelist transport

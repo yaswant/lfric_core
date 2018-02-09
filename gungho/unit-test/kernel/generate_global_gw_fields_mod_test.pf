@@ -61,11 +61,12 @@ contains
                                     wind_time_period=0.0_r_def, &
                                     smp_init_wind = .false.  )
 
-    call feign_formulation_config(transport_only=.false., rotating=.false.,  &
-                                  use_moisture=.false., &
-                                  shallow=.true., use_physics=.false., &
-				  dlayer_on=.false., &
-                                  use_wavedynamics=.true.)
+    call feign_formulation_config(transport_only=.false., rotating=.false., &
+                                  use_moisture=.false.,                     &
+                                  shallow=.true., use_physics=.false.,      &
+				  use_wavedynamics=.true.,                  &
+				  dry_static_adjust=.false.,                &
+				  dlayer_on=.false.)
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

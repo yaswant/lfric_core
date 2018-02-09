@@ -9,22 +9,15 @@ module fast_physics_alg_mod
 
   use constants_mod,                only: i_def,r_def
   use log_mod,                      only: log_event,         &
-                                          LOG_LEVEL_INFO
-  use physics_config_mod,           only: heldsuarez_placement
+                                          LOG_LEVEL_ERROR
+  use physics_config_mod,           only: heldsuarez_wind_placement, &
+                                          heldsuarez_thermo_placement
   use derived_config_mod,           only: bundle_size
   use finite_element_config_mod,    only: element_order
   ! PsyKAl PSYClone kernels
-  use held_suarez_kernel_mod,       only: held_suarez_kernel_type
-  use enforce_bc_kernel_mod,        only: enforce_bc_kernel_type
-  
-  use field_bundle_mod,             only: set_bundle_scalar
   
   ! Derived Types
   use field_mod,                    only: field_type
-  use quadrature_xyoz_mod,          only: quadrature_xyoz_type
-  use quadrature_rule_gaussian_mod, only: quadrature_rule_gaussian_type
-  ! Field indices
-  use field_indices_mod,            only: igh_u, igh_t, igh_p
   
   implicit none
 
@@ -45,21 +38,20 @@ contains
     ! Prognostic fields    
     type(field_type), intent( in )         :: state_n(bundle_size)
     type(field_type), intent( inout )      :: rhs_phys(bundle_size)
-    type(quadrature_xyoz_type)             :: qr
-    type(quadrature_rule_gaussian_type)    :: quadrature_rule
 
-    ! This currently only implements weak form physics schemes (i.e. FE held-suarez) and
-    ! so returns weak form values in computational (i.e. not physical) space
+    ! This routine is currently only a placeholder ready for implementation of fast
+    ! physics schemes
 
-    if (heldsuarez_placement > 0)then        
-        call log_event( 'fast physics: Running Held-Suarez forcing', LOG_LEVEL_INFO )
-        ! Held Suarez forcing is expensive to do exactly so instead use low
-        ! order quadrature rule
-        qr = quadrature_xyoz_type(element_order+1, quadrature_rule)
-        call set_bundle_scalar(0.0_r_def, rhs_phys, bundle_size)
-        call invoke(held_suarez_kernel_type(rhs_phys(igh_u), rhs_phys(igh_t), &
-                    state_n(igh_u), state_n(igh_t), state_n(igh_p), chi, qr))
-        call invoke( enforce_bc_kernel_type( rhs_phys(igh_u) ) )
+    if (heldsuarez_wind_placement > 0)then      
+      call log_event( &
+         'fast_physics: Held-Suarez wind forcing is not currently available in fast physics.', &
+         LOG_LEVEL_ERROR )
+    end if
+
+    if (heldsuarez_thermo_placement > 0)then      
+      call log_event( &
+         'fast_physics: Held-Suarez thermal forcing is not currently available in fast physics.', &
+         LOG_LEVEL_ERROR )
     end if
 
   end subroutine fast_physics
