@@ -4,6 +4,8 @@
 # under which the code may be used.
 ##############################################################################
 
+PROJECT_NAME = lfric_atm
+
 PROFILE ?= fast-debug
 
 export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod xios mod_wait

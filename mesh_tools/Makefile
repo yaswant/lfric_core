@@ -28,6 +28,8 @@
 #
 ##############################################################################
 
+PROJECT_NAME = mesh_tools
+
 PROFILE ?= fast-debug
 
 export IGNORE_DEPENDENCIES = netcdf MPI ESMF pfunit_mod planet_constants_mod xios mod_wait

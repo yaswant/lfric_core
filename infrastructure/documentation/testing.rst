@@ -341,6 +341,11 @@ If ``OPERATE_ON`` is not set a default list will be used. There is not default
 for ``TEST_SUITE_TARGETS`` but it will be set up by the Met Office module
 system.
 
+`Note:` A clean test-suite can be forced using the ``PURGE_SUITES`` keyword
+which will purge any rose suites in the ``~/cycl-run`` directory with the
+same name as your suite before launching a new gui
+i.e. ``make test-suite PURGE_SUITES=1``.
+
 During development it is often useful to target a single platform.
 
 If the test suite is invoked using ``rose stem --config <project>/rose-stem``

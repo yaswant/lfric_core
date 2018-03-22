@@ -21,6 +21,7 @@
 #              files" performance, i.e. probably not Lustre.
 #              Default: ./working
 # VERBOSE: Set in order to see actual commands issued by the build system.
+# PURGE_SUITES: Set in order clean out exisiting rose suites of same name.
 #
 # Plus the normal compiler macros...
 #
@@ -81,6 +82,11 @@ ifdef PE_ENV
   else
     $(error Unrecognised Cray programming environment)
   endif
+endif
+
+# Set flag to perform a fresh rose stem suite
+ifdef PURGE_SUITES
+  CLEAN_OPT :='--new' 
 endif
 
 include $(LFRIC_BUILD)/fortran/$(FORTRAN_COMPILER).mk
@@ -181,15 +187,16 @@ api-documentation: ALWAYS
 # SUITE_NAME   - Base name for suites.
 #
 .PHONY: launch-test-suite
-launch-test-suite: SUITE_GROUP ?= developer
+launch-test-suite: SUITE_GROUP  ?= developer
 launch-test-suite: TEST_SUITE_TARGETS ?= $(error Please set the TEST_SUITE_TARGETS environment variable.)
 launch-test-suite:
 	$(Q)umask 022; for target in $(TEST_SUITE_TARGETS) ; do \
-	    echo Launching test suite against $$target ; \
-	    rose stem --name=$(SUITE_NAME)-$$target-$(SUITE_GROUP) \
-	              --config=$(SUITE_CONFIG) \
-	              --opt-conf-key=$$target \
-	              --group=$(SUITE_GROUP);\
+	echo Launching $(PROJECT_NAME) test suite against $$target with $(SUITE_GROUP) group ; \
+	rose stem --name=$(SUITE_NAME)-$$target-$(SUITE_GROUP) \
+	          --config=$(SUITE_CONFIG) \
+	          --opt-conf-key=$$target \
+	          $(CLEAN_OPT) \
+	          --group=$(SUITE_GROUP) ; \
 	done
 
 ##############################################################################
