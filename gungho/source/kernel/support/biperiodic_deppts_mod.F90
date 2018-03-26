@@ -9,7 +9,7 @@
 !-------------------------------------------------------------------------------
 module biperiodic_deppts_mod
 
-use constants_mod, only : r_def
+use constants_mod, only : r_def, i_def
 use log_mod,       only : log_event, LOG_LEVEL_ERROR, log_scratch_space
 use biperiodic_deppt_config_mod, only : biperiodic_deppt_method_euler,       &
                                         biperiodic_deppt_method_midpoint,    &
@@ -41,6 +41,8 @@ contains
                             deltaT,              &
                             method,              &
                             n_dep_pt_iterations )  result(distance)
+
+    implicit none
 
     real(kind=r_def), intent(in)    :: x_arrival
     integer, intent(in)             :: nCellEdges
@@ -110,6 +112,69 @@ contains
 
 
 !--------------------------------------------------------------------------------
+!>  @brief  Calculates the distance between the arrival point and the departure
+!!          point in 1D using the trapezoidal method for integrating the velocity
+!!          u. Note that the distance has sign (+/-) and positive
+!!          values represent the case when the wind is positive, such that
+!!          x_departure < x_arrival. The distance is negative if the wind is
+!!          negative.
+!!
+!!  @param[in]   x_arrival    Arrival point in departure point calculation
+!!  @param[in]   nCellEdges   Number of velocity values
+!!  @param[in]   u_n          Velocity at cell edges at time n
+!!  @param[in]   u_np1        Velocity at cell edges at time n+1
+!!  @param[in]   deltaT       Time step length
+!!  @param[in]   n_dep_pt_iterations Number of solver iterations
+!!  @param[out]  distance     Distance between arrival point and departure point
+!--------------------------------------------------------------------------------
+  function calc_vertical_trapezoidal( x_arrival,              &
+                                      nCellEdges,             &
+                                      u_n,                    &
+                                      u_np1,                  &
+                                      deltaT,                 &
+                                      n_dep_pt_iterations )   &
+           result(distance)
+
+    implicit none
+
+    real(kind=r_def), intent(in)        :: x_arrival
+    integer(kind=i_def), intent(in)     :: nCellEdges
+    real(kind=r_def), intent(in)        :: u_n(1:nCellEdges)
+    real(kind=r_def), intent(in)        :: u_np1(1:nCellEdges)
+    real(kind=r_def), intent(in)        :: deltaT
+    integer(kind=i_def), intent(in)     :: n_dep_pt_iterations
+    real(kind=r_def)                    :: distance
+
+    real(kind=r_def) :: u_arrival
+    real(kind=r_def) :: u_departure
+    real(kind=r_def) :: left_limit
+    real(kind=r_def) :: right_limit
+    real(kind=r_def) :: x_departure
+
+    integer(kind=i_def) :: iLoop
+
+    x_departure = x_arrival
+
+    left_limit = 0.0_r_def
+    right_limit = real(nCellEdges,r_def)
+    call test_value_in_limits(x_arrival,left_limit,right_limit)
+
+    u_arrival = calc_u_in_vertical(x_arrival,nCellEdges,u_np1)
+    x_departure = x_arrival - deltaT*u_arrival
+    call test_value_in_limits(x_departure,left_limit,right_limit)
+
+    do iLoop=1,n_dep_pt_iterations
+      u_departure = calc_u_in_vertical(x_departure,nCellEdges,u_n)
+      x_departure = x_arrival - deltaT*0.5_r_def*(u_arrival+u_departure)
+      call test_value_in_limits(x_departure,left_limit,right_limit)
+    end do
+
+    distance = x_arrival - x_departure
+
+  end function calc_vertical_trapezoidal
+
+
+!--------------------------------------------------------------------------------
 !>  @brief  Calculates the location of a value x_in within a given stencil of
 !!          length nCellEdges
 !!
@@ -119,6 +184,9 @@ contains
 !!  @param[out]   fractional_x_value  Fractional value of x_in
 !--------------------------------------------------------------------------------
   subroutine find_local_x_value(x_in,nCellEdges,iEdge,fractional_x_value)
+
+    implicit none
+
     real(kind=r_def), intent(in)    :: x_in
     integer, intent(in)             :: nCellEdges
     integer, intent(out)            :: iEdge
@@ -142,6 +210,35 @@ contains
 
 
 !--------------------------------------------------------------------------------
+!>  @brief  Calculates integer part and fractional part of x_in and the subrotine
+!!          is typically used in the vertical direction.
+!!
+!!  @param[in]    x_in  Arrival value, typically equal to 0.0.
+!!  @param[in]    nCellEdges  Number of cell edges in a stencil
+!!  @param[out]   iEdge       Index of cell edge to the left of x_in
+!!  @param[out]   fractional_x_value  Fractional value of x_in
+!--------------------------------------------------------------------------------
+  subroutine find_local_vertical_value(x_in,nCellEdges,iEdge,fractional_x_value)
+
+    implicit none
+
+    real(kind=r_def),    intent(in)       :: x_in
+    integer(kind=i_def), intent(in)       :: nCellEdges
+    integer(kind=i_def), intent(out)      :: iEdge
+    real(kind=r_def),    intent(out)      :: fractional_x_value
+
+    iEdge = floor(x_in)+1
+
+    ! Calculate distance from nearest lefthand cell edge
+    fractional_x_value = abs(x_in - floor(x_in))
+
+    if (iEdge < 1 .OR. iEdge > nCellEdges) then
+      call log_event( " Error in find_local_vertical_value routine ", LOG_LEVEL_ERROR )
+    end if
+
+  end subroutine find_local_vertical_value
+
+!--------------------------------------------------------------------------------
 !>  @brief  Subroutine which checks whether departure points are outside the
 !!          domain of interest defined by the stencil length
 !!
@@ -150,6 +247,9 @@ contains
 !!  @param[in]   right_limit  Right hand bound
 !--------------------------------------------------------------------------------
   subroutine test_value_in_limits(x_in,left_limit,right_limit)
+
+    implicit none
+
     real(kind=r_def), intent(in) ::   x_in
     real(kind=r_def), intent(in) ::   left_limit
     real(kind=r_def), intent(in) ::   right_limit
@@ -171,6 +271,9 @@ contains
 !!  @result       u_out       Interpolated wind value
 !--------------------------------------------------------------------------------
   function calc_u_at_x(x_in,nCellEdges,u_wind) result(u_out)
+
+    implicit none
+
     real(kind=r_def), intent(in)  ::  x_in
     integer, intent(in)           ::  nCellEdges
     real(kind=r_def), intent(in)  ::  u_wind(1:nCellEdges)
@@ -193,6 +296,39 @@ contains
 
   end function calc_u_at_x
 
+!--------------------------------------------------------------------------------
+!>  @brief  Returns an interpolated wind field value in the vertical direction
+!!          at x_in.
+!!
+!!  @param[in]    x_in        Position at which to interpolate wind
+!!  @param[in]    nCellEdges  Number of values in the local u field
+!!  @param[in]    u_wind      Wind values
+!!  @result       u_out       Interpolated wind value
+!--------------------------------------------------------------------------------
+  function calc_u_in_vertical(x_in,nCellEdges,u_wind) result(u_out)
 
+    implicit none
+
+    real(kind=r_def), intent(in)       ::  x_in
+    integer(kind=i_def), intent(in)    ::  nCellEdges
+    real(kind=r_def), intent(in)       ::  u_wind(1:nCellEdges)
+    real(kind=r_def)                   ::  u_out
+
+    real(kind=r_def)    :: fractional_x_value
+    integer(kind=i_def) :: iEdge
+    integer(kind=i_def) :: iCellRight
+
+    call find_local_vertical_value(x_in,nCellEdges,iEdge,fractional_x_value)
+
+    if (iEdge==nCellEdges) then
+      iCellRight=iEdge
+    else
+      iCellRight = iEdge+1
+    end if
+
+    u_out = (1.0_r_def-fractional_x_value)*u_wind(iEdge) +                &
+                                  fractional_x_value*u_wind(iCellRight)
+
+  end function calc_u_in_vertical
 
 end module biperiodic_deppts_mod

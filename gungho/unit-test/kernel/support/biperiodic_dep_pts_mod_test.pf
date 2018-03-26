@@ -14,11 +14,13 @@ contains
   @test
   subroutine find_local_x_value_test()
     use pFUnit_Mod
-    use constants_mod, only: r_def
+    use constants_mod, only: r_def, i_def
     use biperiodic_deppts_mod, only: find_local_x_value
 
-    real(kind=r_def) :: x_original,local_coordinate_value, tol
-    integer :: iEdge,nCellEdges
+    implicit none
+
+    real(kind=r_def)    :: x_original, local_coordinate_value, tol
+    integer(kind=i_def) :: iEdge, nCellEdges
 
     tol = 10.0e-8_r_def
 
@@ -47,14 +49,48 @@ contains
   end subroutine find_local_x_value_test
 
   @test
+  subroutine find_local_vertical_value_test()
+    use pFUnit_Mod
+    use constants_mod, only: r_def, i_def
+    use biperiodic_deppts_mod, only: find_local_vertical_value
+
+    implicit none
+
+    real(kind=r_def)    :: x_original, local_coordinate_value, tol
+    integer(kind=i_def) :: iEdge, nCellEdges
+
+    tol = 10.0e-8_r_def
+
+    nCellEdges = 10
+
+    x_original = 0.4_r_def
+    call find_local_vertical_value(x_original,nCellEdges,iEdge,local_coordinate_value)
+    @assertEqual(1, iEdge)
+    @assertEqual(0.4_r_def, local_coordinate_value,tol)
+
+    x_original = 8.9_r_def
+    call find_local_vertical_value(x_original,nCellEdges,iEdge,local_coordinate_value)
+    @assertEqual(9, iEdge)
+    @assertEqual(0.9_r_def, local_coordinate_value,tol)
+
+    x_original = 9.0_r_def
+    call find_local_vertical_value(x_original,nCellEdges,iEdge,local_coordinate_value)
+    @assertEqual(10, iEdge)
+    @assertEqual(0.0_r_def, local_coordinate_value,tol)
+
+  end subroutine find_local_vertical_value_test
+
+  @test
   subroutine calc_u_at_x_test()
     use pFUnit_Mod
-    use constants_mod, only: r_def
+    use constants_mod, only: r_def, i_def
     use biperiodic_deppts_mod, only: calc_u_at_x
 
-    real(kind=r_def) :: x_in, u_at_x, tol
+    implicit none
+
+    real(kind=r_def)              :: x_in, u_at_x, tol
     real(kind=r_def), allocatable :: wind_values(:)
-    integer :: nCellEdges
+    integer(kind=i_def)           :: nCellEdges
 
     tol = 10.0e-8_r_def
     nCellEdges = 4
@@ -69,12 +105,47 @@ contains
     deallocate(wind_values)
   end subroutine calc_u_at_x_test
 
+  @test
+  subroutine calc_u_in_vertical_test()
+    use pFUnit_Mod
+    use constants_mod, only: r_def, i_def
+    use biperiodic_deppts_mod, only: calc_u_in_vertical
+
+    implicit none
+
+    real(kind=r_def)              :: x_in, u_at_x, tol
+    real(kind=r_def), allocatable :: wind_values(:)
+    integer(kind=i_def)           :: nCellEdges
+
+    tol = 10.0e-8_r_def
+    nCellEdges = 6
+
+    allocate(wind_values(1:nCellEdges))
+
+    wind_values=(/ 0.0_r_def,0.2_r_def,0.4_r_def,0.4_r_def,0.2_r_def,0.0_r_def /)
+    x_in = 0.5_r_def
+    u_at_x = calc_u_in_vertical(x_in,nCellEdges,wind_values)
+    @assertEqual(0.1_r_def, u_at_x,tol)
+
+    wind_values=(/ 0.0_r_def,0.2_r_def,0.4_r_def,0.4_r_def,0.2_r_def,0.0_r_def /)
+    x_in = 1.0_r_def
+    u_at_x = calc_u_in_vertical(x_in,nCellEdges,wind_values)
+    @assertEqual(0.2_r_def, u_at_x,tol)
+
+    wind_values=(/ 0.0_r_def,0.2_r_def,0.4_r_def,0.4_r_def,0.2_r_def,0.0_r_def /)
+    x_in = 5.0_r_def
+    u_at_x = calc_u_in_vertical(x_in,nCellEdges,wind_values)
+    @assertEqual(0.0_r_def, u_at_x,tol)
+
+
+    deallocate(wind_values)
+  end subroutine calc_u_in_vertical_test
 
   @test
   subroutine calc_dep_point_test()
 
     use pFUnit_Mod
-    use constants_mod,               only: r_def
+    use constants_mod,               only: r_def, i_def
     use biperiodic_deppts_mod,       only: calc_dep_point
     use biperiodic_deppt_config_mod, only: biperiodic_deppt_method_euler,    &
                                            biperiodic_deppt_method_midpoint, &
@@ -82,8 +153,8 @@ contains
 
     implicit none
 
-    real(kind=r_def) :: x_arrival, deltaT, x_departure, tol
-    integer :: n_dep_pt_iterations, nCellEdges
+    real(kind=r_def)    :: x_arrival, deltaT, x_departure, tol
+    integer(kind=i_def) :: n_dep_pt_iterations, nCellEdges
     real(kind=r_def), allocatable :: u_n(:),u_np1(:)
 
     tol = 10.0e-8_r_def
@@ -115,5 +186,57 @@ contains
     deallocate(u_np1)
 
   end subroutine calc_dep_point_test
+
+  @test
+  subroutine calc_vertical_departure_dist_test()
+
+    use pFUnit_Mod
+    use constants_mod,               only: r_def, i_def
+    use biperiodic_deppts_mod,       only: calc_vertical_trapezoidal
+
+    implicit none
+
+    real(kind=r_def)    :: x_arrival, deltaT, departure_dist, tol
+    integer(kind=i_def) :: n_dep_pt_iterations, nCellEdges
+    real(kind=r_def), allocatable :: u_n(:),u_np1(:)
+
+    tol = 10.0e-8_r_def
+
+    nCellEdges = 4
+
+    allocate(u_n(1:nCellEdges))
+    allocate(u_np1(1:nCellEdges))
+    u_n   = (/ 0.0_r_def,0.6_r_def,0.6_r_def,0.0_r_def /)
+    u_np1 = (/ 0.0_r_def,0.6_r_def,0.6_r_def,0.0_r_def /)
+
+    x_arrival = 1.0_r_def
+    deltaT = 1.0_r_def
+    n_dep_pt_iterations = 1
+
+    departure_dist =  calc_vertical_trapezoidal( x_arrival,nCellEdges,u_n,u_np1,deltaT,     &
+                                    n_dep_pt_iterations )
+    @assertEqual(0.42_r_def, departure_dist, tol)
+
+    deallocate(u_n)
+    deallocate(u_np1)
+
+    nCellEdges = 6
+
+    allocate(u_n(1:nCellEdges))
+    allocate(u_np1(1:nCellEdges))
+
+    u_n   = (/ 0.0_r_def,-1.2_r_def,-1.2_r_def,-1.2_r_def,-0.8_r_def,0.0_r_def /)
+    u_np1 = (/ 0.0_r_def,-1.2_r_def,-1.2_r_def,-1.2_r_def,-0.8_r_def,0.0_r_def /)
+
+    x_arrival = 3.0_r_def
+
+    departure_dist =  calc_vertical_trapezoidal( x_arrival,nCellEdges,u_n,u_np1,deltaT,     &
+                                    n_dep_pt_iterations )
+    @assertEqual(-0.92_r_def, departure_dist, tol)
+
+    deallocate(u_n)
+    deallocate(u_np1)
+
+  end subroutine calc_vertical_departure_dist_test
 
 end module biperiodic_dep_pts_mod_test

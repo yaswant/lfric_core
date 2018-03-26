@@ -1,0 +1,158 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+module vertical_trapezoidal_kernel_mod_test
+
+  use pFUnit_Mod
+  use constants_mod,      only : i_def, r_def
+  use mesh_mod,           only : mesh_type
+
+  implicit none
+
+  private
+  public :: vertical_trapezoidal_test_type , test_all
+
+  @TestCase
+  type, extends(TestCase) :: vertical_trapezoidal_test_type
+    private
+    type(mesh_type)          :: mesh
+  contains
+    procedure setUp
+    procedure test_all
+  end type vertical_trapezoidal_test_type
+
+  integer(i_def), parameter :: n_dep_pt_iterations = 3
+
+  real(r_def), parameter    :: dt  = 1.0_r_def
+  real(r_def), parameter    :: alpha   = 0.5_r_def
+  real(r_def), parameter    :: tau_u   = 0.5_r_def
+  real(r_def), parameter    :: tau_t   = 0.5_r_def
+  real(r_def), parameter    :: tau_r   = 0.5_r_def
+  integer(i_def), parameter :: inner_iterations = 0
+  integer(i_def), parameter :: outer_iterations = 0
+  real(r_def), parameter    :: spinup_period = 0.0_r_def
+  logical, parameter        :: spinup_winds  = .false.
+  logical, parameter        :: spinup_alpha  = .false.
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    use gungho_feign_config_mod,      only : feign_biperiodic_deppt_config
+    use timestepping_config_mod,      only : timestepping_method_semi_implicit, &
+                                             timestepping_runge_kutta_method_ssp3
+    use biperiodic_deppt_config_mod,  only : biperiodic_deppt_method_euler,  &
+                                             biperiodic_deppt_method_trapezoidal, &
+                                             biperiodic_deppt_method_midpoint
+    use gungho_feign_config_mod,      only : feign_timestepping_config
+
+    implicit none
+
+    class(vertical_trapezoidal_test_type), intent(inout) :: this
+
+    call feign_biperiodic_deppt_config( method = biperiodic_deppt_method_trapezoidal,  &
+                                        n_dep_pt_iterations=n_dep_pt_iterations  )
+
+    call feign_timestepping_config( timestepping_method_semi_implicit,   &
+                                    dt,                                  &
+                                    alpha,                               &
+                                    tau_u,                               &
+                                    tau_t,                               &
+                                    tau_r,                               &
+                                    outer_iterations,                    &
+                                    inner_iterations,                    &
+                                    timestepping_runge_kutta_method_ssp3,&
+                                    spinup_period,                       &
+                                    spinup_alpha,                        &
+                                    spinup_winds                         &
+                                    )
+
+  end subroutine setUp
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @test
+  subroutine test_all( this )
+
+    use calc_departure_point_kernel_mod, only : calc_departure_point_code
+    use flux_direction_mod,              only : x_direction
+    use biperiodic_deppt_config_mod,     only : biperiodic_deppt_method_euler, &
+                                                biperiodic_deppt_method_trapezoidal
+    use vertical_trapezoidal_kernel_mod, only : vertical_trapezoidal_code
+
+    implicit none
+
+    class(vertical_trapezoidal_test_type), intent(inout) :: this
+
+    real(r_def), parameter        :: tol    = 1.0e-6_r_def
+    real(kind=r_def),allocatable  :: u_field(:), dep_pts(:)
+    integer(kind=i_def)           :: nlayers
+    integer(kind=i_def)           :: ndf_w2
+    integer(kind=i_def)           :: undf_w2
+    integer(kind=i_def)           :: map_w2(6)
+
+    nlayers = 5
+    undf_w2 = 26
+    ndf_w2 = 6
+    map_w2 = (/ 1,6,11,16,21,22 /)
+
+    allocate(u_field(1:undf_w2))
+    allocate(dep_pts(1:undf_w2))
+
+    ! Assume a constant wind field with departure distances less than one.
+    u_field(:) = -99.0_r_def
+    u_field(21) = 0.0_r_def
+    u_field(22) = 0.8_r_def
+    u_field(23) = 0.8_r_def
+    u_field(24) = 0.8_r_def
+    u_field(25) = 0.8_r_def
+    u_field(26) = 0.0_r_def
+
+    call vertical_trapezoidal_code(  nlayers,              &
+                                     dep_pts,              &
+                                     u_field,              &
+                                     u_field,              &
+                                     undf_w2,              &
+                                     ndf_w2,               &
+                                     map_w2 )
+
+    @assertEqual( 0.0_r_def, dep_pts(21), tol)
+    @assertEqual( 0.5568_r_def, dep_pts(22), tol)
+    @assertEqual( 0.8_r_def, dep_pts(23), tol)
+    @assertEqual( 0.8_r_def, dep_pts(24), tol)
+    @assertEqual( 0.8_r_def, dep_pts(25), tol)
+    @assertEqual( 0.0_r_def, dep_pts(26), tol)
+
+    ! Assume a varying wind field with departure distances greater than one.
+    u_field(:) = -99.0_r_def
+    u_field(21) = 0.0_r_def
+    u_field(22) = 0.8_r_def
+    u_field(23) = 1.6_r_def
+    u_field(24) = 1.6_r_def
+    u_field(25) = 0.8_r_def
+    u_field(26) = 0.0_r_def
+
+    call vertical_trapezoidal_code(  nlayers,              &
+                                     dep_pts,              &
+                                     u_field,              &
+                                     u_field,              &
+                                     undf_w2,              &
+                                     ndf_w2,               &
+                                     map_w2 )
+
+    @assertEqual( 0.0_r_def, dep_pts(21), tol)
+    @assertEqual( 0.5568_r_def, dep_pts(22), tol)
+    @assertEqual( 1.1136_r_def, dep_pts(23), tol)
+    @assertEqual( 1.4176_r_def, dep_pts(24), tol)
+    @assertEqual( 1.2_r_def, dep_pts(25), tol)
+    @assertEqual( 0.0_r_def, dep_pts(26), tol)
+
+  deallocate(u_field)
+  deallocate(dep_pts)
+
+  end subroutine test_all
+
+end module vertical_trapezoidal_kernel_mod_test

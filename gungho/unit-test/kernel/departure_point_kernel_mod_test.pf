@@ -58,10 +58,10 @@ contains
                                     outer_iterations,                    &
                                     inner_iterations,                    &
                                     timestepping_runge_kutta_method_ssp3,&
-				    spinup_period,                       &
-				    spinup_alpha,                        &
-				    spinup_winds                         &
-				    )
+                                    spinup_period,                       &
+                                    spinup_alpha,                        &
+                                    spinup_winds                         &
+                                    )
 
 
   end subroutine setUp
