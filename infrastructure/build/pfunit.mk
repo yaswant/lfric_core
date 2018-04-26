@@ -12,7 +12,7 @@ PF_FILES = $(shell find $(SOURCE_DIR) -name '*.pf' -printf '%P\n')
 .PHONY: prepare-pfunit
 prepare-pfunit: $(patsubst %.pf,$(WORKING_DIR)/%.F90,$(PF_FILES)) \
         $(WORKING_DIR)/$(PROJECT)_unit_tests.F90
-	@echo >/dev/null
+	$(Q)echo >/dev/null
 
 include $(LFRIC_BUILD)/lfric.mk
 

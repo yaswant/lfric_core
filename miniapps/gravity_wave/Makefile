@@ -21,7 +21,7 @@ export PROJECT_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 ROOT_DIR ?= ../..
 
 .PHONY: default
-default: build
+default: build unit-tests integration-tests
 	$(Q)echo > /dev/null
 
 .PHONY: documentation doc docs
@@ -60,12 +60,13 @@ document-latex: WORKING_DIR   := $(WORKING_DIR)/latex
 document-latex: TEX_STUFF      = documentation/tex
 document-latex: COMMON_FIGURES = documentation/common-figures
 document-latex: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/latex.mk SOURCE_DIR=$(SOURCE_DIR) \
-	                                   WORKING_DIR=$(WORKING_DIR) \
-	                                   DOCUMENT_DIR=$(DOCUMENT_DIR) \
-	                                   TEX_STUFF=$(TEX_STUFF) \
-	                                   COMMON_FIGURES=$(COMMON_FIGURES) \
-	                                   DOCUMENTS="$(DOCUMENTS)"
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/latex.mk \
+                                 SOURCE_DIR=$(SOURCE_DIR) \
+	                         WORKING_DIR=$(WORKING_DIR) \
+	                         DOCUMENT_DIR=$(DOCUMENT_DIR) \
+	                         TEX_STUFF=$(TEX_STUFF) \
+	                         COMMON_FIGURES=$(COMMON_FIGURES) \
+	                         DOCUMENTS="$(DOCUMENTS)"
 
 .PHONY: document-api
 document-api: PROJECT       = $(PROJECT_NAME)
@@ -87,14 +88,14 @@ extract: ALWAYS
 	$(call MESSAGE,==============================)
 	$(call MESSAGE,Extracting $(PROJECT_NAME))
 	$(call MESSAGE,==============================)
-	@$(MAKE) --quiet  \
+	$(Q)$(MAKE) $(QUIET_ARG)   \
                  -f $(LFRIC_BUILD)/extract.mk \
 	         SOURCE_DIR=$(SOURCE_DIR) \
 	         WORKING_DIR=$(WORKING_DIR)
 	$(call MESSAGE,==============================)
 	$(call MESSAGE,Psycloning $(PROJECT_NAME))
 	$(call MESSAGE,==============================)
-	@$(MAKE) --quiet  \
+	$(Q)$(MAKE) $(QUIET_ARG)   \
                  -f $(LFRIC_BUILD)/psyclone.mk \
 	         SOURCE_DIR=source WORKING_DIR=$(WORKING_DIR) \
                  OPTIMISATION_PATH=$(OPTIMISATION_PATH)
@@ -102,9 +103,9 @@ extract: ALWAYS
 .PHONY: extract-infrastructure
 extract-infrastructure: ALWAYS
 	$(call MESSAGE,===============================)
-	$(call MESSAGE,Extracting LFRic Infrastructure)
+	$(call MESSAGE,Extracting LFRic infrastructure)
 	$(call MESSAGE,===============================)
-	@$(MAKE) --quiet  \
+	$(Q)$(MAKE) $(QUIET_ARG)   \
                  -C $(ROOT_DIR)/infrastructure \
                  -f $(LFRIC_BUILD)/extract.mk \
 	         SOURCE_DIR=source \
@@ -115,18 +116,18 @@ extract-gungho: extract-infrastructure
 extract-gungho: export OPTIMISATION_PATH ?= $(wildcard $ROOT/gungho/optimisation/$(LFRIC_TARGET_PLATFORM))
 extract-gungho: ALWAYS
 	$(call MESSAGE,========================================)
-	$(call MESSAGE,Extracting LFRic Dynamical Core \(Gungho\))
+	$(call MESSAGE,Extracting Gungho dynamical core)
 	$(call MESSAGE,========================================)
-	@$(MAKE) --quiet \
+	$(Q)$(MAKE) $(QUIET_ARG)  \
                  -C $(ROOT_DIR)/gungho \
                  -f $(LFRIC_BUILD)/extract.mk \
 	         SOURCE_DIR=source \
 	         WORKING_DIR=$(abspath $(WORKING_DIR)) \
 	         WITHOUT_PROGRAMS=1
 	$(call MESSAGE,====================================)
-	$(call MESSAGE,Psycloning Dynamical Core \(Gungho\))
+	$(call MESSAGE,Psycloning Gungho dynamical core)
 	$(call MESSAGE,====================================)
-	@$(MAKE) --quiet \
+	$(Q)$(MAKE) $(QUIET_ARG)  \
                  -C $(ROOT_DIR)/gungho \
                  -f $(LFRIC_BUILD)/psyclone.mk \
 	         SOURCE_DIR=source \
@@ -152,17 +153,18 @@ build: WORKING_DIR := $(WORKING_DIR)
 build: BIN_DIR     ?= $(PROJECT_DIR)/bin
 build: PROGRAMS    := $(basename $(notdir $(shell find $(SOURCE_DIR) -maxdepth 1 -name '*.[Ff]90' -print)))
 build: extract
-	@$(MAKE) --quiet generate-configuration PROJECT=$(PROJECT_NAME) \
-                 SOURCE_DIR=$(WORKING_DIR) \
-                 WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG)  generate-configuration \
+                                  PROJECT=$(PROJECT_NAME) \
+                                  SOURCE_DIR=$(WORKING_DIR) \
+                                  WORKING_DIR=$(WORKING_DIR)
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Analysing $(PROJECT) build dependencies)
 	$(call MESSAGE,=========================================================)
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG)  -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Compiling $(PROJECT))
 	$(call MESSAGE,=========================================================)
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
+	$(Q)$(MAKE) $(QUIET_ARG)  -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
 	         BIN_DIR=$(BIN_DIR) PROGRAMS="$(PROGRAMS)"
 
 
@@ -171,14 +173,15 @@ generate-configuration: ALWAYS
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Processing namelist loaders for $(PROJECT))
 	$(call MESSAGE,=========================================================)
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/configuration.mk PROJECT=$(PROJECT) \
-	                                           SOURCE_DIR=$(SOURCE_DIR) \
-	                                           WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk \
+                                 PROJECT=$(PROJECT) \
+	                         SOURCE_DIR=$(SOURCE_DIR) \
+	                         WORKING_DIR=$(WORKING_DIR)
 
 .PHONY: generate-psykal
 generate-psykal: export SOURCE_DIR = source
 generate-psykal: ALWAYS
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/psyclone.mk WORKING_DIR=$(WORKING_DIR) \
+	$(Q)$(MAKE) $(QUIET_ARG)  -f $(LFRIC_BUILD)/psyclone.mk WORKING_DIR=$(WORKING_DIR) \
                 SOURCE_DIR=$(SOURCE_DIR) \
                 OPTIMISATION_PATH=$(OPTIMISATION_PATH)
 
@@ -202,19 +205,22 @@ unit-tests:run-unit-tests
 	$(Q)echo > /dev/null
 
 .PHONY: generate-unit-tests
-#generate-unit-tests: export WITHOUT_PROGRAMS=1
 generate-unit-tests: extract-unit-tests
-	@$(MAKE) --quiet generate-configuration PROJECT=$(PROJECT_NAME) \
-                 SOURCE_DIR=$(WORKING_DIR) \
-                 WORKING_DIR=$(WORKING_DIR)
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
-	@$(MAKE) --quiet pfunit WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG)  generate-configuration \
+                                  PROJECT=$(PROJECT_NAME) \
+                                  SOURCE_DIR=$(WORKING_DIR) \
+                                  WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG)  -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG)  pfunit WORKING_DIR=$(WORKING_DIR)
 
 .PHONY: extract-unit-tests
 extract-unit-tests: extract
 extract-unit-tests: export SOURCE_DIR = $(PROJECT_DIR)/unit-test
 extract-unit-tests:
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/extract.mk WORKING_DIR=$(WORKING_DIR)
+	$(call MESSAGE,=========================================================)
+	$(call MESSAGE,Extracting unit-tests for $(PROJECT))
+	$(call MESSAGE,=========================================================)
+	$(Q)$(MAKE) $(QUIET_ARG)  -f $(LFRIC_BUILD)/extract.mk WORKING_DIR=$(WORKING_DIR)
 	$(Q)cp -r $(SOURCE_DIR)/data $(WORKING_DIR)
 
 
@@ -231,9 +237,10 @@ integration-tests: $(addprefix integration-test-run/,$(basename $(shell find int
 
 .PHONY: generate-integration-tests
 generate-integration-tests: extract-integration-tests
-	@$(MAKE) --quiet generate-configuration PROJECT=$(PROJECT_NAME) \
-                 SOURCE_DIR=$(WORKING_DIR) \
-                 WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG) generate-configuration \
+                                 PROJECT=$(PROJECT_NAME) \
+                                 SOURCE_DIR=$(WORKING_DIR) \
+                                 WORKING_DIR=$(WORKING_DIR)
 
 .PHONY: extract-integration-tests
 extract-integration-tests: extract
@@ -242,7 +249,7 @@ extract-integration-tests: ALWAYS
 	$(call MESSAGE,=========================================================)
 	$(call MESSAGE,Extracting integration-tests for $(PROJECT))
 	$(call MESSAGE,=========================================================)
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/extract.mk WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG)  -f $(LFRIC_BUILD)/extract.mk WORKING_DIR=$(WORKING_DIR)
 
 ##############################################################################
 # Clean
@@ -252,6 +259,7 @@ clean: ALWAYS
 	$(call MESSAGE,Removing,$(PROJECT_NAME) work space)
 	$(Q)-rm -r $(WORKING_DIR)
 	$(call MESSAGE,Removing,$(PROJECT_NAME) documents)
-	$(Q)-rm -rf documents
+	$(Q)-if [ -d documents ] ; then rm -r documents; fi
 	$(call MESSAGE,Removing,$(PROJECT_NAME) binaries)
-	$(Q)-rm -rf bin test
+	$(Q)-if [ -d bin ] ; then rm -r bin ; fi
+	$(Q)-if [ -d test ] ; then rm -r test ; fi

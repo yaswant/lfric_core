@@ -28,7 +28,7 @@ default: $(addprefix default/,$(OPERATE_ON))
 
 .PHONY: default/%
 default/%: ALWAYS
-	$(Q)$(MAKE) -C $*
+	$(Q)$(MAKE) $(QUIET_ARG) -C $*
 
 ##############################################################################
 # Perform the clean action on each sub-project in OPERATE_ON list.
@@ -39,7 +39,7 @@ clean: $(addprefix clean/,$(OPERATE_ON))
 
 .PHONY: clean/%
 clean/%: ALWAYS
-	$(Q)$(MAKE) -C $* clean
+	$(Q)$(MAKE) $(QUIET_ARG) -C $* clean
 
 ##############################################################################
 # Launch test suite for each sub-project in OPERATE_ON list.
@@ -51,7 +51,7 @@ test-suite: $(addprefix test-suite/,$(OPERATE_ON))
 
 .PHONY: test-suite/%
 test-suite/%: ALWAYS
-	$(Q)-$(MAKE) -C $* test-suite TEST_SUITE_TARGETS="$(TEST_SUITE_TARGETS)"
+	$(Q)-$(MAKE) $(QUIET_ARG) -C $* test-suite TEST_SUITE_TARGETS="$(TEST_SUITE_TARGETS)"
 
 ##############################################################################
 

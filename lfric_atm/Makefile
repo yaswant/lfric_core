@@ -63,28 +63,28 @@ build: WORKING_DIR := $(WORKING_DIR)/gungho
 build: BIN_DIR     ?= $(PROJECT_DIR)/bin
 build: PROGRAMS    := $(basename $(notdir $(shell find $(SOURCE_DIR) -maxdepth 1 -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \;)))
 build: generate-psykal extract-gungho extract-um-physics
-	$(MAKE) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(abspath $(WORKING_DIR))
-	$(MAKE) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
-	$(MAKE) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(abspath $(WORKING_DIR))
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
 	                             BIN_DIR=$(BIN_DIR) \
                                      PROGRAMS="$(PROGRAMS)" \
                                      COMPILE_OPTIONS=$(abspath $(PROJECT_DIR)/build/compile_options.mk)
 
 .PHONY: generate-psykal
 generate-psykal: extract-gungho
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk SOURCE_DIR=source \
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk SOURCE_DIR=source \
 	                                     WORKING_DIR=$(WORKING_DIR)
-	$(MAKE) -f $(LFRIC_BUILD)/psyclone.mk SOURCE_DIR=source
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk SOURCE_DIR=source
 
 .PHONY: extract-gungho
 extract-gungho: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
 	        SOURCE_DIR=$(PROJECT_DIR)/../gungho/source \
 	        WORKING_DIR=$(WORKING_DIR) \
 	        WITHOUT_PROGRAMS=1
-	$(MAKE) -C $(ROOT_DIR)/gungho -f $(LFRIC_BUILD)/psyclone.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(ROOT_DIR)/gungho -f $(LFRIC_BUILD)/psyclone.mk \
 	        SOURCE_DIR=source WORKING_DIR=$(abspath $(WORKING_DIR))
-	$(MAKE) -C $(ROOT_DIR)/gungho generate-configuration \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(ROOT_DIR)/gungho generate-configuration \
 	        PROJECT=$(PROJECT) WORKING_DIR=$(abspath $(WORKING_DIR))
 
 .PHONY: extract-um-physics
@@ -92,10 +92,10 @@ extract-um-physics: export platform_config_dir=$(strip $(shell grep -E "$(LFRIC_
 extract-um-physics:
 	$(call MESSAGE,Extracting,UM physics)
 	$(Q)if [ x$(platform_config_dir) = x ] ; then echo Unable to convert $(LFRIC_TARGET_PLATFORM):$(FORTRAN_COMPILER) to a UM target; false; fi
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
 	        SOURCE_DIR=$(ROOT_DIR)/um_physics/source \
 	        WORKING_DIR=$(abspath $(WORKING_DIR))
-	$(MAKE) -C $(ROOT_DIR)/um_physics -f $(LFRIC_BUILD)/psyclone.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(ROOT_DIR)/um_physics -f $(LFRIC_BUILD)/psyclone.mk \
 	        SOURCE_DIR=source WORKING_DIR=$(abspath $(WORKING_DIR))
 	$(info Using UM target $(platform_config_dir))
 	# Retrieve and preprocess the UM, Jules and Socrates code
@@ -120,4 +120,5 @@ partial-clean pclean: ALWAYS
 	$(call MESSAGE,Removing,"GungHo workspace")
 	$(Q)-rm -r $(WORKING_DIR)/gungho
 	$(call MESSAGE,Removing,"GungHo binaries")
-	$(Q)-rm -r bin
+	$(Q)-if [ -d bin ] ; then rm -r bin ; fi
+

@@ -62,7 +62,7 @@ export LDFLAGS := $(LDFLAGS) $(OPENMP_ARG)
 .PHONY: extract
 extract: export SOURCE_DIR = source
 extract: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk
 
 ##############################################################################
 # Documentation
@@ -104,13 +104,13 @@ unit-tests: run-unit-tests
 
 .PHONY: generate-unit-tests
 generate-unit-tests: extract-unit-tests
-	$(MAKE) extract
-	$(MAKE) pfunit
+	$(Q)$(MAKE) $(QUIET_ARG) extract
+	$(Q)$(MAKE) $(QUIET_ARG) pfunit
 
 .PHONY: extract-unit-tests
 extract-unit-tests: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
-	$(Q) cp -r $(SOURCE_DIR)/data $(WORKING_DIR)/
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk
+	$(Q)cp -r $(SOURCE_DIR)/data $(WORKING_DIR)/
 
 ##############################################################################
 # Integration tests
@@ -126,15 +126,15 @@ integration-tests: $(addprefix integration-test-run/,$(basename $(shell find int
 .PHONY: generate-integration-tests
 generate-integration-tests: extract-integration-test \
 	                   configuration-integration-test
-	$(MAKE) extract
+	$(Q)$(MAKE) $(QUIET_ARG) extract
 
 .PHONY: configuration-integration-test
 configuration-integration-test: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/lfric.mk configuration
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/lfric.mk configuration
 
 .PHONY: extract-integration-test
 extract-integration-test: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk
 
 ##############################################################################
 # Clean
@@ -146,4 +146,4 @@ clean: ALWAYS
 	$(call MESSAGE,Removing,"infrastructure documents")
 	$(Q)if [ -d documents ] ; then rm -r documents; fi
 	$(call MESSAGE,Removing,"infrastructure binaries")
-	$(Q)-rm -r test
+	$(Q)-if [ -d test ] ; then rm -r test ; fi

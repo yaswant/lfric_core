@@ -124,17 +124,20 @@ ifdef VERBOSE
   DOUBLE_VERBOSE_ARG = --verbose
 else
   Q := @
+  QUIET_ARG = --quiet
   VERBOSE_REDIRECT = >/dev/null
 endif
+
 export Q
+export QUIET_ARG
 
 # We only want to send terminal control characters if there is a terminal to
 # interpret them...
 #
 ifneq 'x$(TERM)' 'x'
-  MESSAGE = @printf "\\033[1m$(1)\\033[0m %s\n" $(2)
+  MESSAGE = $(Q)printf "\\033[1m$(1)\\033[0m %s\n" $(2)
 else
-  MESSAGE = @echo *$(1)* $(2)
+  MESSAGE = $(Q)echo *$(1)* $(2)
 endif
 
 # Set up some special macros for hard to escape characters
@@ -163,7 +166,7 @@ TARGET_DIR = $(patsubst $(PERCENT)/,$(PERCENT),$(dir $@))
 #
 .PHONY: uml-documentation
 uml-documentation:
-	$(MAKE) uml-pdfs DOCUMENT_DIR=$(DOCUMENT_DIR) SOURCE_DIR=$(SOURCE_DIR) WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG) uml-pdfs DOCUMENT_DIR=$(DOCUMENT_DIR) SOURCE_DIR=$(SOURCE_DIR) WORKING_DIR=$(WORKING_DIR)
 
 .PHONY: uml-pdfs
 uml-pdfs: $$(patsubst $$(SOURCE_DIR)/$$(PERCENT).puml,$$(DOCUMENT_DIR)/$$(PERCENT).pdf,$$(wildcard $$(SOURCE_DIR)/*.puml))
@@ -215,7 +218,7 @@ launch-test-suite:
 	rose stem --name=$(SUITE_NAME)-$$target-$(SUITE_GROUP) \
 	          --config=$(SUITE_CONFIG) \
 	          --opt-conf-key=$$target \
-	          $(CLEAN_OPT) \
+	          $(CLEAN_OPT) $(QUIET_ARG) \
 	          --group=$(SUITE_GROUP) ; \
 	done
 
@@ -224,8 +227,8 @@ launch-test-suite:
 #
 .PHONY: run-unit-tests
 run-unit-tests: generate-unit-tests
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk
 	$(call MESSAGE,Running,$(PROGRAMS))
 	$(Q)cd $(WORKING_DIR); mpiexec -n 1 $(BIN_DIR)/$(PROGRAMS) $(DOUBLE_VERBOSE_ARG)
 
@@ -236,8 +239,8 @@ run-unit-tests: generate-unit-tests
 .PHONY: integration-test-run/%
 integration-test-run/%: export PYTHONPATH := $(PYTHONPATH):$(LFRIC_BUILD)
 integration-test-run/%: generate-integration-tests
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk PROGRAMS=$(notdir $*)
-	@$(MAKE) --quiet -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk PROGRAMS=$(notdir $*)
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
 	        PROGRAMS=$(notdir $*) FFLAGS="$(FFLAGS) $(FFLAGS_DEBUG) $(FFLAGS_RUNTIME)"
 	$(call MESSAGE,Running,$*)
 	$(Q)cd $(dir $*); \
@@ -248,11 +251,11 @@ integration-test-run/%: generate-integration-tests
 #
 .PHONY: configuration
 configuration:
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/configuration.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk
 
 ##############################################################################
 # Generate pFUnit unit tests.
 #
 .PHONY: pfunit
 pfunit:
-	@$(MAKE) --quiet -f $(LFRIC_BUILD)/pfunit.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/pfunit.mk

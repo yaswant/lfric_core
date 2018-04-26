@@ -74,22 +74,22 @@ build: WORKING_DIR := $(WORKING_DIR)/mesh_tools
 build: BIN_DIR     ?= $(PROJECT_DIR)/bin
 build: PROGRAMS    := $(basename $(notdir $(shell find $(SOURCE_DIR) -maxdepth 1 -name '*.[Ff]90' -print)))
 build: generate-configuration extract
-	$(MAKE) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(realpath $(WORKING_DIR))
-	$(MAKE) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
-	$(MAKE) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(realpath $(WORKING_DIR))
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
 	                             BIN_DIR=$(BIN_DIR) PROGRAMS="$(PROGRAMS)"
 
 .PHONY: generate-configuration
 generate-configuration: SOURCE_DIR = source
 generate-configuration: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/configuration.mk PROJECT=$(PROJECT) \
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk PROJECT=$(PROJECT) \
 	                                           SOURCE_DIR=$(SOURCE_DIR) \
 	                                           WORKING_DIR=$(WORKING_DIR)
 
 .PHONY: extract
 extract: export SOURCE_DIR = source
 extract: ALWAYS
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk
 
 ##############################################################################
 # Unit tests
@@ -98,7 +98,7 @@ extract: ALWAYS
 unit-tests: export PROJECT      = mesh_tools
 unit-tests: export SOURCE_DIR   = unit-test
 unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-tests
-unit-tests: export BIN_DIR     ?= $(PROJECT_DIR)/tests
+unit-tests: export BIN_DIR     ?= $(PROJECT_DIR)/test
 unit-tests: export PROGRAMS     = mesh_tools_unit_tests
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
 unit-tests: export FFLAGS      += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
@@ -111,14 +111,14 @@ unit-tests: run-unit-tests
 
 .PHONY: generate-unit-tests
 generate-unit-tests: extract-unit-tests
-	$(MAKE) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(realpath $(WORKING_DIR))
-	$(MAKE) extract
-	$(MAKE) generate-configuration
-	$(MAKE) pfunit
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(LFRIC_INFRASTRUCTURE) extract WORKING_DIR=$(realpath $(WORKING_DIR))
+	$(Q)$(MAKE) $(QUIET_ARG) extract
+	$(Q)$(MAKE) $(QUIET_ARG) generate-configuration
+	$(Q)$(MAKE) $(QUIET_ARG) pfunit
 
 .PHONY: extract-unit-tests
 extract-unit-tests:
-	$(MAKE) -f $(LFRIC_BUILD)/extract.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk
 
 ##############################################################################
 # Clean
@@ -128,6 +128,6 @@ clean: ALWAYS
 	$(call MESSAGE,Removing,"mesh tools work space")
 	$(Q)-rm -r $(WORKING_DIR)
 	$(call MESSAGE,Removing,"mesh tools binaries")
-	$(Q)-rm -r bin
+	$(Q)-if [ -d bin ] ; then rm -r bin ; fi
 	$(call MESSAGE,Removing,"mesh tools tests")
-	$(Q)-rm -r tests
+	$(Q)-if [ -d test ] ; then rm -r test ; fi
