@@ -12,8 +12,6 @@ module gungho_driver_mod
   use checksum_alg_mod,           only : checksum_alg
   use conservation_algorithm_mod, only : conservation_algorithm
   use constants_mod,              only : i_def, imdi
-  use cosmic_transport_alg_mod,   only : cosmic_transport_init, &
-                                         cosmic_transport_step
   use yz_bip_cosmic_alg_mod,      only : yz_bip_cosmic_step
   use cusph_cosmic_transport_alg_mod, &
                                   only : cusph_cosmic_transport_init, &
@@ -83,8 +81,7 @@ module gungho_driver_mod
   use transport_config_mod,       only : scheme, &
                                          transport_scheme_method_of_lines, &
                                          transport_scheme_yz_bip_cosmic, &
-                                         transport_scheme_bip_cosmic, &
-                                         transport_scheme_cusph_cosmic
+                                         transport_scheme_horz_cosmic
   use xios
   use count_mod,                  only: count_type, halo_calls
 
@@ -347,10 +344,7 @@ contains
           case ( transport_scheme_yz_bip_cosmic )
             call cusph_cosmic_transport_init(mesh_id,u,timestep)
             call yz_bip_cosmic_step(rho,u,mesh_id,timestep)
-          case ( transport_scheme_bip_cosmic )
-            call cosmic_transport_init(mesh_id, u, timestep)
-            call cosmic_transport_step(rho)
-          case ( transport_scheme_cusph_cosmic )
+          case ( transport_scheme_horz_cosmic )
             call cusph_cosmic_transport_init(mesh_id, u, timestep)
             call cusph_cosmic_transport_step( mesh_id, rho)
           case default

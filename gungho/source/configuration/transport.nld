@@ -1,7 +1,6 @@
 namelist transport
   scheme               : enumeration[ method_of_lines,  ! MOL using RK-SSP3 for time integration of fluxes
-                                      bip_cosmic,       ! Cosmic transport scheme in the horizontal on the biperiodic mesh only
-                                      cusph_cosmic,     ! Cosmic transport scheme in the horizontal on the cubed-sphere mesh only
+                                      horz_cosmic,      ! Cosmic transport scheme in the horizontal
                                       yz_bip_cosmic ]   ! Cosmic transport scheme for a Y-Z slice of the biperiodic mesh
   operators            : enumeration[ fv, fem ]
   fv_flux_order        : integer

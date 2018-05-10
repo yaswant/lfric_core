@@ -21,8 +21,7 @@ module oned_density_update_alg_mod
                                                invoke_conservative_fluxes, &
                                                invoke_fv_mass_fluxes
   use transport_config_mod,              only: scheme, &
-                                               transport_scheme_bip_cosmic, &
-                                               transport_scheme_cusph_cosmic
+                                               transport_scheme_horz_cosmic
   use cusph_density_update_alg_mod,      only: cusph_density_update_alg
   use operator_mod,                      only: operator_type
   use dg_matrix_vector_kernel_mod,       only: dg_matrix_vector_kernel_type
@@ -96,26 +95,15 @@ contains
                  setval_c(a1,        0.0_r_def), &
                  setval_c(a2,        0.0_r_def) )
 
-    if (scheme == transport_scheme_cusph_cosmic) then
-      mm_w3 => get_mass_matrix(w3_id)
-      call invoke( dg_matrix_vector_kernel_type(mass,   rho_in,   mm_w3) )
-      call invoke_subgrid_coeffs(a0,a1,a2,mass,cell_orientation,direction,      &
-                          rho_approximation_stencil_extent,dep_pt_stencil_extent)
-      call invoke_fv_mass_fluxes(  mass, dep_pts, u, mass_flux,  &
-                                   a0, a1, a2, direction, dep_pt_stencil_extent )
-    else
-      call invoke_subgrid_coeffs(a0,a1,a2,rho_in,cell_orientation,direction,      &
-                          rho_approximation_stencil_extent,dep_pt_stencil_extent)
-      call invoke_conservative_fluxes(  rho_in, dep_pts, u, mass_flux,  &
-                                   a0, a1, a2, direction, dep_pt_stencil_extent )
-    end if
+    mm_w3 => get_mass_matrix(w3_id)
+    call invoke( dg_matrix_vector_kernel_type(mass, rho_in, mm_w3) )
+    call invoke_subgrid_coeffs(a0, a1, a2, mass, cell_orientation, direction, &
+                               rho_approximation_stencil_extent, dep_pt_stencil_extent)
+    call invoke_fv_mass_fluxes(mass, dep_pts, u, mass_flux, &
+                               a0, a1, a2, direction, dep_pt_stencil_extent)
 
-    if (scheme == transport_scheme_cusph_cosmic) then
-      call cusph_density_update_alg(rho_in, mass_flux, rho_adv_np1, cell_orientation, direction )
-    else
-      call density_update_alg(rho_in, mass_flux, rho_adv_np1, detj_at_w2)
-    end if
-
+    call cusph_density_update_alg(rho_in, mass_flux, rho_adv_np1, &
+                                  cell_orientation, direction)
 
     ! Calculate the fluxes for rho=1
     call invoke( setval_c(mass_flux,      0.0_r_def), &
@@ -124,27 +112,16 @@ contains
                  setval_c(a1,             0.0_r_def), &
                  setval_c(a2,             0.0_r_def) )
 
-    if (scheme == transport_scheme_cusph_cosmic) then
-      mm_w3 => get_mass_matrix(w3_id)
-      call invoke( dg_matrix_vector_kernel_type(mass,   rho_constant_1,   mm_w3) )
-      call invoke_subgrid_coeffs(a0,a1,a2,mass,cell_orientation,direction,        &
-                          rho_approximation_stencil_extent,dep_pt_stencil_extent)
+    mm_w3 => get_mass_matrix(w3_id)
+    call invoke( dg_matrix_vector_kernel_type(mass, rho_constant_1, mm_w3) )
+    call invoke_subgrid_coeffs(a0, a1, a2, mass, cell_orientation, direction, &
+                               rho_approximation_stencil_extent, dep_pt_stencil_extent)
 
-      call invoke_fv_mass_fluxes(  mass, dep_pts, u, mass_flux,  &
-                                   a0, a1, a2, direction, dep_pt_stencil_extent )
-    else
-      call invoke_subgrid_coeffs(a0,a1,a2,rho_constant_1,cell_orientation,direction, &
-                          rho_approximation_stencil_extent,dep_pt_stencil_extent)
-      call invoke_conservative_fluxes(  rho_constant_1, dep_pts, u, mass_flux,  &
-                                   a0, a1, a2, direction, dep_pt_stencil_extent )
-    end if
+    call invoke_fv_mass_fluxes(mass, dep_pts, u, mass_flux, &
+                               a0, a1, a2, direction, dep_pt_stencil_extent)
 
-    if (scheme == transport_scheme_cusph_cosmic) then
-      call cusph_density_update_alg(rho_constant_1, mass_flux, rho_constant_np1, cell_orientation, direction )
-    else
-      call density_update_alg(rho_constant_1, mass_flux, rho_constant_np1, detj_at_w2)
-    end if
-
+    call cusph_density_update_alg(rho_constant_1, mass_flux, rho_constant_np1, &
+                                  cell_orientation, direction)
 
     ! Perform multiplicative correction to obtain the advective update of density
     call invoke( X_divideby_Y(rho_out, rho_adv_np1, rho_constant_np1) )

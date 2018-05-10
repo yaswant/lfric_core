@@ -42,14 +42,11 @@ module init_mesh_mod
   use transport_config_mod,       only: scheme, operators, fv_flux_order, &
                                         fv_advective_order,               &
                                         transport_operators_fv,           &
-                                        transport_scheme_bip_cosmic,      &
-                                        transport_scheme_cusph_cosmic,    &
+                                        transport_scheme_horz_cosmic,     &
                                         transport_scheme_yz_bip_cosmic
 
   use ugrid_2d_mod,               only: ugrid_2d_type
   use ugrid_file_mod,             only: ugrid_file_type
-  use transport_config_mod,       only: scheme, &
-                                        transport_scheme_cusph_cosmic
 
   implicit none
 
@@ -141,7 +138,7 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id )
     end if
 
     if (total_ranks == 1) then
-      if (scheme == transport_scheme_cusph_cosmic) then
+      if (scheme == transport_scheme_horz_cosmic) then
         call log_event( "For Cosmic the total number of processors must be "// &
                         "greater than 1 and a multiple of 6 for a          "// &
                         "cubed-sphere domain.", &
@@ -221,9 +218,8 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id )
     max_stencil_depth = max(max_stencil_depth,max_fv_stencil)
   end if
 
-  if (scheme == transport_scheme_bip_cosmic .or. &
-      scheme == transport_scheme_yz_bip_cosmic .or. &
-      scheme == transport_scheme_cusph_cosmic) then
+  if (scheme == transport_scheme_yz_bip_cosmic .or. &
+      scheme == transport_scheme_horz_cosmic) then
     max_stencil_depth = max(max_stencil_depth,      &
                             dep_pt_stencil_extent + &
                             rho_approximation_stencil_extent)

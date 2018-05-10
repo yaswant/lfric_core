@@ -32,9 +32,6 @@ module conservative_flux_alg_mod
                                                invoke_conservative_fluxes,          &
                                                invoke_fv_mass_fluxes
   use flux_direction_mod,                only: x_direction, y_direction
-  use transport_config_mod,              only: scheme, &
-                                               transport_scheme_bip_cosmic, &
-                                               transport_scheme_cusph_cosmic
   use psykal_lite_mod,                   only: invoke_set_field_scalar
 
   implicit none

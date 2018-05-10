@@ -20,7 +20,7 @@ module runtime_constants_mod
   use formulation_config_mod,            only: transport_only, dlayer_on, &
                                                rotating
   use transport_config_mod,              only: scheme,                     &
-                                               transport_scheme_cusph_cosmic
+                                               transport_scheme_horz_cosmic
   use mixing_config_mod,                 only: smagorinsky
 
   ! Derived Types
@@ -185,7 +185,7 @@ contains
 
     !=================== Create cell orientation field ========================!
 
-    if ( transport_only .and. scheme == transport_scheme_cusph_cosmic ) then
+    if ( transport_only ) then
       temp_w2_field = field_type( vector_space = w2_fs )
       cell_orientation = field_type( vector_space = w3_fs )
       call invoke( setval_c(temp_w2_field,    9999.0_r_def), &
@@ -418,7 +418,7 @@ contains
   function get_cell_orientation() result(orientation)
     implicit none
     type(field_type), pointer :: orientation
-    if ( transport_only .and. scheme == transport_scheme_cusph_cosmic ) then
+    if ( transport_only ) then
       orientation => cell_orientation
     else
       call log_event( "Cell orientation variable has not been created", LOG_LEVEL_ERROR )

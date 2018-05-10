@@ -49,8 +49,7 @@ contains
                                            base_mesh_geometry_spherical,       &
                                            base_mesh_geometry_planar
     use transport_config_mod,        only: scheme,                             &
-                                           transport_scheme_bip_cosmic,        &
-                                           transport_scheme_cusph_cosmic,      &
+                                           transport_scheme_horz_cosmic,       &
                                            operators,                          &
                                            transport_operators_fv,             &
                                            consistent_metric
@@ -181,7 +180,7 @@ contains
         write( log_scratch_space, '(A)' ) 'Consistent metric option only valid for planar geometries'
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
       end if
-      if ( (scheme == transport_scheme_bip_cosmic .or. scheme == transport_scheme_cusph_cosmic) .and. &
+      if ( (scheme == transport_scheme_horz_cosmic) .and. &
             .not. transport_only ) then
         write( log_scratch_space, '(A)' ) 'COSMIC scheme only implemented for transport only algorithms'
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
