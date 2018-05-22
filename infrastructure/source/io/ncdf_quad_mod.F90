@@ -43,9 +43,13 @@ integer(i_def), parameter :: MESH_EDGE_NODES_RANK = 2  !< Rank of edge-node conn
 integer(i_def), parameter :: MESH_FACE_EDGES_RANK = 2  !< Rank of face-edge connectivity arrays
 integer(i_def), parameter :: MESH_FACE_LINKS_RANK = 2  !< Rank of face-face connectivity arrays
 integer(i_def), parameter :: MESH_MESH_LINKS_RANK = 2  !< Rank of mesh-mesh connectivity arrays
-integer(i_def), parameter :: MESH_NODE_X_RANK     = 1  !< Rank of node longitude coordinate array
-integer(i_def), parameter :: MESH_NODE_Y_RANK     = 1  !< Rank of node latitude  coordinate array
+integer(i_def), parameter :: MESH_NODE_X_RANK     = 1  !< Rank of node x coordinate array
+integer(i_def), parameter :: MESH_NODE_Y_RANK     = 1  !< Rank of node y coordinate array
+integer(i_def), parameter :: MESH_FACE_X_RANK     = 1  !< Rank of face x coordinate array
+integer(i_def), parameter :: MESH_FACE_Y_RANK     = 1  !< Rank of face y coordinate array
 
+! Note: For spherical coordinates x is equivalent to longitude
+!                                 y is equivalent to latitude
 
 !-------------------------------------------------------------------------------
 !> @brief   NetCDF quad file type
@@ -96,6 +100,8 @@ type, public, extends(ugrid_file_type) :: ncdf_quad_type
   integer(i_def) :: mesh_face_links_id   !< NetCDF-assigned ID for the face-face connectivity
   integer(i_def) :: mesh_node_x_id       !< NetCDF-assigned ID for node x-coordinates
   integer(i_def) :: mesh_node_y_id       !< NetCDF-assigned ID for node y-coordinates
+  integer(i_def) :: mesh_face_x_id       !< NetCDF-assigned ID for cell x-coordinates
+  integer(i_def) :: mesh_face_y_id       !< NetCDF-assigned ID for cell y-coordinates
 
   integer(i_def), allocatable :: mesh_mesh_links_id(:)
                                          !< NetCDF-assigned ID for the mesh-mesh connectivity
@@ -327,6 +333,8 @@ subroutine define_variables(self)
   integer(i_def) :: mesh_mesh_links_dims(MESH_MESH_LINKS_RANK)
   integer(i_def) :: mesh_node_x_dims(MESH_NODE_X_RANK)
   integer(i_def) :: mesh_node_y_dims(MESH_NODE_Y_RANK)
+  integer(i_def) :: mesh_face_x_dims(MESH_FACE_X_RANK)
+  integer(i_def) :: mesh_face_y_dims(MESH_FACE_Y_RANK)
 
   character(*), parameter :: routine = 'define_variables'
   character(str_long) :: cmess
@@ -389,6 +397,23 @@ subroutine define_variables(self)
   ierr = nf90_def_var( self%ncid, trim(var_name),       &
                        nf90_double, mesh_node_y_dims,   &
                        self%mesh_node_y_id )
+  call check_err(ierr, routine, cmess)
+
+
+  mesh_face_x_dims(1) = self%nmesh_faces_dim_id
+  var_name = trim(self%mesh_name)//'_face_x'
+  cmess = 'Defining '//trim(var_name)
+  ierr = nf90_def_var( self%ncid, trim(var_name),       &
+                       nf90_double, mesh_face_x_dims,   &
+                       self%mesh_face_x_id )
+  call check_err(ierr, routine, cmess)
+
+  mesh_face_y_dims(1) = self%nmesh_faces_dim_id
+  var_name = trim(self%mesh_name)//'_face_y'
+  cmess = 'Defining '//trim(var_name)
+  ierr = nf90_def_var( self%ncid, trim(var_name),       &
+                       nf90_double, mesh_face_y_dims,   &
+                       self%mesh_face_y_id )
   call check_err(ierr, routine, cmess)
 
   ! Define variables which this mesh maps to
@@ -516,6 +541,14 @@ subroutine assign_attributes(self)
   ierr = nf90_put_att( self%ncid, id, trim(attname),      &
                        trim(self%mesh_name)//'_node_x '// &
                        trim(self%mesh_name)//'_node_y' )
+  call check_err(ierr, routine, cmess)
+
+  attname = 'face_coordinates'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname),      &
+                       trim(self%mesh_name)//'_face_x '// &
+                       trim(self%mesh_name)//'_face_y' )
   call check_err(ierr, routine, cmess)
 
   attname = 'face_node_connectivity'
@@ -744,8 +777,74 @@ subroutine assign_attributes(self)
   ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units_y )
   call check_err(ierr, routine, cmess)
 
+
   !===================================================================
-  ! 7.0 Add attributes for mesh mesh link variables
+  ! 7.0 Add attributes for mesh face coordinate variables
+  !===================================================================
+  select case (trim(self%mesh_class))
+  case ('sphere')
+    std_x_name  = 'longitude'
+    std_y_name  = 'latitude'
+    long_x_name = 'longitude of 2D face centres'
+    long_y_name = 'latitude of 2D face centres'
+  case ('plane')
+    std_x_name  = 'projection_x_coordinate'
+    std_y_name  = 'projection_y_coordinate'
+    long_x_name = 'x coordinate of 2D face centres'
+    long_y_name = 'y coordinate of 2D face centres'
+  end select
+
+  id   = self%mesh_face_x_id
+  ierr = nf90_inquire_variable( ncid=self%ncid, varid=id, name=var_name )
+  write(cmess,'(A,I0)') 'Inquiring name of variable, id:',id
+  call check_err(ierr, routine, cmess)
+  !===================================================================
+  attname = 'standard_name'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), std_x_name )
+  call check_err(ierr, routine, cmess)
+
+  attname = 'long_name'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), long_x_name )
+  call check_err(ierr, routine, cmess)
+
+  attname = 'units'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units_x )
+  call check_err(ierr, routine, cmess)
+
+
+
+  id = self%mesh_face_y_id
+  ierr = nf90_inquire_variable( ncid=self%ncid, varid=id, name=var_name )
+  write(cmess,'(A,I0)') 'Inquiring name of variable, id:',id
+  call check_err(ierr, routine, cmess)
+  !===================================================================
+  attname = 'standard_name'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), std_y_name )
+  call check_err(ierr, routine, cmess)
+
+  attname = 'long_name'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), long_y_name )
+  call check_err(ierr, routine, cmess)
+
+  attname = 'units'
+  cmess   = 'Adding attribute "'//trim(attname)// &
+            '" to variable "'//trim(var_name)//'"'
+  ierr = nf90_put_att( self%ncid, id, trim(attname), coord_units_y )
+  call check_err(ierr, routine, cmess)
+
+
+  !===================================================================
+  ! 8.0 Add attributes for mesh mesh link variables
   !===================================================================
   if (allocated(self%mesh_mesh_links_id)) then
 
@@ -862,6 +961,19 @@ subroutine inquire_ids(self, mesh_name)
   cmess = 'Getting id for '//trim(var_name)
   ierr = nf90_inq_varid( self%ncid, trim(var_name), &
                          self%mesh_node_y_id )
+  call check_err(ierr, routine, cmess)
+
+  ! Face coordinates
+  var_name = trim(mesh_name)//'_face_x'
+  cmess = 'Getting id for '//trim(var_name)
+  ierr = nf90_inq_varid( self%ncid, trim(var_name), &
+                         self%mesh_face_x_id )
+  call check_err(ierr, routine, cmess)
+
+  var_name = trim(mesh_name)//'_face_y'
+  cmess = 'Getting id for '//trim(var_name)
+  ierr = nf90_inq_varid( self%ncid, trim(var_name), &
+                         self%mesh_face_y_id )
   call check_err(ierr, routine, cmess)
 
   ! Face node connectivity
@@ -1068,7 +1180,10 @@ end subroutine get_dimensions
 !>  @param[out]     mesh_class               Primitive class of mesh
 !>  @param[out]     constructor_inputs       Inputs to the ugrid_generator to
 !>                                           generate mesh
-!>  @param[out]     node_coordinates         long/lat coordinates of each node.
+!>  @param[out]     node_coordinates         Coordinates of each node.
+!>  @param[out]     face_coordinates         Coordinates of each face.
+!>  @param[out]     coord_units_x            Units of x coordinates.
+!>  @param[out]     coord_units_y            Units of y coordinates.
 !>  @param[out]     face_node_connectivity   Nodes adjoining each face.
 !>  @param[out]     edge_node_connectivity   Nodes adjoining each edge.
 !>  @param[out]     face_edge_connectivity   Edges adjoining each face.
@@ -1077,10 +1192,11 @@ end subroutine get_dimensions
 !>  @param[out]     target_mesh_names        Mesh(es) that this mesh has maps for
 !-------------------------------------------------------------------------------
 
-subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
-                      node_coordinates, coord_units_x, coord_units_y, &
-                      face_node_connectivity, edge_node_connectivity, &
-                      face_edge_connectivity, face_face_connectivity, &
+subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs, &
+                      node_coordinates, face_coordinates,              &
+                      coord_units_x, coord_units_y,                    &
+                      face_node_connectivity, edge_node_connectivity,  &
+                      face_edge_connectivity, face_face_connectivity,  &
                       num_targets, target_mesh_names )
   implicit none
 
@@ -1091,6 +1207,7 @@ subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
   character(str_def),  intent(out) :: mesh_class
   character(str_long), intent(out) :: constructor_inputs
   real(r_def),         intent(out) :: node_coordinates(:,:)
+  real(r_def),         intent(out) :: face_coordinates(:,:)
   character(str_def),  intent(out) :: coord_units_x
   character(str_def),  intent(out) :: coord_units_y
   integer(i_def),      intent(out) :: face_node_connectivity(:,:)
@@ -1144,14 +1261,23 @@ subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
     end do
   end if
 
+
+
+  ! Coordinate units
+  cmess = 'Getting x-coord units for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_att( self%ncid, self%mesh_node_x_id, "units", coord_units_x )
+  call check_err(ierr, routine, cmess)
+
+  cmess = 'Getting y-coord units for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_att( self%ncid, self%mesh_node_y_id, "units", coord_units_y )
+  call check_err(ierr, routine, cmess)
+
+
+
   ! Node coordinates
   cmess = 'Getting node x coords for mesh "'//trim(mesh_name)//'"'
   ierr = nf90_get_var( self%ncid, self%mesh_node_x_id, &
                        node_coordinates(1,:))
-  call check_err(ierr, routine, cmess)
-
-  cmess = 'Getting node x coords units for mesh "'//trim(mesh_name)//'"'
-  ierr = nf90_get_att( self%ncid, self%mesh_node_x_id, "units", coord_units_x )
   call check_err(ierr, routine, cmess)
 
   cmess = 'Getting node y coords for mesh "'//trim(mesh_name)//'"'
@@ -1159,9 +1285,20 @@ subroutine read_mesh( self, mesh_name, mesh_class, constructor_inputs,&
                        node_coordinates(2,:))
   call check_err(ierr, routine, cmess)
 
-  cmess = 'Getting node y coords units for mesh "'//trim(mesh_name)//'"'
-  ierr = nf90_get_att( self%ncid, self%mesh_node_y_id, "units", coord_units_y )
+
+
+  ! Face coordinates
+  cmess = 'Getting face x coords for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_var( self%ncid, self%mesh_face_x_id, &
+                       face_coordinates(1,:))
   call check_err(ierr, routine, cmess)
+
+  cmess = 'Getting face y coords for mesh "'//trim(mesh_name)//'"'
+  ierr = nf90_get_var( self%ncid, self%mesh_face_y_id, &
+                       face_coordinates(2,:))
+  call check_err(ierr, routine, cmess)
+
+
 
   ! Face node connectivity
   cmess = 'Getting face-node connectivity for mesh "'//trim(mesh_name)//'"'
@@ -1209,7 +1346,10 @@ end subroutine read_mesh
 !>  @param[in]      num_nodes                The number of nodes on the mesh.
 !>  @param[in]      num_edges                The number of edges on the mesh.
 !>  @param[in]      num_faces                The number of faces on the mesh.
-!>  @param[in]      node_coordinates         long/lat coordinates of each node.
+!>  @param[in]      node_coordinates         Coordinates of each node.
+!>  @param[in]      face_coordinates         Coordinates of each face.
+!>  @param[in]      coord_units_x            Units of x coordinates.
+!>  @param[in]      coord_units_y            Units of y coordinates.
 !>  @param[in]      face_node_connectivity   Nodes adjoining each face.
 !>  @param[in]      edge_node_connectivity   Nodes adjoining each edge.
 !>  @param[in]      face_edge_connectivity   Edges adjoining each face.
@@ -1221,7 +1361,8 @@ end subroutine read_mesh
 
 subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
                        num_nodes, num_edges, num_faces,                   &
-                       node_coordinates, coord_units_x, coord_units_y,    &
+                       node_coordinates, face_coordinates,                &
+                       coord_units_x, coord_units_y,                      &
                        face_node_connectivity, edge_node_connectivity,    &
                        face_edge_connectivity, face_face_connectivity,    &
                        num_targets, target_mesh_names, target_mesh_maps )
@@ -1237,6 +1378,7 @@ subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
   integer(i_def),      intent(in) :: num_edges
   integer(i_def),      intent(in) :: num_faces
   real(r_def),         intent(in) :: node_coordinates(:,:)
+  real(r_def),         intent(in) :: face_coordinates(:,:)
   character(str_def),  intent(in) :: coord_units_x
   character(str_def),  intent(in) :: coord_units_y
   integer(i_def),      intent(in) :: face_node_connectivity(:,:)
@@ -1307,6 +1449,15 @@ subroutine write_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
 
   cmess = 'Writing node y-coords for mesh, "'//trim(mesh_name)//'"'
   ierr = nf90_put_var( self%ncid, self%mesh_node_y_id, node_coordinates(2,:) )
+  call check_err(ierr, routine, cmess)
+
+  ! Face coordinates
+  cmess = 'Writing face x-coords for mesh, "'//trim(mesh_name)//'"'
+  ierr = nf90_put_var( self%ncid, self%mesh_face_x_id, face_coordinates(1,:) )
+  call check_err(ierr, routine, cmess)
+
+  cmess = 'Writing face y-coords for mesh, "'//trim(mesh_name)//'"'
+  ierr = nf90_put_var( self%ncid, self%mesh_face_y_id, face_coordinates(2,:) )
   call check_err(ierr, routine, cmess)
 
   ! Face node connectivity
@@ -1407,7 +1558,10 @@ end function is_mesh_present
 !>  @param[in]      num_nodes                The number of nodes on the mesh.
 !>  @param[in]      num_edges                The number of edges on the mesh.
 !>  @param[in]      num_faces                The number of faces on the mesh.
-!>  @param[in]      node_coordinates         long/lat coordinates of each node.
+!>  @param[in]      node_coordinates         Coordinates of each node.
+!>  @param[in]      face_coordinates         Coordinates of each face.
+!>  @param[in]      coord_units_x            Units of x coordinates.
+!>  @param[in]      coord_units_y            Units of y coordinates.
 !>  @param[in]      face_node_connectivity   Nodes adjoining each face.
 !>  @param[in]      edge_node_connectivity   Nodes adjoining each edge.
 !>  @param[in]      face_edge_connectivity   Edges adjoining each face.
@@ -1417,7 +1571,8 @@ end function is_mesh_present
 !>  @param[in]      target_mesh_maps         Mesh maps from this mesh to target mesh(es)
 !-------------------------------------------------------------------------------
 subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
-                        num_nodes, num_edges, num_faces, node_coordinates, &
+                        num_nodes, num_edges, num_faces,                   &
+                        node_coordinates, face_coordinates,                &
                         coord_units_x, coord_units_y,                      &
                         face_node_connectivity, edge_node_connectivity,    &
                         face_edge_connectivity, face_face_connectivity,    &
@@ -1433,6 +1588,7 @@ subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
   integer(i_def),        intent(in)    :: num_edges
   integer(i_def),        intent(in)    :: num_faces
   real(r_def),           intent(in)    :: node_coordinates(:,:)
+  real(r_def),           intent(in)    :: face_coordinates(:,:)
   character(str_def),    intent(in)    :: coord_units_x
   character(str_def),    intent(in)    :: coord_units_y
   integer(i_def),        intent(in)    :: face_node_connectivity(:,:)
@@ -1472,6 +1628,7 @@ subroutine append_mesh( self, mesh_name, mesh_class, constructor_inputs,   &
       num_edges  = num_edges,                          &
       num_faces  = num_faces,                          &
       node_coordinates = node_coordinates,             &
+      face_coordinates = face_coordinates,             &
       coord_units_x    = coord_units_x,                &
       coord_units_y    = coord_units_y,                &
       face_node_connectivity = face_node_connectivity, &

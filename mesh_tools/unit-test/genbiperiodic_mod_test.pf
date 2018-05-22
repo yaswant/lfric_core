@@ -35,6 +35,7 @@ module genbiperiodic_mod_test
     integer(i_def), allocatable :: edges_on_face(:,:)
     integer(i_def), allocatable :: nodes_on_edge(:,:)
     real(r_def),    allocatable :: coords(:,:)
+    real(r_def),    allocatable :: face_coords(:,:)
   contains
     procedure setUp
     procedure tearDown
@@ -68,6 +69,7 @@ contains
     allocate( this%edges_on_face(4, edge_cells_x*edge_cells_y) )
     allocate( this%nodes_on_edge(2, 2*edge_cells_x*edge_cells_y) )
     allocate( this%coords(2, edge_cells_x*edge_cells_y) )
+    allocate( this%face_coords(2, edge_cells_x*edge_cells_y) )
 
   end subroutine setUp
 
@@ -83,6 +85,7 @@ contains
     deallocate( this%edges_on_face )
     deallocate( this%nodes_on_edge )
     deallocate( this%coords )
+    deallocate( this%face_coords )
 
   end subroutine tearDown
 
@@ -171,8 +174,8 @@ contains
                                 this%edges_on_face, this%faces_on_face)
 
     ! Mesh has expected vertex values on certain faces
-    @assertEqual(this%nodes_on_face(:,1), (/ 1,2,3,4 /), "Incorrect vertex sequence on faces.")
-    @assertEqual(this%nodes_on_face(:,20), (/ 9,4,17,20 /), "Incorrect vertex sequence on faces.")
+    @assertEqual(this%nodes_on_face(:,1),  (/  1, 2,  3,  4 /), "Incorrect vertex sequence on faces.")
+    @assertEqual(this%nodes_on_face(:,20), (/ 10, 4, 16, 20 /), "Incorrect vertex sequence on faces.")
 
     ! Mesh connectivity is complete
     @assertTrue(minval(this%faces_on_face, 2) /= 0, "Incomplete faces_on_face connectivity.")
@@ -181,21 +184,28 @@ contains
     @assertTrue(minval(this%nodes_on_edge, 2) /= 0, "Incomplete nodes_on_edge connectivity.")
 
     ! Mesh connectivity has expected values at certain points
-    @assertEqual(this%faces_on_face(:,1), (/ 5,6,2,16 /), "Incorrect faces_on_face connectivity.")
-    @assertEqual(this%faces_on_face(:,11), (/ 15,16,12,6 /), "Incorrect faces_on_face connectivity.")
+    @assertEqual(this%faces_on_face(:,1),  (/  5,  6,  2, 16 /), "Incorrect faces_on_face connectivity.")
+    @assertEqual(this%faces_on_face(:,11), (/ 15, 16, 12,  6 /), "Incorrect faces_on_face connectivity.")
 
-    @assertEqual(this%edges_on_face(:,1), (/ 14,3,2,1 /), "Incorrect edges_on_face connectivity.")
-    @assertEqual(this%edges_on_face(:,20), (/ 39,13,40,35 /), "Incorrect edges_on_face connectivity.")
+    @assertEqual(this%edges_on_face(:,1),  (/  1,  2,  3,  4 /), "Incorrect edges_on_face connectivity.")
+    @assertEqual(this%edges_on_face(:,20), (/ 40, 15, 36, 35 /), "Incorrect edges_on_face connectivity.")
 
-    @assertEqual(this%nodes_on_edge(:,1), (/ 4,3 /), "Incorrect nodes_on_edge connectivity.")
-    @assertEqual(this%nodes_on_edge(:,40), (/ 17,4 /), "Incorrect nodes_on_edge connectivity.")
+    @assertEqual(this%nodes_on_edge(:,1),  (/  4,  1 /), "Incorrect nodes_on_edge connectivity.")
+    @assertEqual(this%nodes_on_edge(:,40), (/ 20, 10 /), "Incorrect nodes_on_edge connectivity.")
 
     ! Retrieve mesh coordinates
-    call bpgen%get_coordinates(this%coords, test_coord_units_x, test_coord_units_y)
+    call bpgen%get_coordinates( this%coords,        &
+                                this%face_coords,   &
+                                test_coord_units_x, &
+                                test_coord_units_y )
 
     ! Mesh coordinates have expected values at certain points
-    @assertTrue(this%coords(:,1) == (/ -12000.0_r_def, 4000.0_r_def /), "Incorrect mesh coordinates.")
-    @assertTrue(this%coords(:,20) == (/ 12000.0_r_def, 0.0_r_def /), "Incorrect mesh coordinates.")
+    @assertTrue(this%coords(:,1)  == (/ -12000.0_r_def,  2000.0_r_def /), "Incorrect mesh coordinates.")
+    @assertTrue(this%coords(:,20) == (/  12000.0_r_def, -2000.0_r_def /), "Incorrect mesh coordinates.")
+
+    ! Cell coordinates have expected values at certain points
+    @assertTrue(this%face_coords(:,1)  == (/  -9000.0_r_def,  3000.0_r_def /), "Incorrect cell coordinates.")
+    @assertTrue(this%face_coords(:,20) == (/  15000.0_r_def, -3000.0_r_def /), "Incorrect cell coordinates.")
 
     @assertTrue( trim(test_coord_units_x) == 'm')
     @assertTrue( trim(test_coord_units_y) == 'm')

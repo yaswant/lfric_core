@@ -56,6 +56,7 @@ type, public :: ugrid_2d_type
 
   ! Coordinates
   real(r_def), allocatable :: node_coordinates(:,:) !< Coordinates of nodes
+  real(r_def), allocatable :: face_coordinates(:,:) !< Coordinates of faces
 
   ! Connectivity
   integer(i_def), allocatable :: face_node_connectivity(:,:) !< Nodes belonging to each face
@@ -88,6 +89,7 @@ contains
   procedure :: get_metadata
   procedure :: get_coord_units
   procedure :: get_node_coords
+  procedure :: get_face_coords
   procedure :: get_node_coords_transpose
   procedure :: get_face_node_connectivity
   procedure :: get_face_edge_connectivity
@@ -226,6 +228,8 @@ subroutine allocate_arrays(self, generator_strategy)
 
   if ( allocated( self%node_coordinates ) )       &
                                      deallocate( self%node_coordinates )
+  if ( allocated( self%face_coordinates ) )       &
+                                     deallocate( self%face_coordinates )
 
   if ( allocated( self%edge_node_connectivity ) ) &
                                      deallocate( self%edge_node_connectivity )
@@ -240,7 +244,8 @@ subroutine allocate_arrays(self, generator_strategy)
                                      deallocate( self%face_face_connectivity )
 
 
-  allocate(self%node_coordinates(1:2, self%num_nodes))
+  allocate(self%node_coordinates(2, self%num_nodes))
+  allocate(self%face_coordinates(2, self%num_faces))
   allocate(self%edge_node_connectivity(self%num_nodes_per_edge, self%num_edges))
   allocate(self%face_node_connectivity(self%num_nodes_per_face, self%num_faces))
   allocate(self%face_edge_connectivity(self%num_edges_per_face, self%num_faces))
@@ -273,6 +278,8 @@ subroutine allocate_arrays_for_file(self)
 
   if ( allocated( self%node_coordinates ) )       &
                                      deallocate( self%node_coordinates )
+  if ( allocated( self%face_coordinates ) )       &
+                                     deallocate( self%face_coordinates )
 
   if ( allocated( self%edge_node_connectivity ) ) &
                                      deallocate( self%edge_node_connectivity )
@@ -286,7 +293,8 @@ subroutine allocate_arrays_for_file(self)
   if ( allocated( self%face_face_connectivity ) ) &
                                      deallocate( self%face_face_connectivity )
 
-  allocate(self%node_coordinates(1:2, self%num_nodes))
+  allocate(self%node_coordinates(2, self%num_nodes))
+  allocate(self%face_coordinates(2, self%num_faces))
 
   allocate(self%edge_node_connectivity(self%num_nodes_per_edge, self%num_edges))
   allocate(self%face_node_connectivity(self%num_nodes_per_face, self%num_faces))
@@ -333,8 +341,9 @@ subroutine set_by_generator(self, generator_strategy)
 
   call generator_strategy%get_coordinates         &
       ( node_coordinates = self%node_coordinates, &
+        cell_coordinates = self%face_coordinates, &
         coord_units_x    = self%coord_units_x,    &
-        coord_units_y    = self%coord_units_y     )
+        coord_units_y    = self%coord_units_y )
 
   call generator_strategy%get_connectivity                    &
       ( face_node_connectivity = self%face_node_connectivity, &
@@ -411,6 +420,7 @@ subroutine set_from_file_read(self, mesh_name, filename)
       mesh_class             = self%mesh_class,             &
       constructor_inputs     = self%constructor_inputs,     &
       node_coordinates       = self%node_coordinates,       &
+      face_coordinates       = self%face_coordinates,       &
       coord_units_x          = self%coord_units_x,          &
       coord_units_y          = self%coord_units_y,          &
       face_node_connectivity = self%face_node_connectivity, &
@@ -454,6 +464,7 @@ subroutine write_to_file(self, filename)
        num_edges              = self%num_edges,              &
        num_faces              = self%num_faces,              &
        node_coordinates       = self%node_coordinates,       &
+       face_coordinates       = self%face_coordinates,       &
        coord_units_x          = self%coord_units_x,          &
        coord_units_y          = self%coord_units_y,          &
        face_node_connectivity = self%face_node_connectivity, &
@@ -470,6 +481,14 @@ subroutine write_to_file(self, filename)
   return
 end subroutine write_to_file
 
+!-------------------------------------------------------------------------------
+!> @brief   Appends stored ugrid information to existing ugrid data file.
+!> @details Calls back to the file handler strategy (component) in order to
+!>          read the ugrid_2d_type mesh data and populate the file_handlers 
+!>          internal arrays which the file handler will append to the ugrid file.
+!>
+!> @param[in,out] self  The calling ugrid object.
+!-------------------------------------------------------------------------------
 
 subroutine append_to_file(self, filename)
 
@@ -491,6 +510,7 @@ subroutine append_to_file(self, filename)
        num_edges              = self%num_edges,              &
        num_faces              = self%num_faces,              &
        node_coordinates       = self%node_coordinates,       &
+       face_coordinates       = self%face_coordinates,       &
        coord_units_x          = self%coord_units_x,          &
        coord_units_y          = self%coord_units_y,          &
        face_node_connectivity = self%face_node_connectivity, &
@@ -587,6 +607,31 @@ subroutine get_node_coords(self, node_coords)
 
   return
 end subroutine get_node_coords
+
+
+!-------------------------------------------------------------------------------
+!> @brief   Gets face coordinates with ugrid array index ordering.
+!> @details Returns a rank-two array of node coordinates, with the
+!>          coordinate dimension index innermost, and the face number
+!>          outermost. Format: [long, lat].
+!>
+!> @param[in]   self        The calling ugrid object.
+!> @return      face_coords Face coordinate array.
+!-------------------------------------------------------------------------------
+
+function get_face_coords(self) result(face_coords)
+
+  implicit none
+
+  class(ugrid_2d_type), intent(in)  :: self
+
+  real(r_def), allocatable :: face_coords(:,:)
+
+  face_coords = self%face_coordinates(:,:)
+
+  return
+end function get_face_coords
+
 
 !-------------------------------------------------------------------------------
 !> @brief   Gets node coordinates with transposed ugrid array index ordering.
@@ -819,6 +864,7 @@ subroutine clear(self)
   class (ugrid_2d_type), intent(inout) :: self
 
   if (allocated(self%node_coordinates))       deallocate( self%node_coordinates )
+  if (allocated(self%face_coordinates))       deallocate( self%face_coordinates )
   if (allocated(self%face_node_connectivity)) deallocate( self%face_node_connectivity )
   if (allocated(self%edge_node_connectivity)) deallocate( self%edge_node_connectivity )
   if (allocated(self%face_edge_connectivity)) deallocate( self%face_edge_connectivity )

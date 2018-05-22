@@ -32,10 +32,7 @@
   dry_static_adjust    = .false.
   set_hydrostatic_init = .false. 
   init_exner_bt        = .false.
-  no_u_update          = .false.
-  no_v_update          = .false.
   hard_wired_j         = .true.
-  use_pointwise_jac    = .false.
 /
 
 &idealised

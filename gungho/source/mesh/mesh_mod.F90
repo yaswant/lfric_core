@@ -506,7 +506,8 @@ contains
     ! Get global ids of all vertices on partition, by looping over the
     ! cell-vertex connectivity on the partition.
     allocate( tmp_list(max_num_vertices_2d) )
-    allocate( vert_on_cell_2d (self%nverts_per_2d_cell, self%ncells_2d_with_ghost) )
+    allocate( vert_on_cell_2d ( self%nverts_per_2d_cell, &
+                                self%ncells_2d_with_ghost ) )
 
     n_uniq_verts = 0
 
@@ -607,6 +608,7 @@ contains
       vert_gid = vert_lid_gid_map(i)
       call global_mesh%get_vert_coords(vert_gid,vertex_coords_2d(:,i))
     end do
+
     ! Set base surface height
     call set_base_z(vertex_coords_2d, n_uniq_verts)
 
@@ -747,6 +749,7 @@ contains
                       npanels,                                              &
                       self%ncells_global_mesh,                              &
                       gid_from_lid(:) )
+
     call init_last_cell_per_colour(self)
 
     if (allocated( verts) )        deallocate(verts)
@@ -818,7 +821,7 @@ contains
     real(r_def),      intent(out) :: vertex_coords(:)
 
     vertex_coords(:) = self%vertex_coords(:,vert_lid)
-
+    
   end subroutine get_vert_coords
 
 

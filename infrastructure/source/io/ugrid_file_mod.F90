@@ -68,6 +68,8 @@ abstract interface
 
     import :: ugrid_file_type, i_def, str_def
 
+    implicit none
+
     ! Arguments
     class(ugrid_file_type), intent(inout) :: self
 
@@ -92,6 +94,8 @@ abstract interface
 
     import :: ugrid_file_type, i_def
 
+    implicit none
+
     ! Arguments
     class(ugrid_file_type),   intent(in)  :: self
     character(len=*),         intent(out) :: mesh_names(:)
@@ -107,6 +111,8 @@ abstract interface
   function get_nmeshes_interface( self ) result( nmeshes )
 
     import :: ugrid_file_type, i_def
+
+    implicit none
 
     ! Arguments
     class(ugrid_file_type), intent(in)  :: self
@@ -124,6 +130,9 @@ abstract interface
   !> @param[out]    constructor_inputs     Inputs to the ugrid_generator used to
   !>                                       create the mesh
   !> @param[out]    node_coordinates       Node coordinates
+  !> @param[out]    face_coordinates       Face coordinates
+  !> @param[out]    coord_units_x          Units for x-coord
+  !> @param[out]    coord_units_y          Units for y-coord
   !> @param[out]    face_node_connectivity Nodes around each face
   !> @param[out]    edge_node_connectivity Nodes defining each edge
   !> @param[out]    face_edge_connectivity Edges bounding each face
@@ -132,16 +141,20 @@ abstract interface
   !> @param[out]    target_mesh_names      Mesh(es) that this mesh has maps for
   !-----------------------------------------------------------------------------
 
-  subroutine read_mesh_interface( self, mesh_name, mesh_class,          &
-                                  constructor_inputs, node_coordinates, &
-                                  coord_units_x, coord_units_y,         &
-                                  face_node_connectivity,               &
-                                  edge_node_connectivity,               &
-                                  face_edge_connectivity,               &
-                                  face_face_connectivity,               &
+  subroutine read_mesh_interface( self, mesh_name, mesh_class, &
+                                  constructor_inputs,          &
+                                  node_coordinates,            &
+                                  face_coordinates,            &
+                                  coord_units_x, coord_units_y,&
+                                  face_node_connectivity,      &
+                                  edge_node_connectivity,      &
+                                  face_edge_connectivity,      &
+                                  face_face_connectivity,      &
                                   num_targets, target_mesh_names )
 
     import :: ugrid_file_type, i_def, r_def, str_def, str_long
+
+    implicit none
 
     ! Arguments
     class(ugrid_file_type), intent(inout) :: self
@@ -151,6 +164,7 @@ abstract interface
     character(str_long), intent(out) :: constructor_inputs
 
     real(r_def),        intent(out) :: node_coordinates(:,:)
+    real(r_def),        intent(out) :: face_coordinates(:,:)
     character(str_def), intent(out) :: coord_units_x
     character(str_def), intent(out) :: coord_units_y
     integer(i_def),     intent(out) :: face_node_connectivity(:,:)
@@ -173,6 +187,9 @@ abstract interface
   !> @param[in]      num_edges               Number of edges
   !> @param[in]      num_faces               Number of faces
   !> @param[in]      node_coordinates        Node coordinates
+  !> @param[in]      face_coordinates        Face coordinates
+  !> @param[in]      coord_units_x           Units for x-coord
+  !> @param[in]      coord_units_y           Units for y-coord
   !> @param[in]      face_node_connectivity  Nodes around each face
   !> @param[in]      edge_node_connectivity  Nodes defining each edge
   !> @param[in]      face_edge_connectivity  Edges bounding each face
@@ -186,6 +203,7 @@ abstract interface
                                    constructor_inputs,              &
                                    num_nodes, num_edges, num_faces, &
                                    node_coordinates,                &
+                                   face_coordinates,                &
                                    coord_units_x,                   &
                                    coord_units_y,                   &
                                    face_node_connectivity,          &
@@ -199,6 +217,8 @@ abstract interface
     import :: ugrid_file_type, i_def, r_def, str_def, str_long, &
               global_mesh_map_collection_type
 
+    implicit none
+
     ! Arguments
     class(ugrid_file_type), intent(inout) :: self
 
@@ -209,6 +229,7 @@ abstract interface
     integer(i_def),      intent(in) :: num_edges
     integer(i_def),      intent(in) :: num_faces
     real(r_def),         intent(in) :: node_coordinates(:,:)
+    real(r_def),         intent(in) :: face_coordinates(:,:)
     character(str_def),  intent(in) :: coord_units_x
     character(str_def),  intent(in) :: coord_units_y
     integer(i_def),      intent(in) :: face_node_connectivity(:,:)
@@ -233,6 +254,8 @@ abstract interface
   function is_mesh_present_interface(self, mesh_name) result(answer)
 
     import :: ugrid_file_type, l_def, str_def
+
+    implicit none
 
     class(ugrid_file_type), intent(in) :: self
     character(str_def),     intent(in) :: mesh_name

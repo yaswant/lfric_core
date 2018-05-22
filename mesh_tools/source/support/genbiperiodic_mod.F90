@@ -63,11 +63,14 @@ module genbiperiodic_mod
     integer(i_def), allocatable :: edges_on_cell(:,:) ! (4, edge_cells_x*edge_cells_y)
     integer(i_def), allocatable :: verts_on_edge(:,:) ! (2, edge_cells_x*edge_cells_y)
     real(r_def),    allocatable :: vert_coords(:,:)   ! (2, edge_cells_x*edge_cells_y)
+    real(r_def),    allocatable :: cell_coords(:,:)   ! (2, edge_cells_x*edge_cells_y)
+
   contains
     procedure :: calc_adjacency
     procedure :: calc_face_to_vert
     procedure :: calc_edges
     procedure :: calc_coords
+    procedure :: calc_cell_centres
     procedure :: generate
     procedure :: get_metadata
     procedure :: get_dimensions
@@ -135,9 +138,10 @@ function genbiperiodic_constructor( mesh_name,                  &
 
   integer(i_def) ::i
 
-  integer(i_def) :: remainder=0
+  integer(i_def) :: remainder = 0_i_def
 
-  if (edge_cells_x < 2 .or. edge_cells_y < 2) then
+  if ( edge_cells_x < 2 .or. &
+       edge_cells_y < 2 ) then
     call log_event( PREFIX//"Invalid dimension argument.", LOG_LEVEL_ERROR )
   end if
 
@@ -146,7 +150,7 @@ function genbiperiodic_constructor( mesh_name,                  &
   self%edge_cells_x = edge_cells_x
   self%edge_cells_y = edge_cells_y
   self%npanels      = NPANELS
-  self%nmaps        = 0
+  self%nmaps        = 0_i_def
 
   if (domain_x < 0.0_r_def)                                               &
       call log_event( PREFIX//" x-domain argument must be non-negative.", &
@@ -211,7 +215,7 @@ function genbiperiodic_constructor( mesh_name,                  &
                self%edge_cells_x, ']'
         end if
 
-        if (remainder == 0) then
+        if (remainder == 0_i_def) then
           self%target_edge_cells_x(i) = target_edge_cells_x(i)
         else
           call log_event( trim(log_scratch_space), LOG_LEVEL_ERROR )
@@ -232,7 +236,7 @@ function genbiperiodic_constructor( mesh_name,                  &
                self%edge_cells_y, ']'
         end if
 
-        if (remainder == 0) then
+        if (remainder == 0_i_def) then
           self%target_edge_cells_y(i) = target_edge_cells_y(i)
         else
           call log_event( trim(log_scratch_space), LOG_LEVEL_ERROR )
@@ -303,7 +307,7 @@ subroutine calc_adjacency(self, cell_next)
 
   allocate(cell_next(4, ncells), stat=astat)
 
-  if (astat /= 0)                                               &
+  if (astat /= 0_i_def)                                         &
       call log_event( PREFIX//"Failure to allocate cell_next.", &
                       LOG_LEVEL_ERROR )
 
@@ -353,6 +357,8 @@ subroutine calc_face_to_vert(self, verts_on_cell)
   integer(i_def) :: edge_cells_x, edge_cells_y, ncells
   integer(i_def) :: y, vert, cell, nxf, astat
 
+
+
   edge_cells_x = self%edge_cells_x
   edge_cells_y = self%edge_cells_y
   ncells = self%edge_cells_x * self%edge_cells_y
@@ -381,8 +387,8 @@ subroutine calc_face_to_vert(self, verts_on_cell)
 
   ! First row
   do cell = 2, edge_cells_x-1
-    verts_on_cell(NE, cell) = nxf
-    verts_on_cell(SE, cell) = nxf+1
+    verts_on_cell(SE, cell) = nxf
+    verts_on_cell(NE, cell) = nxf+1
     nxf = nxf + 2
 
     ! East neighbour
@@ -398,8 +404,8 @@ subroutine calc_face_to_vert(self, verts_on_cell)
   do y = 1, edge_cells_y-2
     ! First cell in row
     cell = y*edge_cells_x+1
-    verts_on_cell(SE, cell) = nxf
-    verts_on_cell(SW, cell) = nxf+1
+    verts_on_cell(SW, cell) = nxf
+    verts_on_cell(SE, cell) = nxf+1
     nxf = nxf+2
 
     ! South neighbour
@@ -416,6 +422,7 @@ subroutine calc_face_to_vert(self, verts_on_cell)
       verts_on_cell(NW, self%cell_next(S, cell)) = verts_on_cell(SW, cell)
       verts_on_cell(NE, self%cell_next(S, cell)) = verts_on_cell(SE, cell)
     end do
+
     ! Special case at end of row for odd edge_cells_x
     if (mod(edge_cells_x, 2) == 1) then
       cell = (y+1)*edge_cells_x
@@ -479,6 +486,8 @@ end subroutine calc_face_to_vert
 !>                             the edges found on each cell.
 !> @param[out]  verts_on_edge  A rank-2 (2,2*ncells)-sized integer array
 !>                             of the vertices found on each edge.
+!>                             Vertex IDs listed with nearest vertex to
+!>                             NW corner.
 !-------------------------------------------------------------------------------
 subroutine calc_edges(self, edges_on_cell, verts_on_edge)
 
@@ -510,61 +519,285 @@ subroutine calc_edges(self, edges_on_cell, verts_on_edge)
       call log_event( PREFIX//"Failure to allocate verts_on_edge.", &
                       LOG_LEVEL_ERROR )
 
-  ! Top row
-  do cell = 1, edge_cells_x
-    ! Top edge
-    verts_on_edge(1, nxf) = self%verts_on_cell(NW, cell)
-    verts_on_edge(2, nxf) = self%verts_on_cell(NE, cell)
-    edges_on_cell(N, cell) = nxf
-    ! Right edge
-    verts_on_edge(1, nxf+1) = self%verts_on_cell(NE, cell)
-    verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
-    edges_on_cell(E, cell) = nxf+1
-    ! Bottom edge
-    verts_on_edge(1, nxf+2) = self%verts_on_cell(SE, cell)
-    verts_on_edge(2, nxf+2) = self%verts_on_cell(SW, cell)
-    edges_on_cell(S, cell) = nxf+2
-    nxf = nxf+3
+
+  ! The assumed working layout for the folowing code with respect to 
+  ! cell/panel is
+  !
+  ! ID Origin     Top (North)
+  !    (NW) O--------------------O (NE)
+  !         |                    +
+  !         |   edge/vertex id   +
+  !         |  + anti-clockwise  +
+  !   Left  |   \   Numbering    + Right 
+  !  (West) |    \               + (East)
+  !         |     +------->      +
+  !         |                    +
+  !         |                    +
+  !    (SE) O+-+-+-+-+-+-+-+-+-+-O (SE)
+  !             Bottom (South)
+  !
+  ! This is a 2D grid, and compass points are used to orientate
+  ! around the panel/cell. (top, left, right, bottom) could
+  ! have been used, though top and bottom could have been
+  ! confused with 3D cells. However, for readability,
+  ! the terms (left, bottom, top, right) are used interchangably
+  ! with the cardinal compass directions in the above diagram.
+  ! It should also be noted that the cardinal compass directions
+  ! are only used as an alternative way to reference the elements
+  ! on the the panel/cells, i.e. the Top (North) edge of a cell
+  ! may not actually be aligned in the same direction as geographic
+  ! north.
+  !
+  ! When considered as a panel, the Eastern and Southern edges
+  ! are taken as the `ghost` edges/vertices in the case of any
+  ! periodicity.
+  !  
+  ! So that vertices on edges are consistent, listed vertices
+  ! connected to edges will go from N-S, or W-E.
+
+  !--------------------------------------------
+  ! Top panel row, cell@left panel edge (ID:1)
+  !--------------------------------------------
+  ! Cell western edge
+  edges_on_cell(W, cell)  = nxf
+  verts_on_edge(1, nxf)   = self%verts_on_cell(NW, cell)
+  verts_on_edge(2, nxf)   = self%verts_on_cell(SW, cell)
+
+
+  ! Cell southern edge
+  edges_on_cell(S, cell)  = nxf+1
+  verts_on_edge(1, nxf+1) = self%verts_on_cell(SW, cell)
+  verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
+
+
+  ! Cell eastern edge
+  edges_on_cell(E, cell)  = nxf+2
+  verts_on_edge(1, nxf+2) = self%verts_on_cell(NE, cell)
+  verts_on_edge(2, nxf+2) = self%verts_on_cell(SE, cell)
+
+
+  ! Cell northern edge
+  edges_on_cell(N, cell)  = nxf+3
+  verts_on_edge(1, nxf+3) = self%verts_on_cell(NW, cell)
+  verts_on_edge(2, nxf+3) = self%verts_on_cell(NE, cell)
+
+  nxf = nxf+4
+
+
+  !-----------------------------------------------------------
+  ! Top panel row, remaining cells, i.e. IDs = 2:edge_cells_x
+  !-----------------------------------------------------------
+  do cell = 2, edge_cells_x
+
+    ! Cell western edge
+    edges_on_cell(W, cell) = edges_on_cell(E,self%cell_next(W,cell))
+
+    ! Cell southern edge
+    edges_on_cell(S, cell) = nxf
+    verts_on_edge(1, nxf)  = self%verts_on_cell(SW, cell)
+    verts_on_edge(2, nxf)  = self%verts_on_cell(SE, cell)
+
+
+    if (cell ==  edge_cells_x) then
+      ! This cell is on the right-hand edge of the panel.
+
+      ! For a biperiodic panel, if the cell is on the right-hand edge
+      ! of the panel then the cell's eastern neighbour is actually
+      ! the left-most cell on this row (because of the periodicity).
+      ! At this point, left-most cell on this row has already
+      ! had its edge ids assigned.
+ 
+      ! In other words, the eastern edge of this cell exists on
+      ! another cell where it has already been assigned an id. 
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell)  = edges_on_cell(W,self%cell_next(E,cell))
+
+      ! Cell northern edge
+      edges_on_cell(N, cell)  = nxf+1
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(NW, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(NE, cell)
+
+      nxf = nxf+2
+
+    else 
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell)  = nxf+1
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
+
+
+      ! Cell northern edge
+      edges_on_cell(N, cell)  = nxf+2
+      verts_on_edge(1, nxf+2) = self%verts_on_cell(NW, cell)
+      verts_on_edge(2, nxf+2) = self%verts_on_cell(NE, cell)
+
+      nxf = nxf+3
+    end if
+  
   end do
 
-  ! Inner rows
+  !-----------------------------------------
+  ! Internal panel rows
+  !-----------------------------------------
   do cell = edge_cells_x+1, ncells-edge_cells_x
-    ! Right edge
-    verts_on_edge(1, nxf) = self%verts_on_cell(NE, cell)
-    verts_on_edge(2, nxf) = self%verts_on_cell(SE, cell)
-    edges_on_cell(E, cell) = nxf
-    ! Bottom edge
-    verts_on_edge(1, nxf+1) = self%verts_on_cell(SE, cell)
-    verts_on_edge(2, nxf+1) = self%verts_on_cell(SW, cell)
-    edges_on_cell(S, cell) = nxf+1
-    nxf = nxf+2
-  end do
 
-  ! Bottom row
+    if (mod(cell,edge_cells_x) == 1) then
+      ! This cell is on the left-hand panel edge
+      !-------------------------------------------
+
+      ! Cell western edge
+      edges_on_cell(W, cell)  = nxf
+      verts_on_edge(1, nxf)   = self%verts_on_cell(NW, cell)
+      verts_on_edge(2, nxf)   = self%verts_on_cell(SW, cell)
+
+
+      ! Cell southern edge
+      edges_on_cell(S, cell)  = nxf+1
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(SW, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
+
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell)  = nxf+2
+      verts_on_edge(1, nxf+2) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf+2) = self%verts_on_cell(SE, cell)
+
+      nxf = nxf+3
+
+    else if (mod(cell,edge_cells_x) == 0) then
+      ! This cell is on the right-hand panel edge
+      !--------------------------------------------
+
+      ! Cell western edge
+      edges_on_cell(W, cell) = edges_on_cell(E,self%cell_next(W,cell))
+
+      ! Cell southern edge
+      edges_on_cell(S, cell) = nxf
+      verts_on_edge(1, nxf)  = self%verts_on_cell(SW, cell)
+      verts_on_edge(2, nxf)  = self%verts_on_cell(SE, cell)
+
+      nxf=nxf+1
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell) = edges_on_cell(W,self%cell_next(E,cell))
+
+    else
+      ! This cell is internal to the panel
+      !-------------------------------------------
+
+      ! Cell western edge
+      edges_on_cell(W, cell) = edges_on_cell(E,self%cell_next(W,cell))
+
+      ! Cell southern edge
+      edges_on_cell(S, cell) = nxf
+      verts_on_edge(1, nxf)  = self%verts_on_cell(SW, cell)
+      verts_on_edge(2, nxf)  = self%verts_on_cell(SE, cell)
+
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell)  = nxf+1
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
+
+      nxf=nxf+2
+
+    end if
+
+    ! Cell northern edge
+    ! The northern edges on these cells exist on the cells in
+    ! the row above/previous to this one. Those edges have
+    ! already been assigned ids.
+    edges_on_cell(N, cell) = edges_on_cell(S,self%cell_next(N,cell))
+
+  end do ! Panel inner rows
+
+
+  ! Panel bottom row
   do cell = ncells-edge_cells_x+1, ncells
-    ! Right edge
-    verts_on_edge(1, nxf) = self%verts_on_cell(NE, cell)
-    verts_on_edge(2, nxf) = self%verts_on_cell(SE, cell)
-    edges_on_cell(E, cell) = nxf
-    nxf = nxf+1
-  end do
 
-  ! EoC Top row W copy
-  do cell = 1, edge_cells_x
-    edges_on_cell(W, cell) = edges_on_cell(E, self%cell_next(W, cell))
-  end do
+    if (mod(cell,edge_cells_x) == 1) then
+      ! This cell is on the left-hand panel edge
+      !-------------------------------------------
 
-  ! EoC Inner rows N & W copy
-  do cell = edge_cells_x+1, ncells-edge_cells_x
-    edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
-    edges_on_cell(W, cell) = edges_on_cell(E, self%cell_next(W, cell))
-  end do
+      ! Cell western edge
+      edges_on_cell(W, cell) = nxf
+      verts_on_edge(1, nxf)  = self%verts_on_cell(NW, cell)
+      verts_on_edge(2, nxf)  = self%verts_on_cell(SW, cell)
 
-  ! EoC Bottom row N,S,W copy
-  do cell = ncells-edge_cells_x+1, ncells
-    edges_on_cell(N, cell) = edges_on_cell(S, self%cell_next(N, cell))
-    edges_on_cell(S, cell) = edges_on_cell(N, self%cell_next(S, cell))
-    edges_on_cell(W, cell) = edges_on_cell(E, self%cell_next(W, cell))
+      ! Cell southern edge
+      ! For a biperiodic panel, if the cell is on the bottom edge
+      ! of the panel then the cell's southern neighbour is actually
+      ! the on the top-edge of the panel (because of the periodicity).
+      ! At this point, all cells on the top-edge of the panel have
+      ! had their edge ids assigned.
+ 
+      ! In other words, the southern edge of this cell exists on
+      ! another cell where it has already been assigned an id. 
+      edges_on_cell(S, cell) = edges_on_cell(N,self%cell_next(S,cell))
+
+      ! Cell eastern edge
+      edges_on_cell(E, cell)  = nxf+1
+      verts_on_edge(1, nxf+1) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf+1) = self%verts_on_cell(SE, cell)
+
+      nxf = nxf+2
+
+    else if (mod(cell,edge_cells_x) == 0) then
+      ! This cell is on the right-hand panel edge
+      !--------------------------------------------
+
+      ! Cell western edge
+      edges_on_cell(W, cell) = edges_on_cell(E,self%cell_next(W,cell))
+      
+      ! Cell southern edge
+      ! For a biperiodic panel, if the cell is on the bottom edge
+      ! of the panel then the cell's southern neighbour is actually
+      ! the on the top-edge of the panel (because of the periodicity).
+      ! At this point, all cells on the top-edge of the panel have
+      ! had their edge ids assigned.
+ 
+      ! In other words, the southern edge of this cell exists on
+      ! another cell where it has already been assigned an id. 
+       edges_on_cell(S, cell) = edges_on_cell(N,self%cell_next(S,cell))
+      
+      ! Cell eastern edge
+      ! For a biperiodic panel, if the cell is on the right-hand edge
+      ! of the panel then the cell's eastern neighbour is actually
+      ! the left-most cell on this row (because of the periodicity).
+      ! At this point, left-most cell on this row has already
+      ! had its edge ids assigned.
+ 
+      ! In other words, the eastern edge of this cell exists on
+      ! another cell where it has already been assigned an id.
+      edges_on_cell(E, cell) = edges_on_cell(W,self%cell_next(E,cell))
+
+    else
+      ! Cell western edge
+      edges_on_cell(W, cell) = edges_on_cell(E,self%cell_next(W,cell))
+
+      ! Cell southern edge
+      ! For a biperiodic panel, if the cell is on the bottom edge
+      ! of the panel then the cell's southern neighbour is actually
+      ! the on the top-edge of the panel (because of the periodicity).
+      ! At this point, all cells on the top-edge of the panel have
+      ! had their edge ids assigned.
+      edges_on_cell(S, cell) = edges_on_cell(N,self%cell_next(S,cell))
+
+      ! Cell eastern edge
+      verts_on_edge(1, nxf) = self%verts_on_cell(NE, cell)
+      verts_on_edge(2, nxf) = self%verts_on_cell(SE, cell)
+      edges_on_cell(E, cell) = nxf
+      nxf = nxf+1
+    end if
+
+    ! Cell north edge
+    ! The northern edges on these cells exist on the cells in
+    ! the row above/previous to this one. Those edges have
+    ! already been assigned ids.
+    edges_on_cell(N, cell) = edges_on_cell(S,self%cell_next(N,cell))
+
   end do
 
   return
@@ -589,7 +822,7 @@ subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
   character(str_def), intent(out) :: coord_units_y
 
   integer(i_def) :: ncells, edge_cells_x, edge_cells_y
-  integer(i_def) :: cell, x, y, astat
+  integer(i_def) :: cell, x, y, astat, vert
 
   edge_cells_x = self%edge_cells_x
   edge_cells_y = self%edge_cells_y
@@ -601,13 +834,13 @@ subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
       call log_event( PREFIX//"Failure to allocate vert_coords.", &
                       LOG_LEVEL_ERROR )
 
+  ! Cells begin numbering in rows from NW corner of panel
   do cell = 1, ncells
-    y = 1+(cell-1)/edge_cells_x
-    x = cell-(y-1)*edge_cells_x
-    ! x, E/W
-    vert_coords(1, self%verts_on_cell(SW, cell)) = real(x-1 - edge_cells_x/2)*self%dx
-    ! y  N/S
-    vert_coords(2, self%verts_on_cell(SW, cell)) = real(edge_cells_y/2 - (y-1))*self%dy
+   y = 1+(cell-1)/edge_cells_x
+   x = cell-(y-1)*edge_cells_x
+   vert = self%verts_on_cell(NW, cell)
+   vert_coords(1, vert) = real(x-1 - edge_cells_x/2,   r_def) * self%dx
+   vert_coords(2, vert) = real(edge_cells_y/2 - (y-1), r_def) * self%dy
   end do
 
   coord_units_x = 'm'
@@ -615,6 +848,48 @@ subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
 
   return
 end subroutine calc_coords
+
+!-------------------------------------------------------------------------------
+!> @brief   Calculates the mesh cell centres.
+!> @details The face centres for the mesh are calculated based on the current
+!>          node coordinates of the node on the NW corner of the cell.
+!>          The node_cordinates are assumed to be in [m] in the
+!>          x,y plane. Resulting face centre coordinates are in [m].
+!>
+!> @param[in,out]  self  The genbiperiodic_type instance reference.
+!-------------------------------------------------------------------------------
+subroutine calc_cell_centres(self)
+
+  implicit none
+
+  class(genbiperiodic_type), intent(inout) :: self
+
+  integer(i_def) :: ncells
+  real(r_def)    :: ratio
+
+  ! Counters
+  integer(i_def) :: cell, base_vert
+
+
+  ncells = self%npanels*self%edge_cells_x*self%edge_cells_y
+
+  ! 1.0 Initialise the face centres
+  if (.not. allocated(self%cell_coords)) allocate( self%cell_coords(2,ncells) )
+  self%cell_coords(:,:) = 0.0_r_def
+
+  ! 2.0 Open cells have `ghost` nodes/edges and are located
+  ! on the Eastern/Southern edges of the panel. Identify the open cells
+  ! assuming that the numbering is along rows beginning from the NW corner
+  ! of the panel. All cells, including the open cells have a unique NW
+  ! vertex. Use this NW and self%dx, self%dy to calculate the face centre,
+  ! assuming the cells are parallel in the x and y directions.
+  do cell=1, ncells
+    base_vert = self%verts_on_cell(NW, cell)
+    self%cell_coords(1,cell) = self%vert_coords(1, base_vert) + self%dx/2.0_r_def
+    self%cell_coords(2,cell) = self%vert_coords(2, base_vert) - self%dy/2.0_r_def
+  end do
+
+end subroutine calc_cell_centres
 
 !-------------------------------------------------------------------------------
 !> @brief Populates the arguments with the dimensions defining
@@ -661,17 +936,26 @@ end subroutine get_dimensions
 !>
 !> @param[in]   self              The genbiperiodic_type instance reference.
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
+!> @param[out]  cell_coordinates  The argument to receive cell centre coordinates.
+!> @param[out]  coord_units_x     Units for x-coordinates
+!> @param[out]  coord_units_y     Units for y-coordinates
 !-------------------------------------------------------------------------------
-subroutine get_coordinates(self, node_coordinates, coord_units_x, coord_units_y)
+subroutine get_coordinates(self, node_coordinates, &
+                                 cell_coordinates, &
+                                 coord_units_x,    &
+                                 coord_units_y)
 
   implicit none
 
   class(genbiperiodic_type), intent(in)  :: self
   real(r_def),               intent(out) :: node_coordinates(:,:)
+  real(r_def),               intent(out) :: cell_coordinates(:,:)
   character(str_def),        intent(out) :: coord_units_x
   character(str_def),        intent(out) :: coord_units_y
 
+
   node_coordinates = self%vert_coords
+  cell_coordinates = self%cell_coords
   coord_units_x    = self%coord_units_x
   coord_units_y    = self%coord_units_y
 
@@ -729,7 +1013,11 @@ subroutine generate(self)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
   if (self%nmaps > 0) call calc_global_mesh_maps(self)
-  call calc_coords(self, self%vert_coords, self%coord_units_x, self%coord_units_y)
+  call calc_coords(self,               &
+                   self%vert_coords,   &
+                   self%coord_units_x, &
+                   self%coord_units_y)
+  call calc_cell_centres(self)
 
   return
 end subroutine generate

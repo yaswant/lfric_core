@@ -4,6 +4,7 @@
 
 class global_mesh_mod::global_mesh_type {
   -mesh_class: string
+  -cell_coords: real[::] <<allocatable>>
   -cell_next_2d: integer[::] <<allocatable>>
   -cell_on_edge_2d: integer[::] <<allocatable>>
   -cell_on_vert_2d: integer[::] <<allocatable>>

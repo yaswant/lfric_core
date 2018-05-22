@@ -26,6 +26,7 @@ module gencube_ps_mod
   use constants_mod,                  only: r_def, i_def, str_def, l_def,     &
                                             str_long, PI, radians_to_degrees, &
                                             degrees_to_radians
+  use coord_transform_mod,            only: ll2xyz, xyz2ll
   use global_mesh_map_collection_mod, only: global_mesh_map_collection_type
   use global_mesh_map_mod,            only: generate_global_mesh_map_id
   use log_mod,                        only: log_event, log_scratch_space, &
@@ -77,12 +78,14 @@ module gencube_ps_mod
     integer(i_def),     allocatable :: edges_on_cell(:,:)
     integer(i_def),     allocatable :: verts_on_edge(:,:)
     real(r_def),        allocatable :: vert_coords(:,:)
+    real(r_def),        allocatable :: cell_coords(:,:)
 
   contains
     procedure :: calc_adjacency
     procedure :: calc_face_to_vert
     procedure :: calc_edges
     procedure :: calc_coords
+    procedure :: calc_cell_centres
     procedure :: generate
     procedure :: get_metadata
     procedure :: get_dimensions
@@ -741,14 +744,14 @@ end subroutine calc_edges
 !> @details Assigns an (x,y) lat-long coordinate to each mesh
 !>          vertex according to its Cartesian position in the mesh.
 !>
-!> @param[in]   self         The gencube_ps_type instance reference.
-!> @param[out]  vert_coords  A rank 2 (2,ncells)-sized real array of long and
-!>                           lat coordinates (degrees) respectively for
-!>                           each vertex.
+!> @param[in]   self           The gencube_ps_type instance reference.
+!> @param[out]  vert_coords    A rank 2 (2,ncells)-sized real array of long and
+!>                             lat coordinates (degrees) respectively for
+!>                             each vertex.
+!> @param[out]  coord_units_x  Units of x-coordinate.
+!> @param[out]  coord_units_y  Units of y-coordinate.
 !-------------------------------------------------------------------------------
 subroutine calc_coords(self, vert_coords, coord_units_x, coord_units_y)
-
-  use coord_transform_mod, only: xyz2ll
 
   implicit none
 
@@ -1025,17 +1028,25 @@ end subroutine get_dimensions
 !>
 !> @param[in]   self              The gencube_ps_type instance reference.
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
+!> @param[out]  cell_coordinates  Cell centre coordinates
+!> @param[out]  coord_units_x  Units of x-coordinate.
+!> @param[out]  coord_units_y  Units of y-coordinate.
 !-------------------------------------------------------------------------------
-subroutine get_coordinates(self, node_coordinates, coord_units_x, coord_units_y)
+subroutine get_coordinates(self, node_coordinates, &
+                                 cell_coordinates, &
+                                 coord_units_x,    &
+                                 coord_units_y)
 
   implicit none
 
   class(gencube_ps_type), intent(in)  :: self
   real(r_def),            intent(out) :: node_coordinates(:,:)
+  real(r_def),            intent(out) :: cell_coordinates(:,:)
   character(str_def),     intent(out) :: coord_units_x
   character(str_def),     intent(out) :: coord_units_y
 
   node_coordinates = self%vert_coords
+  cell_coordinates = self%cell_coords
   coord_units_x    = self%coord_units_x
   coord_units_y    = self%coord_units_y
 
@@ -1111,23 +1122,31 @@ subroutine generate(self)
   call calc_adjacency(self, self%cell_next)
   call calc_face_to_vert(self, self%verts_on_cell)
   call calc_edges(self, self%edges_on_cell, self%verts_on_edge)
-  if (self%nmaps > 0) call calc_global_mesh_maps(self)
-  call calc_coords(self, self%vert_coords, self%coord_units_x, self%coord_units_y)
+
+  if (self%nmaps > 0_i_def) call calc_global_mesh_maps(self)
+
+  call calc_coords(self, self%vert_coords,   &
+                         self%coord_units_x, &
+                         self%coord_units_y)
+
   call orient_lfric(self)
+
   if (self%nsmooth > 0_i_def) call smooth(self)
 
+  call calc_cell_centres(self)
 
   ! Convert coordinate units to degrees to be CF compliant
   if (trim(self%coord_units_x) == 'radians') then
     self%vert_coords(1,:) = self%vert_coords(1,:) * radians_to_degrees
+    self%cell_coords(1,:) = self%cell_coords(1,:) * radians_to_degrees
     self%coord_units_x = 'degrees_east'
   end if
 
   if (trim(self%coord_units_y) == 'radians') then
     self%vert_coords(2,:) = self%vert_coords(2,:) * radians_to_degrees
+    self%cell_coords(2,:) = self%cell_coords(2,:) * radians_to_degrees
     self%coord_units_y = 'degrees_north'
   end if
-
 
   if (DEBUG) call write_mesh(self)
 
@@ -1188,7 +1207,6 @@ end subroutine calc_global_mesh_maps
 subroutine write_mesh(self)
 
   use iso_fortran_env,     only : stdout => output_unit
-  use coord_transform_mod, only : ll2xyz
 
   implicit none
 
@@ -1290,8 +1308,6 @@ end subroutine orient_lfric
 !-------------------------------------------------------------------------------
 subroutine smooth(self)
 
-  use coord_transform_mod, only : ll2xyz, xyz2ll
-
   implicit none
 
   class(gencube_ps_type), intent(inout) :: self
@@ -1321,7 +1337,7 @@ subroutine smooth(self)
 
   ! Preliminary - Compute cell on vertices look up
   cell_on_vert(:,:) = -1_i_def
-  ncell_on_vert(:)  = 0_i_def
+  ncell_on_vert(:)  =  0_i_def
 
   do cell=1, ncells
     do i=1, 4
@@ -1329,7 +1345,7 @@ subroutine smooth(self)
       do j=1, 4
         if (cell_on_vert(j,vert_id) == -1_i_def ) then
           cell_on_vert(j,vert_id) = cell
-          ncell_on_vert(vert_id) = ncell_on_vert(vert_id) + 1_i_def
+          ncell_on_vert(vert_id)  = ncell_on_vert(vert_id) + 1_i_def
           exit
         end if
       end do
@@ -1337,17 +1353,16 @@ subroutine smooth(self)
   end do
 
   ! Preliminary - Compute cell centre coordinates
-  do cell=1, ncells
-    xc(:) = 0.0_r_def
-    do vert=1, 4
-      ll = self%vert_coords(:,self%verts_on_cell(vert,cell))
-      call ll2xyz(ll(1),ll(2),x0(1),x0(2),x0(3))
-      xc(:) = xc(:) + x0(:)
-    end do
-    radius_ratio = 1.0_r_def/sqrt( xc(1)**2 + xc(2)**2 + xc(3)**2)
-    cell_coords(:,cell) = xc(:)*radius_ratio
-  end do
+  call self%calc_cell_centres()
 
+  do cell=1, ncells
+    call ll2xyz( self%cell_coords(1,cell), &
+                 self%cell_coords(2,cell), &
+                 cell_coords(1,cell),      & 
+                 cell_coords(2,cell),      &
+                 cell_coords(3,cell) )
+
+  end do
 
   do smooth_pass=1, self%nsmooth
 
@@ -1380,6 +1395,84 @@ subroutine smooth(self)
 
   return
 end subroutine smooth
+
+!-------------------------------------------------------------------------------
+!> @brief   Calculates the mesh cell centres.
+!> @details The face centres for the mesh are calculated based on the current
+!>          node coordinates. The node_cordinates are assumed to be in [lon, lat].
+!>          Resulting face centre coordinates are in [lon, lat].
+!>
+!> @param[in,out]  self  The gencube_ps_type instance reference.
+!-------------------------------------------------------------------------------
+subroutine calc_cell_centres(self)
+
+  implicit none
+
+  class(gencube_ps_type), intent(inout) :: self
+
+  integer(i_def) :: ncells
+
+  real(r_def)    :: radius_ratio
+
+  integer(i_def), allocatable :: verts_on_cell(:)
+
+  real(r_def),    allocatable :: cell_vert_coords_xyz(:,:)
+  real(r_def),    allocatable :: cell_vert_coords_ll(:,:)
+
+  real(r_def), allocatable :: cell_centre_xyz(:)
+
+  integer(i_def) :: nverts_per_cell = 4
+
+  ! Counters
+  integer(i_def) :: cell, vert
+
+  ncells = self%npanels*self%edge_cells*self%edge_cells
+
+  allocate( verts_on_cell(nverts_per_cell) )
+  allocate( cell_vert_coords_xyz(3,nverts_per_cell) )
+  allocate( cell_vert_coords_ll(2,nverts_per_cell) )
+  allocate( cell_centre_xyz(3) )
+
+  if (.not. allocated(self%cell_coords)) allocate( self%cell_coords(2,ncells) )
+
+  self%cell_coords(:,:) = 0.0_r_def
+
+  do cell=1, ncells
+    cell_centre_xyz(:) = 0.0_r_def
+
+    ! Get the vertex ids on the cell
+    verts_on_cell(:) = self%verts_on_cell(:,cell)
+
+    do vert=1, nverts_per_cell
+      ! Get the vertex coords (in radians)
+      cell_vert_coords_ll(:,vert) = self%vert_coords(:,verts_on_cell(vert))
+
+      ! Get vertex coords as cartesian (x,y,z)
+      call ll2xyz( cell_vert_coords_ll(1,vert),  &
+                   cell_vert_coords_ll(2,vert),  &
+                   cell_vert_coords_xyz(1,vert), &
+                   cell_vert_coords_xyz(2,vert), &
+                   cell_vert_coords_xyz(3,vert) )
+
+      cell_centre_xyz(:) = cell_centre_xyz(:) + cell_vert_coords_xyz(:,vert)
+
+    end do
+
+    radius_ratio = 1.0_r_def/sqrt(  cell_centre_xyz(1)**2 &
+                                  + cell_centre_xyz(2)**2 &
+                                  + cell_centre_xyz(3)**2 )
+
+    cell_centre_xyz(:) = cell_centre_xyz(:) * radius_ratio
+
+    ! Convert cell centre back to lat long
+    call xyz2ll( cell_centre_xyz(1),   & ! x
+                 cell_centre_xyz(2),   & ! y
+                 cell_centre_xyz(3),   & ! z
+                 self%cell_coords(1,cell),  & ! longitude
+                 self%cell_coords(2,cell) )   ! latititude
+  end do
+
+end subroutine calc_cell_centres
 
 !-----------------------------------------------------------------------------
 !> @brief Returns mesh metadata information.

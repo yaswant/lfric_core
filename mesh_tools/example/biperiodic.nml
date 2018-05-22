@@ -1,9 +1,9 @@
 &biperiodic_mesh_generator
-  mesh_filename = mesh_BiP64x16-25x25.nc
-  nmeshes       = 5
-  mesh_names    = 'physics', 'dynamics', 'multigrid_l1', 'multigrid_l2', 'multigrid_l3'
-  edge_cells_x  = 192, 64, 32, 16, 8
-  edge_cells_y  = 48,  16,  8,  4, 2
-  domain_x      = 1600.0
-  domain_y      = 400.0
+  mesh_filename = mesh_BiP4x4-10000x10000.nc
+  nmeshes       = 1
+  mesh_names    = 'dynamics'
+  edge_cells_x  = 4
+  edge_cells_y  = 4
+  domain_x      = 40000.0
+  domain_y      = 40000.0
 /

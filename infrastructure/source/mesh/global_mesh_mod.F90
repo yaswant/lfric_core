@@ -28,7 +28,9 @@ module global_mesh_mod
   ! Type of mesh that the global mesh describes
     character(str_def) :: mesh_class
   ! Horizontal coords of vertices in full domain
-    real(kind=r_def), allocatable :: vert_coords(:,:)
+    real(r_def), allocatable :: vert_coords(:,:)
+  ! Horizontal coords of cells in full domain
+    real(r_def), allocatable :: cell_coords(:,:)
   ! Full domain cell to cell connectivities
     integer(i_def), allocatable :: cell_next_2d(:,:)
   ! Full domain vertices on a cell
@@ -167,15 +169,20 @@ contains
     self%nedges_per_cell      = num_edges_per_face
     self%max_cells_per_vertex = max_num_faces_per_node
 
-    allocate( self%vert_coords(2, nvert_in) )
+    allocate( self%vert_coords(2, self%nverts) )
     call ugrid_2d%get_node_coords(self%vert_coords)
+
+    allocate( self%cell_coords(2, self%ncells) )
+    self%cell_coords = ugrid_2d%get_face_coords()
 
     ! CF Standard for longitude/latitude is in degrees
     ! though many functions assume radians. Convert
     ! coords to radians before going any further into
     ! code
-    if (trim(self%mesh_class) == 'sphere') &
-        self%vert_coords(:,:) = self%vert_coords(:,:) * degrees_to_radians
+    if (trim(self%mesh_class) == 'sphere') then
+      self%vert_coords(:,:) = self%vert_coords(:,:) * degrees_to_radians
+      self%cell_coords(:,:) = self%cell_coords(:,:) * degrees_to_radians
+    end if
 
     allocate( self%cell_next_2d( num_edges_per_face, nface_in ) )
     call ugrid_2d%get_face_face_connectivity( self%cell_next_2d )
@@ -264,7 +271,8 @@ contains
     allocate( self%edge_on_cell_2d (self%nedges_per_cell, self%ncells) )
     allocate( self%cell_on_vert_2d (self%max_cells_per_vertex, nverts) )
     allocate( self%cell_on_edge_2d (2, nedges) )
-    allocate( self%vert_coords     (3, nverts) )
+    allocate( self%vert_coords     (2, nverts) )
+    allocate( self%cell_coords     (2, self%ncells) )
     allocate( self%vert_cell_owner (nverts) )
     allocate( self%edge_cell_owner (nedges) )
 
@@ -397,12 +405,13 @@ contains
   !          nvert           Number of vertices
   ! Output:  cell_on_vert    Array with indices of cells on vertices
   !-------------------------------------------------------------------------------
-  subroutine calc_cell_on_vertex(vert_on_cell, &
+  subroutine calc_cell_on_vertex(vert_on_cell,  &
                                 verts_per_cell, &
-                                ncell, &
-                                cell_on_vert, &
-                                cells_per_vert,  &
+                                ncell,          &
+                                cell_on_vert,   &
+                                cells_per_vert, &
                                 nvert)
+
   implicit none
 
   integer(i_def), intent(in)  :: verts_per_cell, ncell
@@ -417,18 +426,21 @@ contains
 
   cell_on_vert = 0
 
-  do cell = 1,ncell
-    do vertno = 1,verts_per_cell
+  ! There is no order to how the cell ids are listed around the vertex
+  ! Some may have 4 or 3 (i.e. vertices on corners of panels)
+  do cell=1, ncell
+    do vertno=1, verts_per_cell
 
       vert = vert_on_cell(vertno,cell)
 
-      do cellno = 1,cells_per_vert
-        if(cell_on_vert(cellno,vert) == cell)exit
-        if(cell_on_vert(cellno,vert) == 0)then
-          cell_on_vert(cellno,vert) = cell
-          exit
+      do cellno=1, cells_per_vert
+        if (cell_on_vert(cellno,vert) == cell) exit
+        if (cell_on_vert(cellno,vert) == 0) then
+           cell_on_vert(cellno,vert) = cell
+           exit
         end if
       end do
+
     end do
   end do
 
@@ -610,6 +622,8 @@ contains
   !>
   function get_nverts( self ) result (nverts)
 
+  implicit none
+
   class(global_mesh_type), intent(in) :: self
 
   integer(i_def) :: nverts
@@ -625,6 +639,8 @@ contains
   !>
   function get_nedges( self ) result (nedges)
 
+  implicit none
+
   class(global_mesh_type), intent(in) :: self
 
   integer(i_def) :: nedges
@@ -639,6 +655,8 @@ contains
   !> @return Total number of cells in the global domain.
   !>
   function get_ncells( self ) result (ncells)
+
+  implicit none
 
   class(global_mesh_type), intent(in) :: self
 
@@ -661,6 +679,8 @@ contains
   !> @return Maximum number of cells that can be incident with a vertex.
   !>
   function get_max_cells_per_vertex( self ) result (max_cells_per_vertex)
+
+  implicit none
 
   class(global_mesh_type), intent(in) :: self
 

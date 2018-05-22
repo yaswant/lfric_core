@@ -25,6 +25,7 @@ module gencube_ps_mod_test
     integer(i_def), allocatable :: edges_on_face(:,:)
     integer(i_def), allocatable :: nodes_on_edge(:,:)
     real(r_def),    allocatable :: coords(:,:)
+    real(r_def),    allocatable :: face_coords(:,:)
   contains
     procedure setUp
     procedure tearDown
@@ -56,6 +57,7 @@ contains
     allocate( this%edges_on_face(4, 6*edge_cells*edge_cells) )
     allocate( this%nodes_on_edge(2, 2*6*edge_cells*edge_cells) )
     allocate( this%coords(2, 6*edge_cells*edge_cells+2) )
+    allocate( this%face_coords(2, 6*edge_cells*edge_cells) )
 
   end subroutine setUp
 
@@ -71,6 +73,7 @@ contains
     deallocate( this%edges_on_face )
     deallocate( this%nodes_on_edge )
     deallocate( this%coords )
+    deallocate( this%face_coords )
 
   end subroutine tearDown
 
@@ -106,7 +109,8 @@ contains
     type(global_mesh_map_type),            pointer :: global_mesh_map  => null()
 
     real(r_def), parameter :: eps = 1E-09_r_def
-   
+
+
     csgen = gencube_ps_type( mesh_name, edge_cells, nsmooth,      &
                              target_mesh_names=target_mesh_names, &
                              target_edge_cells=target_edge_cells )
@@ -138,10 +142,6 @@ contains
     @assertEqual( nmaps, size(test_maps_mesh_names   ) )
     @assertEqual( nmaps, size(test_maps_edge_cells_x ) )
     @assertEqual( nmaps, size(test_maps_edge_cells_y ) )
-
-
-
-
 
     ! Generate the mesh and connectivity
     call csgen%generate()
@@ -179,17 +179,26 @@ contains
     @assertEqual(this%edges_on_face(:,1), (/ 2,3,5,1 /), "Incorrect edges_on_face connectivity.")
     @assertEqual(this%edges_on_face(:,20), (/ 48,50,46,47 /), "Incorrect edges_on_face connectivity.")
 
-    @assertEqual(this%nodes_on_edge(:,1), (/ 1,2 /), "Incorrect nodes_on_edge connectivity.")
-    @assertEqual(this%nodes_on_edge(:,40), (/ 43,42 /), "Incorrect nodes_on_edge connectivity.")
+    @assertEqual(this%nodes_on_edge(:,1),  (/  1,  2 /), "Incorrect nodes_on_edge connectivity.")
+    @assertEqual(this%nodes_on_edge(:,40), (/ 43, 42 /), "Incorrect nodes_on_edge connectivity.")
 
     ! Retrieve mesh coordinates
-    call csgen%get_coordinates(this%coords,test_coord_units_x,test_coord_units_y)
+    call csgen%get_coordinates( this%coords,        &
+                                this%face_coords,   &
+                                test_coord_units_x, &
+                                test_coord_units_y )
 
-    ! Mesh coordinates have expected values at specified points
-    @assertTrue(abs(this%coords(1,1)  - 315.0000000000001137_r_def) < eps)
-    @assertTrue(abs(this%coords(2,1)  -  35.2643896827546399_r_def) < eps)
-    @assertTrue(abs(this%coords(1,20) - 160.7237414026762394_r_def) < eps)
-    @assertTrue(abs(this%coords(2,20) -  43.3480768096655993_r_def) < eps)
+    ! Node coordinates have expected values at specified points
+    @assertTrue(abs(this%coords(1,1)  - 315.0000000000001137_r_def) < eps, "Incorrect x-coord, node 1.")
+    @assertTrue(abs(this%coords(2,1)  -  35.2643896827546399_r_def) < eps, "Incorrect y-coord, node 1.")
+    @assertTrue(abs(this%coords(1,20) - 160.7237414026762394_r_def) < eps, "Incorrect x-coord, node 20.")
+    @assertTrue(abs(this%coords(2,20) -  43.3480768096655993_r_def) < eps, "Incorrect y-coord, node 20.")
+
+    ! Check face co-ordinates for cells 1 and 20
+    @assertTrue(abs(this%face_coords(1,1)  - 328.6231683398669929375_r_def) < eps, "Incorrect x-coord, face 1.")
+    @assertTrue(abs(this%face_coords(2,1)  -  27.5043902958763375466_r_def) < eps, "Incorrect y-coord, face 1.")
+    @assertTrue(abs(this%face_coords(1,20) - 179.9999999999999715783_r_def) < eps, "Incorrect x-coord, face 20.")
+    @assertTrue(abs(this%face_coords(2,20) -  30.1569744318065886546_r_def) < eps, "Incorrect y-coord, face 20.")
 
     @assertTrue( trim(test_coord_units_x) == 'degrees_east')
     @assertTrue( trim(test_coord_units_y) == 'degrees_north')
@@ -211,8 +220,6 @@ contains
     @assertEqual( 4,  global_mesh_map%get_ntarget_cells_per_source_cell() )
     @assertEqual( 1,  global_mesh_map%get_source_id() )
     @assertEqual( 2,  global_mesh_map%get_target_id() )
-
-
 
   end subroutine test_all
 

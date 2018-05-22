@@ -38,25 +38,37 @@ end type ugrid_generator_type
 
 abstract interface
 
-
+  !-----------------------------------------------------------------------------
+  !> @brief Function interface for requesting global_mesh_maps collection
+  !>        connected with the ugrid_generator
+  !>
+  !> @return global_mesh_maps  Pointer global_mesh_maps collection.
+  !-----------------------------------------------------------------------------
   function get_global_mesh_maps_interface (self) result (global_mesh_maps)
 
     import :: ugrid_generator_type, global_mesh_map_collection_type
+
+    implicit none
 
     class(ugrid_generator_type), target, intent(in) :: self
     type(global_mesh_map_collection_type), pointer :: global_mesh_maps
 
   end function get_global_mesh_maps_interface
 
+
   !-----------------------------------------------------------------------------
   !> @brief Interface: runs the mesh generator strategy.
   !>
   !> @param[in,out] self  The generator strategy object.
   !-----------------------------------------------------------------------------
-
   subroutine generate_interface (self)
+
     import :: ugrid_generator_type
+
+    implicit none
+
     class(ugrid_generator_type), intent(inout) :: self
+
   end subroutine generate_interface
 
 
@@ -88,6 +100,8 @@ abstract interface
 
     import :: ugrid_generator_type, i_def, str_def, str_long
 
+    implicit none
+
     class(ugrid_generator_type),  intent(in)  :: self
     character(str_def), optional, intent(out) :: mesh_name
     character(str_def), optional, intent(out) :: mesh_class
@@ -104,8 +118,8 @@ abstract interface
     integer(i_def), optional, intent(out) :: edge_cells_x
     integer(i_def), optional, intent(out) :: edge_cells_y
 
-
   end subroutine get_metadata_interface
+
 
   !-----------------------------------------------------------------------------
   !> @brief Interface: Returns mesh dimension information.
@@ -118,11 +132,12 @@ abstract interface
   !> @param[out]    num_edges_per_face     Number of edges per face
   !> @param[out]    num_nodes_per_edge     Number of nodes per edge
   !-----------------------------------------------------------------------------
-
   subroutine get_dimensions_interface (self, num_nodes, num_edges, num_faces,  &
                  num_nodes_per_face, num_edges_per_face, num_nodes_per_edge)
 
     import :: ugrid_generator_type, i_def
+
+    implicit none
 
     class(ugrid_generator_type), intent(in) :: self
 
@@ -135,23 +150,33 @@ abstract interface
 
   end subroutine get_dimensions_interface
 
+
   !-----------------------------------------------------------------------------
   !> @brief Interface: Gets coordinates of nodes, edges and faces.
-  !> @param[in]     self                   The generator strategy object.
-  !> @param[out]    node_coordinates       Node coordinates
+  !> @param[in]   self              The generator strategy object.
+  !> @param[out]  node_coordinates  Node coordinates
+  !> @param[out]  cell_coordinates  Cell coordinates
+  !> @param[out]  coord_units_x     Units for x-coordinate
+  !> @param[out]  coord_units_y     Units for y-coordinate
   !-----------------------------------------------------------------------------
-
-  subroutine get_coordinates_interface (self, node_coordinates, coord_units_x, coord_units_y)
+  subroutine get_coordinates_interface (self, node_coordinates, &
+                                              cell_coordinates, &
+                                              coord_units_x,    &
+                                              coord_units_y)
 
     import :: ugrid_generator_type, r_def, str_def
 
+    implicit none
+
     class(ugrid_generator_type), intent(in) :: self
 
-    real(r_def), intent(out) :: node_coordinates(:,:)
+    real(r_def), intent(out)        :: node_coordinates(:,:)
+    real(r_def), intent(out)        :: cell_coordinates(:,:)
     character(str_def), intent(out) :: coord_units_x
     character(str_def), intent(out) :: coord_units_y
 
   end subroutine get_coordinates_interface
+
 
   !-----------------------------------------------------------------------------
   !> @brief Interface: Gets a selection of connectivity information from the
@@ -162,12 +187,13 @@ abstract interface
   !> @param[out]    face_edge_connectivity Edges around each face.
   !> @param[out]    face_face_connectivity Faces adjacent to each face.
   !-----------------------------------------------------------------------------
-
   subroutine get_connectivity_interface (self,                         &
                        face_node_connectivity, edge_node_connectivity, &
                        face_edge_connectivity, face_face_connectivity)
 
     import :: ugrid_generator_type, i_def
+
+    implicit none
 
     class(ugrid_generator_type), intent(in) :: self
 
@@ -177,6 +203,7 @@ abstract interface
     integer(i_def), intent(out) :: face_face_connectivity(:,:)
 
   end subroutine get_connectivity_interface
+
 
 end interface
 

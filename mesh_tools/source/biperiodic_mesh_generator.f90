@@ -163,7 +163,7 @@ program biperiodic_mesh_generator
   !===================================================================
   ! 6.0 Report/Check what the code thinks is requested by user
   !===================================================================
-  call log_event( "Generating ordered cubed-sphere mesh(es):", &
+  call log_event( "Generating ordered bi-periodic mesh(es):", &
                   LOG_LEVEL_INFO )
   tmp_str1=''
   tmp_str2=''

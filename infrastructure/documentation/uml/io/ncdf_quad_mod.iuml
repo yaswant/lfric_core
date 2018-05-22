@@ -32,6 +32,8 @@ class ncdf_quad_mod::ncdf_quad_type {
 
   -mesh_node_x_id: integer
   -mesh_node_y_id: integer
+  -mesh_face_x_id: integer
+  -mesh_face_y_id: integer
 
   +read_mesh( ... )
   +write_mesh( ... )

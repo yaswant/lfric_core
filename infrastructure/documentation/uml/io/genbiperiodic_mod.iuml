@@ -27,6 +27,7 @@ class genbiperiodic_mod::genbiperiodic_type {
   -edges_on_cell: integer[::] <<allocatable>>
   -verts_on_edge: integer[::] <<allocatable>>
   -vert_coords: real[::] <<allocatable>>
+  -cell_coords: real[::] <<allocatable>>
 
   +<<create>>genbiperiodic_constructor( <<in>> mesh_name: string, <<in>> edge_cells_x: integer, <<in>> edge_cells_y: integer, <<in>> domain_x: integer, <<in>> domain_y: integer, <<in>> target_mesh_names: string[:] <<optional>>, <<in>> target_edge_cells_x: integer[:] <<optional>>, <<in>> target_edge_cells_y: integer[:] <<optional>> ): genbiperiodic_type
 
@@ -34,6 +35,7 @@ class genbiperiodic_mod::genbiperiodic_type {
   +calc_face_to_vert( <<out>> verts_on_cell: integer[::] <<allocatable>> )
   +calc_edges( <<out>> edges_on_cell: integer[::] <<allocatable>>, <<out>> verts_on_edge: integer[::] <<allocatable>> )
   +calc_coords( <<out>> vert_coords: real[::] <<allocatable>>, <<out>> coord_units_x: string, <<out>> coord_units_y: string )
+  +calc_cell_centres()
 
   +generate( ... )
   +get_metadata( ... )
