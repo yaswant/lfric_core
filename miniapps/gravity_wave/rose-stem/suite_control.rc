@@ -18,6 +18,7 @@
                       resolutions=[("C24",100.0)], publish=True )',
     'godliness( publish=True )',
     'cleanliness'],
-                  } %}
+'nightly': [
+    'cleanliness'] } %}
 
 #########################################################################################

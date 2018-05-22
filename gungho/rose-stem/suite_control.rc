@@ -21,8 +21,7 @@
                                                               'agnesi_hyd_cart', 'agnesi_nhyd_cart', 'schar3d_cart_8s',
                                                               'schar_cart_8s', 'schar_cart_40s',
                                                               'default' ],
-                                       'solver_miniapp'   : [ 'default' ],
-                                       'io_miniapp'       : [ 'default' ]
+                                        'solver_miniapp'   : [ 'default' ]
                                      } %}
 
 {%- set canned_configurations  = ['gungho'] %}
@@ -119,8 +118,6 @@
                               "directives":{"default":{"mpi_parts":16,"threads":1,"wallclock":"00:30:00"} } },
                       plotstr="warm3dbubble.py $NODAL_DATA_DIR 40 40 theta T000000:T000048:T000096 $PLOT_DIR",
                       publish=True )',
-    'run_application( io_miniapp, default,            resolutions=[("C12",)],
-                      checkkgo=False, publish=True )',
     'check_compilers( gungho, semi-implicit, full-debug, resolutions=[("C12",10.0)],
                       publish=True )',
     'godliness(publish=True)',

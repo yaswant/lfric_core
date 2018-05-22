@@ -1,0 +1,23 @@
+#!jinja2
+{%- set projectName = 'io_dev' %}
+{%- set projectDir  = 'io_dev' %}
+{%- set miniappFlag = True %}
+
+{%- set application_configurations = { 'io_dev' : ['default'] } %}
+
+{%- set canned_configurations  = [''] %}
+
+{%- set groups = {
+'developer': [
+    'run_application( io_dev, default, resolutions=[("C12",)],
+                      checkkgo=False, publish=True )',
+    'check_compilers( io_dev, default, fast-debug, resolutions=[("C12",)], checkkgo=False )',
+    'godliness',
+    'cleanliness'],
+'nightly': [
+    'cleanliness'] } %}
+
+#########################################################################################
+
+{# Include any local miniapp include files here #}
+%include inc/MyMiniappIncludeFile.rc

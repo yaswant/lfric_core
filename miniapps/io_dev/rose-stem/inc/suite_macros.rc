@@ -141,16 +141,16 @@
 {%- macro godliness(publish=False) %}
       [[[R1]]]
 {%-   if 'documentation' in TECHNICAL_DEVELOPER_TESTS %}
-            purge_local => purge_target
-            purge_target => export_source
+            purge_local   => purge_target
+            purge_target  => export_source
             export_source => api_documentation
             export_source => uml_documentation
             export_source => design_documentation
 {%-     if publish %}
             api_documentation    => publish_api_documentation
             api_documentation    => publish_api_log
-            design_documentation => publish_design_documentation
             uml_documentation    => publish_uml_documentation
+            design_documentation => publish_design_documentation
 {%-     endif %}
 {%-   endif %}
 {%- endmacro %}

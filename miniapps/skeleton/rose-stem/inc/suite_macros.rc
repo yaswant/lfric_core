@@ -259,7 +259,8 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
 {%- endmacro %}
 
 {#- #########################################################################}
-{%- macro check_compilers( appName, configuration, build, resolutions=[('')], publish=False ) %}
+{%- macro check_compilers( appName, configuration, build, resolutions=[('')],
+                           publish=False, checkkgo=True ) %}
       [[[R1]]]
 
 {%-   set perform_run = [] %}
@@ -301,7 +302,9 @@ test -w "{{directory}}" -o ! -e "{{directory}}" && rm -rf {{directory}} || ( ech
             run_{{appLabel_res}}_{{label}}:finish => publish_{{appLabel_res}}_{{label}}
 {%-           endif %}
 {%-           if compiler in TARGET_PERFORM_KGO_TESTS %}
+{%-             if checkkgo %}
             run_{{appLabel_res}}_{{label}} => check_{{appLabel_res}}_{{label}}
+{%-             endif %}
 {%-           endif %}
 {%-         endfor %} {# i #}
 {%-       endfor %} {# resolution #}

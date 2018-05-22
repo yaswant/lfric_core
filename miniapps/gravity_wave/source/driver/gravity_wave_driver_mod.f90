@@ -133,14 +133,13 @@ contains
   ! is initialised.
   call log_event( program_name//': Running miniapp ...', LOG_LEVEL_INFO )
 
-! call get_initial_filename( filename )
   call load_configuration( filename )
   call set_derived_config( .false. )
 
   restart = restart_type( restart_filename, local_rank, total_ranks )
 
   !----------------------------------------------------------------------------
-  ! Model init
+  ! Mesh init
   !----------------------------------------------------------------------------
   if ( subroutine_timers ) call timer(program_name)
 
@@ -150,6 +149,9 @@ contains
   ! Create the mesh
   call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id )
 
+  !----------------------------------------------------------------------------
+  ! FEM init
+  !----------------------------------------------------------------------------
   ! Create FEM specifics (function spaces and chi field)
   call init_fem(mesh_id, chi)
 
@@ -179,6 +181,9 @@ contains
 
   end if
 
+  !----------------------------------------------------------------------------
+  ! Model init
+  !----------------------------------------------------------------------------
   multigrid_function_space_chain = function_space_chain_type()
 
   ! Create function space collection and initialise prognostic fields

@@ -9,10 +9,10 @@
 !> Originally these were "block" constructs within the program but neither
 !> GNU or Intel Fortran where properly able to cope with that.
 !>
-module io_miniapp_mod
+module io_dev_mod
 
 
-  use gungho_configuration_mod, only : read_configuration,   &
+  use io_dev_configuration_mod, only : read_configuration,   &
                                        ensure_configuration, &
                                        final_configuration
   use log_mod, only : log_event,         &
@@ -71,4 +71,4 @@ contains
 
   end subroutine load_configuration
 
-end module io_miniapp_mod
+end module io_dev_mod

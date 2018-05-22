@@ -4,11 +4,11 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
-!> @brief init functionality for IO Mini App
+!> @brief init functionality for the io_dev miniapp
 
 !> @details Handles init of a test field for IO
 
-module init_io_miniapp_mod
+module init_io_dev_mod
 
   use constants_mod,                  only : i_def
   use field_mod,                      only : field_type, write_interface
@@ -20,14 +20,14 @@ module init_io_miniapp_mod
   use runtime_constants_mod,          only : create_runtime_constants
   use io_mod,                         only : xios_write_field_face
 
-  use io_miniapp_init_fields_alg_mod, only : io_miniapp_init_fields_alg
+  use io_dev_init_fields_alg_mod,     only : io_dev_init_fields_alg
 
   implicit none
 
 
   contains
 
-  subroutine init_io_miniapp(mesh_id, chi, test_field)
+  subroutine init_io_dev(mesh_id, chi, test_field)
 
     integer(i_def), intent(in)               :: mesh_id
     type( field_type ), intent(inout)        :: chi(:)
@@ -36,7 +36,7 @@ module init_io_miniapp_mod
 
     procedure(write_interface), pointer      :: tmp_ptr
 
-    call log_event( 'IO Mini App: initialisation...', LOG_LEVEL_INFO )
+    call log_event( 'io miniapp: initialisation...', LOG_LEVEL_INFO )
 
     ! Create field
     test_field   = field_type( vector_space = &
@@ -55,12 +55,12 @@ module init_io_miniapp_mod
     call create_runtime_constants(mesh_id, chi)
 
     ! Initialise the test field to a fixed value
-    call io_miniapp_init_fields_alg(test_field)
+    call io_dev_init_fields_alg(test_field)
 
     nullify( tmp_ptr )
 
-    call log_event( 'IO Mini App initialised', LOG_LEVEL_INFO )
+    call log_event( 'io_dev miniapp initialised', LOG_LEVEL_INFO )
 
-  end subroutine init_io_miniapp
+  end subroutine init_io_dev
 
-end module init_io_miniapp_mod
+end module init_io_dev_mod

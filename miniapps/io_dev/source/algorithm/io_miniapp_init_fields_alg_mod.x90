@@ -5,7 +5,7 @@
 !-----------------------------------------------------------------------------
 
 !>@brief Initialisation of a test field for the IO Mini App
-module io_miniapp_init_fields_alg_mod
+module io_dev_init_fields_alg_mod
 
   use log_mod,                         only: log_event,         &
                                              log_scratch_space, &
@@ -18,12 +18,12 @@ module io_miniapp_init_fields_alg_mod
   implicit none
 
   private
-  public :: io_miniapp_init_fields_alg
+  public :: io_dev_init_fields_alg
 
 contains
   !> @details An algorithm for initialising a test field
   !> @param[inout] test_field a test field
-  subroutine io_miniapp_init_fields_alg(test_field)
+  subroutine io_dev_init_fields_alg(test_field)
 
     implicit none
 
@@ -31,12 +31,12 @@ contains
     type( field_type ),   intent(inout) :: test_field
 
 
-    call log_event( "IO Mini App: Initialising test field", LOG_LEVEL_INFO )
+    call log_event( "io_dev: Initialising test field", LOG_LEVEL_INFO )
     ! Set the field values to 1.0
     call invoke( setval_c( test_field, 1.0_r_def ) )
 
-    call log_event( "IO Mini Ap: Initialised test field", LOG_LEVEL_INFO )
+    call log_event( "io_dev: Initialised test field", LOG_LEVEL_INFO )
 
-  end subroutine io_miniapp_init_fields_alg
+  end subroutine io_dev_init_fields_alg
 
-end module io_miniapp_init_fields_alg_mod
+end module io_dev_init_fields_alg_mod

@@ -10,5 +10,6 @@
     'run_application( lfric_atm, wet_conv_bl_scm,  resolutions=[("BiP4x4-10000x10000",600.0)],
                                                    checkkgo=True)',
 
-    'cleanlines'],
-} %}
+    'cleanliness'],
+'nightly': [
+    'cleanliness'] } %}

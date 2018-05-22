@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<simulation> 
+<simulation>
 
   <!-- In this version we have ONE context  -->
-  
-  
-  <context id = "io_mini"> 
-  
+
+  <context id = "io_dev">
+
    <calendar type = "Gregorian" start_date = "2016-01-01 15:00:00" />
 
    <axis_definition>
     <axis id="vert_axis_node" name="levels_nodes"/>
-    <axis id="vert_axis_half_levels" name="half_levels_faces"/>   
-    <axis id="vert_axis_full_levels" name="full_levels_faces"/>   
+    <axis id="vert_axis_half_levels" name="half_levels_faces"/>
+    <axis id="vert_axis_full_levels" name="full_levels_faces"/>
    </axis_definition>
-   
+
    <domain_definition>
       <domain id="node" name="Mesh2d_node" nvertex="1"/>
       <domain id="face_half_levels" name="Mesh2d_half_levels" nvertex="4"/>
@@ -24,7 +23,7 @@
       <domain id="restart_W3" name="restart_W3" nvertex="1"/>
       <domain id="restart_Wtheta" name="restart_Wtheta" nvertex="1"/>
    </domain_definition>
-   
+
    <grid_definition>
     <grid id="node_grid">
       <domain domain_ref="node"/>
@@ -41,44 +40,44 @@
    </grid_definition>
 
    <field_definition prec="8" >
-   
+
      <!-- Checkpoint group -->
      <field_group id="checkpoint_fields" freq_op="1ts" operation="once"  enabled=".FALSE." >
        <field id="checkpoint_test" name="test_field" long_name="air_density" standard_name="air_density" unit="kg m-3" domain_ref="restart_W3" />
      </field_group>
 
      <!-- Diagnostic group -->
-     <field_group id="diagnostic_fields" freq_op="1ts" enabled=".TRUE." operation="instant" >  
+     <field_group id="diagnostic_fields" freq_op="1ts" enabled=".TRUE." operation="instant" >
        <field id="test_field" name="test_field" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_grid" />
-     </field_group>  
-     
+     </field_group>
+
    </field_definition>
 
-   <file_definition 
-      type="one_file" 
+   <file_definition
+      type="one_file"
       par_access="collective"
       time_counter="none">
-      
+
       <!-- Checkpoint/ Restart group -->
-      
+
       <!-- File definition for write -->
       <file id="lfric_checkpoint" name="lfric_io_checkpoint" convention="CF" enabled=".FALSE.">
         <field field_ref="checkpoint_test"/>
-      </file> 
-      
+      </file>
+
        <!-- file definition for read -->
       <file id="lfric_restart" name="lfric_io_checkpoint" mode="read" output_freq="1ts" cyclic="true" enabled=".FALSE.">
        <field id="restart_test" name="test_field" long_name="air_density" standard_name="air_density" unit="kg m-3" operation="instant" domain_ref="restart_W3" />
       </file>
-      
+
       <file id="lfric_diag" name="lfric_io_diag" output_freq="1ts" convention="UGRID" enabled=".TRUE.">
         <field field_ref="test_field"/>
-      </file> 
+      </file>
 
     </file_definition>
-    
+
   </context>
-  
+
   <context id = "xios">
     <variable_definition>
       <variable_group id = "buffer">

@@ -231,7 +231,6 @@
     [[PUBLISH]]
         [[[environment]]]
             DESTINATION = {{publish_destination}}
-            TARGET_PLOT_PYTHON = {{TARGET_PLOT_PYTHON}}
 
 ##############################################################################
 
@@ -511,15 +510,19 @@
 {%-     if 'unit_test_with_' + label in scheduledTasks %}
     [[unit_test_with_{{label}}]]
         inherit = {{family}}, TARGET
-        pre-script = """
-                     {{'\n                     '|
-                       commandList( TARGET_BASE_SETUP,
-                                    compiler_setup[compiler],
-                                    TARGET_BUILD_SETUP,
-                                    TARGET_REVEAL_SETUP,
-                                    deleteDirectory('$WORKING_DIR') )}}
-                     """
-        script      = rose task-run --app-key=compile
+        pre-script  = """
+                      {{'\n                     '|
+                        commandList( TARGET_BASE_SETUP,
+                                     compiler_setup[compiler],
+                                     TARGET_BUILD_SETUP,
+                                     TARGET_REVEAL_SETUP,
+                                     deleteDirectory('$WORKING_DIR') )}}
+                      """
+        script      = """
+                      if [ ! -z ls -A $(SOURCE_DIRECTORY)/integration-test -I data -I support ]; then
+                        rose task-run --app-key=compile
+                      fi
+                      """
         post-script = """
                       {{deleteDirectory('$WORKING_DIR')}}
                       """
@@ -540,19 +543,24 @@
 {%-     if 'integration_test_with_' + label in scheduledTasks %}
     [[integration_test_with_{{label}}]]
         inherit = {{family}}, TARGET
-        pre-script = """
-                     {{'\n                     '|
-                       commandList( TARGET_BASE_SETUP,
-                                    compiler_setup[compiler],
-                                    TARGET_BUILD_SETUP,
-                                    TARGET_REVEAL_SETUP )}}
-                     """
-        script = make -C $SOURCE_DIRECTORY integration-tests
+        pre-script  = """
+                      {{'\n                     '|
+                        commandList( TARGET_BASE_SETUP,
+                                     compiler_setup[compiler],
+                                     TARGET_BUILD_SETUP,
+                                     TARGET_REVEAL_SETUP )}}
+                      """
+        script      = """
+                      if [ ! -z ls -A $(SOURCE_DIRECTORY)/integration-test ]; then
+                        make -C $SOURCE_DIRECTORY integration-tests
+                      fi
+                      """
         post-script = """
                       {{deleteDirectory('$WORKING_DIR')}}
                       """
         [[[environment]]]
-            WORKING_DIR = {{TARGET_BUILD_ROOT}}/integration_{{label}}
+            SOURCE_DIRECTORY = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
+            WORKING_DIR      = {{TARGET_BUILD_ROOT}}/integration_{{label}}
         [[[directives]]]
 {%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
             {{DIRECTIVE}}
@@ -824,6 +832,7 @@
                      mkdir -p $PLOT_DIR
                      # remove old plots before running new ones
                      rm -rf $PLOT_DIR/*.png
+                     {{TARGET_PLOT_PYTHON_SETUP}}
                      """
         script = rose task-run --app-key=plot
         [[[environment]]]

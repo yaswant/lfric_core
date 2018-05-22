@@ -120,11 +120,11 @@
 
 
 {#- #########################################################################}
-{%- macro cleanlines() %}
+{%- macro cleanliness() %}
       [[[R1]]]
+            purge_local   => purge_target
 {%-   set label =  TARGET_TECHNICAL_COMPILER | lower + '_fast-debug' %}
 {%-   if 'cleanliness' in TECHNICAL_DEVELOPER_TESTS %}
-            purge_local   => purge_target
             purge_target  => export_source
             export_source => compile_{{projectName}}_with_{{label}}
 
@@ -137,8 +137,8 @@
 
 
 {#- ######################################################################## #}
-{#- Documentation, it's next to cleanlines ##################################}
-{%- macro godlines(publish=False) %}
+{#- Documentation, it's next to cleanliness ##################################}
+{%- macro godliness(publish=False) %}
       [[[R1]]]
 {%-   set label =  TARGET_TECHNICAL_COMPILER | lower + '_fast-debug' %}
 {%-   if 'documentation' in TECHNICAL_DEVELOPER_TESTS %}
