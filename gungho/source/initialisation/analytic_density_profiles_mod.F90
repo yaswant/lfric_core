@@ -23,6 +23,7 @@ use idealised_config_mod,       only : idealised_test_cold_bubble_x,           &
                                        idealised_test_yz_cosine_hill,          &
                                        idealised_test_slotted_cylinder,        &
                                        idealised_test_constant_field,          &
+                                       idealised_test_hadley_like_dcmip,       &
                                        idealised_test_cosine_stripe,           &
                                        idealised_test_vortex_field,            &
                                        idealised_test_gravity_wave,            &
@@ -48,6 +49,7 @@ private
 
 public :: vortex_field
 public :: analytic_density
+public :: hadley_like_dcmip
 
 contains
 
@@ -109,6 +111,36 @@ function vortex_field(lat,long,radius,time) result(density)
                                                     sin(lon_dash-omega*time))
 
 end function vortex_field
+
+
+!>@brief Compute the density function from Allen and Zerroukat 2016
+!>@details  Equations below have been taken from Allen and Zerroukat, "A deep
+!> non-hydrostatic compressible atmospheric model on a Yin-Yang grid", JCP, 2016,
+!> equation (5.5)
+!> Parameter values have been taken from the paper and are currently
+!> hard-wired
+!>@param[in] radius Distance from the centre of the planet to the point of interest
+!>@return density Value of the tracer field at this point
+function hadley_like_dcmip(radius) result(density)
+  implicit none
+  real(kind=r_def), intent(in) :: radius
+  real(kind=r_def)             :: density
+
+  real(kind=r_def) :: z, z1, z2, z0
+
+  z = radius - scaled_radius
+
+  z1 = 2000.0_r_def
+  z2 = 5000.0_r_def
+  z0 = 0.5_r_def*(z1+z2)
+
+  if ((z-z1)*(z2-z)>0) then
+    density = 0.5_r_def*(1.0_r_def + cos(2.0_r_def*pi*(z-z0)/(z2-z1)))
+  else
+    density = 0.0_r_def
+  end if
+
+end function hadley_like_dcmip
 
 
 !> @brief Compute an analytic density field
@@ -252,6 +284,9 @@ function analytic_density(chi, choice, time) result(density)
 
   case( idealised_test_vortex_field )
     density = vortex_field(lat,long,radius,time)
+
+  case( idealised_test_hadley_like_dcmip )
+    density = hadley_like_dcmip(radius)
 
   case( idealised_test_solid_body_rotation,                                    &
         idealised_test_solid_body_rotation_alt )

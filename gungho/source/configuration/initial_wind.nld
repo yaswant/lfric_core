@@ -13,6 +13,7 @@ namelist initial_wind
                                NL_case_4,
                                xy_NL_case_1,
                                yz_NL_case_1,
+                               hadley_like_dcmip,
                                vortex]
   u0                : real
   v0                : real

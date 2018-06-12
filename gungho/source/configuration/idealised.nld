@@ -15,6 +15,7 @@ namelist idealised
                      constant_field,          ! Constant density value everywhere (planar or spherical)
                      cosine_stripe,           ! Cosine profile which is a function of longitude only (planar or spherical)
                      vortex_field,            ! Pair of vortices (spherical)
+                     hadley_like_dcmip,       ! Hadley-like DCMIP test (spherical)
                      held_suarez,             ! Held-Suarez idealised initialization
                      solid_body_rotation,     ! Solid body rotation test
                      solid_body_rotation_alt, ! Switchable deep/shallow solid body rotation test

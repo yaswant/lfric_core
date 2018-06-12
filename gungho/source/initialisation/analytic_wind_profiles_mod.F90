@@ -25,7 +25,8 @@ use initial_wind_config_mod, only : &
                                initial_wind_profile_NL_case_1,                 &
                                initial_wind_profile_NL_case_2,                 &
                                initial_wind_profile_NL_case_3,                 &
-                               initial_wind_profile_NL_case_4
+                               initial_wind_profile_NL_case_4,                 &
+                               initial_wind_profile_hadley_like_dcmip
 
 use planet_config_mod,  only : scaled_radius
 use log_mod,            only : log_event,                &
@@ -43,12 +44,48 @@ private :: NL_wind_case_3
 private :: NL_wind_case_4
 private :: xy_NL_wind_case_1
 private :: yz_NL_wind_case_1
+private :: hadley_like_dcmip
 private :: xy2longlat
 private :: yz2longlat
 
 public :: analytic_wind
 
 contains
+
+!> @brief Compute wind field for Hadley-like DCMIP test
+!> @param[in] lat Latitudinal position
+!> @param[in] height Radial distance
+!> @param[in] time Time
+!> @result u Result wind field vector (u,v,w)
+function hadley_like_dcmip(lat,height,time) result(u)
+  implicit none
+  real(kind=r_def), intent(in)    :: lat
+  real(kind=r_def), intent(in)    :: height
+  real(kind=r_def), intent(in)    :: time
+  real(kind=r_def), dimension(3)  :: u
+
+  real(kind=r_def)             :: u0, w0, k, top_of_atmosphere, l, z
+  real(kind=r_def)             :: tau, time_period
+
+  ! Equations below have been taken from Allen and Zerroukat, "A deep
+  !> non-hydrostatic compressible atmospheric model on a Yin-Yang grid", JCP, 2016,
+  !> or equivalently Kent, Ullrich, Jablonowski, "Dynamical core intercomparison project:
+  !> Tracer transport test cases", QJRMS 2014.
+
+  u0 = 40.0_r_def
+  w0 = 0.03_r_def
+  k = 5.0_r_def
+  top_of_atmosphere = 12000.0_r_def
+  l = pi/top_of_atmosphere
+  time_period = 24.0_r_def*60.0_r_def*60.0_r_def
+  tau = pi/time_period
+  z = height-scaled_radius
+
+  u(1) = u0*cos(lat)
+  u(2) = (-scaled_radius*w0*l)*cos(lat)*sin(k*lat)*cos(l*z)*cos(tau*time)
+  u(3) = w0*(-2.0_r_def*sin(k*lat)*sin(lat)+k*cos(k*lat)*cos(lat))*sin(l*z)*cos(tau*time)
+
+end function hadley_like_dcmip
 
 !> @brief Compute a vortex wind field
 !> @param[in] lat Latitudinal position
@@ -384,6 +421,8 @@ function analytic_wind(chi, time, choice, num_options, option_arg) result(u)
       u = xy_NL_wind_case_1(chi(1),chi(2),time)
     case ( initial_wind_profile_yz_NL_case_1 )
       u = yz_NL_wind_case_1(chi(2),chi(3),time)
+    case ( initial_wind_profile_hadley_like_dcmip )
+      u = hadley_like_dcmip(chi(2),chi(3),time)
 
     case default
       write( log_scratch_space, '(A)' )  'Invalid velocity profile choice, stopping'

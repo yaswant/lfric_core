@@ -128,7 +128,8 @@ contains
                                initial_wind_profile_NL_case_1,               &
                                initial_wind_profile_NL_case_2,               &
                                initial_wind_profile_NL_case_3,               &
-                               initial_wind_profile_NL_case_4
+                               initial_wind_profile_NL_case_4,               &
+                               initial_wind_profile_hadley_like_dcmip
 
     implicit none
 
@@ -289,6 +290,22 @@ contains
 
     @assertEqual(0.62831853071795862_r_def, u(1), tol)
     @assertEqual(-0.86354124622677830_r_def, u(2), tol)
+
+    initial_time = 3600.0_r_def
+    llr = (/ PI/8.0_r_def, 0.0_r_def, 6000000.0_r_def + 4500.0_r_def /)
+    u = analytic_wind(llr,initial_time,initial_wind_profile_hadley_like_dcmip,0)
+
+    @assertEqual(40.0_r_def, u(1), tol)
+    @assertEqual(0.0_r_def, u(2), tol)
+    @assertEqual(0.137396342255513_r_def, u(3), tol)
+
+    initial_time = 82800.0_r_def
+    llr = (/ PI/4.0_r_def, 0.0_r_def, 6000000.0_r_def + 4500.0_r_def /)
+    u = analytic_wind(llr,initial_time,initial_wind_profile_hadley_like_dcmip,0)
+
+    @assertEqual(40.0_r_def, u(1), tol)
+    @assertEqual(0.0_r_def, u(2), tol)
+    @assertEqual(-0.137396342255513_r_def, u(3), tol)
 
   end subroutine test_all
 

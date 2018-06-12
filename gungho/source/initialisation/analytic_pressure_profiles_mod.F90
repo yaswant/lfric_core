@@ -25,6 +25,7 @@ use idealised_config_mod,       only : idealised_test_cold_bubble_x,           &
                                        idealised_test_constant_field,          &
                                        idealised_test_cosine_stripe,           &
                                        idealised_test_vortex_field,            &
+                                       idealised_test_hadley_like_dcmip,       &
                                        idealised_test_gravity_wave,            &
                                        idealised_test_solid_body_rotation,     &
                                        idealised_test_solid_body_rotation_alt, &
@@ -229,7 +230,8 @@ contains
     case (idealised_test_vortex_field)
       pressure = vortex_field(lat,long,radius,time)
   
-    case( idealised_test_yz_cosine_hill )
+    case( idealised_test_yz_cosine_hill, &
+          idealised_test_hadley_like_dcmip )
       ! This case is for transport of tracers and density only so it is not
       ! calculated here.
 
