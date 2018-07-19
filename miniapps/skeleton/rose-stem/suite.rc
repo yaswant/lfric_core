@@ -186,10 +186,8 @@
                  svn export --force {{SOURCE_LFRIC}}/mesh_tools/Makefile     $SOURCE_ROOT/mesh_tools
 
                  mkdir -p `dirname $SOURCE_ROOT/gungho/source`
-                 mkdir -p `dirname $SOURCE_ROOT/gungho/documentation`
                  mkdir -p `dirname $SOURCE_ROOT/gungho/optimisation`
                  svn export --force {{SOURCE_LFRIC}}/gungho/source           $SOURCE_ROOT/gungho/source
-                 svn export --force {{SOURCE_LFRIC}}/gungho/documentation    $SOURCE_ROOT/gungho/documentation
                  svn export --force {{SOURCE_LFRIC}}/gungho/optimisation     $SOURCE_ROOT/gungho/optimisation
                  svn export --force {{SOURCE_LFRIC}}/gungho/Makefile         $SOURCE_ROOT/gungho/Makefile
 
@@ -272,7 +270,7 @@
 ##############################################################################
     [[TECHNICAL]]
         [[[environment]]]
-            SOURCE_DIRECTORY      = $SOURCE_ROOT/gungho
+            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
             WORKING_DIR           = {{LOCAL_BUILD_ROOT}}/{{TARGET_TECHNICAL_COMPILER}}_fast-debug
 
@@ -287,7 +285,7 @@
                                     'mkdir -p $WORKING_DIR',
                                     'cp -rp $SOURCE_DIRECTORY/build/* $WORKING_DIR' )}}
                      """
-        script = make -C $SOURCE_DIRECTORY/gungho/source unused-check
+        script = make -C $SOURCE_DIRECTORY/source unused-check
         post-script = {{deleteDirectory( '$WORKING_DIR' )}}
         [[[directives]]]
 {%-   for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
@@ -410,7 +408,7 @@
 {%-       do rose_suite_gui_headers.append(family) %}
     [[{{family}}]]
         [[[environment]]]
-            SOURCE_DIRECTORY      = $SOURCE_ROOT/gungho
+            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{label}}
             COMPILER              = {{compiler}}
             {#- We can't define WORKING_DIR here as it may contain    #}
@@ -438,7 +436,6 @@
                       echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/compile.log.path
                       """
         [[[environment]]]
-            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
             WORKING_DIR           = {{TARGET_BUILD_ROOT}}/{{label}}
             BIN_DIR               = $DESTINATION_DIRECTORY/bin
             TARGET                = build
@@ -534,7 +531,6 @@
                       {{deleteDirectory('$WORKING_DIR')}}
                       """
         [[[environment]]]
-            SOURCE_DIRECTORY      = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
             WORKING_DIR           = {{TARGET_BUILD_ROOT}}/{{label}}
             TARGET                = unit-tests
             PROFILE               = {{build}}
@@ -572,7 +568,6 @@
                       {{deleteDirectory('$WORKING_DIR')}}
                       """
         [[[environment]]]
-            SOURCE_DIRECTORY = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
             WORKING_DIR      = {{TARGET_BUILD_ROOT}}/integration_{{label}}
         [[[directives]]]
 {%-       for DIRECTIVE in TARGET_BUILD_BATCHER_DIRECTIVES %}
@@ -606,7 +601,6 @@
             APP_NAME         = {{appName}}
             BIN_DIR          = $DESTINATION_DIRECTORY/bin
             OMP_NUM_THREADS  = 1
-            SOURCE_DIRECTORY = $SOURCE_ROOT/{{appPathFragment}}{{appName}}
 
         [[[directives]]]
 {%-         for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
