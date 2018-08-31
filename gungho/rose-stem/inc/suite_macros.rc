@@ -31,43 +31,16 @@
 {%-       set res_value, dt_values, res_label, dt_labels, res_opt = resolution | getResolutionLabels() %}
 {%-       for i in range(0,dt_values|length) %}
 {%-         set appName_res_label = appLabel ~ res_label ~ dt_labels[i] %}
-
-{%-         if crun > 1  %}
-         [[[R{{crun}}/P1/{{crun}}]]]
-            graph = """
-            run_{{appName_res_label}}_{{label}}[-P1] => run_{{appName_res_label}}_{{label}}
-                 """
-         [[[R1/P{{crun}}/{{crun}}]]]
-            graph = """
-{%-           if checkkgo %}
-{%-             if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS  %}
-            run_{{appName_res_label}}_{{label}} => check_{{appName_res_label}}_{{label}}
-{%-             endif %}
-{%-           endif %}
-{%-           if plotstr %}
-{%-             do plot_config.update( {appLabel : plotstr} ) %}
-            run_{{appName_res_label}}_{{label}} => plot_{{appName_res_label}}_{{label}}
-{%-             if publish %}
-            plot_{{appName_res_label}}_{{label}} => publish_{{appName_res_label}}_{{label}}_plots
-{%-             endif %}
-{%-           endif %}
-                 """
-{%-         endif %}
-
-        [[[R1]]]
+        [[[R1]]] {#- Repeat once at the start #}
             graph = """
             purge_local => purge_target
             purge_target => export_source
-            export_source => compile_{{projectName}}_with_{{label}}
             export_source => compile_mesh_tools_with_{{label}}
-{%-         if publish %}
-            compile_{{projectName}}_with_{{label}}:finish => publish_{{label}}_compile
-{%-         endif %}
+            export_source => compile_{{projectName}}_with_{{label}}
 
 {%-         if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
 {%-           if res_label != '' %}
             compile_mesh_tools_with_{{label}} => generate_mesh{{res_label}}_{{label}}
-            generate_mesh{{res_label}}_{{label}} => run_{{appName_res_label}}_{{label}}
 {%-           endif %}
 {%-           if support_meshes != [''] %}
 {%-             for mesh_name in support_meshes %}
@@ -79,25 +52,25 @@
 
             compile_{{projectName}}_with_{{label}} => run_{{appName_res_label}}_{{label}}
 
-{%-         if checkkgo %}
-{%-           if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_RUN %}
-{%-             if TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS and crun < 2  %}
-            run_{{appName_res_label}}_{{label}} => check_{{appName_res_label}}_{{label}}
-{%-             endif %}
-{%-           endif %}
+{%-         if checkkgo and TARGET_SCIENCE_COMPILER in TARGET_PERFORM_KGO_TESTS  %}
+            run_{{appName_res_label}}_{{label}}[{{crun}}] => check_{{appName_res_label}}_{{label}}
 {%-         endif %}
-
-{%-         if publish %}
-            run_{{appName_res_label}}_{{label}}:finish => publish_{{appName_res_label}}_{{label}}
-{%-         endif %}
-{%-         if plotstr and crun < 2 %}
-{%-           do plot_config.update( {appLabel : plotstr} ) %}
-            run_{{appName_res_label}}_{{label}} => plot_{{appName_res_label}}_{{label}}
-{%-           if publish %}
+{%-         if plotstr %}
+{%-             do plot_config.update( {appLabel : plotstr} ) %}
+            run_{{appName_res_label}}_{{label}}[{{crun}}] => plot_{{appName_res_label}}_{{label}}
+{%-             if publish %}
             plot_{{appName_res_label}}_{{label}} => publish_{{appName_res_label}}_{{label}}_plots
-{%-           endif %}
+{%-             endif %}
 {%-         endif %}
-                 """
+                    """
+         [[[R{{crun}}/P1/{{crun}}]]] {#- Repeat cycle times, once per cycle ending on last cycle #}
+            graph = """
+            run_{{appName_res_label}}_{{label}}[-P1] => run_{{appName_res_label}}_{{label}}
+                    """
+
+         [[[R1/P{{crun}}/{{crun}}]]] {#- Repeat once at last cycle #}
+           graph = """
+                   """
 {%-       endfor %} {# i #}
 {%-     endfor %} {# resolution #}
 {%-   endfor %} {# appConfigsCompilerRuns #}
@@ -209,7 +182,7 @@
             generate_mesh{{res_label}}_{{label}} => run_{{appLabel_res}}_{{label}}
             compile_{{projectName}}_with_{{label}} => run_{{appLabel_res}}_{{label}}
 {%-           if publish %}
-            run_{{appLabel_res}}_{{label}}:finish => publish_{{appLabel_res}}_{{label}}
+            run_{{appLabel_res}}_{{label}} => publish_{{appLabel_res}}_{{label}}_run
 {%-           endif %}
 {%-           if compiler in TARGET_PERFORM_KGO_TESTS %}
             run_{{appLabel_res}}_{{label}} => check_{{appLabel_res}}_{{label}}

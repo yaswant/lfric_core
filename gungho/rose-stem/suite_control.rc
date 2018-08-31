@@ -138,11 +138,13 @@
             'run_application( gungho, robert10m, resolutions=[("BiP100x4-10x10",1.25)],checkkgo=False,
                               env={"crun":1, "nrun":432,
                                    "directives":{"default":{"mpi_parts":10,"threads":1,"wallclock":"01:30:00"} } },
-                              plotstr="robert_plot.py $NODAL_DATA_DIR 100 4 theta:w3projection_xi2 T000000:T000576:T000864 $PLOT_DIR" )',
+                              plotstr="robert_plot.py $NODAL_DATA_DIR 100 4 theta:w3projection_xi2 T000000:T000576:T000864 $PLOT_DIR",
+                              publish=True )',
             'run_application( gungho, robert5m, resolutions=[("BiP200x4-5x5",0.625)],checkkgo=False,
                               env={"crun":8, "nrun":216,
                                    "directives":{"default":{"mpi_parts":20,"threads":1,"wallclock":"01:30:00"} } },
-                              plotstr="robert_plot.py $NODAL_DATA_DIR 200 4 theta:w3projection_xi2 T000000:T001152:T001728 $PLOT_DIR" )',
+                              plotstr="robert_plot.py $NODAL_DATA_DIR 200 4 theta:w3projection_xi2 T000000:T001152:T001728 $PLOT_DIR",
+                              publish=True )',
             'run_application( gungho, baroclinic, resolutions=[("C48",1800.0),("C96",900.0)],checkkgo=False,
                               env={"crun":10,
                                    "nrun":{"default":96, ("C48",1800.0):48},"directives":
@@ -153,7 +155,8 @@
                                                             "threads":1,
                                                              "wallclock":"01:30:00"} }
                                   },
-                              plotstr="baroclinic.py diagDynamo $NODAL_DATA_DIR theta:exner:w3projection_u1:w3projection_u2:w3projection_u3 T000384:T000480:T000768:T000960 $PLOT_DIR 1")',
+                              plotstr="baroclinic.py diagDynamo $NODAL_DATA_DIR theta:exner:w3projection_u1:w3projection_u2:w3projection_u3 T000384:T000480:T000768:T000960 $PLOT_DIR 1",
+                              publish=True )',
             'run_application( gungho, hs, resolutions=[("C24",600.0),("C48",600.0)],checkkgo=False,
                               env={"crun":10, "nrun": {"default":1440,},
                                    "directives":{"default":{"mpi_parts":144,
@@ -166,16 +169,20 @@
                                                                    "xios_nodes":1,}
                                                 }
                                   },
-                              plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR")',
+                              plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR",
+                              publish=True )',
             'run_application( gungho, straka_50m, resolutions=[("BiP1024x4-50x50",1.25)],checkkgo=False,
                               env={"crun":1, "nrun":720,
                                    "directives":{"default":{"mpi_parts":128,"threads":1,"wallclock":"01:30:00"} } },
-                              plotstr="straka_plot_x.py $NODAL_DATA_DIR 1024 4 theta T000720 $PLOT_DIR" )',
+                              plotstr="straka_plot_x.py $NODAL_DATA_DIR 1024 4 theta T000720 $PLOT_DIR",
+                              publish=True )',
             'run_application( gungho, straka_25m, resolutions=[("BiP2048x4-25x25",0.625)],checkkgo=False,
                               env={"crun":2, "nrun":720,
                                    "directives":{"default":{"mpi_parts":256,"threads":1,"wallclock":"01:30:00"} } },
-                              plotstr="straka_plot_x.py $NODAL_DATA_DIR 2048 4 theta T001440 $PLOT_DIR" )']
-                        }
+                              plotstr="straka_plot_x.py $NODAL_DATA_DIR 2048 4 theta T001440 $PLOT_DIR",
+                              publish=True )',
+            'publish_commit']
+                 }
 %}
 
 {# The csar groups are now included in the following #}

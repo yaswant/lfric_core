@@ -22,11 +22,14 @@
 {%- if RUN_NAMES is defined %}
 {%-   if RUN_NAMES is string %}
 {%-     set groupsToRun = [RUN_NAMES] %}
+{%-     set publishGroup = RUN_NAMES %}
 {%-   else %}
 {%-     set groupsToRun = RUN_NAMES %}
+{%-     set publishGroup = RUN_NAMES[0] %}
 {%-   endif %}
 {%- else %}
 {%-   set groupsToRun = ['developer'] %}
+{%-   set publishGroup = 'developer' %}
 {%- endif %}
 
 {%- if miniappFlag == True %}
@@ -55,7 +58,7 @@
 {#                          These are updated from the mission calls.   #}
 
 {%- set crunInfo = {'maxcrun':1} %}  {# 'maxcrun' is used as the number of cycles based on the requested jobs #}
-{%- set MAXRUNAHEAD = 50 %} {# The maximum allowable runahead limit - if we need more thant this then maybe split up the suite, or just be patient! #}
+{%- set MAXRUNAHEAD = 3 %}
 {%- set scheduledTasksEnv = {} %}
 {%- set scheduledTasksDict = {} %}
 {%- set dummy = setTaskEnv(scheduledTasksDict) -%} {# sets the environment configurations for each job #}
@@ -94,7 +97,7 @@
     cycling mode = integer
     initial cycle point = 1
     final cycle point   = {{ crunInfo['maxcrun'] }}
-    max active cycle points = {{ crunInfo['maxcrun'] if crunInfo['maxcrun'] < MAXRUNAHEAD else MAXRUNAHEAD  }}
+    max active cycle points = {{ crunInfo['maxcrun'] if crunInfo['maxcrun'] < MAXRUNAHEAD else MAXRUNAHEAD }}
 
     [[queues]]
         [[[host_throttle]]]
@@ -142,7 +145,7 @@
             batch system = {{TARGET_BATCHER}}
 
 
-{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-' + TARGET_OPT %}
+{%- set publish_destination = '$CYLC_SUITE_SHARE_DIR/publish-' + publishGroup + '-' + TARGET_OPT %}
     [[PUBLISH]]
         [[[environment]]]
             DESTINATION = {{publish_destination}}
@@ -242,7 +245,7 @@
                      """
         script = rose task-run --app-key=publish --command-key=index
         [[[environment]]]
-            DESTINATION = $CYLC_SUITE_SHARE_DIR/publish-{{TARGET_OPT}}
+            DESTINATION = {{publish_destination}}
 {%-   if ROSE_BUSH_URL %}
             ROSE_BUSH_ARG = -bush {{ROSE_BUSH_URL}}
 {%-   endif %}
@@ -255,8 +258,8 @@
         inherit = None, LOCAL
         script = rose task-run --app-key=publish --command-key=mirror
         [[[environment]]]
-            SOURCE  = $CYLC_SUITE_SHARE_DIR/publish-{{TARGET_OPT}}
-            TARGET  = file:///$HOME/public_html/lfric-gungho-{{TARGET_OPT}}
+            SOURCE  = {{publish_destination}}
+            TARGET  = file:///$HOME/public_html/lfric-gungho-{{TARGET_OPT}}-{{publishGroup}}
 {%- endif %}
 
 {%- if 'mirror_results_remote' in scheduledTasks %}
@@ -267,7 +270,7 @@
         script = rose task-run --app-key=publish --command-key=mirror
         [[[environment]]]
             REWRITE = {{MIRROR_REWRITE}}
-            SOURCE  = $CYLC_SUITE_SHARE_DIR/publish-{{TARGET_OPT}}
+            SOURCE  = {{publish_destination}}
             TARGET  = {{MIRROR_UPLOAD_URL}}lfric-gungho-{{TARGET_OPT}}
 {%- endif %}
 
@@ -862,18 +865,23 @@
              NODAL_DATA_DIR = $DESTINATION_DIRECTORY/{{pathFragment}}/results
              PLOT_DIR = $DESTINATION_DIRECTORY/{{pathFragment}}/plots
              PLOT_CONFIG = {{plot_config[plot_label]}}
+
+        [[[directives]]]
+{%-                 for DIRECTIVE in TARGET_TECHNICAL_BATCHER_DIRECTIVES %}
+            {{DIRECTIVE}}
+{%-                 endfor %}
 {%-               endif %}
 
 
 {# PUBLISH THE APP OUTPUT #}
-{%-               if 'publish_' + configuration_label_res in scheduledTasks %}
+{%-               if 'publish_' + configuration_label_res + '_run' in scheduledTasks %}
 {%-                 if 'publish_output' not in rose_suite_gui_headers %}
 {%-                   do rose_suite_gui_headers.append('publish_output') %}
     [[PUBLISH_OUTPUT]]
         inherit = PUBLISH, LOCAL
 {%-                 endif %}
 
-    [[publish_{{configuration_label_res}}]]
+    [[publish_{{configuration_label_res}}_run]]
         inherit = PUBLISH_OUTPUT, {{appLabel|upper}}_{{label|upper}}
         pre-script = """
                      {{ensureDestination()}}
