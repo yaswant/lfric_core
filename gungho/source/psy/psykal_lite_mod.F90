@@ -1096,21 +1096,22 @@ contains
     field_res_proxy = field_res%get_proxy()
 
     !sanity check
-    undf = field1_proxy%vspace%get_undf()
-    if(undf /= field2_proxy%vspace%get_undf() ) then
+    undf = field1_proxy%vspace%get_last_dof_owned()
+    if(undf /= field2_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:axpy:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf /= field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:axpy:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
+
     !$omp parallel do schedule(static), default(none) &
     !$omp&  shared(field1_proxy,field2_proxy, field_res_proxy, &
     !$omp&  undf, scalar),  private(i)
@@ -1244,23 +1245,21 @@ contains
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
-    integer(kind=i_def)                :: depth, dplp
-    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
     field_res_proxy = field_res%get_proxy()
 
     !sanity check
-    undf = field1_proxy%vspace%get_undf()
-    if(undf /= field2_proxy%vspace%get_undf() ) then
+    undf = field1_proxy%vspace%get_last_dof_owned()
+    if(undf /= field2_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:minus_field_data:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf /= field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:minus_field_data:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -1273,16 +1272,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
-    depth = mesh%get_halo_depth()
-
-    do dplp = 1, depth
-      if( field1_proxy%is_dirty(depth=dplp) .or. field2_proxy%is_dirty(depth=dplp) ) then
-        call field_res_proxy%set_dirty()
-      else
-        call field_res_proxy%set_clean(dplp)
-      end if
-    end do
+    call field_res_proxy%set_dirty()
 
   end subroutine invoke_minus_field_data
   
@@ -1298,23 +1288,21 @@ contains
     type( field_proxy_type)            :: field1_proxy,field2_proxy      &
                                         , field_res_proxy
     integer(kind=i_def)                :: i,undf
-    integer(kind=i_def)                :: depth, dplp
-    type(mesh_type), pointer           :: mesh => null()
 
     field1_proxy = field1%get_proxy()
     field2_proxy = field2%get_proxy()
     field_res_proxy = field_res%get_proxy()
 
     !sanity check
-    undf = field1_proxy%vspace%get_undf()
-    if(undf /= field2_proxy%vspace%get_undf() ) then
+    undf = field1_proxy%vspace%get_last_dof_owned()
+    if(undf /= field2_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:plus_field_data:field1 and field2 live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
       !abort
       stop
     endif
-    if(undf /= field_res_proxy%vspace%get_undf() ) then
+    if(undf /= field_res_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:plus_field_data:field1 and result_field live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -1327,16 +1315,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
-    depth = mesh%get_halo_depth()
-
-    do dplp = 1, depth
-      if( field1_proxy%is_dirty(depth=dplp) .or. field2_proxy%is_dirty(depth=dplp) ) then
-        call field_res_proxy%set_dirty()
-      else
-        call field_res_proxy%set_clean(dplp)
-      end if
-    end do
+    call field_res_proxy%set_dirty()
 
   end subroutine invoke_plus_field_data
   
@@ -1439,15 +1418,14 @@ contains
     type( field_type ), intent(inout ) :: field_res
     type( field_proxy_type)            :: field1_proxy , field_res_proxy
     integer(kind=i_def)                :: i,undf
-    integer(kind=i_def)                :: depth, dplp
-    type(mesh_type), pointer           :: mesh => null()
+
 
     field1_proxy = field1%get_proxy()
     field_res_proxy = field_res%get_proxy()
 
     !sanity check
-    undf = field1_proxy%vspace%get_undf()
-    if(undf /= field_res_proxy%vspace%get_undf() ) then
+    undf = field1_proxy%vspace%get_last_dof_owned()
+    if(undf /= field_res_proxy%vspace%get_last_dof_owned() ) then
       ! they are not on the same function space
       call log_event("Psy:copy_scaled_field_data:field1 and field_res live on different w-spaces" &
                     , LOG_LEVEL_ERROR)
@@ -1460,16 +1438,7 @@ contains
     end do
     !$omp end parallel do
    
-    mesh => field_res%get_mesh()
-    depth = mesh%get_halo_depth()
-        
-    do dplp = 1, depth
-       if( field1_proxy%is_dirty(depth=dplp) ) then
-          call field_res_proxy%set_dirty()
-       else
-          call field_res_proxy%set_clean(dplp)
-       end if
-    end do
+    call field_res_proxy%set_dirty()
    
   end subroutine invoke_copy_scaled_field_data
 
@@ -1686,7 +1655,9 @@ contains
       f_p(i) = field(i)%get_proxy()
       x_p(i) = coords(i)%get_proxy()
     end do
-    undf = f_p(1)%vspace%get_undf()
+
+    undf = f_p(1)%vspace%get_last_dof_owned()
+
     do df = 1, undf
       vector_in(:)  = (/ f_p(1)%data(df), f_p(2)%data(df), f_p(3)%data(df) /)              
       xyz(:)        = (/ x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df) /)
@@ -1715,7 +1686,9 @@ contains
     do i = 1,3
       x_p(i) = coords(i)%get_proxy()
     end do
-    undf = x_p(1)%vspace%get_undf()
+
+    undf = x_p(1)%vspace%get_last_dof_owned()
+
     do df = 1, undf
       call xyz2llr(x_p(1)%data(df), x_p(2)%data(df), x_p(3)%data(df), &
                    llr(1), llr(2), llr(3))
