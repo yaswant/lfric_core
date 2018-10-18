@@ -6,7 +6,12 @@
 {%- set application_configurations = { 'transport' : ['cosine_hill_45deg',
                                                       'transport-biperiodic',
                                                       'yz_biperiodic_cosmic',
-                                                      'hadley_like_dcmip'] } %}
+                                                      'hadley_like_dcmip',
+                                                      'biperiodic-cosmic',
+                                                      'divergence_cosmic',
+                                                      'northpole_cosine_hill',
+                                                      'corner_cosine_hill',
+                                                      'equator_cosine_hill'] } %}
 
 {%- set canned_configurations  = ['transport'] %}
 
@@ -25,4 +30,16 @@
     'godliness',
     'cleanliness'],
 'nightly': [
+    'run_application( transport, divergence_cosmic,      resolutions=[("C32",1.0)],
+                      plotstr="slices.py transport $NODAL_DATA_DIR density T000000:T000050:T000100:T000150:T000200:T000250 -1 -91 0 $PLOT_DIR" )',
+    'run_application( transport, biperiodic-cosmic,      resolutions=[("BiP200x200-5x5",1.0)],
+                      plotstr="biperiodic-cosmic_plot.py $NODAL_DATA_DIR 200 200 density T000000:T000500 $PLOT_DIR" )',
+    'run_application( transport, equator_cosine_hill,      resolutions=[("C48",4050.0)],
+                      env={"crun":1, "nrun":256,
+                           "directives":{"default":{"mpi_parts":12,"threads":1,"wallclock":"00:05:00"} } },
+                      plotstr="slices.py transport $NODAL_DATA_DIR density T000000:T000064:T000128:T000192:T000256 -1 -91 0 $PLOT_DIR" )',
     'cleanliness'] } %}
+
+
+%include inc/cosmic.rc
+{%- do groups.update(cosmic_groups) %}

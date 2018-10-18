@@ -2,7 +2,7 @@
 {# These can then be imported into the main rose stem groups as required #}
 
 {%- set cosmic_groups = {
-               'cosmic-northpole_cosine_hill':['run_application(gungho, northpole_cosine_hill,
+               'cosmic-northpole_cosine_hill':['run_application(transport, northpole_cosine_hill,
                                          resolutions=[("C24", 8100.0),
                                                       ("C48", 4050.0),
                                                       ("C96", 2025.0),
@@ -23,7 +23,7 @@
                                              },
                                          checkkgo=False)'
                                ],
-               'cosmic-equator_cosine_hill':['run_application(gungho, equator_cosine_hill,
+               'cosmic-equator_cosine_hill':['run_application(transport, equator_cosine_hill,
                                          resolutions=[("C24", 8100.0),
                                                       ("C48", 4050.0),
                                                       ("C96", 2025.0),
@@ -44,7 +44,7 @@
                                              },
                                          checkkgo=False)'
                                ],
-               'cosmic-corner_cosine_hill':['run_application(gungho, corner_cosine_hill,
+               'cosmic-corner_cosine_hill':['run_application(transport, corner_cosine_hill,
                                          resolutions=[("C24", 8100.0),
                                                       ("C48", 4050.0),
                                                       ("C96", 2025.0),

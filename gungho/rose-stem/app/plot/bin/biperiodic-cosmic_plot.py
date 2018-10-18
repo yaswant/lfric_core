@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
     for ts in ts_list:
 
-      filestem =  datapath + "/diagDynamo_nodal_" + field + "_" + ts + "*"
+      filestem =  datapath + "/transport_nodal_" + field + "_" + ts + "*"
 
       if field in ['u','xi']:
         # Vector field - plot w component by default

@@ -1,0 +1,2 @@
+Inner product checksum density = 406D4EAC4A84304B
+Inner product checksum wind = 439CE15E2F9A6E6C
