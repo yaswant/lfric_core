@@ -240,7 +240,7 @@ contains
     call r%axpy(1.0_r_def, b)   ! r = b - A.x
     r_nrm_0 = r%norm()                   ! r_0 = ||r||_2
     write(log_scratch_space,'(A,E15.8)')  &
-         "cg starting ||b|| = ", r_nrm_0
+         "cg starting ||r|| = ||b - A.x|| = ", r_nrm_0
     call log_event(log_scratch_space,LOG_LEVEL_DEBUG)
 
     call z%set_scalar(0.0_r_def)
@@ -332,6 +332,7 @@ contains
 
     ! tempory vectors
     class(abstract_vector_type), allocatable :: r
+    class(abstract_vector_type), allocatable :: r0
     class(abstract_vector_type), allocatable :: p
     class(abstract_vector_type), allocatable :: v
     class(abstract_vector_type), allocatable :: t
@@ -340,25 +341,37 @@ contains
     class(abstract_vector_type), allocatable :: z
     
     !temporary scalars
-    real(kind=r_def) :: alpha, beta, rho, omega, norm
+    real(kind=r_def) :: alpha, beta, rho, omega, rho_old
     real(kind=r_def) :: err, sc_err, tt, ts
 
     integer(kind=r_def) :: iter
 
     ! compute the starting residual
+    ! r = b
     call x%duplicate(r)
     call r%copy(b)
+
+    ! v = Ax
+    call x%duplicate(v)    
+    call v%set_scalar(0.0_r_def)
+    call self%lin_op%apply(x,v)
+    ! r = b - Ax
+    call r%axpy(-1.0_r_def,v)
+    ! store initial residual
+    call r%duplicate(r0)
+    call r0%copy(r)
+    
     sc_err = r%norm()
-    sc_err = max(sc_err,0.001_r_def)    
+    sc_err = max(sc_err,self%a_tol)    
     write( log_scratch_space, '(A,E15.8)' ) &
-         " bicgstab starting ... ||b|| = ", sc_err
+         " bicgstab starting ... ||r|| = ||b - A.x|| = ", sc_err
     call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
 
     alpha = 1.0_r_def
     omega = 1.0_r_def
-    norm  = 1.0_r_def
+    rho_old  = 1.0_r_def
 
-    call x%duplicate(v)
+
     call x%duplicate(p)
     call x%duplicate(s)
     call x%duplicate(t)
@@ -369,18 +382,22 @@ contains
     call x%duplicate(z)
 
     do iter = 1, self%max_iter
-       rho = r%dot(b)
-       beta = (rho/norm) * (alpha/omega)
-       ! p = r + beta*(p - omega*v)
-       call p%aypx(beta, r)
-       call p%axpy(-beta*omega, v)
-       ! precondition
-       call self%prec%apply(p,y)
+       rho = r%dot(r0)
+       beta = (rho/rho_old) * (alpha/omega)
+       
+       ! p =C( r - beta*omega*v) + beta P This is post-conditioning
+       ! in two stages
+       ! stage 1.
+       call t%copy(r)
+       call t%axpy(-beta*omega, v)
+       ! stage 2 post-condition
+       call self%prec%apply(t,y)
+       ! now add on beta P
+       call p%aypx(beta, y)
        ! apply the matrix
-       call self%lin_op%apply(y,v)
+       call self%lin_op%apply(p,v)
 
-       norm = b%dot(v)
-       alpha = rho/norm
+       alpha = rho/r0%dot(v)
 
        ! s = r - alpha * v
        call s%copy(r)
@@ -395,15 +412,15 @@ contains
        ts = t%dot(s)
        omega = ts/tt
        ! final updates
-       ! x = x + omega*z + alpha * y
+       ! x = x + omega*z + alpha * p
        call x%axpy(omega,z)
-       call x%axpy(alpha,y)
+       call x%axpy(alpha,p)
        ! compute the residual vector
        call r%copy(s)
        call r%axpy(-omega,t)
 
        !update the scalars
-       norm = rho
+       rho_old = rho
 
        ! check for convergence
        err = r%norm()/sc_err
@@ -476,7 +493,6 @@ contains
     ! temporary vectors
     class(abstract_vector_type), allocatable :: s
     class(abstract_vector_type), allocatable :: w
-    class(abstract_vector_type), allocatable :: dx
     class(abstract_vector_type), allocatable :: Ax    
     class(abstract_vector_type), allocatable :: res
     class(abstract_vector_type), allocatable, dimension(:) :: v
@@ -484,49 +500,49 @@ contains
     ! temporary scalars
     real(kind=r_def), allocatable, dimension(:)   :: u, g
     real(kind=r_def), allocatable, dimension(:,:) :: h
-    real(kind=r_def)                              :: beta, si, ci, nrm, h1, h2, p, q
+    real(kind=r_def)                              :: beta, si, ci, nrm, h1, h2, p, q, res_norm
     real(kind=r_def)                              :: err, sc_err, init_err
 
     ! iterators
     integer(kind=i_def) :: iv, ivj, iter
 
-    call x%duplicate(dx)
-    call dx%set_scalar(0.0_r_def)
-
     call x%duplicate(Ax)
     call Ax%set_scalar(0.0_r_def)
 
-    call x%duplicate(res) 
-    call res%copy(b) ! assumes Ax is zero initial guess
+    call b%duplicate(res)
+    ! compute res = b -Ax ... in stages
+    call self%lin_op%apply(x,Ax)
+    call res%copy(b)
+    call res%axpy(-1.0_r_def,Ax)
     
     sc_err = res%norm()
     sc_err = max(sc_err,self%a_tol)    
     write( log_scratch_space, '(A,E15.8,":",E15.8)' ) &
-         "GMRES starting ... ||b|| = ", b%norm(),sc_err
+         "GMRES starting ... ||r|| = ||b - A.x||", res%norm(),sc_err
     call log_event(log_scratch_space, LOG_LEVEL_INFO)
     init_err = sc_err
 
     !initial guess
     call x%duplicate(s)
     call x%duplicate(w)
-    call s%set_scalar(0.0_r_def)
-    ! pre-cond
-    call self%prec%apply(res,s)
 
-    beta = s%norm()
     allocate(v(self%gcrk), source=x)
-    call v(1)%copy(s)
-    call v(1)%scale(1.0_r_def/beta)
     
     allocate( h(self%gcrk+1, self%gcrk) )
     allocate( g(self%gcrk+1) )
     allocate( u(self%gcrk) )
-    
-    g(:)   = 0.0_r_def
-    g(1)   = beta
 
     ! initialisation complete, lets go to work.
     do iter = 1, self%max_iter
+       call s%set_scalar(0.0_r_def)
+       call self%prec%apply(res,s)
+       beta = s%norm()
+       call v(1)%copy(s)
+       call v(1)%scale(1.0_r_def/beta)
+
+       g(:) = 0.0_r_def
+       g(1) = beta
+          
        do iv = 1, self%gcrk
           
           call w%copy(v(iv))
@@ -575,20 +591,21 @@ contains
           u(iv) = u(iv)/h(iv,iv)
        end do
 
-       ! compute the increments
+       ! compute the increments and update the solution
        do iv = 1, self%gcrk
           ! y, x : y = Px
           call s%copy(v(iv))
-          call dx%axpy(u(iv), s)
+          call x%axpy(u(iv), s)
        end do
        
        ! check for convergence
-       call self%lin_op%apply(dx, Ax)
+       call Ax%set_scalar(0.0_r_def)
+       call self%lin_op%apply(x, Ax)
        call res%copy(Ax)
        call res%aypx(-1.0_r_def, b)
 
-       beta = res%norm()
-       err = beta/sc_err
+       res_norm = res%norm()
+       err = res_norm/sc_err
        if (err < self%r_tol ) then
           write( log_scratch_space, '(A, I2, A, E12.4, A, E15.8)' ) &
                "GMRES solver_algorithm: converged in ", &
@@ -597,12 +614,6 @@ contains
           exit ! break out of loop
        end if
 
-       call self%prec%apply(res,s)
-       call v(1)%set_scalar(0.0_r_def)
-       call v(1)%axpy(1.0_r_def/beta, s)
-
-       g(:) = 0.0_r_def
-       g(1) = beta
     end do
 
     if( (iter >= self%max_iter .and. err > self%r_tol ) &
@@ -613,10 +624,7 @@ contains
        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     end if
 
-    call x%axpy(1.0_r_def, dx)
-       
     deallocate(h, g, u)
-    deallocate(v)
     
   end subroutine gmres_solve
 end submodule gmres_smod

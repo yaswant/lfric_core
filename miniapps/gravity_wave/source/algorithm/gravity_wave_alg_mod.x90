@@ -59,7 +59,7 @@ module gravity_wave_alg_mod
 
   ! 'State' items private to the algorithm that need to be 
   !  created once but used every step
-  type( field_vector_type ) :: state, state_n, rhs_n
+  type( field_vector_type ) :: state, state_n, rhs_n, state_inc
   type( field_type )        :: rhs_p
   type(operator_type)       :: Q
 
@@ -143,6 +143,7 @@ contains
     state   = field_vector_type(bundle_size)
     state_n = field_vector_type(bundle_size)
     rhs_n   = field_vector_type(bundle_size)
+    state_inc = field_vector_type(bundle_size)
 
     !=== Initialise internal state field objects =============================!
     u_fs => wind%get_function_space() 
@@ -155,6 +156,7 @@ contains
 
     state_n = state
     rhs_n = state
+    state_inc = state    
 
     rhs_p =  field_type( vector_space = p_fs )
 
@@ -401,7 +403,9 @@ contains
 
     ! Solve mixed system
     call log_event( "Gravity Wave: mixed solve:", LOG_LEVEL_INFO )
-    call gw_mixed_solver%apply(state, rhs_n)
+    call state_inc%set_scalar(0.0_r_def)
+    call gw_mixed_solver%apply(state_inc, rhs_n)
+    call state%axpy(1.0_r_def,state_inc)
 
     ! Return fields
     call state%export_field(wind,     igw_u)
