@@ -12,7 +12,6 @@ module oned_density_update_alg_mod
                                                log_scratch_space,    &
                                                LOG_LEVEL_INFO,       &
                                                LOG_LEVEL_TRACE
-  use density_update_alg_mod,            only: density_update_alg
   use subgrid_config_mod,                only: dep_pt_stencil_extent,          &
                                                rho_approximation_stencil_extent
   use runtime_constants_mod,             only: get_mass_matrix, w3_id

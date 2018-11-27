@@ -15,7 +15,7 @@ module vert_advective_cosmic_alg_mod
   use field_mod,                         only: field_type
   use function_space_mod,                only: function_space_type
   use vert_conservative_cosmic_alg_mod,  only: vert_conservative_cosmic_alg
-  use cosmic_density_update_alg_mod,     only: cosmic_density_update_alg
+  use cosmic_divergence_alg_mod,         only: cosmic_divergence_alg
   use runtime_constants_mod,             only: get_detJ_at_w2
   use flux_direction_mod,                only: x_direction, z_direction
 
@@ -54,6 +54,7 @@ contains
     type(field_type) :: rho_constant_1
     type(field_type) :: rho_constant_1_np1
     type(field_type) :: mass_flux
+    type(field_type) :: increment
 
     type(function_space_type), pointer :: w3_fs     => null()
     type(function_space_type), pointer :: w2_fs     => null()
@@ -69,6 +70,7 @@ contains
     rho_constant_1     = field_type( vector_space = w3_fs )
     rho_constant_1_np1 = field_type( vector_space = w3_fs )
     mass_flux          = field_type( vector_space = w2_fs )
+    increment          = field_type( vector_space = w3_fs )
 
     ! To calculate the advective step we use the following equation
     !
@@ -81,7 +83,10 @@ contains
     !
     call invoke( setval_c(mass_flux, LARGE_REAL_NEGATIVE) )
     call vert_conservative_cosmic_alg(mass_flux, rho, dep_pts, dt )
-    call cosmic_density_update_alg(rho_np1, rho, mass_flux, detj_at_w2, cell_orientation, z_direction)
+    call cosmic_divergence_alg(increment, mass_flux, detj_at_w2,              &
+                               cell_orientation, z_direction)
+
+    call invoke( X_minus_bY(rho_np1, rho, dt, increment) )
 
     !
     ! Part 2. Calculate (rho=1) - dt*div(mass_flux(rho=1))
@@ -89,12 +94,16 @@ contains
     call invoke( setval_c(rho_constant_1,1.0_r_def) )
     call invoke( setval_c(mass_flux, LARGE_REAL_NEGATIVE) )
     call vert_conservative_cosmic_alg(mass_flux, rho_constant_1, dep_pts, dt)
-    call cosmic_density_update_alg(rho_constant_1_np1, rho_constant_1, mass_flux, detj_at_w2, cell_orientation, z_direction)
+    call cosmic_divergence_alg(increment, mass_flux, detj_at_w2,              &
+                               cell_orientation, z_direction)
+
+    call invoke( X_minus_bY(rho_constant_1_np1, rho_constant_1, dt, increment) )
 
     !
     ! Part 3. Division
     !
     call invoke( X_divideby_Y(rho_adv,rho_np1,rho_constant_1_np1) )
+
 
     nullify( w2_fs, w3_fs, detj_at_w2 )
 

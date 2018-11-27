@@ -43,7 +43,9 @@ module init_transport_mod
   !> @param[in,out] dep_pts_x  Departure points in the x-direction
   !> @param[in,out] dep_pts_y  Departure points in the y-direction
   !> @param[in,out] dep_pts_z  Departure points in the z-direction
-  subroutine init_transport( mesh_id, chi, wind, density, dep_pts_x, dep_pts_y, dep_pts_z )
+  !> @param[in,out] increment  Density increment
+  subroutine init_transport( mesh_id, chi, wind, density, dep_pts_x,          &
+                             dep_pts_y, dep_pts_z, increment )
 
     integer(i_def), intent(in)        :: mesh_id
     type(field_type), intent(inout)   :: chi(:)
@@ -52,6 +54,7 @@ module init_transport_mod
     type(field_type), intent(inout)   :: dep_pts_x
     type(field_type), intent(inout)   :: dep_pts_y
     type(field_type), intent(inout)   :: dep_pts_z
+    type(field_type), intent(inout)   :: increment
 
     type(function_space_type), pointer       :: function_space => null()
     procedure(write_interface), pointer      :: tmp_write_ptr => null()
@@ -61,6 +64,8 @@ module init_transport_mod
                           function_space_collection%get_fs( mesh_id, element_order, W2 ), &
                           output_space = W3 )
     density = field_type( vector_space = &
+                          function_space_collection%get_fs( mesh_id, element_order, W3 ) )
+    increment = field_type( vector_space = &
                           function_space_collection%get_fs( mesh_id, element_order, W3 ) )
 
     dep_pts_x  = field_type( vector_space = &
@@ -87,10 +92,12 @@ module init_transport_mod
        tmp_write_ptr => xios_write_field_face
        call wind%set_write_field_behaviour( tmp_write_ptr )
        call density%set_write_field_behaviour( tmp_write_ptr )
+       call increment%set_write_field_behaviour( tmp_write_ptr )
     end if
 
     call density%set_restart_behaviour( tmp_restart_ptr )
     call wind%set_restart_behaviour( tmp_restart_ptr )
+    call increment%set_restart_behaviour( tmp_restart_ptr )
 
     nullify( function_space, tmp_write_ptr, tmp_restart_ptr )
 

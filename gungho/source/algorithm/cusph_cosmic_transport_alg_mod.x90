@@ -36,8 +36,8 @@ module cusph_cosmic_transport_alg_mod
   private
 
   ! 'State' items that need to be created once but used every step
-  type( field_type ) :: u_n, u_np1, rho_n, rho_np1, mass_flux_x, mass_flux_y
-  type( field_type ) :: rho_temp, r_u
+  type( field_type ) :: u_n, u_np1
+  type( field_type ) :: r_u
 
   public :: set_winds
   public :: cusph_cosmic_transport_step
@@ -69,13 +69,8 @@ contains
     w2_fs   => function_space_collection%get_fs( mesh_id, element_order, W2 )
     w3_fs   => function_space_collection%get_fs( mesh_id, element_order, W3 )
 
-    rho_n       = field_type( vector_space = w3_fs )
-    rho_np1     = field_type( vector_space = w3_fs )
-    rho_temp    = field_type( vector_space = w3_fs )
     u_n         = field_type( vector_space = w2_fs )
     u_np1       = field_type( vector_space = w2_fs )
-    mass_flux_x = field_type( vector_space = w2_fs )
-    mass_flux_y = field_type( vector_space = w2_fs )
     r_u         = field_type( vector_space = w2_fs )
 
     qr = quadrature_xyoz_type(element_order+2, quadrature_rule)
@@ -102,47 +97,60 @@ contains
   !> @details The algorithm iterates forwards in time and transports the density
   !>          field using the COSMIC advection scheme. This routine advects in
   !>          horizontal direction only. The wind profile is defined analytically.
-  !> @param[inout] rho              Density field
-  !> @param[in]    dep_pts_x        Departure points in the x direction
-  !> @param[in]    dep_pts_y        Departure points in the y direction
-  subroutine cusph_cosmic_transport_step( rho,                &
+  !> @param[in,out] increment        Density increment
+  !> @param[in]     rho              Density field
+  !> @param[in]     dep_pts_x        Departure points in the x direction
+  !> @param[in]     dep_pts_y        Departure points in the y direction
+  subroutine cusph_cosmic_transport_step( increment,          &
+                                          rho,                &
                                           dep_pts_x,          &
                                           dep_pts_y )
 
     implicit none
 
-    type(field_type),    intent(inout) :: rho
+    type(field_type),    intent(inout) :: increment
+    type(field_type),    intent(in)    :: rho
     type(field_type),    intent(in)    :: dep_pts_x
     type(field_type),    intent(in)    :: dep_pts_y
 
-    type(field_type), pointer :: chi(:) => null()
     ! Array to hold cell orientation values in W3 field
     type(field_type), pointer :: cell_orientation => null()
     ! Array to hold detj values at W2 dof locations
     type(field_type), pointer :: detj_at_w2 => null()
 
-    chi              => get_coordinates()
+    type(function_space_type), pointer :: w2_fs     => null()
+    type(function_space_type), pointer :: w3_fs     => null()
+
+    type( field_type ) :: increment_x, increment_y
+    type( field_type ) :: mass_flux_x, mass_flux_y
+
     cell_orientation => get_cell_orientation()
     detj_at_w2       => get_detj_at_w2()
 
-    call invoke( setval_X(rho_n, rho),                  &
-                 setval_c(rho_np1, LARGE_REAL_NEGATIVE) &
-                 )
+    w2_fs => dep_pts_x%get_function_space()
+    w3_fs => rho%get_function_space()
 
-    ! Call algorithm to calculate mass fluxes using COSMIC scheme
-    call cusph_split_transport_alg( rho_n, cell_orientation,  &
-                                 mass_flux_x, mass_flux_y, dep_pts_x, &
-                                 dep_pts_y, detj_at_w2 )
+    mass_flux_x = field_type( vector_space = w2_fs )
+    mass_flux_y = field_type( vector_space = w2_fs )
+    increment_x = field_type( vector_space = w3_fs )
+    increment_y = field_type( vector_space = w3_fs )
 
-    call cusph_fv_density_update_alg(rho_n, mass_flux_x, mass_flux_y, rho_temp,     &
+    ! Call algorithm to calculate mass fluxes in x and y direction using COSMIC scheme
+    call cusph_split_transport_alg( rho, cell_orientation,             &
+                                    mass_flux_x, mass_flux_y, dep_pts_x, &
+                                    dep_pts_y, detj_at_w2 )
+
+    ! Calculate divergence (increment) in the x direction
+    call cusph_fv_density_update_alg( increment_x, mass_flux_x, mass_flux_y,     &
                                       cell_orientation, x_direction, detj_at_w2)
 
-    call cusph_fv_density_update_alg(rho_temp, mass_flux_x, mass_flux_y, rho_np1,   &
+    ! Calculate divergence (increment) in the y direction
+    call cusph_fv_density_update_alg( increment_y, mass_flux_x, mass_flux_y,     &
                                       cell_orientation, y_direction, detj_at_w2)
 
-    call invoke( setval_X(rho, rho_np1) )
+    call invoke( X_plus_Y( increment, increment_x, increment_y ) )
 
-    nullify(chi, cell_orientation, detj_at_w2)
+    nullify(cell_orientation, detj_at_w2, w2_fs, w3_fs)
 
   end subroutine cusph_cosmic_transport_step
 

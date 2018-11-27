@@ -37,44 +37,38 @@ contains
   !>           calculated at the W3 dofs, where density (rho) is located.
   !>           The divergence term is calculated by a simple difference of the
   !>           flux on opposite faces.
-  !> @param[in]       rho_n               Density at time n
+  !> @param[in,out]   increment           Density increment
   !> @param[in]       mass_flux_x         Mass flux in y direction
   !> @param[in]       mass_flux_y         Mass flux in x direction
-  !> @param[inout]    rho                 Density at time n+1
   !> @param[in]       cell_orientation    Orientation of cells
   !> @param[in]       direction           Direction in which divergence update is performed
   !> @param[in]       detj_at_w2          DetJ values located at W2 dofs (lowest order)
-  subroutine cusph_fv_density_update_alg( rho_n,                    &
+  subroutine cusph_fv_density_update_alg( increment,                &
                                           mass_flux_x,              &
                                           mass_flux_y,              &
-                                          rho,                      &
                                           cell_orientation,         &
                                           direction,                &
                                           detj_at_w2 )
 
     implicit none
  
-    type(field_type),    intent(in)     :: rho_n
+    type(field_type),    intent(inout)  :: increment
     type(field_type),    intent(in)     :: mass_flux_x
     type(field_type),    intent(in)     :: mass_flux_y
-    type(field_type),    intent(inout)  :: rho
     type(field_type),    intent(in)     :: detj_at_w2
     type(field_type),    intent(in)     :: cell_orientation
     integer(i_def),      intent(in)     :: direction
 
-    type( field_type )                  :: div
     type( field_type )                  :: div_temp
     type( field_type )                  :: mass_flux_mult_x, mass_flux_mult_y
     type(operator_type), pointer        :: m3_inv => null()
 
     m3_inv            => get_mass_matrix(w3inv_id)
-    div               = field_type( vector_space = rho_n%get_function_space() )
-    div_temp          = field_type( vector_space = rho_n%get_function_space() )
+    div_temp          = field_type( vector_space = increment%get_function_space() )
     mass_flux_mult_x  = field_type( vector_space = detj_at_w2%get_function_space() )
     mass_flux_mult_y  = field_type( vector_space = detj_at_w2%get_function_space() )
 
-    call invoke( setval_c(div,                 LARGE_REAL_NEGATIVE),  &
-                 setval_c(div_temp,            LARGE_REAL_NEGATIVE),  &
+    call invoke( setval_c(div_temp,            LARGE_REAL_NEGATIVE),  &
                  setval_c(mass_flux_mult_x,    LARGE_REAL_NEGATIVE),  &
                  setval_c(mass_flux_mult_y,    LARGE_REAL_NEGATIVE)   &
                  )
@@ -91,10 +85,7 @@ contains
                                                     cell_orientation, direction)
 
     ! Divide the divergence by detJ values at W3 dofs
-    call invoke( dg_matrix_vector_kernel_type(div, div_temp, m3_inv) )
-
-    call invoke_set_field_scalar(-99.0_r_def, rho)
-    call invoke( X_minus_bY(rho, rho_n, dt, div) )
+    call invoke( dg_matrix_vector_kernel_type(increment, div_temp, m3_inv) )
 
     nullify( m3_inv )
 

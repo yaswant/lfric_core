@@ -53,6 +53,7 @@ module transport_driver_mod
                                             cusph_cosmic_transport_step
   use cosmic_threed_alg_mod,          only: cosmic_threed_transport_step
   use calc_dep_pts_alg_mod,           only: calc_dep_pts
+  use density_inc_update_alg_mod,     only: density_inc_update_alg
   use xios
 
   implicit none
@@ -71,6 +72,7 @@ module transport_driver_mod
   type(field_type) :: dep_pts_x
   type(field_type) :: dep_pts_y
   type(field_type) :: dep_pts_z
+  type(field_type) :: increment
 
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
@@ -138,7 +140,8 @@ contains
     call init_fem( mesh_id, chi )
 
     ! Transport initialisation
-    call init_transport( mesh_id, chi, wind, density, dep_pts_x, dep_pts_y, dep_pts_z )
+    call init_transport( mesh_id, chi, wind, density, dep_pts_x, dep_pts_y,   &
+                         dep_pts_z, increment )
 
     if ( (write_xios_output) ) then
       dtime = int(dt)
@@ -205,16 +208,19 @@ contains
 
       select case( scheme )
         case ( transport_scheme_yz_bip_cosmic )
-          call yz_bip_cosmic_step( density, dep_pts_y, dep_pts_z )
+          call yz_bip_cosmic_step( increment, density, dep_pts_y, dep_pts_z )
         case ( transport_scheme_horz_cosmic )
-          call cusph_cosmic_transport_step( density, dep_pts_x, dep_pts_y )
+          call cusph_cosmic_transport_step( increment, density, dep_pts_x, dep_pts_y )
         case ( transport_scheme_cosmic_3D )
-          call cosmic_threed_transport_step( density, dep_pts_x, dep_pts_y, dep_pts_z )
+          call cosmic_threed_transport_step( increment, density, dep_pts_x, dep_pts_y, dep_pts_z )
         case default
           call log_event( "Transport mini-app: incorrect transport option chosen, "// &
                           "stopping program! ",LOG_LEVEL_ERROR )
           stop
       end select
+
+      ! Add the increment to density
+      call density_inc_update_alg(density, increment)
 
       call density_diagnostic_alg( density, timestep )
       call mass_conservation( timestep, density )

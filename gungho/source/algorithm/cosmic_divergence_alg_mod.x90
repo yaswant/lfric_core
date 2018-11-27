@@ -5,12 +5,16 @@
 !-----------------------------------------------------------------------------
 !
 !-------------------------------------------------------------------------------
-!> @brief Algorithm which updates rho using rho_n - dt * div(mass_flux)
-!> @details  Inputs are the the mass flux and rho at time level n. Output is rho at
-!>           time level n+1. The divergence of the mass flux is calculated and
-!>           multiplied by dt and added to the density rho at time n. The divergence
+!> @brief Algorithm which calculates the divergence given a field in W2 space.
+!> @details  Input is typically the mass flux at time level n. Output is the
+!>           divergence. Due to the split scheme nature of Cosmic the divergence
 !>           is calculated in the x, y or z direction separately.
-module cosmic_density_update_alg_mod
+!>           The divergence is calculated by multiplying the flux term by the
+!>           det(J) values at the W2 dofs, then taking the divergence which at
+!>           lowest order elements is simply the difference between fluxes on
+!>           opposite faces and then dividing by the det(J) values at W3 dofs.
+!>           This is the divergence form for use with curvlinear coordinates.
+module cosmic_divergence_alg_mod
 
   use constants_mod,                     only: i_def, r_def
   use field_mod,                         only: field_type
@@ -26,45 +30,39 @@ module cosmic_density_update_alg_mod
   implicit none
 
   private
-  public :: cosmic_density_update_alg
+  public :: cosmic_divergence_alg
 
 contains
 
-  !> @brief Algorithm which updates rho using rho_n - dt * div(mass_flux)
-  !> @details  Inputs are the the mass flux and rho at time level n. Output is rho at
-  !>           time level n+1. The divergence of the mass flux is calculated and
-  !>           multiplied by dt and added to the density rho at time n.
-  !> @param[inout] rho              Density at time n+1
-  !> @param[in]    rho_n            Density at time n
-  !> @param[in]    mass_flux        mass flux
+  !> @brief Algorithm which calculate the divergence of a mass flux W2 field.
+  !> @details  Inputs are the the mass flux and rho at time level n. Output is the
+  !>           divergence calculated in the x, y or z direction.
+  !> @param[inout] divergence       Divergence term
+  !> @param[in]    mass_flux        Mass flux
   !> @param[in]    detj_at_w2       Det(J) located at W2 dofs
   !> @param[in]    cell_orientation Cell orientation values
   !> @param[in]    direction        The direction in which to calculate the
   !>                                divergence, x, y or z
-  subroutine cosmic_density_update_alg( rho,               &
-                                        rho_n,             &
-                                        mass_flux,         &
-                                        detj_at_w2,        &
-                                        cell_orientation,  &
-                                        direction  )
+  subroutine cosmic_divergence_alg( divergence,        &
+                                    mass_flux,         &
+                                    detj_at_w2,        &
+                                    cell_orientation,  &
+                                    direction  )
 
     implicit none
  
-    type(field_type),    intent(inout)    :: rho
-    type(field_type),    intent(in)       :: rho_n
+    type(field_type),    intent(inout)    :: divergence
     type(field_type),    intent(in)       :: mass_flux
     type(field_type),    intent(in)       :: detj_at_w2
     type(field_type),    intent(in)       :: cell_orientation
     integer(kind=i_def), intent(in)       :: direction
 
-    type(field_type)                      :: div, div_temp, mass_flux_mult
+    type(field_type)                      :: div_temp, mass_flux_mult
     type(operator_type), pointer          :: m3_inv => null()
-    real(kind=r_def)                      :: minus_dt
 
     m3_inv => get_mass_matrix(w3inv_id)
 
-    div            = field_type( vector_space = rho_n%get_function_space() )
-    div_temp       = field_type( vector_space = rho_n%get_function_space() )
+    div_temp       = field_type( vector_space = divergence%get_function_space() )
     mass_flux_mult = field_type( vector_space = detj_at_w2%get_function_space() )
 
     !
@@ -90,16 +88,10 @@ contains
     end if
 
     ! Divide the divergence by detj located at W3 dofs.
-    call invoke( dg_matrix_vector_kernel_type(div, div_temp, m3_inv) )
-
-    !
-    ! Part2. Calculate rho_n - dt*div(mass_flux)
-    !
-    minus_dt = -dt
-    call invoke( aX_plus_Y(rho, minus_dt, div, rho_n) )
+    call invoke( dg_matrix_vector_kernel_type(divergence, div_temp, m3_inv) )
 
     nullify( m3_inv )
 
-  end subroutine cosmic_density_update_alg
+  end subroutine cosmic_divergence_alg
 
-end module cosmic_density_update_alg_mod
+end module cosmic_divergence_alg_mod
