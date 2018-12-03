@@ -14,6 +14,7 @@ module slow_physics_alg_mod
   use physics_config_mod,        only: heldsuarez_thermo_placement, &
                                        heldsuarez_wind_placement, &
                                        boundary_layer_placement,  &
+                                       convection_placement, &
                                        microphysics_placement
   ! PsyKAl PSYClone kernels
   use held_suarez_fv_kernel_mod,      only: held_suarez_fv_kernel_type
@@ -46,22 +47,23 @@ contains
 
   !> @details Collection of procedures for subgrid physics that act
   !>          before the outer loop of the solver
-  !> @param[inout] du increment to wind field 
-  !> @param[inout] dtheta increment to theta field 
-  !> @param[in]    theta theta field 
-  !> @param[in]    rho        Rho on w3 space
-  !> @param[in]    exner      Exner pressure on w3 space
-  !> @param[in]    mr_n Mixing ratios at start of timestep
-  !> @param[inout] mr Mixing ratios to be updated
-  !> @param[in]    derived_fields Group of derived fields
-  !> @param[inout] cloud_fields Group of cloud fields
-  !> @param[inout] twod_fields Group of 2D fields
-  !> @param[in]    height_w3  Height in w3
-  !> @param[in]    height_wth Height in wth
-  !> @param[in]    chi coordinate array
+  !> @param[in,out] du             Increment to wind field 
+  !> @param[in,out] dtheta         Increment to theta field 
+  !> @param[in]     theta          Theta field 
+  !> @param[in]     rho            Rho on w3 space
+  !> @param[in]     exner          Exner pressure on w3 space
+  !> @param[in]     mr_n           Mixing ratios at start of timestep
+  !> @param[in,out] mr             Mixing ratios to be updated
+  !> @param[in]     derived_fields Group of derived fields
+  !> @param[in,out] cloud_fields   Group of cloud fields
+  !> @param[in,out] twod_fields    Group of 2D fields
+  !> @param[in,out] physics_incs   Group of physics increments
+  !> @param[in]     height_w3      Height in w3
+  !> @param[in]     height_wth     Height in wth
+  !> @param[in]     chi            Coordinate array
   subroutine slow_physics(du, dtheta, theta, rho, exner, mr_n, mr,   &
                           derived_fields, cloud_fields, twod_fields, &
-                          height_w3, height_wth,  chi)
+                          physics_incs, height_w3, height_wth,  chi)
 
     implicit none
 
@@ -78,6 +80,7 @@ contains
     type( field_collection_type ), intent(inout) :: derived_fields
     type( field_collection_type ), intent(inout) :: cloud_fields
     type( field_collection_type ), intent(inout) :: twod_fields
+    type( field_collection_type ), intent(inout) :: physics_incs
     
     ! Coordinate fields
     type( field_type ), intent( in )    :: height_w3, height_wth
@@ -145,7 +148,7 @@ contains
 
         call mphys_alg_step( mr_n, theta,  exner, height_w3, height_wth,       &
                              derived_fields, cloud_fields, dmr_mphys,          &
-                             dtheta_mphys )
+                             dtheta_mphys, physics_incs )
 
         ! N.B. Call to microphysics passes in mr_n, which is intent(in) and
         !      represents the start of the timestep value of the mixing 
@@ -171,10 +174,15 @@ contains
     end if   ! microphysics placement > 0
 #endif
 
-
     if (boundary_layer_placement < 0) then       
       call log_event( &
          'slow_physics: Boundary layer is not currently available in slow physics.', &
+         LOG_LEVEL_ERROR )
+    end if
+
+    if (convection_placement < 0) then
+      call log_event( &
+         'slow_physics: Convection is not currently available in slow physics.', &
          LOG_LEVEL_ERROR )
     end if
 
@@ -195,7 +203,5 @@ contains
     nullify( w2_rmultiplicity )
 
   end subroutine slow_physics
-
-
 
 end module slow_physics_alg_mod

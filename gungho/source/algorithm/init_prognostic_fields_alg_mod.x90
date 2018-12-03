@@ -31,6 +31,7 @@ module init_prognostic_fields_alg_mod
                                              invoke_initial_rho_sample_kernel, &
                                              invoke_initial_exner_sample_kernel, &
                                              invoke_hydrostatic_exner_kernel
+  use field_bundle_mod,                only: set_bundle_scalar
 
   ! PsyKAl PSYClone kernels
   use set_rho_kernel_mod,              only: set_rho_kernel_type
@@ -148,7 +149,11 @@ contains
         end if
       end if
 
-      if (use_moisture) call invoke_initial_mr_kernel( theta, rho, mr(:), chi )
+      if (use_moisture) then
+        call invoke_initial_mr_kernel( theta, rho, mr(:), chi )
+      else
+        call set_bundle_scalar(0.0_r_def, mr, nummr)
+      end if
 
       call log_event( "Gungho: Initialised prognostic fields", LOG_LEVEL_INFO )
 

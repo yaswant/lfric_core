@@ -1,0 +1,74 @@
+!-------------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-------------------------------------------------------------------------------
+
+!> @brief Interface to the UM convection scheme
+
+module conv_alg_mod
+
+  use constants_mod,        only: i_def
+  use field_mod,            only: field_type
+  use field_collection_mod, only: field_collection_type
+  use mr_indices_mod,       only: nummr, imr_v
+
+  ! xios output
+  use output_config_mod,  only: write_xios_output
+  use diagnostics_io_mod, only: write_scalar_diagnostic
+
+  implicit none
+
+  private
+
+  public conv_alg_step
+
+contains
+
+  !> @brief Run the Lambert-Lewis convection scheme
+  !> @details The Lambert-Lewis convection scheme is a simple
+  !>           convection parametrization that mixes theta and moisture
+  !>           as documented in UMDP41
+  !> @param[in,out] physics_incs   Group of physics increments
+  !> @param[in,out] derived_fields Group of derived fields
+  !> @param[in]     exner          Exner pressure field in density (w3) space
+  !> @param[in]     mr             Mixing ratios
+  !> @param[in]     timestep       Model timestep number
+  subroutine conv_alg_step(physics_incs, derived_fields, exner, mr, &
+                           timestep)
+
+    use conv_kernel_mod, only: conv_kernel_type
+
+    implicit none
+
+    type( field_collection_type ), intent(inout) :: physics_incs
+    type( field_collection_type ), intent(inout) :: derived_fields
+    type( field_type ), intent( in )             :: exner, mr(nummr)
+    integer(kind=i_def), intent(in)              :: timestep
+
+    ! Temporary fields unpacked from collections
+    type( field_type ), pointer :: exner_in_wth  => null()
+    type( field_type ), pointer :: theta_star => null()
+    type( field_type ), pointer :: dt_conv => null()
+    type( field_type ), pointer :: dmv_conv => null()
+
+    ! Unpack fields
+    exner_in_wth => derived_fields%get_field('exner_in_wth')
+    theta_star => derived_fields%get_field('theta_star')
+
+    dt_conv => physics_incs%get_field('dt_conv')
+    dmv_conv => physics_incs%get_field('dmv_conv')
+
+    call invoke(conv_kernel_type(dt_conv, dmv_conv, theta_star, mr(imr_v), &
+                                 exner_in_wth, exner) )
+
+    if (write_xios_output) then
+      call write_scalar_diagnostic("dt_conv", dt_conv, timestep, &
+                                    dt_conv%get_mesh_id(), .false. )
+      call write_scalar_diagnostic("dmv_conv", dmv_conv, timestep, &
+                                    dmv_conv%get_mesh_id(), .false. )
+    end if
+
+  end subroutine conv_alg_step
+
+end module conv_alg_mod

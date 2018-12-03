@@ -98,8 +98,7 @@ module iter_timestep_alg_mod
   use mixing_config_mod,          only: viscosity, smagorinsky
 
 #ifdef UM_PHYSICS
-  ! UM BL scheme
-  use bl_init_mod,                only: bl_init
+  use um_init_mod,                only: um_init
   use cld_alg_mod,                only: cld_alg_step
   use physics_config_mod,         only: cloud_scheme, &
                                         physics_cloud_scheme_none
@@ -243,8 +242,8 @@ contains
 
 #ifdef UM_PHYSICS
     if ( use_physics ) then
-      ! Initialization for the UM boundary layer
-      call bl_init(theta, twod_fields)
+      ! Initialization for the UM physics schemes (BL, cloud, mphys, conv)
+      call um_init(theta)
     end if
 #endif
 
@@ -274,19 +273,20 @@ contains
   !>          by default. This means that there is one evaluation of old time
   !>          level terms, 2 evaluation of advective terms and 4 evaluations 
   !>          of new time level terms and increment updates per timestep
-  !> @param[in,out] u  3D wind field
-  !> @param[in,out] rho Density
-  !> @param[in,out] theta Potential temperature
-  !> @param[in,out] exner Exner pressure
-  !> @param[in,out] mr Mixing ratios
-  !> @param[in,out] xi Vorticity field
+  !> @param[in,out] u              3D wind field
+  !> @param[in,out] rho            Density
+  !> @param[in,out] theta          Potential temperature
+  !> @param[in,out] exner          Exner pressure
+  !> @param[in,out] mr             Mixing ratios
+  !> @param[in,out] xi             Vorticity field
   !> @param[in,out] derived_fields Group of derived fields
-  !> @param[in,out] cloud_fields Group of cloud fields
-  !> @param[in,out] twod_fields  2D fields for UM physics
-  !> @param[in]    timestep model timestep number
+  !> @param[in,out] cloud_fields   Group of cloud fields
+  !> @param[in,out] twod_fields    2D fields for UM physics
+  !> @param[in,out] physics_incs   Group of physics increments
+  !> @param[in]     timestep       Model timestep number
   subroutine iter_alg_step(u, rho, theta, exner, mr, xi, &
                            derived_fields, cloud_fields, twod_fields,    &
-                           timestep)
+                           physics_incs, timestep)
 
     implicit none
 
@@ -297,6 +297,7 @@ contains
     type( field_collection_type ), intent( inout ) :: derived_fields
     type( field_collection_type ), intent( inout ) :: cloud_fields
     type( field_collection_type ), intent( inout ) :: twod_fields
+    type( field_collection_type ), intent( inout ) :: physics_incs
     ! Timestep value
     integer, intent(in) :: timestep  
 
@@ -366,7 +367,7 @@ contains
 
     ! Update state_n and mr_n with start of timestep values
     call copy_bundle(state, state_n, bundle_size)
-    if (use_moisture)call copy_bundle(mr, mr_n, nummr)
+    call copy_bundle(mr, mr_n, nummr)
 
     !==========================================================================
     ! Fields for physics
@@ -405,7 +406,7 @@ contains
       call slow_physics(du, dtheta, state_n(igh_t), state_n(igh_d),     &
                         state_n(igh_p), mr_n, mr,                       &
                         derived_fields, cloud_fields, twod_fields,      &
-                        height_w3, height_wth,  chi)
+                        physics_incs, height_w3, height_wth, chi)
       ! update state prognostics including map back of winds
       call invoke(name="update_from_slow_physics",                      &
                   inc_X_plus_Y(state(igh_t), dtheta),                   &
@@ -414,7 +415,6 @@ contains
                   )
       call log_event( "slow physics: completed slow physics.", LOG_LEVEL_INFO )
     end if !use_physics
-
 
     ! Update state_after_slow and mr_after_slow with 
     ! start of timestep + slow physics values
@@ -484,7 +484,8 @@ contains
         call fast_physics(du, dtheta, mr, outer, state_n(igh_t),        &
                           state_n(igh_d), state_n(igh_p), mr_n,         &
                           derived_fields, cloud_fields, twod_fields,    &
-                          height_w3, height_wth,  chi)
+                          physics_incs, height_w3, height_wth, chi,     &
+                          timestep)
 
         if (use_wavedynamics) then
           ! copy increments into rhs_phys, including convert to weak form theta

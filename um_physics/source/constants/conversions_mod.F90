@@ -27,7 +27,7 @@ module conversions_mod
 
   private
   public :: isec_per_day, isec_per_hour, pi, rhour_per_sec, rsec_per_day,  &
-            rsec_per_hour, zerodegc, zerodegc_32b
+            rsec_per_hour, zerodegc, zerodegc_32b, pi_over_180
 
   ! The following variables have been hidden as they are not currently
   ! required to build the extracted UM code. They have been left in
@@ -37,7 +37,7 @@ module conversions_mod
 
   ! Disabled variables:
   !   isec_per_min, ihour_per_day, rhour_per_day, rday_per_hour,
-  !   pi_over_180, recip_pi_over_180, kt2ms, ft2m
+  !   recip_pi_over_180, kt2ms, ft2m
 
 
   integer(i_um), parameter :: isec_per_day  = int(seconds_per_day,    i_um)

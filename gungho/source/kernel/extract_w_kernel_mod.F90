@@ -89,7 +89,7 @@ subroutine extract_w_code(nlayers,                   &
   !Internal variables
   integer :: k
 
-  do k = 1, nlayers
+  do k = 0, nlayers
 
     w_physics(map_wth(1) + k) = u_physics(map_w2(5) + k )
 

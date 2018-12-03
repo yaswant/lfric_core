@@ -56,12 +56,12 @@
        <field id="checkpoint_exner" name="exner" long_name="exner_pressure" unit="1" domain_ref="restart_W3" />
        <field id="checkpoint_u" name="u" long_name="U" unit="m s-1" domain_ref="restart_W2" />
        <field id="checkpoint_xi" name="xi" long_name="Xi" unit="s-1" domain_ref="restart_W1" />
-       <field id="checkpoint_m_v" name="m_v" long_name="m_v" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_cl" name="m_cl" long_name="m_cl" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_r" name="m_r" long_name="m_r" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_ci" name="m_ci" long_name="m_ci" unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_s" name="m_s" long_name="m_s"  unit="1" domain_ref="restart_Wtheta" />
-       <field id="checkpoint_m_g" name="m_g" long_name="m_g"  unit="1" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_v" name="m_v" long_name="m_v" unit="kg/kg" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_cl" name="m_cl" long_name="m_cl" unit="kg/kg" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_r" name="m_r" long_name="m_r" unit="kg/kg" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_ci" name="m_ci" long_name="m_ci" unit="kg/kg" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_s" name="m_s" long_name="m_s"  unit="kg/kg" domain_ref="restart_Wtheta" />
+       <field id="checkpoint_m_g" name="m_g" long_name="m_g"  unit="kg/kg" domain_ref="restart_Wtheta" />
        <field id="checkpoint_area_fraction" name="area_fraction" long_name="area_fraction"  unit="1" domain_ref="restart_Wtheta" />
        <field id="checkpoint_ice_fraction" name="ice_fraction" long_name="ice_fraction"  unit="1" domain_ref="restart_Wtheta" />
        <field id="checkpoint_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction"  unit="1" domain_ref="restart_Wtheta" />
@@ -78,12 +78,16 @@
      <field_group id="diagnostic_fields" freq_op="1ts" operation="instant" enabled=".TRUE." >
        <field id="theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_grid" />
        <field id="w_physics" name="w_physics" long_name="vertical_wind_on_physics_points" standard_name="vertical_velocity" unit="ms-1" grid_ref="full_level_face_grid" />
-       <field id="m_v" name="m_v" long_name="m_v" unit="1" grid_ref="full_level_face_grid" />
-       <field id="m_cl" name="m_cl" long_name="m_cl" unit="1" grid_ref="full_level_face_grid" />
-       <field id="m_r" name="m_r" long_name="m_r" unit="1" grid_ref="full_level_face_grid" />
-       <field id="m_ci" name="m_ci" long_name="m_ci" unit="1" grid_ref="full_level_face_grid" />
-       <field id="m_s" name="m_s" long_name="m_s"  unit="1" grid_ref="full_level_face_grid" />
-       <field id="m_g" name="m_g" long_name="m_g"  unit="1" grid_ref="full_level_face_grid" />
+       <field id="dt_bl" name="dt_bl" long_name="BL temperature increment" unit="K" grid_ref="full_level_face_grid" />  
+       <field id="dmv_bl" name="dmv_bl" long_name="BL vapour increment" unit="kg/kg" grid_ref="full_level_face_grid" />  
+       <field id="dt_conv" name="dt_conv" long_name="Convection temperature increment" unit="K" grid_ref="full_level_face_grid" />  
+       <field id="dmv_conv" name="dmv_conv" long_name="Convection vapour increment" unit="kg/kg" grid_ref="full_level_face_grid" />  
+       <field id="m_v" name="m_v" long_name="m_v" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="m_cl" name="m_cl" long_name="m_cl" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="m_r" name="m_r" long_name="m_r" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="m_ci" name="m_ci" long_name="m_ci" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="m_s" name="m_s" long_name="m_s"  unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="m_g" name="m_g" long_name="m_g"  unit="kg/kg" grid_ref="full_level_face_grid" />
        <field id="area_fraction" name="area_fraction" long_name="area_fraction" unit="1" grid_ref="full_level_face_grid" />
        <field id="ice_fraction" name="ice_fraction" long_name="ice_fraction" unit="1" grid_ref="full_level_face_grid" />
        <field id="liquid_fraction" name="liquid_fraction" long_name="liquid_fraction" unit="1" grid_ref="full_level_face_grid" />
@@ -103,12 +107,12 @@
       <!-- Initial conditions group -->
      <field_group id="initial_fields" freq_op="1ts" operation="once" enabled=".TRUE." >
        <field id="init_theta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_grid" />
-       <field id="init_m_v" name="m_v" long_name="m_v" unit="1" grid_ref="full_level_face_grid" />
-       <field id="init_m_cl" name="m_cl" long_name="m_cl" unit="1" grid_ref="full_level_face_grid" />
-       <field id="init_m_r" name="m_r" long_name="m_r" unit="1" grid_ref="full_level_face_grid" />
-       <field id="init_m_ci" name="m_ci" long_name="m_ci" unit="1" grid_ref="full_level_face_grid" />
-       <field id="init_m_s" name="m_s" long_name="m_s"  unit="1" grid_ref="full_level_face_grid" />
-       <field id="init_m_g" name="m_g" long_name="m_g"  unit="1" grid_ref="full_level_face_grid" />
+       <field id="init_m_v" name="m_v" long_name="m_v" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="init_m_cl" name="m_cl" long_name="m_cl" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="init_m_r" name="m_r" long_name="m_r" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="init_m_ci" name="m_ci" long_name="m_ci" unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="init_m_s" name="m_s" long_name="m_s"  unit="kg/kg" grid_ref="full_level_face_grid" />
+       <field id="init_m_g" name="m_g" long_name="m_g"  unit="kg/kg" grid_ref="full_level_face_grid" />
        <field id="init_area_fraction" name="area_fraction" long_name="area_fraction"  unit="1" grid_ref="full_level_face_grid" />
        <field id="init_ice_fraction" name="ice_fraction" long_name="ice_fraction"  unit="1" grid_ref="full_level_face_grid" />
        <field id="init_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction"  unit="1" grid_ref="full_level_face_grid" />
@@ -166,12 +170,12 @@
        <field id="restart_rho" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" operation="instant" domain_ref="restart_W3" />
        <field id="restart_u" name="u" long_name="U" unit="m s-1" operation="instant" domain_ref="restart_W2" />
        <field id="restart_xi" name="xi" long_name="Xi" unit="s-1" operation="instant" domain_ref="restart_W1" />
-       <field id="restart_m_v" name="m_v" long_name="m_v" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_cl" name="m_cl" long_name="m_cl" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_r" name="m_r" long_name="m_r" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_ci" name="m_ci" long_name="m_ci" unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_s" name="m_s" long_name="m_s"  unit="1" operation="instant" domain_ref="restart_Wtheta" />
-       <field id="restart_m_g" name="m_g" long_name="m_g"  unit="1" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_v" name="m_v" long_name="m_v" unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_cl" name="m_cl" long_name="m_cl" unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_r" name="m_r" long_name="m_r" unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_ci" name="m_ci" long_name="m_ci" unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_s" name="m_s" long_name="m_s"  unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
+       <field id="restart_m_g" name="m_g" long_name="m_g"  unit="kg/kg" operation="instant" domain_ref="restart_Wtheta" />
        <field id="restart_area_fraction" name="area_fraction" long_name="area_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
        <field id="restart_ice_fraction" name="ice_fraction" long_name="ice_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
        <field id="restart_liquid_fraction" name="liquid_fraction" long_name="liquid_fraction" unit="1" operation="instant" domain_ref="restart_Wtheta" />
@@ -188,6 +192,10 @@
       <file id="lfric_diag" name="lfric_diag" output_freq="10ts" convention="UGRID" enabled=".TRUE.">
         <field field_ref="theta"/>
         <field field_ref="w_physics"/>
+        <field field_ref="dt_bl"/>
+        <field field_ref="dmv_bl"/>
+        <field field_ref="dt_conv"/>
+        <field field_ref="dmv_conv"/>
         <field field_ref="m_v"/>
         <field field_ref="m_cl"/>
         <field field_ref="m_r"/>

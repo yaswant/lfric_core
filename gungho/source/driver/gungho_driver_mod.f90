@@ -113,6 +113,7 @@ module gungho_driver_mod
   type( field_collection_type ) :: derived_fields
   type( field_collection_type ) :: cloud_fields
   type( field_collection_type ) :: twod_fields
+  type( field_collection_type ) :: physics_incs
 
   ! Coordinate field
   type(field_type), target :: chi(3)
@@ -234,7 +235,8 @@ contains
     if (use_physics) then
       call init_physics(mesh_id, twod_mesh_id, restart,             &
                         u, exner, rho, theta,                       &
-                        derived_fields, cloud_fields, twod_fields)
+                        derived_fields, cloud_fields, twod_fields,  &
+                        physics_incs)
     end if
 
     ! Initial output
@@ -343,7 +345,7 @@ contains
             end if
             call iter_alg_step(u, rho, theta, exner, mr, xi, &
                                derived_fields, cloud_fields, twod_fields,    &
-                               timestep)
+                               physics_incs, timestep)
 
           case( timestepping_method_rk )             ! RK
             ! Initialise and output initial conditions on first timestep

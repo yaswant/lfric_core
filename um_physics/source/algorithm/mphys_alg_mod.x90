@@ -27,21 +27,23 @@ contains
   !>                (e.g. latent heating and cooling).
   !>         See UMDP26 for full scheme details
   !>@param[in]     mr_n           Start of timestep mixing ratios
-  !>@param[in]     theta          Potential temperature (theta) in native space
-  !>@param[in]     exner_in_w3    Exner Pressure in the w3 space (i.e. colocated with density)
+  !>@param[in]     theta          Potential temperature (theta) in wth space
+  !>@param[in]     exner_in_w3    Exner Pressure in the w3 space
   !>@param[in]     height_w3      Dry density in its native space
   !>@param[in]     height_wth     Dry density in its native space
-  !>@param[in,out]  derived_fields Group of derived fields
-  !>@param[in,out]  cloud_fields   Group of cloud fields
-  !>@param[in,out]  dmr_mphys      Mixing ratio increment due to microphysics
-  !>@param[in,out]  theta_inc      Potential temperature increment in native space
-
+  !>@param[in,out] derived_fields Group of derived fields
+  !>@param[in,out] cloud_fields   Group of cloud fields
+  !>@param[in,out] dmr_mphys      Mixing ratio increment due to microphysics
+  !>@param[in,out] theta_inc      Potential temperature increment in wth space
+  !>@param[in,out] physics_incs   Group of physics increments
   subroutine mphys_alg_step( mr_n, theta, exner_in_w3, height_w3, height_wth, &
                              derived_fields, cloud_fields, dmr_mphys,         &
-                             theta_inc )
+                             theta_inc, physics_incs )
 
     use mphys_kernel_mod, only: mphys_kernel_type
     use mr_indices_mod,   only: imr_v, imr_cl, imr_r, imr_ci, imr_g, nummr
+    use planet_constants_mod, only: lcrcp, lsrcp
+    use physics_config_mod, only: boundary_layer_placement
 
     implicit none
 
@@ -49,6 +51,7 @@ contains
     type( field_type ), intent( in )    :: height_w3, height_wth
 
     type( field_collection_type ), intent(inout) :: derived_fields, cloud_fields
+    type( field_collection_type ), intent(inout) :: physics_incs
 
     type( field_type ), intent( inout ) :: dmr_mphys ( nummr )
     type( field_type ), intent( inout ) :: theta_inc
@@ -62,6 +65,8 @@ contains
     type( field_type ), pointer :: cf_in         => null()
     type( field_type ), pointer :: cfl_in        => null()
     type( field_type ), pointer :: cff_in        => null()
+    type( field_type ), pointer :: dtl_mphys     => null()
+    type( field_type ), pointer :: dmt_mphys     => null()
 
     ! Unpack fields
     exner_in_wth  => derived_fields%get_field('exner_in_wth')
@@ -83,7 +88,20 @@ contains
                                      dmr_mphys(imr_v),  dmr_mphys(imr_cl),     &
                                      dmr_mphys(imr_ci), dmr_mphys(imr_r),      &
                                      dmr_mphys(imr_g),  theta_inc ) )
-    
+
+    ! Calculate increments required by the BL scheme
+    if (boundary_layer_placement /= 0) then
+      dtl_mphys => physics_incs%get_field('dtl_mphys')
+      dmt_mphys => physics_incs%get_field('dmt_mphys')
+      ! Calculate TL = T - (lc/cp)*mcl - ((lc+lf)/cp)*mci
+      call invoke(     X_times_Y(dtl_mphys, theta_inc, exner_in_wth),          &
+                  inc_X_minus_bY(dtl_mphys, lcrcp, dmr_mphys(imr_cl)),         &
+                  inc_X_minus_bY(dtl_mphys, lsrcp, dmr_mphys(imr_ci)),         &
+                  ! And mt = mv+mcl+mci
+                      X_plus_Y(dmt_mphys, dmr_mphys(imr_v), dmr_mphys(imr_cl)),&
+                  inc_X_plus_Y(dmt_mphys, dmr_mphys(imr_ci)) )
+    end if
+
   end subroutine mphys_alg_step
 
 end module mphys_alg_mod

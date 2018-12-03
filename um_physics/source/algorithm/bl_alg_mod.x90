@@ -13,7 +13,13 @@ module bl_alg_mod
   use field_collection_mod, only: field_collection_type
   use mr_indices_mod,       only: nummr, imr_v, imr_cl, imr_ci
 
+  ! xios output
+  use output_config_mod,  only: write_xios_output
+  use diagnostics_io_mod, only: write_scalar_diagnostic
+
   implicit none
+
+  private
 
   public bl_alg_step
 
@@ -21,26 +27,32 @@ contains
 
   !>@brief Run the UM Boundary Layer scheme
   !>@details The UM Boundary Layer scheme does:
-  !>             vertical mixing of heat and momentum (no moisture yet),
+  !>             vertical mixing of heat, momentum and moisture,
   !>             as documented in UMDP24
   !>         NB This version uses winds in w3 space (i.e. A-grid)
-  !>@param[in,out] dtheta_bl Theta increment
-  !>@param[in,out] mr        Mixing ratios
-  !>@param[in]    outer     outer loop counter
-  !>@param[in]    theta     Theta in its native space
-  !>@param[in]    rho       Dry density in its native space
-  !>@param[in]    mr_n      mixing ratios at time level n
-  !>@param[in]    exner     Exner Pressure in the w3 space (i.e. colocated with density)
-  !>@param[in]    height_w3  Height in w3
-  !>@param[in]    height_wth Height in wth
-  !>@param[in,out] derived_fields Group of derived fields
-  !>@param[in,out] cloud_fields Group of cloud fields
-  !>@param[in,out] twod_fields Group of 2D fields
+  !>            and doesn't currently feed-back wind increments
+  !>@param[in,out] dtheta_bl       Theta increment
+  !>@param[in,out] mr              Mixing ratios
+  !>@param[in]     outer           Outer loop counter
+  !>@param[in]     theta           Theta in its native (wth) space
+  !>@param[in]     rho             Dry density in its native (w3) space
+  !>@param[in]     mr_n            Mixing ratios at time level n
+  !>@param[in]     exner           Exner Pressure in the w3 space
+  !>@param[in]     height_w3       Height in w3
+  !>@param[in]     height_wth      Height in wth
+  !>@param[in,out] derived_fields  Group of derived fields
+  !>@param[in,out] cloud_fields    Group of cloud fields
+  !>@param[in,out] twod_fields     Group of 2D fields
+  !>@param[in,out] physics_incs    Group of physics increments
+  !>@param[in]     convection_done Flag on whether convection has been done
+  !>@param[in]     timestep        Model timestep number
   subroutine bl_alg_step(dtheta_bl, mr, outer, theta, rho, mr_n, exner, &
                          height_w3, height_wth, derived_fields,         &
-                         cloud_fields, twod_fields)
+                         cloud_fields, twod_fields, physics_incs,       &
+                         convection_done, timestep)
 
     use bl_kernel_mod, only: bl_kernel_type
+    use physics_config_mod, only: microphysics_placement
 
     implicit none
 
@@ -50,11 +62,14 @@ contains
     type( field_collection_type ), intent(inout) :: derived_fields
     type( field_collection_type ), intent(inout) :: cloud_fields
     type( field_collection_type ), intent(inout) :: twod_fields
-    integer(kind=i_def), intent(in)         :: outer
+    type( field_collection_type ), intent(inout) :: physics_incs
+    integer(kind=i_def), intent(in)         :: outer, timestep
+    logical, intent(in)                     :: convection_done
 
     ! Temporary fields unpacked fields from collections
     type( field_type ), pointer :: exner_in_wth  => null()
-    type( field_type ), pointer :: rho_in_wth => null()
+    type( field_type ), pointer :: wetrho_in_wth => null()
+    type( field_type ), pointer :: wetrho_in_w3 => null()
     type( field_type ), pointer :: u1_in_w3 => null()
     type( field_type ), pointer :: u2_in_w3  => null()
     type( field_type ), pointer :: w_physics => null()
@@ -72,11 +87,17 @@ contains
     type( field_type ), pointer :: cf_liq  => null()
     type( field_type ), pointer :: cf_bulk  => null()
     type( field_type ), pointer :: rhcrit_in_wth => null()
+    type( field_type ), pointer :: dt_bl => null()
+    type( field_type ), pointer :: dmv_bl => null()
+    type( field_type ), pointer :: dt_conv => null()
+    type( field_type ), pointer :: dmv_conv => null()
+    type( field_type ), pointer :: dtl_mphys => null()
+    type( field_type ), pointer :: dmt_mphys => null()
 
-
-    !Unpack derived fields
+    ! Unpack derived fields
     exner_in_wth => derived_fields%get_field('exner_in_wth')
-    rho_in_wth => derived_fields%get_field('rho_in_wth')
+    wetrho_in_wth => derived_fields%get_field('wetrho_in_wth')
+    wetrho_in_w3 => derived_fields%get_field('wetrho_in_w3')
     u1_in_w3 => derived_fields%get_field('u1_in_w3')
     u2_in_w3 => derived_fields%get_field('u2_in_w3')
     w_physics => derived_fields%get_field('w_physics')
@@ -85,30 +106,58 @@ contains
     u2_in_w3_star => derived_fields%get_field('u2_in_w3_star')
     w_physics_star => derived_fields%get_field('w_physics_star')
 
-    !Unpack twod fields
+    ! Unpack twod fields
     tstar_2d => twod_fields%get_field('tstar')
     zh_2d => twod_fields%get_field('zh')
     z0msea_2d => twod_fields%get_field('z0msea')
     ntml_2d => twod_fields%get_field('ntml')
     cumulus_2d => twod_fields%get_field('cumulus')
 
-    !Unpack cloud fields
+    ! Unpack cloud fields
     cf_area => cloud_fields%get_field('area_fraction')
     cf_ice => cloud_fields%get_field('ice_fraction')
     cf_liq => cloud_fields%get_field('liquid_fraction')
     cf_bulk => cloud_fields%get_field('bulk_fraction')
     rhcrit_in_wth => cloud_fields%get_field('rhcrit')
     
-    call invoke(bl_kernel_type( outer, theta, rho, rho_in_wth,            &
-                           exner, exner_in_wth, u1_in_w3, u2_in_w3,       &
-                           w_physics, mr_n(imr_v), mr_n(imr_cl),          &
-                           mr_n(imr_ci),                                  &
-                           theta_star, u1_in_w3_star, u2_in_w3_star,      &
-                           w_physics_star,                                &
-                           height_w3, height_wth, tstar_2d, zh_2d,        &
-                           z0msea_2d, ntml_2d, cumulus_2d, dtheta_bl,     &
-                           mr(imr_v), mr(imr_cl),mr(imr_ci), cf_area,     &
+    ! Unpack the physics increments
+    dt_bl => physics_incs%get_field('dt_bl')
+    dmv_bl => physics_incs%get_field('dmv_bl')
+    dt_conv => physics_incs%get_field('dt_conv')
+    dmv_conv => physics_incs%get_field('dmv_conv')
+    dtl_mphys => physics_incs%get_field('dtl_mphys')
+    dmt_mphys => physics_incs%get_field('dmt_mphys')
+
+    if (.not. convection_done) then
+      ! If we've not just done convection, ensure increments are 0
+      call invoke( setval_c(dt_conv, 0.0_r_def), &
+                   setval_c(dmv_conv, 0.0_r_def) )
+    end if
+
+    if (microphysics_placement == 0) then
+      ! If microphysics is not being used, ensure increments are 0
+      call invoke( setval_c(dtl_mphys, 0.0_r_def), &
+                   setval_c(dmt_mphys, 0.0_r_def) )
+    end if
+
+    call invoke(bl_kernel_type( outer, theta, rho, wetrho_in_w3,               &
+                           wetrho_in_wth, exner, exner_in_wth,                 &
+                           u1_in_w3, u2_in_w3, w_physics,                      &
+                           mr_n(imr_v), mr_n(imr_cl), mr_n(imr_ci), theta_star,&
+                           u1_in_w3_star, u2_in_w3_star, w_physics_star,       &
+                           height_w3, height_wth, tstar_2d, zh_2d,             &
+                           z0msea_2d, ntml_2d, cumulus_2d, dtheta_bl,          &
+                           dt_bl, dmv_bl, dt_conv, dmv_conv,                   &
+                           dtl_mphys, dmt_mphys,                               &
+                           mr(imr_v), mr(imr_cl),mr(imr_ci), cf_area,          &
                            cf_ice, cf_liq, cf_bulk, rhcrit_in_wth ))
+
+    if (write_xios_output) then
+      call write_scalar_diagnostic("dt_bl", dt_bl, timestep, &
+                                    dt_bl%get_mesh_id(), .false. )
+      call write_scalar_diagnostic("dmv_bl", dmv_bl, timestep, &
+                                    dmv_bl%get_mesh_id(), .false. )
+    end if
 
   end subroutine bl_alg_step
 

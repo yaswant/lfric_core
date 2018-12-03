@@ -1,0 +1,318 @@
+!----------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!----------------------------------------------------------------------------
+!> @brief Initialisation of things needed by UM physics schemes
+
+module um_init_mod
+
+  use constants_mod,         only : i_def, i_um, r_def, r_um
+  use extrusion_config_mod,  only : domain_top
+  use field_collection_mod,  only : field_collection_type
+  use physics_config_mod,    only : cloud_scheme,               &
+                                    physics_cloud_scheme_none,  &
+                                    physics_cloud_scheme_smith, &
+                                    rhcritical,                 &
+                                    convection_placement
+  use log_mod,               only : log_event,         &
+                                    log_scratch_space, &
+                                    LOG_LEVEL_ERROR
+  implicit none
+
+contains
+
+  !>@brief Initialize the UM physics schemes
+  !>@param[in]    theta_in_wth Theta in its native space
+  subroutine um_init(theta_in_wth)
+
+    ! UM modules containing things that need setting
+    use allocate_jules_arrays_mod, only: allocate_jules_arrays
+    use ancil_info, only: ssi_pts, sea_pts, sice_pts,                      &
+         sice_pts_ncat, ssi_index, sea_index, sice_index,                  &
+         sice_index_ncat, fssi_ij, sea_frac, sice_frac, sice_frac_ncat
+    use atm_fields_bounds_mod, only: atm_fields_bounds_init
+    use bl_option_mod, only: i_bl_vn, sbl_op, ritrans,                     &
+         cbl_op, lambda_min_nml, l_bl_mix_qcf, local_fa, keep_ri_fa,       &
+         sg_orog_mixing, fric_heating, idyndiag,                           &
+         zhloc_depth_fac, flux_grad, entr_smooth_dec,                      &
+         relax_sc_over_cu, bl_res_inv, blending_option,                    &
+         a_ent_shr_nml, alpha_cd, puns, pstb, nl_bl_levels, kprof_cu,      &
+         non_local_bl
+    use cloud_inputs_mod, only: i_cld_vn, forced_cu, i_rhcpt, i_cld_area,  &
+         l_fixbug_pc2_mixph, rhcrit, cloud_fraction_method,                &
+         ice_fraction_method,falliceshear_method, cff_spread_rate,         &
+         l_subgrid_qv, ice_width
+    use cv_run_mod, only: icvdiag, cvdiag_inv, cvdiag_sh_wtest,            &
+         limit_pert_opt, tv1_sd_opt, iconv_congestus, iconv_deep,          &
+         ent_fac_dp, cldbase_opt_dp, cldbase_opt_sh, w_cape_limit,         & 
+         l_param_conv
+    use cderived_mod, only: delta_lambda, delta_phi
+    use dyn_coriolis_mod, only: f3_at_u
+    use dynamics_input_mod, only: numcycles
+    use fsd_parameters_mod, only: fsd_eff_lam, fsd_eff_phi 
+    use gen_phys_inputs_mod, only: l_mr_physics
+    use jules_sea_seaice_mod, only: nice_use, iseasurfalg, emis_sea,       &
+         seasalinityfactor, charnock, nice
+    use jules_soil_mod, only: dzsoil, dzsoil_io
+    use jules_surface_mod, only: l_epot_corr, cor_mo_iter, iscrntdiag,     &
+         isrfexcnvgust
+    use jules_surface_types_mod, only: nnpft, npft, nnvg, ntype, urban,    &
+         lake, soil, ice
+    use level_heights_mod, only: r_theta_levels, r_rho_levels, eta_theta_levels
+    use model_domain_mod, only: model_type
+    use mphys_bypass_mod, only: mphys_mod_top
+    use mphys_inputs_mod, only: ai, ar, bi, c_r_correl, ci_input, cic_input, &
+        di_input, dic_input, i_mcr_iter, l_diff_icevt,                       &
+        l_mcr_qrain, l_psd, l_psd_global, l_rain, l_rainfall_as,             &
+        l_warm_new, timestep_mp_in, tnuc, x1r, x2r, l_mcr_qcf2
+    use nlsizes_namelist_mod, only: model_levels, bl_levels, row_length,   &
+         rows, land_field, ntiles, sm_levels, tr_vars
+    use rad_input_mod, only: two_d_fsd_factor
+    use timestep_mod, only: timestep
+    use trignometric_mod, only: cos_theta_latitude
+    use tuning_segments_mod, only: bl_segment_size, precip_segment_size
+
+    ! LFRic modules with information we need
+    use conversions_mod, only: pi_over_180
+    use field_mod, only : field_type, field_proxy_type
+    use timestepping_config_mod, only: dt, outer_iterations
+
+    implicit none
+
+    type( field_type ), intent( in ) :: theta_in_wth
+    type( field_proxy_type )  :: theta_in_wth_proxy
+
+    integer(kind=i_def) :: nlayers
+
+    ! Loop counters
+    integer(kind=i_def) :: i,j,l
+
+    theta_in_wth_proxy = theta_in_wth%get_proxy()
+
+    ! Set up physics dimensions as a single column sea point
+    ! This may need changing if we pass multiple columns to physics kernels
+    nlayers      = theta_in_wth_proxy%vspace%get_nlayers()
+    model_levels = theta_in_wth_proxy%vspace%get_nlayers()
+    bl_levels    = nlayers-1
+    row_length   = 1
+    rows         = 1
+    land_field   = 0
+    ntiles       = 1
+    sm_levels    = 1
+    nice         = 1
+    nice_use     = 1
+    tr_vars      = 0
+
+    ! Set up array sizes for a single column model
+    model_type = 5
+    call atm_fields_bounds_init( 0_i_um, 0_i_um, 0_i_um, &
+                                 0_i_um, row_length, rows,rows,  &
+                                 nlayers, bl_levels, nlayers )
+
+    ! Arrays that need to be allocated at startup
+    allocate(f3_at_u(row_length,rows))
+    allocate(r_theta_levels(row_length,rows,0:nlayers))
+    allocate(r_rho_levels(row_length,rows,nlayers))
+    allocate(eta_theta_levels(0:nlayers))
+
+    ! Set up surface and allocate Jules arrays
+    nnpft = 5
+    npft  = 5
+    nnvg  = 4
+    ntype = 9
+    urban = 6
+    lake  = 7
+    soil  = 8
+    ice   = 9
+    call allocate_jules_arrays(land_field,ntiles,sm_levels,nice_use,nice_use)
+    dzsoil => dzsoil_io(1:sm_levels)
+
+    ! Set physics timestep from Gungho timestep
+    timestep=dt
+
+    ! Set the number of dynamics outer loops
+    numcycles=outer_iterations
+
+    ! Set mixing ratios to always be true
+    l_mr_physics=.true.
+
+    ! BL namelist options - should be moved to namelist in future
+    i_bl_vn          = 3
+    sbl_op           = 6
+    ritrans          = 0.1_r_um
+    cbl_op           = 2
+    lambda_min_nml   = 40.0_r_um
+    l_bl_mix_qcf     = .true.
+    local_fa         = 1
+    keep_ri_fa       = 1
+    sg_orog_mixing   = 0
+    fric_heating     = 1
+    idyndiag         = 4
+    zhloc_depth_fac  = 0.3_r_um
+    flux_grad        = 0
+    entr_smooth_dec  = 0
+    relax_sc_over_cu = 0
+    kprof_cu         = 0
+    bl_res_inv       = 0
+    blending_option  = 0
+    a_ent_shr_nml    = 5.0_r_um
+    allocate(alpha_cd(bl_levels))
+    alpha_cd         = 1.5_r_um
+    alpha_cd(1)      = 2.0_r_um
+    puns             = 0.5_r_um
+    pstb             = 2.0_r_um
+    nl_bl_levels     = bl_levels
+    if (convection_placement /= 0) non_local_bl = 0
+
+    ! Convection namelist options - should be moved to namelist in future
+    if (convection_placement /= 0) l_param_conv = .true.
+    icvdiag         = 1
+    cvdiag_inv      = 0
+    cvdiag_sh_wtest = 0.02_r_um
+    limit_pert_opt  = 2
+    tv1_sd_opt      = 2
+    iconv_congestus = 0
+    iconv_deep      = 1
+    ent_fac_dp      = 1.13_r_um
+    cldbase_opt_dp  = 3
+    cldbase_opt_sh  = 0
+    w_cape_limit    = 0.3_r_um
+    l_param_conv    = .false.
+
+    ! Cloud namelist options - should be moved to namelist in future
+    select case (cloud_scheme)
+      case(physics_cloud_scheme_none) 
+        i_cld_vn = 0
+      case(physics_cloud_scheme_smith) 
+        i_cld_vn = 1
+      case default
+        write( log_scratch_space, '(A,I3)' )  &
+          'Invalid cloud scheme option, stopping', cloud_scheme 
+        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+    end select
+    i_rhcpt               = 0
+    forced_cu             = 0
+    i_cld_area            = 0
+    l_fixbug_pc2_mixph    = .true.
+    cloud_fraction_method = 1
+    ice_fraction_method   = 1
+    falliceshear_method   = 2
+    cff_spread_rate       = 1.0e-3_r_um
+    l_subgrid_qv          = .true.
+    ice_width             = 0.02_r_um
+    ! Set rhcrit to the profile provided in the physics namelist.
+    ! rhcrit is used throughout the UM and its value needs setting 
+    ! here.
+    rhcrit = rhcritical
+
+    ! Microphysics namelist options - should be moved to namelist in future
+    ai             = 2.5700e-2_r_um
+    ar             = 1.00_r_um
+    bi             = 2.00_r_um
+    c_r_correl     = 0.9_r_um
+    ci_input       = 14.3_r_um
+    cic_input      = 1024.0_r_um
+    di_input       = 0.416_r_um
+    dic_input      = 1.0_r_um
+    i_mcr_iter     = 2
+    l_diff_icevt   = .true.
+    l_mcr_qrain    = .true.
+    l_psd          = .true.
+    l_psd_global   = .true.
+    l_rain         = .true.
+    l_rainfall_as  = .true.
+    l_warm_new     = .true.
+    timestep_mp_in = 120
+    tnuc           = -10.00_r_um
+    x1r            = 2.2000e-1_r_um
+    x2r            = 2.2000_r_um
+
+    ! Radiation option needed by microphysics
+    two_d_fsd_factor = 1.414_r_um
+
+    ! Things required by mphys.
+    ! These should all be reviewed and removed or
+    ! set to more sensible values based on LFRic mesh
+    ! However the code will not work if they are left unset.
+
+    ! This is used in the calculation of grid-box size. Since they are
+    ! nearly square, we set it to a value of 1 for now
+    allocate(cos_theta_latitude(row_length,rows), source=1.0_r_um)
+    mphys_mod_top       = domain_top
+    delta_lambda        = 1.875_r_um*pi_over_180
+    delta_phi           = 1.875_r_um*pi_over_180
+    fsd_eff_lam         = delta_lambda
+    fsd_eff_phi         = delta_phi
+
+    ! Jules namelist options - should be moved to namelist in future
+    charnock          = 0.018_r_um
+    emis_sea          = 0.985_r_um
+    iseasurfalg       = 1
+    seasalinityfactor = 0.98_r_um
+    cor_mo_iter       = 3
+    iscrntdiag        = 2
+    isrfexcnvgust     = 1
+    l_epot_corr       = .true.
+
+    ! Tuning segment sizes used in the physics code
+    bl_segment_size     = 1
+    precip_segment_size = 1
+
+    !-----------------------------------------------------------------------
+    ! Set up index for sea and sea-ice
+    !
+    ! This code is copied from atmos_physics1 and has been adapted
+    ! for a sea-point only - no land or sea-ice
+    !
+    ! It will need re-writing!
+    !-----------------------------------------------------------------------
+    ssi_pts = 0
+    ssi_index(:)=0
+    DO j=1,rows
+      DO i=1,row_length
+        ssi_pts=ssi_pts + 1
+        ssi_index(ssi_pts) = (j-1)*row_length + i
+        fssi_ij(i,j)=1.0_r_um
+      END DO
+    END DO
+
+    !-----------------------------------------------------------------------
+    ! Allocate space for and initialise sea and sea-ice indices.
+    !-----------------------------------------------------------------------
+    sea_pts = 0
+    sice_pts = 0
+    sea_index(:)=0
+    sice_index(:)=0
+    sice_frac(:)=0.0_r_um
+    sea_frac(:)=0.0_r_um
+    DO l=1,ssi_pts
+      j=(ssi_index(l)-1)/row_length + 1
+      i = ssi_index(l) - (j-1)*row_length
+      IF (ssi_index(l) > 0) THEN
+        sea_pts=sea_pts+1
+        sea_index(sea_pts)=l
+        sea_frac(l)=1.0_r_um - sice_frac(l)
+      END IF
+    END DO
+
+    ! NOTE these settings use NICE_USE not NICE so are suitable for use here and
+    ! in the explicit part of the surface exchange code.  They are then updated
+    ! using NICE before the call to the implicit part of the surface exchange
+    ! code
+    sice_pts_ncat(:)=0
+    sice_index_ncat(:,:)=0
+    sice_frac_ncat(:,:)=0.0_r_um
+
+    !-----------------------------------------------------------------------
+    ! Final error checking
+    !-----------------------------------------------------------------------
+    if (l_mcr_qcf2) then
+         call log_event( &
+        'mphys_kernel_mod: Second ice prognostic is retired in LFRic.', &
+         LOG_LEVEL_ERROR )
+    end if
+
+  end subroutine um_init
+
+end module um_init_mod

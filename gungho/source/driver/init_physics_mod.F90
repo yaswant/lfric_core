@@ -7,7 +7,7 @@
 !> @details Handles initialization of prognostic fields
 module init_physics_mod
 
-  use constants_mod,                  only : i_def
+  use constants_mod,                  only : i_def, l_def
   use field_mod,                      only : field_type, &
                                              write_diag_interface, &
                                              checkpoint_interface, &
@@ -35,7 +35,6 @@ module init_physics_mod
 
   implicit none
 
-
 contains
   !>@brief Routine to initialise the field objects required by the physics
   !> @param[in] mesh_id Identifier of the mesh
@@ -48,9 +47,13 @@ contains
   !> @param[out]   derived_fields Collection of FD fields derived from FE fields 
   !> @param[out]   cloud_fields Collection of FD cloud fields
   !> @param[out]   twod_fields Collection of two fields
+  !> @param[out]   physics_incs Collection of physics increments
   subroutine init_physics(mesh_id, twod_mesh_id, restart,             &
                           u, exner, rho, theta,                       &
-                          derived_fields, cloud_fields, twod_fields)
+                          derived_fields, cloud_fields, twod_fields,  &
+                          physics_incs)
+
+    implicit none
 
     integer(i_def), intent(in)               :: mesh_id
     type(restart_type), intent(in)           :: restart
@@ -62,12 +65,13 @@ contains
     type(field_collection_type), intent(out) :: twod_fields
     type(field_collection_type), intent(out) :: cloud_fields
     type(field_collection_type), intent(out) :: derived_fields
+    type(field_collection_type), intent(out) :: physics_incs
 
     ! pointers to vector spaces
     type(function_space_type), pointer  :: vector_space => null()
 
     integer(i_def) :: theta_space
-    logical :: checkpoint_restart_flag
+    logical(l_def) :: checkpoint_restart_flag
 
     call log_event( 'Physics: initialisation...', LOG_LEVEL_INFO )
     
@@ -146,8 +150,23 @@ contains
 
     ! Initialise cloud fields
     call init_cloud_twod_fields_alg( cloud_fields, twod_fields, restart )
-    call log_event( 'Physics initialised', LOG_LEVEL_INFO ) 
 
+    !========================================================================
+    ! Increment values from individual physics parametrizations
+    ! either for use by subsequent parametrizations or as diagnostics
+    !========================================================================
+    physics_incs = field_collection_type(name='physics_incs')
+    vector_space => function_space_collection%get_fs(mesh_id, 0, Wtheta)
+    checkpoint_restart_flag = .false. ! no need to dump any of these
+
+    call add_physics_field(physics_incs, 'dt_bl', vector_space, checkpoint_restart_flag, restart)
+    call add_physics_field(physics_incs, 'dmv_bl', vector_space, checkpoint_restart_flag, restart)
+    call add_physics_field(physics_incs, 'dt_conv', vector_space, checkpoint_restart_flag, restart)
+    call add_physics_field(physics_incs, 'dmv_conv', vector_space, checkpoint_restart_flag, restart)
+    call add_physics_field(physics_incs, 'dtl_mphys', vector_space, checkpoint_restart_flag, restart)
+    call add_physics_field(physics_incs, 'dmt_mphys', vector_space, checkpoint_restart_flag, restart)
+
+    call log_event( 'Physics initialised', LOG_LEVEL_INFO ) 
 
   end subroutine init_physics
 
@@ -176,7 +195,7 @@ contains
     type(field_collection_type), intent(inout) :: field_collection
     type(function_space_type), intent(in)      :: vector_space
     type(restart_type), intent(in)             :: restart
-    logical, intent(in)                        :: checkpoint_restart_flag
+    logical(l_def), intent(in)                 :: checkpoint_restart_flag
 
     !Local variables
     type(field_type)                           :: new_field
