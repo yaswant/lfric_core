@@ -305,7 +305,8 @@ subroutine sample_poly_adv_code( nlayers,              &
       dzdx_c = dzdx_c / dx
       dzdy_c = dzdy_c / dy
 
-      etadot = u(3,k+dft) + u(1,k+dft)*dx/dz*(dzdx_l-dzdx_c) + u(2,k+dft)*dy/dz*(dzdy_l-dzdy_c) 
+      etadot = u(3,k+dft) + dx/dz*(u(1,k+dft)*dzdx_l-abs(u(1,k+dft))*dzdx_c) &
+                          + dy/dz*(u(2,k+dft)*dzdy_l-abs(u(2,k+dft))*dzdy_c)
       if ( k == 0 .or. k == nlayers ) etadot = 0.0_r_def
     else
       etadot = u(3,k+dft)
