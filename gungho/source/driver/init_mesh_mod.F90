@@ -174,7 +174,7 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
     ! that are closest to sqrt(ranks_per_panel). If two factors can't
     ! be found after max_factor_iters attempts, they would provide 
     ! partitions that are too un-square, so an error is produced.
-    start_factor  = int(sqrt(float(ranks_per_panel)))
+    start_factor  = nint(sqrt(real(ranks_per_panel, kind=r_def)), kind=i_def)
     end_factor    = max(1,(start_factor-max_factor_iters))
     found_factors = .false.
     do fact_count = start_factor, end_factor, -1

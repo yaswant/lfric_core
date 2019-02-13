@@ -740,7 +740,8 @@ contains
       sw_corner_cells(1)=1
     else
       ! For multi-panel meshes, the panels must be square
-      num_cells_x = nint(sqrt(float(global_mesh%get_ncells())/float(num_panels)))
+      num_cells_x = nint(sqrt( real(global_mesh%get_ncells(), kind=r_def)/ &
+                               real(num_panels, kind=r_def) ))
       num_cells_y = num_cells_x
 
       ! Calculate the South West corner cells of all the panels in the global mesh
@@ -771,7 +772,7 @@ contains
     endif
 
     !convert the local rank number into a face number and a local xproc and yproc
-    face = int(float(num_panels)*(real(local_rank)/real(total_ranks)))+1
+    face = ((num_panels*local_rank)/total_ranks) + 1
     start_cell = sw_corner_cells(face)
     start_rank = xproc*yproc*(face-1)
     local_xproc = modulo(local_rank-start_rank,xproc)
@@ -782,15 +783,10 @@ contains
     !Work out the start index and number of cells (in x- and y-dirn) for
     !the local partition - this algorithm should spread out the number of
     !cells each partition gets fairly evenly
-    start_x = int( ( real( local_xproc ) * real( num_cells_x )/ &
-                    real( xproc ) ) + 0.5_r_def ) + 1
-    num_x   = int( ( real( local_xproc + 1 ) * real( num_cells_x )/ &
-                    real( xproc ) ) + 0.5_r_def ) - start_x + 1
-
-    start_y = int( ( real( local_yproc ) * real( num_cells_y )/ &
-                    real( yproc ) ) + 0.5_r_def ) + 1
-    num_y   = int( ( real( local_yproc + 1 ) * real( num_cells_y )/ &
-                    real( yproc ) ) + 0.5_r_def ) - start_y + 1
+    start_x = ( (local_xproc*num_cells_x) / xproc ) + 1
+    num_x   = ( ((local_xproc+1)*num_cells_x) / xproc ) - start_x + 1
+    start_y = ( (local_yproc*num_cells_y) / yproc ) + 1
+    num_y   = ( ((local_yproc+1)*num_cells_y) / yproc ) - start_y + 1
 
     !Create a linked list of all cells that are part of this partition (not halos)
 
