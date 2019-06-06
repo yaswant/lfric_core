@@ -18,7 +18,8 @@ module conservation_algorithm_mod
   use function_space_collection_mod,   only: function_space_collection
   use field_mod,                       only: field_type
   use finite_element_config_mod,       only: element_order, &
-                                             vorticity_in_w1
+                                             vorticity_in_w1, &
+                                             nqp_exact
   use fs_continuity_mod,               only: W3
   use function_space_mod,              only: function_space_type
   use log_mod,                         only: log_event,         &
@@ -79,7 +80,7 @@ contains
     chi          => get_coordinates()
 
     ! Get a quadrature rule
-    qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+    qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
     mesh = rho%get_mesh_id()
     w3_fs => function_space_collection%get_fs( mesh, element_order, W3)
    

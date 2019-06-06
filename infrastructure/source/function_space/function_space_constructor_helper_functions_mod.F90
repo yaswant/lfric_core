@@ -270,12 +270,12 @@ contains
 
     reference_element => mesh%get_reference_element()
 
-    nverts_exterior = reference_element%get_number_horizontal_vertices()
-    nedges_exterior = reference_element%get_number_horizontal_edges()
+    nverts_exterior = reference_element%get_number_2d_vertices()
+    nedges_exterior = reference_element%get_number_2d_edges()
     nfaces_exterior = 1
 
-    nedges_interior = reference_element%get_number_horizontal_vertices()
-    nfaces_interior = reference_element%get_number_horizontal_edges()
+    nedges_interior = reference_element%get_number_2d_vertices()
+    nfaces_interior = reference_element%get_number_2d_edges()
 
 
     ! Local values
@@ -509,7 +509,7 @@ contains
     number_edges    = reference_element%get_number_edges()
     number_vertices = reference_element%get_number_vertices()
 
-    number_horizontal_edges = reference_element%get_number_horizontal_edges()
+    number_horizontal_edges = reference_element%get_number_2d_edges()
 
     ! To uniquely specify a 3D tensor product basis function the following is
     ! needed:
@@ -1507,15 +1507,12 @@ contains
     !=========================================================
 
     reference_element => mesh%get_reference_element()
-    number_horizontal_faces &
-                    = reference_element%get_number_horizontal_faces()
-    number_horizontal_edges &
-                    = reference_element%get_number_horizontal_edges()
-    number_horizontal_vertices &
-                    = reference_element%get_number_horizontal_vertices()
-    number_faces    = reference_element%get_number_faces()
-    number_edges    = reference_element%get_number_edges()
-    number_vertices = reference_element%get_number_vertices()
+    number_horizontal_faces    = reference_element%get_number_2d_faces()
+    number_horizontal_edges    = reference_element%get_number_2d_edges()
+    number_horizontal_vertices = reference_element%get_number_2d_vertices()
+    number_faces               = reference_element%get_number_faces()
+    number_edges               = reference_element%get_number_edges()
+    number_vertices            = reference_element%get_number_vertices()
 
     ncells = ncells_2d_with_ghost
 

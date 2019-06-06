@@ -135,7 +135,7 @@ function init_quadrature_variable(np_1, np_2, horizontal_faces, vertical_faces, 
 
   ! Note: for both prisms and cubes, there will only ever be 2 vertical faces
   if ( horizontal_faces ) then
-    self%nfaces_horizontal = reference_element%get_number_horizontal_faces()
+    self%nfaces_horizontal = reference_element%get_number_2d_faces()
   else
     self%nfaces_horizontal = 0
   end if
@@ -193,10 +193,10 @@ function init_quadrature_symmetrical(np, horizontal_faces, vertical_faces, &
   real(kind=r_def), pointer               :: points_weights_2(:,:) => null()
 
   if ( horizontal_faces .and. vertical_faces ) then
-    self%nfaces_horizontal = reference_element%get_number_horizontal_faces()
+    self%nfaces_horizontal = reference_element%get_number_2d_faces()
     self%nfaces_vertical   = 2
   else if ( horizontal_faces ) then
-    self%nfaces_horizontal = reference_element%get_number_horizontal_faces()
+    self%nfaces_horizontal = reference_element%get_number_2d_faces()
     self%nfaces_vertical   = 0
   else if ( vertical_faces ) then
     self%nfaces_horizontal = 0

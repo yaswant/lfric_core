@@ -25,7 +25,9 @@ use idealised_config_mod,         only : test_cold_bubble_x,           &
                                          test_solid_body_rotation,     &
                                          test_solid_body_rotation_alt, &
                                          test_deep_baroclinic_wave,    &
-                                         test_dry_cbl
+                                         test_dry_cbl,                 &
+                                         test_cos_phi,                 &
+                                         test_cosine_bubble
 use initial_density_config_mod,    only : r1, x1, y1, r2, x2, y2,     &
                                           tracer_max, tracer_background
 use base_mesh_config_mod,          only : geometry, &
@@ -136,10 +138,10 @@ function analytic_temperature(chi, choice) result(temperature)
     end if
     temperature = temperature + dt
 
-  case( test_GAUSSIAN_HILL )
+  case( test_gaussian_hill )
     h1 = tracer_max*exp( -(l1/r1)**2 )
     h2 = tracer_max*exp( -(l2/r2)**2 )
-    temperature = h1 +h2
+    temperature = h1 + h2
 
   case( test_cosine_hill )
     if ( l1 < r1 ) then
@@ -231,6 +233,17 @@ function analytic_temperature(chi, choice) result(temperature)
       temperature = 293.0
     else if (z> 1000.0)then
       temperature = 300.0 + 15.0*(z-1000.0)/(6000.0-1000.0)
+    end if
+
+  case( test_cos_phi )
+    temperature = tracer_max*cos(lat)**4
+
+  case( test_cosine_bubble ) 
+    l1 = sqrt( ((chi(1) - x1)/r1)**2 + ((chi(3) - y1)/r2)**2 )
+    if ( l1 < 1.0_r_def ) then
+      temperature = tracer_background + tracer_max*cos(0.5_r_def*l1*PI)**2
+    else
+      temperature = tracer_background
     end if
 
   end select

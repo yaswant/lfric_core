@@ -19,10 +19,14 @@ module init_gungho_prognostics_alg_mod
                                              w3inv_id,        &
                                              get_height
 
-  use finite_element_config_mod,       only: element_order
+  use finite_element_config_mod,       only: element_order, &
+                                             nqp_exact
   use formulation_config_mod,          only: use_moisture, set_hydrostatic_init
   use initial_density_config_mod,      only: sample_init_rho
-  use initial_wind_config_mod,         only: smp_init_wind
+  use initial_wind_config_mod,         only: smp_init_wind,                           &
+                                             profile,                                 &
+                                             profile_sbr_streamfunction, &
+                                             profile_dcmip301_streamfunction
   use io_mod,                          only: ts_fname
   use time_config_mod,                 only: timestep_start
 
@@ -43,6 +47,8 @@ module init_gungho_prognostics_alg_mod
   use hydrostatic_exner_kernel_mod,    only: hydrostatic_exner_kernel_type
   use moist_dyn_factors_kernel_mod,    only: moist_dyn_factors_kernel_type
   use initial_mr_kernel_mod,           only: initial_mr_kernel_type
+  use initial_streamfunc_kernel_mod,   only: initial_streamfunc_kernel_type
+  use strong_curl_kernel_mod,          only: strong_curl_kernel_type
 
   ! Derived Types
   use field_mod,                       only: field_type
@@ -51,9 +57,10 @@ module init_gungho_prognostics_alg_mod
   use quadrature_rule_gaussian_mod,    only: quadrature_rule_gaussian_type
   use sample_initial_u_kernel_mod,     only: sample_initial_u_kernel_type 
   use operator_mod,                    only: operator_type
+  use function_space_collection_mod,   only: function_space_collection
 
   ! Handles
-  use fs_continuity_mod,               only: W3, Wtheta
+  use fs_continuity_mod,               only: W1, W3, Wtheta
   use mr_indices_mod,                  only: nummr, mr_names
   use moist_dyn_mod,                   only: num_moist_factors, gas_law
   implicit none
@@ -81,7 +88,7 @@ contains
 
     type( quadrature_xyoz_type )          :: qr
     type( quadrature_rule_gaussian_type ) :: quadrature_rule
-    type( field_type )                    :: r_u
+    type( field_type )                    :: r_u, r_psi, psi
     ! Coordinate fields
     type( field_type ), pointer           :: chi(:) => null(), &
                                              height_wth => null(), &
@@ -96,11 +103,10 @@ contains
     ! Operators
     type(operator_type), pointer        :: m3_inv => null()
 
-    integer :: i
+    integer(kind=i_def)  :: i, mesh_id
+    real(kind=r_def)     :: initial_time
 
-    real(kind=r_def) :: initial_time
-
-    qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+    qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
     chi => get_coordinates()
 
 
@@ -125,21 +131,37 @@ contains
 
     initial_time = 0.0_r_def
 
+    ! Initialise U according to formulation
     if (smp_init_wind) then
       call invoke( name = "Initialise U",    &
                    setval_c( u, 0.0_r_def ), &
                    sample_initial_u_kernel_type( u, chi ) )
     else
-      ! Initialise U and Rho according to formulation
-      r_u = field_type( vector_space =  u%get_function_space() )
-      call invoke( name = "Initialise U and Rho",   &
-                   setval_c( u,   0.0_r_def ),      &
-                   setval_c( r_u, 0.0_r_def ),      &
-                   initial_u_kernel_type( r_u, chi, initial_time, qr ), &
-                   enforce_bc_kernel_type( r_u ) )
-      call mass_matrix_solver_alg(u, r_u)
+      if ( profile == profile_sbr_streamfunction .or.  &
+           profile == profile_dcmip301_streamfunction ) then
+        call log_event( "Gungho: Initialising winds from stream function", LOG_LEVEL_INFO )
+        mesh_id = u%get_mesh_id()
+        psi = field_type( vector_space =                                           &
+                    function_space_collection%get_fs(mesh_id, element_order, W1) )
+        r_psi = field_type( vector_space =                                         &
+                    function_space_collection%get_fs(mesh_id, element_order, W1) )
+        call invoke( setval_c(psi, 0.0_r_def),   &
+                     setval_c(r_psi, 0.0_r_def), &
+                     initial_streamfunc_kernel_type(r_psi, chi, qr) )
+        call mass_matrix_solver_alg(psi, r_psi)
+        call invoke( strong_curl_kernel_type(u, psi) )
+      else
+        r_u = field_type( vector_space =  u%get_function_space() )
+        call invoke( name = "Initialise U and Rho",   &
+                     setval_c( u,   0.0_r_def ),      &
+                     setval_c( r_u, 0.0_r_def ),      &
+                     initial_u_kernel_type( r_u, chi, initial_time, qr ), &
+                     enforce_bc_kernel_type( r_u ) )
+        call mass_matrix_solver_alg(u, r_u)
+      end if
     end if
 
+    ! Initialise Rho and Exner pressure according to formulation
     if (set_hydrostatic_init) then
       height_w3 => get_height(W3)
       height_wth => get_height(Wtheta)

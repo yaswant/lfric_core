@@ -6,7 +6,7 @@
 {%- set mesh_rdef_precision = "64" %}
 
 {%- set application_configurations = { 'gungho'           : [ 'runge-kutta', 'semi-implicit',
-                                                              'transport-rk',
+                                                              'transport-rk', 'transport-rk-bip',
                                                               'biperiodic_p0_gw', 'biperiodic_p1_gw',
                                                               'biperiodic_p0_gw_fem',
                                                               'agnesi_orog_cartesian', 'agnesi_orog_cartesian_long',
@@ -104,8 +104,6 @@
                                                    "threads":1,
                                                    "wallclock":"02:00:00"}}},
                      plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 128 4 theta T000090 $PLOT_DIR" )',
-    'run_application("gungho", "transport-rk",
-                     resolutions=[("C12",7200.0)] )',
     'run_application("gungho", "robert",
                      resolutions=[("BiP50x4-20x20",2.5)],
                      env={"crun":3, "nrun":144},
@@ -174,6 +172,13 @@
     'check_compilers("gungho", "semi-implicit", "full-debug",
                      resolution=("C12",10.0),
                      publish=True )',
+    'run_application( "gungho", "transport-rk", resolutions=[("C12",7200.0),("C24",3600.0),("C48",1800.0),("C96",900.0)],
+                      env={"crun":1, "nrun":{"default":144,("C12",7200.0):144, ("C24",3600.0):288, ("C48",1800.0):576, ("C96",900.0):1152 },
+                           "directives":{"default":{"mpi_parts":6,"threads":1,"wallclock":"00:30:00"} } },
+                           plotstr="errors.py diagDynamo $NODAL_DATA_DIR rho:theta T000144:T000288:T000576:T001152 -1 -91 0 0.1 $PLOT_DIR")',
+    'run_application( "gungho", "transport-rk-bip", resolutions=[("BiP300x4-1000x2000",50.0)],
+                      env={"crun":1, "nrun":{"default":600},"directives":{"default":{"mpi_parts":6,"threads":1,"wallclock":"00:15:00"} } },
+                           plotstr="cartesian_mountain_adv_plot.py $NODAL_DATA_DIR 300 4 theta:rho 1 T000100:T000200:T000300:T000400:T000500:T000600 lines $PLOT_DIR")',
     'godliness(publish=True)',
     'publish_commit'],
 'weekly':[

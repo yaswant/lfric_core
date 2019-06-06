@@ -9,32 +9,30 @@
 !!          point based upon a specified analytic formula
 module analytic_wind_profiles_mod
 
-use constants_mod,      only : r_def, pi
-use initial_wind_config_mod, only : &
-                               profile_none,                      &
-                               profile_solid_body_rotation,       &
-                               profile_solid_body_rotation_alt,   &
-                               profile_constant_uv,               &
-                               profile_constant_shear_uv,         &
-                               profile_sin_uv,                    &
-                               profile_dcmip301,                  &
-                               profile_deep_baroclinic_steady,    &
-                               profile_deep_baroclinic_perturbed, &
-                               profile_vortex,                    &
-                               profile_xy_NL_case_1,              &
-                               profile_yz_NL_case_1,              &
-                               profile_NL_case_1,                 &
-                               profile_NL_case_2,                 &
-                               profile_NL_case_3,                 &
-                               profile_NL_case_4,                 &
-                               profile_hadley_like_dcmip
-
-use planet_config_mod,  only : scaled_radius
-use log_mod,            only : log_event,                &
-                               log_scratch_space,        &
-                               LOG_LEVEL_ERROR
-use deep_baroclinic_wave_mod, only : deep_baroclinic_wave
-use formulation_config_mod,   only : shallow
+use constants_mod,            only: r_def, pi
+use initial_wind_config_mod,  only: profile_none,                      &
+                                    profile_solid_body_rotation,       &
+                                    profile_solid_body_rotation_alt,   &
+                                    profile_constant_uv,               &
+                                    profile_constant_shear_uv,         &
+                                    profile_dcmip301,                  &
+                                    profile_sin_uv,                    &
+                                    profile_deep_baroclinic_steady,    &
+                                    profile_deep_baroclinic_perturbed, &
+                                    profile_vortex,                    &
+                                    profile_xy_NL_case_1,              &
+                                    profile_yz_NL_case_1,              &
+                                    profile_NL_case_1,                 &
+                                    profile_NL_case_2,                 &
+                                    profile_NL_case_3,                 &
+                                    profile_NL_case_4,                 &
+                                    profile_hadley_like_dcmip
+use planet_config_mod,        only: scaled_radius
+use log_mod,                  only: log_event,                         &
+                                    log_scratch_space,                 &
+                                    LOG_LEVEL_ERROR
+use deep_baroclinic_wave_mod, only: deep_baroclinic_wave
+use formulation_config_mod,   only: shallow
 
 implicit none
 

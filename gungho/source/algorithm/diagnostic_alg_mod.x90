@@ -49,6 +49,8 @@ contains
     use runtime_constants_mod,       only: get_mass_matrix, &
                                            get_div, &
                                            w3inv_id
+    use planet_config_mod,           only: scaled_radius
+    use constants_mod,               only: pi
 
     implicit none 
     type(field_type), intent(inout) :: divergence
@@ -58,6 +60,7 @@ contains
 
     type(field_type)             :: div_u
     type(operator_type), pointer :: div => null(), m3_inv => null()
+    real(r_def)                  :: norm
 
 
 
@@ -66,12 +69,16 @@ contains
     div_u      =  field_type( vector_space = function_space_collection%get_fs(mesh_id,element_order, W3) )
     div    => get_div()
     m3_inv => get_mass_matrix(w3inv_id)
-
     ! Compute l2 norm of area integrated quantity
-
-    call invoke( dg_matrix_vector_kernel_type( div_u, u, div ), &
-                 X_innerproduct_X( l2, div_u ) )
-
+    call invoke( dg_matrix_vector_kernel_type( div_u, u, div ),             &
+                 dg_matrix_vector_kernel_type( divergence, div_u , m3_inv), &
+                 X_innerproduct_Y( l2, div_u, divergence ) )
+    ! Normalisation factor: surface area of planet
+    if ( geometry == geometry_spherical ) then
+      norm = 4.0_r_def*pi*scaled_radius**2
+    else
+      norm = 1.0_r_def
+    end if
     l2 = sqrt(l2)
 
     ! Convert to pointwise W3 field for output
@@ -89,14 +96,13 @@ contains
   !> @param[in] rho_num  Density
   !> @param[in] timestep Timestep
   subroutine density_diagnostic_alg(l2, rho_num, timestep)
-    use runtime_constants_mod,        only: get_qr, &
-                                            get_coordinates
+    use runtime_constants_mod,        only: get_coordinates, &
+                                            get_mass_matrix, &
+                                            w3_id
     use operator_mod,                 only: operator_type
     use field_mod,                    only: field_type
     use quadrature_xyoz_mod,          only: quadrature_xyoz_type
     use set_rho_alg_mod,              only: set_rho_alg
-    use runtime_constants_mod,        only: get_mass_matrix, w3_id
-
 
     implicit none
 
@@ -108,13 +114,11 @@ contains
     type(field_type)             :: rho_diff
     type(field_type)             :: w3_rho_diff
     type(field_type)             :: w3_rho_analytic
-    type(quadrature_xyoz_type)   :: qr
 
     type(field_type), pointer    :: chi(:) => null()
     real(r_def)                  :: sum_diff, sum_analytic
     type(operator_type), pointer :: mm_w3 => null()
 
-    qr = get_qr()
     chi => get_coordinates()
 
     rho_analytic = field_type( vector_space = rho_num%get_function_space() )

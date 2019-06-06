@@ -16,21 +16,37 @@ module advection_alg_mod
                                             get_mass_matrix, &
                                             get_mass_matrix_diagonal, &
                                             get_inverse_lumped_mass_matrix, &
-                                            w1_id, w2_id, w3inv_id, &
-                                            theta_space_id
+                                            w1_id, w2_id, w3inv_id, w3_id, &
+                                            wt_id
   use field_mod,                      only: field_type
   use finite_element_config_mod,      only: element_order, supg, &
-                                            vorticity_in_w1
+                                            vorticity_in_w1, &
+                                            nqp_exact
   use function_space_mod,             only: function_space_type
   use matrix_vector_kernel_mod,       only: matrix_vector_kernel_type
   use dg_matrix_vector_kernel_mod,    only: dg_matrix_vector_kernel_type
   use operator_mod,                   only: operator_type
-  use psykal_lite_mod,                only: invoke_sample_poly_flux,    &
-                                            invoke_sample_poly_adv,     &
-                                            invoke_rtheta_bd_kernel
-  use quadrature_xyoz_mod,            only: quadrature_xyoz_type
+  use psykal_lite_mod,                only: invoke_rtheta_bd_kernel
+  use psykal_lite_mol_mod,            only: psykal_lite_mol_init,           &
+                                            psykal_lite_mol_final,          &
+                                            invoke_poly1d_flux,             &
+                                            invoke_poly1d_flux_coeffs,      &
+                                            invoke_poly1d_vert_flux,        &
+                                            invoke_poly1d_vert_flux_coeffs, &
+                                            invoke_poly2d_flux,             &
+                                            invoke_poly2d_flux_coeffs,      &
+                                            invoke_poly1d_adv_recon,        &
+                                            invoke_poly1d_advective_coeffs, &
+                                            invoke_poly2d_adv_recon,        &
+                                            invoke_poly2d_advective_coeffs, &
+                                            invoke_poly1d_vert_adv_coeffs,  &
+                                            invoke_poly1d_vert_adv
+  use quadrature_rule_gauss_lobatto_mod, &
+                                      only: quadrature_rule_gauss_lobatto_type
   use quadrature_rule_gaussian_mod,   only: quadrature_rule_gaussian_type
+  use quadrature_xyoz_mod,            only: quadrature_xyoz_type
   use quadrature_face_mod,            only: quadrature_face_type
+  use quadrature_edge_mod,            only: quadrature_edge_type
   use rtheta_kernel_mod,              only: rtheta_kernel_type
   use rtheta_supg_kernel_mod,         only: rtheta_supg_kernel_type
   use flux_rhs_kernel_mod,            only: flux_rhs_kernel_type
@@ -44,11 +60,14 @@ module advection_alg_mod
   use w2_vorticity_advection_kernel_mod, &
                                       only: w2_vorticity_advection_kernel_type
 
-  use transport_config_mod,           only: operators,          &
-                                            fv_flux_order,      &
-                                            fv_advective_order, &
-                                            operators_fv,       &
-                                            operators_fem
+  use transport_config_mod,           only: operators,            &
+                                            fv_flux_order,        &
+                                            fv_advective_order,   &
+                                            operators_fv,         &
+                                            operators_fem,        &
+                                            oned_reconstruction,  &
+                                            enforce_monotonicity, &
+                                            consistent_metric
   use log_mod,                        only: log_event,         &
                                             LOG_LEVEL_ERROR,   &
                                             LOG_LEVEL_INFO
@@ -61,6 +80,7 @@ module advection_alg_mod
   use timestepping_config_mod,        only: time_method => method, &
                                             method_rk  
   use strong_curl_kernel_mod,         only: strong_curl_kernel_type
+  use poly_advective_kernel_mod,      only: poly_advective_kernel_type
   use cosmic_threed_alg_mod,          only: cosmic_threed_transport_step
   use calc_dep_pts_alg_mod,           only: calc_dep_pts
   use transport_config_mod,           only: scheme, &
@@ -72,11 +92,20 @@ module advection_alg_mod
 
   private
   integer(i_def)                  :: flux_stencil_extent, &
-                                     advective_stencil_extent
+                                     advective_stencil_extent, &
+                                     flux2d_stencil_size, &
+                                     advective2d_stencil_size
   type( field_type ), allocatable :: mr_prediction(:)
   integer(i_def)                  :: nstage_adv
   real(r_def),        allocatable :: ak_adv(:,:)
   type(function_space_type), pointer :: w1_fs => null()
+  ! Interpolation coefficients needed for nonuniform fv operators
+  type( field_type ), allocatable :: flux_coeffs(:,:), vert_flux_coeffs(:,:), &
+                                     adv_coeffs(:,:),  vert_adv_coeffs(:,:)
+  type( field_type )              :: advective_av
+  type( field_type )              :: advective_av_chi3, theta_metrics, chi3_at_wt
+  integer(i_def)                  :: nfaces_h, nfaces_v
+
 
   public  :: advection_alg
   public  :: advection_alg_init
@@ -94,18 +123,36 @@ contains
   !>
   subroutine advection_alg_init( mesh_id )
 
-    use mesh_mod,                          only: mesh_type
-    use mesh_collection_mod,               only: mesh_collection
-    use sample_poly_flux_kernel_mod,       only: sample_poly_flux_init
-    use sample_poly_adv_kernel_mod,        only: sample_poly_adv_init
-    use fs_continuity_mod,                 only: W1
+    use fs_continuity_mod,                 only: W1, W3, Wtheta
     use function_space_collection_mod,     only: function_space_collection
-
+    use multiplicity_kernel_mod,           only: multiplicity_kernel_type
+    use sample_field_kernel_mod,           only: sample_field_kernel_type
+    use reference_element_mod,             only: reference_element_type
+    use mesh_mod,                          only: mesh_type
     implicit none
 
     integer(i_def),  intent(in) :: mesh_id
 
-    type(mesh_type), pointer :: mesh => null()
+    integer(i_def)              :: flux_stencil_size,  &
+                                   advective_stencil_size, &
+                                   direction, polynomial
+    type( field_type ), pointer :: chi(:) => null()
+    type( field_type ), pointer :: md_w3 => null(), &
+                                   md_wt => null()
+
+    type( quadrature_rule_gaussian_type )      :: gaussian_quadrature
+    type( quadrature_rule_gauss_lobatto_type ) :: gauss_lobatto_quadrature
+
+    type( quadrature_xyoz_type )           :: qr
+    type( quadrature_face_type )           :: qrf
+    type( quadrature_edge_type )           :: qre
+    type( function_space_type ), pointer   :: w3_fs => null(), &
+                                              wt_fs => null()
+    type( field_type )                     :: wt_field, w3_field
+    class(reference_element_type), pointer :: reference_element => null()
+    type(mesh_type),               pointer :: mesh => null()
+    integer(i_def)                         :: face_quad_order
+    integer(i_def)                         :: nqp_xy, nqp_z, nqp_xyz
 
     if ( time_method == method_rk ) then
       ! If using explicit timestepping then advection is called once per stage,
@@ -122,12 +169,157 @@ contains
 
     if ( operators == operators_fv ) then
       if ( element_order == 0 ) then
-        mesh => mesh_collection%get_mesh( mesh_id )
-        call sample_poly_flux_init(fv_flux_order, mesh%get_nlayers())
-        call sample_poly_adv_init (fv_advective_order, mesh%get_nlayers())
+
         ! Compute stencil extents
         flux_stencil_extent      = int(real(fv_flux_order+1)/2.0,i_def)
         advective_stencil_extent = int(real(fv_advective_order+1)/2.0,i_def)
+        !======================================================================!
+        ! Compute stencil for nonuniform polynomial fit   
+        ! Initialise PSy layer arrays (this will not be needed when
+        ! multi-dimensional field arrays are supported)
+        ! This needs some temporary fields for computing undf in the PSy layer
+        w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
+        wt_fs => function_space_collection%get_fs( mesh_id, element_order, Wtheta )                
+        w3_field = field_type( vector_space = w3_fs )
+        wt_field = field_type( vector_space = wt_fs )
+
+        ! Get topology information from the reference element
+        mesh              => wt_field%get_mesh()
+        reference_element => mesh%get_reference_element()
+        ! Number of horizontal neighbours
+        nfaces_h = reference_element%get_number_horizontal_faces()
+        ! Number of vertical neighbours is (and always will be) 2 
+        nfaces_v = reference_element%get_number_vertical_faces()
+
+        if ( oned_reconstruction ) then
+          flux_stencil_size      = fv_flux_order      + 1
+          advective_stencil_size = fv_advective_order + 1
+        else
+          ! Compute the maximum number of cells in the flux stencil 
+          ! This occurs on a uniform mesh
+          ! (this computation is only correct for quadrilateral meshes)
+          flux2d_stencil_size = 1    
+          do polynomial = 1, fv_flux_order
+            if ( mod(polynomial, 2) == 0 ) then
+              flux2d_stencil_size = flux2d_stencil_size + nfaces_h
+            else
+              flux2d_stencil_size = flux2d_stencil_size + nfaces_h*polynomial
+            end if
+          end do
+          flux_stencil_size = flux2d_stencil_size
+          ! Compute the maximum number of cells in the advective stencil 
+          ! This occurs on a uniform mesh
+          ! (this computation is only correct for quadrilateral meshes)
+          advective2d_stencil_size = 1    
+          do polynomial = 1, fv_advective_order
+            if ( mod(polynomial, 2) == 0 ) then
+              advective2d_stencil_size = advective2d_stencil_size + nfaces_h
+            else
+              advective2d_stencil_size = advective2d_stencil_size + nfaces_h*polynomial
+            end if
+          end do
+          advective_stencil_size = advective2d_stencil_size
+        end if  
+        call psykal_lite_mol_init(wt_field, w3_field, &
+                                  fv_flux_order, flux_stencil_size, &
+                                  fv_advective_order, advective_stencil_size, &
+                                  nfaces_h, nfaces_v)
+
+        chi => get_coordinates()
+        nqp_xyz = fv_flux_order+1
+        qr = quadrature_xyoz_type(nqp_xyz, gaussian_quadrature)
+        if ( oned_reconstruction ) then
+          face_quad_order = 1
+        else
+          face_quad_order = fv_flux_order+1
+        end if
+        ! Quadrature rule on lateral faces with 1 point in the vertical
+        nqp_xy = face_quad_order
+        nqp_z  = 1
+        qrf = quadrature_face_type(nqp_xy, nqp_z, .true., .false., &
+                                   reference_element, gaussian_quadrature)
+
+        call log_event( "Gungho: computing horizontal flux coeffs", LOG_LEVEL_INFO )
+        md_w3 => get_mass_matrix_diagonal(w3_id)
+        allocate( flux_coeffs(flux_stencil_size, nfaces_h), &
+                   adv_coeffs(flux_stencil_size, nfaces_h) )
+        do direction = 1, nfaces_h
+          do polynomial = 1,flux_stencil_size
+              flux_coeffs(polynomial, direction) = field_type( vector_space = w3_fs )
+              adv_coeffs(polynomial, direction)  = field_type( vector_space = wt_fs )
+          end do
+        end do
+        if ( oned_reconstruction ) then
+          call invoke_poly1d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                          fv_flux_order,                    &
+                                          flux_stencil_extent, nfaces_h )
+        else
+          call invoke_poly2d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                          fv_flux_order,                    &
+                                          flux2d_stencil_size, nfaces_h )
+        end if
+        call log_event( "Gungho: computing vertical flux coeffs", LOG_LEVEL_INFO )
+        ! Vertical flux coeffs
+        allocate( vert_flux_coeffs(fv_flux_order+1, nfaces_v) )
+        do direction = 1, nfaces_v
+          do polynomial = 1,fv_flux_order+1
+            vert_flux_coeffs(polynomial, direction) = field_type( vector_space = w3_fs )
+          end do
+        end do
+        ! Quadrature rule on vertical faces with 1 point in both horizontal and
+        ! vertical directions
+        nqp_xyz = 1
+        qrf = quadrature_face_type(nqp_xyz, .false., .true.,                   &
+                                   reference_element, gaussian_quadrature)
+        call invoke_poly1d_vert_flux_coeffs( vert_flux_coeffs, md_w3, chi,     &
+                                             qr, qrf, fv_flux_order, nfaces_v )
+
+        ! Compute advective coefficients       
+        call log_event( "Gungho: computing horizontal advective coeffs", LOG_LEVEL_INFO )
+        ! Quadrature rule which has enough points to exactly integrate
+        ! fv_advective_order polynomials and is odd order horizontaly and has
+        ! 2 vertical points such that it gives points on the vertical faces
+        nqp_xy = fv_advective_order+3
+        nqp_z  = 2
+        qr = quadrature_xyoz_type(nqp_xy, nqp_xy, nqp_z, &
+                                  gauss_lobatto_quadrature)
+        ! Edge based quadrature rule on horizontal edges
+        nqp_xyz = face_quad_order
+        qre = quadrature_edge_type(nqp_xyz, .true., .false.,           &
+                                   reference_element, gaussian_quadrature)
+
+        md_wt => get_mass_matrix_diagonal(wt_id)
+        w1_fs => function_space_collection%get_fs( mesh_id, element_order, W1 )
+        advective_av = field_type( vector_space =  w1_fs )
+        if ( oned_reconstruction ) then
+          call invoke_poly1d_advective_coeffs( adv_coeffs, md_wt, chi, qr, qre,  &
+                                               fv_advective_order,               &
+                                               advective_stencil_extent, nfaces_h )
+        else
+          call invoke_poly2d_advective_coeffs( adv_coeffs, md_wt, chi, qr, qre, &
+                                               fv_advective_order,              &
+                                               advective2d_stencil_size,        &
+                                               nfaces_h )
+        end if
+        ! Vertical advective coeffs
+        call log_event( "Gungho: computing vertical advective coeffs", LOG_LEVEL_INFO )
+        allocate( vert_adv_coeffs(fv_advective_order+2, nfaces_v) )
+        do direction = 1, nfaces_v
+          do polynomial = 1, fv_advective_order+2
+            vert_adv_coeffs(polynomial, direction) = field_type( vector_space = wt_fs )
+          end do
+        end do
+        call invoke_poly1d_vert_adv_coeffs( vert_adv_coeffs, md_wt, chi, & 
+                                            fv_advective_order, nfaces_v )
+        if ( consistent_metric ) then
+          advective_av_chi3 = field_type(vector_space = w1_fs )
+          theta_metrics     = field_type(vector_space = wt_fs )
+          chi3_at_wt        = field_type(vector_space = wt_fs )
+          call invoke( setval_c(wt_field, 0.0_r_def),       &
+                       multiplicity_kernel_type(wt_field),  &
+                       sample_field_kernel_type( chi3_at_wt, wt_field, chi(3)) )
+        end if
+        !======================================================================!
       else
         call log_event( "Gungho: subgrid mappings needed for FV MoL with high &
                          order elements", LOG_LEVEL_ERROR )
@@ -139,7 +331,7 @@ contains
     if ( .not. vorticity_in_w1 ) &
       w1_fs => function_space_collection%get_fs( mesh_id, element_order, W1 )
 
-    nullify(mesh)
+    nullify( chi, md_w3, md_wt, w3_fs, wt_fs, reference_element, mesh )
 
   end subroutine advection_alg_init
 
@@ -149,17 +341,20 @@ contains
   !>         initialised.
   subroutine advection_alg_final()
 
-    use sample_poly_flux_kernel_mod, only: sample_poly_flux_final
-    use sample_poly_adv_kernel_mod,  only: sample_poly_adv_final
-
     implicit none
 
     if (allocated(mr_prediction)) deallocate( mr_prediction )
     if (allocated(ak_adv))        deallocate( ak_adv )
     nullify (w1_fs)
 
-    call sample_poly_adv_final()
-    call sample_poly_flux_final()
+    if ( operators == operators_fv .and. &
+         element_order == 0 ) then
+      deallocate( flux_coeffs, vert_flux_coeffs, &
+                  adv_coeffs,  vert_adv_coeffs )
+      ! Deallocate PSy layer arrays (this will not be needed when
+      ! multi-dimensional field arrays are supported)
+      call psykal_lite_mol_final()
+    end if
 
   end subroutine advection_alg_final
 
@@ -212,6 +407,7 @@ contains
   type(field_type), pointer          :: mt_lumped_inv => null()
   type(field_type)                   :: u_in_w1, r_u
   integer(i_def)                     :: stage, st
+  integer(i_def)                     :: nqp_xyz
 
   ! Auxiliary constants to group invokes
   real(kind=r_def), parameter  :: minus_one = -1.0_r_def
@@ -243,7 +439,7 @@ contains
   r_rho     = field_type( vector_space = rho_fs )
   r_theta   = field_type( vector_space = theta_fs)
 
-  qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+  qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
 
   ! Predictor fields used to store the right hand side at each stage of the
   ! Runge-Kutta algorithm
@@ -301,17 +497,18 @@ contains
                setval_X(theta_adv, theta) )
   do stage = 1,nstage_adv
     ! Compute u.grad(theta) using desired spatial reconstruction of gtad(theta)
-    call advective_inc_alg(r_theta, theta_adv, advecting_wind)
+    call advective_inc_alg(r_theta, theta_adv, advecting_wind, dt)
     ! If using FEM operators and SUPG scheme add correction
     if ( supg ) call invoke( rtheta_supg_kernel_type(r_theta,     &
                              theta_adv, theta, mass_flux, rho, chi, qr) )   
 
     ! Obtain lumped inverse and full mass matrices for the correct space (Wtheta
     ! or W0) 
-    mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
-    mm_wt         => get_mass_matrix(theta_space_id) 
+    mt_lumped_inv => get_inverse_lumped_mass_matrix(wt_id)
+    mm_wt         => get_mass_matrix(wt_id) 
     call invoke( X_times_Y(rtheta_prediction(stage), r_theta, mt_lumped_inv), &
                  setval_c(r_theta, 0.0_r_def) )
+
     ! Build the rhs of the RK scheme at this stage: sum_s -ak(s)*r_theta(s)
     do st = 1, stage
       call invoke( inc_X_minus_bY(r_theta, ak_adv(stage,st), rtheta_prediction(st)) )
@@ -451,13 +648,13 @@ contains
     do imr = 1,nummr
       call invoke( setval_X(mr_latest, mr(imr)) )
       do stage = 1,nstage_adv
-        call advective_inc_alg(mr_prediction(stage), mr_latest, wind)
+        call advective_inc_alg(mr_prediction(stage), mr_latest, wind, dt)
         call invoke( setval_c(mr_adv, 0.0_r_def) )
         do st = 1, stage
           call invoke( inc_X_minus_bY(mr_adv, ak_adv(stage,st), mr_prediction(st)) )
         end do
         ! Use lumped mass matrix     
-        mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
+        mt_lumped_inv => get_inverse_lumped_mass_matrix(wt_id)
         ! Here we: 
         !  (1) update mr_inc(imr) to be in strong form by multiplying by inverse MM,
         !  (2) then make this into an increment by multiplying by dt,
@@ -479,7 +676,6 @@ contains
   !>@param[in]    density Field to advect
   !>@param[in]    wind Advecting wind field
   subroutine mass_flux_alg(mass_flux, density, wind)
-  use sample_poly_flux_kernel_mod, only: sample_poly_flux_kernel_type
 
   implicit none
   
@@ -494,27 +690,32 @@ contains
   type(quadrature_rule_gaussian_type) :: quadrature_rule
   type(field_type)                    :: rhs_f 
 
-  type(function_space_type), pointer :: u_fs  => null()
-
-  u_fs     => wind%get_function_space()
+  type(function_space_type), pointer  :: u_fs  => null()
 
   select case(operators)
     case(operators_fv)
-     ! Use pointwise fv operators compute mass flux with high-order polynomial
-     ! interpolation of density
-     call invoke_sample_poly_flux( mass_flux, wind, density, &
-                                   flux_stencil_extent )
-     ! Psyclone doesnt call the correct colouring routines yet
-     !call invoke( sample_poly_flux_kernel_type( mass_flux, wind, density, &
-     !                                           flux_stencil_extent ) )
+     if ( oned_reconstruction ) then
+       ! Use 1d flux reconstruction
+       call invoke_poly1d_flux( mass_flux, wind, density, flux_coeffs, &
+                                fv_flux_order, flux_stencil_extent, nfaces_h )
+     else
+       ! Use 2d flux reconstruction
+       call invoke_poly2d_flux( mass_flux, wind, density, flux_coeffs, &
+                                fv_flux_order, flux2d_stencil_size, nfaces_h )
+     end if
+     ! Compute vertical components of mass flux
+     call invoke_poly1d_vert_flux( mass_flux, wind, density, &
+                                   vert_flux_coeffs, &
+                                   fv_flux_order, nfaces_v)
 
     case(operators_fem)  
-      ! Project density*wind into the mass flux space    
-      qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+      ! Project density*wind into the mass flux space 
+      qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
 
       mm_w2  => get_mass_matrix(w2_id)
       mmd_w2 => get_mass_matrix_diagonal(w2_id)
       chi    => get_coordinates()
+      u_fs   => wind%get_function_space()
       rhs_f = field_type( vector_space = u_fs )
       call invoke( name = "Transport operators fem",                    &
                    setval_c(rhs_f, 0.0_r_def),                          &
@@ -534,13 +735,17 @@ contains
   !>@param[inout] rtheta Advective increment
   !>@param[in]    theta Field to advect
   !>@param[in]    wind Advecting wind field
-  subroutine advective_inc_alg(rtheta, theta, wind)
-  use sample_poly_adv_kernel_mod, only: sample_poly_adv_kernel_type
-  use reference_element_mod,      only: reference_element_type
-  use mesh_mod,                   only: mesh_type
+  !>@param[in]    dt timestep  
+  subroutine advective_inc_alg(rtheta, theta, wind, dt)
+  use consistent_wind_kernel_mod,  only: consistent_wind_kernel_type
+  use reference_element_mod,       only: reference_element_type
+  use mesh_mod,                    only: mesh_type
+  use monotonic_update_kernel_mod, only: monotonic_update_kernel_type
   implicit none
+
   type(field_type), intent(in)           :: theta, wind
   type(field_type), intent(inout)        :: rtheta
+  real(r_def),      intent(in)           :: dt
   type(quadrature_xyoz_type)             :: qr
   type(quadrature_face_type)             :: qrf
   type(quadrature_rule_gaussian_type)    :: quadrature_rule
@@ -548,37 +753,71 @@ contains
   type(field_type), pointer              :: mt_lumped_inv => null()
   class(reference_element_type), pointer :: reference_element =>null()
   type(mesh_type),               pointer :: mesh => null()
+  integer(i_def)                         :: mono_stencil
+  type(field_type)                       :: consistent_wind
 
-  mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
+  mt_lumped_inv => get_inverse_lumped_mass_matrix(wt_id)
 
   select case(operators)
     case(operators_fv)
-     ! Use pointwise fv operators compute u.grad(theta) with high-order 
-     ! polynomial interpolation of theta
-      chi => get_coordinates()
-      call invoke_sample_poly_adv( rtheta, theta, wind, mt_lumped_inv, chi, &
-                                   advective_stencil_extent )
-      ! Psyclone doesnt call the correct colouring routines yet
-      !chi_stencil_extent = advective_stencil_extent
-      !call invoke( sample_poly_adv_kernel_type( rtheta, theta, advective_stencil_extent,&
-      !                                          wind,  &
-      !                                          chi(1),chi_stencil_extent, chi(2),chi(3)&
-      !                                          ) )
-         
+      call invoke( setval_c(advective_av, 0.0_r_def) )
+      if ( consistent_metric )  call invoke( setval_c(advective_av_chi3, 0.0_r_def) )
+      if ( oned_reconstruction ) then
+       ! Use 1d reconstruction
+        call invoke_poly1d_adv_recon( advective_av, wind, theta, adv_coeffs, &
+                                      fv_flux_order, flux_stencil_extent, nfaces_h )
+        ! Horizontal advection of metric terms
+        if ( consistent_metric ) & 
+          call invoke_poly1d_adv_recon( advective_av_chi3, wind, chi3_at_wt, adv_coeffs, &
+                                        fv_flux_order, flux_stencil_extent, nfaces_h )
+      else
+       ! Use 2d reconstruction
+        call invoke_poly2d_adv_recon( advective_av, wind, theta, adv_coeffs, &
+                                      fv_flux_order, flux2d_stencil_size,    &
+                                      nfaces_h )
+        ! Horizontal advection of metric terms
+        if ( consistent_metric ) & 
+          call invoke_poly2d_adv_recon( advective_av_chi3, wind, chi3_at_wt, adv_coeffs, &
+                                        fv_flux_order, flux2d_stencil_size,              &
+                                        nfaces_h )
+
+      end if
+      ! Compute horizontal advective update
+      call invoke( poly_advective_kernel_type(rtheta, wind, advective_av) )
+      consistent_wind = wind 
+      if ( consistent_metric ) then
+        chi => get_coordinates()
+        call invoke( poly_advective_kernel_type(theta_metrics, wind, advective_av_chi3), &
+        ! Modify advecting wind
+                     consistent_wind_kernel_type(consistent_wind, wind, theta_metrics, chi) )
+      end if
+      ! Compute vertical component of advective update
+      call invoke_poly1d_vert_adv( rtheta, consistent_wind, theta, &
+                                   vert_adv_coeffs, fv_flux_order, nfaces_v )
     case(operators_fem)
-     ! Use project u.grad(theta) into the theta function space
-      qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
+      ! Use project u.grad(theta) into the theta function space
+      qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
       mesh              => rtheta%get_mesh()
       reference_element => mesh%get_reference_element()
-      qrf = quadrature_face_type(element_order+3, .true., .false., &
+      ! Quadrature rule on lateral faces only
+      qrf = quadrature_face_type(nqp_exact, .true., .false., &
                                  reference_element, quadrature_rule)
-      call invoke( setval_c(rtheta, 0.0_r_def) )
-      call invoke( rtheta_kernel_type (rtheta, theta, wind, qr) )
-      call invoke_rtheta_bd_kernel ( rtheta, theta, wind, qrf )
-      nullify( mesh, reference_element )
-   end select
+      call invoke( setval_c(rtheta, 0.0_r_def),                    &
+                   rtheta_kernel_type (rtheta, theta, wind, qr) )
+      call invoke_rtheta_bd_kernel(rtheta, theta, wind, qrf)      
+  end select
 
-  nullify( chi, mt_lumped_inv )
+  ! Apply monotonicity (as if this a full timestep)
+  if ( enforce_monotonicity ) then
+    if ( operators == operators_fem ) then
+      mono_stencil = 1
+    else
+      mono_stencil = fv_flux_order/2
+    end if
+    call invoke( monotonic_update_kernel_type(rtheta, theta, mono_stencil, mt_lumped_inv, dt, fv_flux_order) )
+  end if
+
+  nullify( chi, mt_lumped_inv, reference_element, mesh )
 
   end subroutine advective_inc_alg
 

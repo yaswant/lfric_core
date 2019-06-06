@@ -31,10 +31,6 @@ module psykal_lite_mod
   use quadrature_face_mod, only : quadrature_face_type, &
                                   quadrature_face_proxy_type
 
-!  use quadrature_xyoz_mod,          only : quadrature_xyoz_type
-!  use quadrature_rule_gaussian_mod, only : quadrature_rule_gaussian_type
-
-
   implicit none
   public
 
@@ -178,7 +174,6 @@ contains
     mesh              => theta%get_mesh()
     reference_element => mesh%get_reference_element()
 
-    nfaces_h = reference_element%get_number_horizontal_faces()
 
     r_theta_bd_proxy = r_theta_bd%get_proxy()
     theta_proxy      = theta%get_proxy()
@@ -197,7 +192,7 @@ contains
     qr_proxy = qr%get_quadrature_proxy()
     nqp=qr_proxy%np_xyz
     wqp=>qr_proxy%weights_xyz
-
+    nfaces_h = qr_proxy%nfaces
     ndf_w2      = u_proxy%vspace%get_ndf( )
     dim_w2      = u_proxy%vspace%get_dim_space( )
     undf_w2     = u_proxy%vspace%get_undf()
@@ -297,7 +292,7 @@ contains
 
     mesh => exner%get_mesh()
     reference_element => mesh%get_reference_element()
-    nfaces_h = reference_element%get_number_horizontal_faces()
+    nfaces_h = reference_element%get_number_2d_faces()
 
     r_u_bd_proxy = r_u_bd%get_proxy()
     exner_proxy  = exner%get_proxy()
@@ -429,7 +424,7 @@ contains
 
     mesh => exner%get_mesh()
     reference_element => mesh%get_reference_element()
-    nfaces_h = reference_element%get_number_horizontal_faces()
+    nfaces_h = reference_element%get_number_2d_faces()
 
     r_u_bd_proxy = r_u_bd%get_proxy()
     exner_proxy  = exner%get_proxy()
@@ -563,7 +558,7 @@ contains
       mesh              => div_star%get_mesh()
       reference_element => mesh%get_reference_element()
 
-      nfaces_h = reference_element%get_number_horizontal_faces()
+      nfaces_h = reference_element%get_number_2d_faces()
 
       !
       ! Initialise qr values
@@ -620,7 +615,7 @@ contains
                             basis_w2_face,                                   &
                             basis_w3_face, basis_wtheta_face,                &
                             adjacent_face(:,cell),                           &
-                            reference_element%get_number_horizontal_faces(), &
+                            reference_element%get_number_2d_faces(),         &
                             out_face_normal )
       end do
       !
@@ -697,7 +692,7 @@ contains
       mesh              => p2theta%get_mesh()
       reference_element => mesh%get_reference_element()
 
-      nfaces_h = reference_element%get_number_horizontal_faces()
+      nfaces_h = reference_element%get_number_2d_faces()
 
       !
       ! Initialise qr values
@@ -825,7 +820,7 @@ contains
       mesh              => ptheta2%get_mesh()
       reference_element => mesh%get_reference_element()
 
-      nfaces_h = reference_element%get_number_horizontal_faces()
+      nfaces_h = reference_element%get_number_2d_faces()
 
       !
       ! Initialise qr values
@@ -2492,299 +2487,6 @@ end subroutine invoke_calc_deppts
     !$omp end parallel do
    
   end subroutine invoke_scale_field_data
-
-
-!-------------------------------------------------------------------------------   
-!> This call lies within psy-lite as the kernel makes use of stencils
-!> and requires psyclone to generate the infrastructure correct calls for the 
-!> horizontal looping when coloring is used
-!> These will be implemented in psyclone issue #127
-subroutine invoke_sample_poly_flux( flux, wind, density, stencil_extent )
-
-  use mesh_mod,                    only: mesh_type
-  use reference_element_mod,       only: reference_element_type
-  use sample_poly_flux_kernel_mod, only: sample_poly_flux_code
-  use stencil_dofmap_mod,          only: stencil_dofmap_type, STENCIL_CROSS
-
-  implicit none
-
-  type(field_type), intent(inout)      :: flux
-  type(field_type), intent(in)         :: wind
-  type(field_type), intent(in)         :: density
-  integer, intent(in)                  :: stencil_extent
-
-  type( field_proxy_type )  :: flux_proxy, wind_proxy, density_proxy
-
-  type(stencil_dofmap_type), pointer :: stencil => null()
-
-  integer, pointer :: map_w2(:,:) => null(), map_w3(:,:) => null()
-  integer, pointer :: stencil_map(:,:,:) => null()
-
-  integer :: undf_w3, ndf_w3
-  integer :: undf_w2, ndf_w2
-  integer :: df_w2, df_wind
-  integer :: cell
-  integer :: nlayers
-  integer :: stencil_size 
-  integer :: d
-  logical :: swap
-
-  type(mesh_type),               pointer :: mesh              => null()
-  class(reference_element_type), pointer :: reference_element => null()
-  real(r_def),                   pointer :: nodes_w2(:,:)     => null()
-
-  real(r_def), allocatable :: basis_w2(:,:,:)
-  real(r_def), allocatable :: out_face_normal(:,:)
-
-  integer :: dim_w2
-
-  integer :: colour, ncolour
-  integer, pointer :: cmap(:,:) =>null(), ncp_colour(:) => null()
-
-  flux_proxy    = flux%get_proxy()
-  wind_proxy    = wind%get_proxy()
-  density_proxy = density%get_proxy()
-
-  ndf_w3  = density_proxy%vspace%get_ndf()
-  undf_w3 = density_proxy%vspace%get_undf()
-
-  ndf_w2  = flux_proxy%vspace%get_ndf()
-  undf_w2 = flux_proxy%vspace%get_undf()
-  dim_w2  = flux_proxy%vspace%get_dim_space()
-  nodes_w2 => flux_proxy%vspace%get_nodes()
-
-  ! Evaluate the basis function
-  allocate (basis_w2(dim_w2, ndf_w2, ndf_w2))
-  do df_w2 = 1, ndf_w2
-    do df_wind = 1, ndf_w2
-      basis_w2(:,df_wind,df_w2) = wind_proxy%vspace%call_function(BASIS,df_wind,nodes_w2(:,df_w2))
-    end do
-  end do
-
-  nlayers = flux_proxy%vspace%get_nlayers()
-
-  stencil => density_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, &
-                                                     stencil_extent)
-  stencil_size = stencil%get_size()
-  stencil_map => stencil%get_whole_dofmap()
-  map_w2 => flux_proxy%vspace%get_whole_dofmap()
-  map_w3 => density_proxy%vspace%get_whole_dofmap()
-
-  if(wind_proxy%is_dirty(depth=1) ) then
-    call wind_proxy%halo_exchange(depth=1)
-  end if
-  swap = .false.
-  do d = 1,stencil_extent+1
-    if(density_proxy%is_dirty(depth=d) ) swap = .true.
-  end do
-  if ( swap )  call density_proxy%halo_exchange(depth=stencil_extent+1)
-  if(flux_proxy%is_dirty(depth=1) ) then
-    call flux_proxy%halo_exchange(depth=1)
-  end if
-
-  mesh => flux%get_mesh()
-  reference_element => mesh%get_reference_element()
-  call reference_element%get_normals_to_out_faces( out_face_normal )
-
-  ! Look-up colour map
-  call flux_proxy%vspace%get_colours(ncolour, ncp_colour, cmap)
-  do colour=1,ncolour
-    !$omp parallel default(shared), private(cell)
-    !$omp do schedule(static)
-    do cell=1,mesh%get_last_halo_cell_per_colour_any(colour,1)
-
-
-      call sample_poly_flux_code( nlayers,                      &
-                                  flux_proxy%data,              &
-                                  wind_proxy%data,              &
-                                  density_proxy%data,           &
-                                  stencil_size,                 &
-                                  stencil_map(:,:,cmap(colour, cell)),       &
-                                  ndf_w2,                       &
-                                  undf_w2,                      &
-                                  map_w2(:,cmap(colour, cell)), &
-                                  basis_w2,                     &
-                                  ndf_w3,                       &
-                                  undf_w3,                      &
-                                  map_w2(:,cmap(colour, cell)), &
-                                  out_face_normal )
-    end do 
-    !$omp end do
-    !$omp end parallel
-  end do
-
-  call flux_proxy%set_dirty()
-
-end subroutine invoke_sample_poly_flux
-
-!-------------------------------------------------------------------------------
-!> This call lies within psy-lite as the kernel makes use of stencils
-!> and requires psyclone to generate the infrastructure correct calls for the 
-!> horizontal looping when coloring is used.
-!> These will be implemented in psyclone issue #127
-subroutine invoke_sample_poly_adv( adv, tracer, wind, mt_lumped_inv, &
-                                   chi, stencil_extent)
-
-  use sample_poly_adv_kernel_mod, only: sample_poly_adv_code
-  use stencil_dofmap_mod,         only: stencil_dofmap_type, STENCIL_CROSS
-  use mesh_mod,                   only: mesh_type
-
-  implicit none
-
-  type(field_type), intent(inout)      :: adv
-  type(field_type), intent(in)         :: tracer
-  type(field_type), intent(in)         :: wind
-  type(field_type), intent(in)         :: mt_lumped_inv
-  type(field_type), intent(in)         :: chi(3)
-  integer, intent(in)                  :: stencil_extent
-
-  type( field_proxy_type )  :: adv_proxy, wind_proxy, tracer_proxy, chi_proxy(3)
-  type( field_proxy_type )  :: mt_lumped_inv_proxy
-
-  type(stencil_dofmap_type), pointer :: stencil => null()
-  type(stencil_dofmap_type), pointer :: stencil_wx => null()
-
-  integer, pointer :: map_w2(:,:) => null(), map_wt(:,:) => null(), map_wx(:,:) => null()
-  integer, pointer :: stencil_map(:,:,:) => null()
-  integer, pointer :: stencil_map_wx(:,:,:) => null()
-
-  integer :: undf_wt, ndf_wt
-  integer :: undf_w2, ndf_w2
-  integer :: undf_wx, ndf_wx
-  integer :: ndf_adv
-  integer :: df_adv, df_w2, df_wx
-  integer :: cell
-  integer :: nlayers
-  integer :: stencil_size, stencil_size_wx
-  integer :: d
-  logical :: swap
-  type(mesh_type), pointer :: mesh => null()
-  real(kind=r_def), pointer :: nodes_adv(:,:) => null()
-
-  real(kind=r_def), allocatable :: basis_w2(:,:,:)
-  real(kind=r_def), allocatable :: basis_wx(:,:,:)
-  real(kind=r_def), allocatable :: diff_basis_wx(:,:,:)
-  integer :: dim_w2
-  integer :: dim_wx, diff_dim_wx
-
-  integer :: colour, ncolour
-  integer, pointer :: cmap(:,:) =>null(), ncp_colour(:) => null()
-
-  adv_proxy    = adv%get_proxy()
-  wind_proxy   = wind%get_proxy()
-  tracer_proxy = tracer%get_proxy()
-  mt_lumped_inv_proxy = mt_lumped_inv%get_proxy()
-  chi_proxy(1) = chi(1)%get_proxy()
-  chi_proxy(2) = chi(2)%get_proxy()
-  chi_proxy(3) = chi(3)%get_proxy()
-
-  ndf_adv = adv_proxy%vspace%get_ndf()
-  nodes_adv => adv_proxy%vspace%get_nodes()
-
-  ndf_wt  = tracer_proxy%vspace%get_ndf()
-  undf_wt = tracer_proxy%vspace%get_undf()
-
-  ndf_w2  = wind_proxy%vspace%get_ndf()
-  undf_w2 = wind_proxy%vspace%get_undf()
-  dim_w2  = wind_proxy%vspace%get_dim_space()
-
-  ndf_wx  = chi_proxy(1)%vspace%get_ndf()
-  undf_wx = chi_proxy(1)%vspace%get_undf()
-  dim_wx  = chi_proxy(1)%vspace%get_dim_space()
-  diff_dim_wx = chi_proxy(1)%vspace%get_dim_space_diff()
-
-  ! Evaluate the basis function
-  allocate (basis_w2(dim_w2, ndf_w2, ndf_adv))
-  allocate (basis_wx(dim_wx, ndf_wx, ndf_adv))
-  allocate (diff_basis_wx(diff_dim_wx, ndf_wx, ndf_adv))
-  do df_adv = 1, ndf_adv
-    do df_w2 = 1, ndf_w2
-      basis_w2(:,df_w2,df_adv) = wind_proxy%vspace%call_function(BASIS,df_w2,nodes_adv(:,df_adv))
-    end do
-    do df_wx = 1, ndf_wx
-      basis_wx(:,df_wx,df_adv) = chi_proxy(1)%vspace%call_function(BASIS,df_wx,nodes_adv(:,df_adv))
-      diff_basis_wx(:,df_wx,df_adv) = chi_proxy(1)%vspace%call_function(DIFF_BASIS,df_wx,nodes_adv(:,df_adv))
-    end do
-  end do
-
-  nlayers = adv_proxy%vspace%get_nlayers()
-
-  stencil => tracer_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, &
-                                                    stencil_extent)
-  stencil_size = stencil%get_size()
-  stencil_map => stencil%get_whole_dofmap()
-
-  stencil_wx => chi_proxy(1)%vspace%get_stencil_dofmap(STENCIL_CROSS, &
-                                                       stencil_extent)
-  stencil_size_wx = stencil_wx%get_size()
-  stencil_map_wx => stencil_wx%get_whole_dofmap()
-
-  if(wind_proxy%is_dirty(depth=1) ) then
-    call wind_proxy%halo_exchange(depth=1)
-  end if
-  swap = .false.
-  do d = 1,stencil_extent+1
-    if(tracer_proxy%is_dirty(depth=d) ) swap = .true.
-  end do
-  if ( swap ) call tracer_proxy%halo_exchange(depth=stencil_extent+1)
-  swap = .false.
-  do d = 1,stencil_extent+1
-    if(chi_proxy(1)%is_dirty(depth=d) ) swap = .true.
-  end do
-  if ( swap ) then
-    call chi_proxy(1)%halo_exchange(depth=stencil_extent+1)
-    call chi_proxy(2)%halo_exchange(depth=stencil_extent+1)
-    call chi_proxy(3)%halo_exchange(depth=stencil_extent+1)
-  end if
-
-  map_w2 => wind_proxy%vspace%get_whole_dofmap()
-  map_wt => tracer_proxy%vspace%get_whole_dofmap()
-  map_wx => chi_proxy(1)%vspace%get_whole_dofmap()
-
-  mesh => adv%get_mesh()
-
-  ! Look-up colour map
-  call adv_proxy%vspace%get_colours(ncolour, ncp_colour, cmap)
-  do colour=1,ncolour
-    !$omp parallel default(shared), private(cell)
-    !$omp do schedule(static)
-    do cell=1,mesh%get_last_edge_cell_per_colour(colour)
-
-      call sample_poly_adv_code( nlayers,                     &
-                                 adv_proxy%data,              &
-                                 tracer_proxy%data,           &
-                                 stencil_size,                &
-                                 stencil_map(:,:,cmap(colour, cell)),       &
-                                 wind_proxy%data,             &
-                                 mt_lumped_inv_proxy%data,    &
-                                 chi_proxy(1)%data,           &
-                                 stencil_size_wx,             &
-                                 stencil_map_wx(:,:,cmap(colour, cell)),    &
-                                 chi_proxy(2)%data,           &
-                                 chi_proxy(3)%data,           &
-                                 ndf_wt,                      &
-                                 undf_wt,                     &
-                                 map_wt(:,cmap(colour, cell)),&
-                                 ndf_w2,                      &
-                                 undf_w2,                     &
-                                 map_w2(:,cmap(colour, cell)),&
-                                 basis_w2,                    &
-                                 ndf_wx,                      &
-                                 undf_wx,                     &
-                                 map_wx(:,cmap(colour, cell)),&
-                                 basis_wx,                    &
-                                 diff_basis_wx                &
-                                 )
-    end do
-    !$omp end do
-    !$omp end parallel
-  end do
-
-  call adv_proxy%set_dirty()
-
-  deallocate( diff_basis_wx, basis_wx, basis_w2 )
-
-end subroutine invoke_sample_poly_adv
 
   !------------------------------------------------------------------------------
   ! Needs correct loop limits in the presence of colouring for psyclone

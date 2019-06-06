@@ -121,9 +121,8 @@ contains
     integer(i_def)         :: nlayers, nqp
     integer(i_def)         :: ndf_wtheta, undf_wtheta
     integer(i_def)         :: ndf_w2, undf_w2
-    integer (i_def)        :: ndf_w3, undf_w3
-
-    integer (i_def)        :: k
+    integer(i_def)         :: ndf_w3, undf_w3
+    integer(i_def)         :: k
 
     ! Test field data
     real(r_def),allocatable :: theta_data(:)

@@ -958,30 +958,78 @@ which is the residual error in the $\theta$ equation tested by the
 upwind component of the test function. To obtain a higher order scheme it may be possible to embed the operators in a higher order space and use some information from surrounding cells to constrain the extra degrees of freedom.
 
 \subsubsection{Finite-Volume Advection Operators\label{sub:Finite-Volume-Advection}}
-Here FV-type operators are used to compute high order in space terms for use in the advection scheme. The first step is to map the desired spaces to a finite volume space. If lowest order elements are used this is the identity mapping, for higher-order elements this is equivalent to mapping to a low order finite element space on a higher resolution grid and so can use the same machineary as is envisioned for the subgrid paramterization routines. 
-To compute the high order approximation a polynomial function is fitted to the pointwise data values and evaluated where needed. In principle these could be 3D or 2D + 1D polynomials with a least squares fit. However to simplify things 1D polynomials are used, furthermore non-orthogonality and non-uniformity of the mesh are ignored.
-To compute the mass flux an order $p$ polynomial is fitted through $p+1$ cells centred on the upwind cell of the face on which the flux lives. The integral of this polynomial is set to match the integral of the cell values computed in computational space as follows, the polynomial set is given by 
+Here FV-type operators are used to compute high order in space terms for use in the advection scheme. The first step is to map the desired spaces to a finite volume space. If lowest order elements are used this is the identity mapping, for higher-order elements this is equivalent to mapping to a low order finite element space on a higher resolution grid and so can use the same machinery as is envisioned for the subgrid paramterization routines. 
+The computation of the high order approximation closely follows that of \cite{thubcottdubos13}, where a polynomial function of the desired order is fitted over a (to be defined) local 1d- or 2d-coordinate to a given stencil of cells. The polynomial function is chosen to include all monomials up to a given order, so for a quadratic fit using a 1d local reconstruction, the monomials used (in terms of the local coordinate $x$) are
 \begin{equation}
-\widetilde{\rho} = \sum_{i=0}^{p}a_i x^i,\label{eq:high_order_rho}
+m\left(x\right) = \left\{1,\,x,\,x^2\right\},\label{eq:1d-monomials}
 \end{equation}
-and the polynomial coefficients are obtained by solving 
+and for a 2d reconstruction, the monomials used (in terms of the local coordinates $x,y$) are
 \begin{equation}
-\int_{cell_i}\widetilde{\rho} = \int_{cell_i}\rho \equiv \rho_{i},\label{eq:high_order_rho_integral}
+m\left(x,y\right) = \left\{1,\,x,\,y,\,x^2,\,xy,\,y^2\right\}.\label{eq:2d-monomials}
 \end{equation}
-over all cells $i$ in the stencil and where $\rho_i$ is the value of the density field in cell $i$. This is equivalent to solving a matrix vector system 
+The polynomial fit $\widetilde{\rho}\left(x,y\right)$ to a field $\rho\left(x,y\right)$ is then given by
 \begin{equation}
-C \mathbf{a} = \mathbf{r}\label{eq:high_order_rho_matrix}
+\widetilde{\rho}\left(x,y\right) = \sum_{i=0}^{l}a_i m_i\left(x,y\right),\label{eq:high_order_rho}
 \end{equation}
-where $\mathbf{a}=\left[a_0,\,a_1,\,...,\,a_p\right]^T$ is the vector of coefficents and $\mathbf{r}=\left[\rho_{i-j},\,\rho_{i-j+1},\,...,\,\rho_{i},\,....\right]^T$  is the values in the stencil and $C^{i,j} = \int_{cell_j} x^i$. Since all computations are done in computational space only a single set of coefficients $a_i$ need to be computed and then reused for every cell.
+where $l$ is the number of monomials to fit and the coefficients $a_i$ are determined by requiring that
+\begin{equation}
+\int_{cell_i}\widetilde{\rho}\left(x,y\right)dV = \int_{cell_i}\rho\left(x,y\right)dV,\qquad\forall i \in \rm{stencil}.\label{eq:high_order_rho_integral}
+\end{equation}
+Note that if the number of cells in the stencil $n_{sten}$ is greater then the number of monomials ($l$) then \eqref{eq:high_order_rho_integral} is an overdetermined problem. In this case only the central cell in the stencil is fitted exactly and all other cells are fitted in a least squares sense, as in \cite{thubcottdubos13}.
 
-To compute the advective update a similar method is used however in this case the approximating polynomial is set to match the grid point values of the underlying fields and then its analytic derivative is computed and used to update the advected field, therefore we solve the system
+\subsubsection{Stencil Generation\label{sub:MoL-stencils}}
+%
+\begin{figure}
+\begin{centering}
+\subfloat[]{\includegraphics[scale=0.4]{cube_p2_1d_stencil}}%
+\subfloat[]{\includegraphics[scale=0.4]{cube_p2_2d_stencil}}
+\par\end{centering}
+\protect\caption{\label{fig:mol-stencils}Stencils used by the MoL scheme for a quadratic reconstruction using (a) 1D monomials and (b) 2D monomials.}
+\end{figure}
+%
+The stencils of cells are generated in one of two ways: 
+\begin{description}
+\item[1D] For a 1D polynomial fit a number of cells in a straight line (in computational space) are chosen so that the number of cells in the stencil match the number of monomials chosen. In order to have an upwind scheme the order of interpolation is restricted to be even resulting in an odd number of cells in the stencil, such that the central cell in the stencil is the upwind cell for the edge at which the field needs to be reconstructed, see Figure \ref{fig:mol-stencils}(a). 
+\item[2D] For a 2D polynomial fit the stencil is generated iteratively as in \cite{thubcottdubos13}, starting with the upwind cell all neighbouring cells of the cells stencil are taken as test cells and any test cell that is a neighbour of more than one cell is added to the stencil. If there are no test cells that neighbour multiple cells in the stencil then all test cells are added to the stencil. This process is repeated until the number of cells in the stencil is greater than or equal to the number of monomials in the polynomial fit. Note this process can lead to different sized stencils at different points on the mesh, i.e. for a quadratic fit the general stencil will contain 9 cells, but around the corners of the cubed-sphere the stencil only contains 8 cells, see  \ref{fig:mol-stencils}(b).
+\end{description}
+
+\subsubsection{Local Coordinates\label{sub:MoL-local-coordinates}}
+
+The local Cartesian coordinates $(x,y)$ are computed as in \cite{thubcottdubos13}, the origin of the coordinate system $\mathbf{x}_0$ is taken to be the centre of the cell in the centre of the stencil and the direction of the $x-$axis is then taken as the direction from  $\mathbf{x}_0$ to either an arbitrary neighbour (2D interpolation) or the neighbour in the upwind direction (1D interpolation). Then for any point  $\mathbf{x}$ it is straightforward to find either the spherical distance (for spherical domains) or the Cartesian distance (Cartesian domains) from $\mathbf{x}_0$  to $\mathbf{x}$, See \cite{thubcottdubos13} for more details.
+
+\subsubsection{Coefficients\label{sub:MoL-coefficients}}
+
+Given the integrals of each monomial over each cell $c$ in the stencil $\int_c m_i(x,y) dA_c$ and the value of the underlying field $\int_c\rho dA_c$ it is relatively straightforward to compute the coefficients $a_i$ of the polynomial expansion and evaluate this expansion at the reconstruction point and this would involve solving the matrix equation
 \begin{equation}
-C \mathbf{a} = \mathbf{t}\label{eq:high_order_theta_matrix}
+M \mathbf{a}^T = \bm{\rho}^T,\label{eq:MoL-coefficients}
 \end{equation}
-where now $\mathbf{t}=\left[\theta_{i-j},\,\theta_{i-j+1},\,...,\,\theta_{i},\,....\right]^T$  are the values in the stencil and $C^{i,j} = j^i$. 
+where $M_{i,j} = \int_j m_i$ is the integral of monomial $i$ over cell $j$ and $\bm{\rho}$ is the integral of the underlying field in each cell. Then given the coefficients $\mathbf{a}$, the reconstruction can be evaluated at any desired point. However, we can simplify the process since we know a-priori the points to evaluate the reconstruction at. Instead of storing the monomial matrix $M$ and computing $\mathbf{a}$ we store the coefficients $b_j$ which are the weights associated with the value in each cell $j$ in the evaluation of the reconstruction $\widetilde{\rho}$, such that evaluating the reconstruction at the point $\left(x_r,y_r\right)$
+\begin{equation}
+\widetilde{\rho}\left(x_r,y_r\right) = \sum_{j=1}^{n_{sten}} b_j \rho_j,\label{eq:high_order_rho_reconstruction}
+\end{equation}
+where $n_{sten}$ is the number of cells in the reconstruction stencil. For a 2D reconstruction it is beneficial to compute the integral of the reconstructed field over the face, and so the polynomial reconstruction is computed at a number of Gauss points on the face and the weights are added together to give the coefficients $b_j$.
 
-In both cases once an update in the computational $x$ direction is computed the process is repeated in the computational $y$ and $z$ directions to provide a full 3D update.
+\subsubsection{Computation of Fluxes\label{sub:MoL-flux}}
 
+To compute the fluxes $\mathbf{F}$, needed for a flux form advection equation such as used for density, the underlying field $\rho$ is reconstructed at velocity points giving $\widetilde{\rho}$. The flux is then obtained by multiplying the velocity $\mathbf{U}$ at that location by the reconstructed field. To update the density field the standard strong form continuity equation is used with discrete divergence operator $D$:
+\begin{equation}
+\rho^{n+1} = \rho^n - \Delta t D \mathbf{F},\label{eq:MoL-flux-form}
+\end{equation}
+
+\subsubsection{Computation of Advective Update\label{sub:MoL-advective}}
+
+To compute the advective update $\mathcal{A} \equiv \mathbf{U}.\nabla q$ of a field $q$ located in $\mathbb{W}_{\theta}$ such as used for potential temperature, For each $q$ point the underlying field $q$ is reconstructed horizontally at horizontal edges giving $\widetilde{q}$ and the horizontal advective update is obtained by computing 
+\begin{equation} 
+\mathcal{A}_h \equiv \overline{\mathbf{U}}\cdot\delta \widetilde{q},\label{eq:MoL-horizontal-advective-update}
+\end{equation}
+where $\overline{\mathbf{U}}$ is the velocity field sampled at the $q$ point and $\delta$ is the discrete gradient operator in the reference space. The vertical update is computed slightly differently: the derivative of the reconstructed polynomial is computed at the $q$ point and this is used to analytically evaluate $\partial \widetilde{q}/\partial \hat{\chi_3}$. The full advective update is then
+\begin{equation}
+\mathcal{A} = \mathcal{A}_h  + w\partial \widetilde{q}/\partial  \hat{\chi_3},\label{eq:MoL-advective-update}
+\end{equation}
+and tracer field is then updated according to 
+\begin{equation}
+q^{n+1} = q^n - \Delta t \mathcal{A}.\label{eq:MoL-advective-form}
+\end{equation}
 
 \subsection{Directionally split advection scheme\label{sub:COSMIC-Advection}}
 This section describes the directionally split advection scheme, commonly known as COSMIC (Conservative Operator Splitting in Multi-dimensions with Inherent Constancy), and its implementation within GungHo. References for the scheme include \cite{Leonard_etal_1996}, \cite{putlin07} and \cite{lin_rood_96}. The scheme is currently coded assuming that $\rho\in \mathbb{W}_3$ and velocity ${\bf u}\in \mathbb{W}_2$ are both at lowest order, $k=0$, and has been implemented as a finite-volume transport method. The scheme has also only initially been written for the two horizontal directions on the orthogonal biperiodic domain. Within this section we refer to $\chi_1$ and $\chi_2$ coordinate directions as $x$ and $y$ directions respectively since this is simpler and consistent with the COSMIC literature.

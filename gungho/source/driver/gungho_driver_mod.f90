@@ -702,8 +702,10 @@ contains
 
     if(write_minmax_tseries) call minmax_tseries_final(mesh_id)
 
-    call iter_alg_final()
-    call rk_alg_final()
+    if ( .not. transport_only ) then
+      if ( method == method_semi_implicit ) call iter_alg_final()
+      if ( method == method_rk )            call rk_alg_final()
+    end if
     call final_runtime_constants()
 
     if ( subroutine_timers ) then

@@ -1,10 +1,10 @@
 &base_mesh
-    f_lat_deg=45.0,
-    filename='mesh_BiP4x4-10000x10000.nc',
-    fplane=.false.,
-    geometry='planar',
-    partitioner='planar',
-    prime_mesh_name='dynamics',
+    f_lat_deg       = 45.0,
+    filename        = 'mesh_BiP4x4-10000x10000.nc',
+    fplane          = .false.,
+    geometry        = 'planar',
+    partitioner     = 'planar',
+    prime_mesh_name = 'dynamics',
 /
 
 &extrusion
@@ -14,12 +14,12 @@
 /
 
 &finite_element
-    cellshape='quadrilateral',
-    coordinate_order=1,
-    element_order=0,
-    rehabilitate=.true.,
-    supg=.false.,
-    vorticity_in_w1=.true.,
+    cellshape        = 'quadrilateral',
+    coordinate_order = 1,
+    element_order    = 0,
+    rehabilitate     = .true.,
+    supg             = .false.,
+    vorticity_in_w1  = .true.,
 /
 
 &formulation
@@ -54,16 +54,16 @@
 /
 
 &initial_temperature
-    bvf_square=0.0001,
-    theta_surf=300.0,
+    bvf_square = 0.0001,
+    theta_surf = 300.0,
 /
 
 &initial_wind
-    profile='constant_uv',
-    sbr_angle_lat=0.0,
-    sbr_angle_lon=0.0,
-    u0=2.0,
-    v0=0.0,
+    profile       = 'constant_uv',
+    sbr_angle_lat = 0.0,
+    sbr_angle_lon = 0.0,
+    u0            = 2.0,
+    v0            = 0.0,
 /
 
 
@@ -97,13 +97,13 @@
 /
 
 &planet
-    cp=1005.0,
-    gravity=9.80665,
-    omega=7.292116E-5,
-    p_zero=100000.0,
-    radius=6371229.0,
-    rd=287.05,
-    scaling_factor=1.0,
+    cp             = 1005.0,
+    gravity        = 9.80665,
+    omega          = 7.292116E-5,
+    p_zero         = 100000.0,
+    radius         = 6371229.0,
+    rd             = 287.05,
+    scaling_factor = 1.0,
 /
 
 &orbit
@@ -167,77 +167,78 @@
 /
 
 &subgrid
-    dep_pt_stencil_extent=3,
-    rho_approximation='ppm_no_limiter',
-    rho_approximation_stencil_extent=2,
+    dep_pt_stencil_extent            = 3,
+    rho_approximation                = 'ppm_no_limiter',
+    rho_approximation_stencil_extent = 2,
 /
 
 &solver
     gcrk=18,
-    maximum_iterations=399,
-    method='bicgstab',
-    preconditioner='diagonal',
-    tolerance=1.0e-12,
+    maximum_iterations = 399,
+    method             = 'bicgstab',
+    preconditioner     = 'diagonal',
+    tolerance          = 1.0e-12,
 /
 
 &mixed_solver
-    gcrk=18,
-    guess_np1=.F,
-    normalise=.T,
-    reference_reset_freq=1,
-    si_maximum_iterations=10,
-    si_method='gcr',
-    si_preconditioner='pressure',
-    si_tolerance=1.0e-6,
+    gcrk                  = 18,
+    guess_np1             = .F,
+    normalise             = .T,
+    reference_reset_freq  = 1,
+    si_maximum_iterations = 10,
+    si_method             = 'gcr',
+    si_preconditioner     = 'pressure',
+    si_tolerance          = 1.0e-6,
 /
 
 &helmholtz_solver
-    gcrk=18,
-    method='bicgstab',
-    normalise=.T,
-    preconditioner='tridiagonal',
-    si_pressure_maximum_iterations=400,
-    si_pressure_tolerance=1.0e-6,
+    gcrk                           = 18,
+    method                         = 'bicgstab',
+    normalise                      = .T,
+    preconditioner                 = 'tridiagonal',
+    si_pressure_maximum_iterations = 400,
+    si_pressure_tolerance          = 1.0e-6,
 /
 
 &timestepping
-    alpha=0.5,
-    dt=600.0,
-    inner_iterations=1,
-    method='semi_implicit',
-    outer_iterations=1,
-    runge_kutta_method='ssp3',
-    spinup_alpha=.false.,
-    spinup_period=0,
-    spinup_winds=.false.,
-    tau_r=0.5,
-    tau_t=0.5,
-    tau_u=0.5,
+    alpha              = 0.5,
+    dt                 = 600.0,
+    inner_iterations   = 1,
+    method             = 'semi_implicit',
+    outer_iterations   = 1,
+    runge_kutta_method = 'ssp3',
+    spinup_alpha       = .false.,
+    spinup_period      = 0,
+    spinup_winds       = .false.,
+    tau_r              = 0.5,
+    tau_t              = 0.5,
+    tau_u              = 0.5,
 /
 
 &biperiodic_deppt
-    method='euler',
-    n_dep_pt_iterations=1,
+    method              = 'euler',
+    n_dep_pt_iterations = 1,
 /
 
 &transport
-    consistent_metric=.false.,
-    enforce_monotonicity=.false.,
-    fv_advective_order=3,
-    fv_flux_order=2,
-    operators='fv',
-    scheme='method_of_lines',
+    consistent_metric    = .false.,
+    enforce_monotonicity = .false.,
+    fv_advective_order   = 2,
+    fv_flux_order        = 2,
+    operators            = 'fv',
+    scheme               = 'method_of_lines',
+    oned_reconstruction  = .true.
 /
 
 &partitioning
-    auto=.true.,
+    auto = .true.,
 /
 
 &domain_size
-    planar_domain_max_x=5000.0,
-    planar_domain_max_y=5000.0,
-    planar_domain_min_x=-5000.0,
-    planar_domain_min_y=-5000.0,
+    planar_domain_max_x = 10000.0,
+    planar_domain_max_y = 10000.0,
+    planar_domain_min_x = -10000.0,
+    planar_domain_min_y = -10000.0,
 /
 
 &mixing
@@ -271,52 +272,52 @@
 /
 
 &orography
-    profile='none',
+    profile = 'none',
 /
 
 &orography_agnesi_cartesian
-    direction='x',
-    half_width_x=10.0,
-    half_width_y=10.0,
-    mountain_height=100.0,
-    x_centre=0.0,
-    y_centre=0.0,
+    direction       = 'x',
+    half_width_x    = 10.0,
+    half_width_y    = 10.0,
+    mountain_height = 100.0,
+    x_centre        = 0.0,
+    y_centre        = 0.0,
 /
 
 &orography_agnesi_spherical
-    half_width=2500.0,
-    lambda_centre_dec=1.5,
-    lambda_focus_dec=1.5,
-    mountain_height=100.0,
-    phi_centre_dec=0.0,
-    phi_focus_dec=0.3333,
+    half_width        = 2500.0,
+    lambda_centre_dec = 1.5,
+    lambda_focus_dec  = 1.5,
+    mountain_height   = 100.0,
+    phi_centre_dec    = 0.0,
+    phi_focus_dec     = 0.3333,
 /
 
 &orography_schar_cartesian
-    direction='x',
-    half_width_x=20.0,
-    half_width_y=20.0,
-    mountain_height=250.0,
-    wavelength=20.0,
-    x_centre=0.0,
-    y_centre=0.0,
+    direction       = 'x',
+    half_width_x    = 20.0,
+    half_width_y    = 20.0,
+    mountain_height = 250.0,
+    wavelength      = 20.0,
+    x_centre        = 0.0,
+    y_centre        = 0.0,
 /
 
 &orography_schar_spherical
-    half_width=5000.0,
-    lambda_centre_dec=0.25,
-    mountain_height=250.0,
-    phi_centre_dec=0.0,
-    wavelength=4000.0,
+    half_width        = 5000.0,
+    lambda_centre_dec = 0.25,
+    mountain_height   = 250.0,
+    phi_centre_dec    = 0.0,
+    wavelength        = 4000.0,
 /
 
 &multigrid
-    l_multigrid=.false.,
+    l_multigrid = .false.,
 /
 
 &checks
-    limit_cfl=.false.,
-    max_cfl=0.75,
+    limit_cfl = .false.,
+    max_cfl   = 0.75,
 /
 
 &section_choice

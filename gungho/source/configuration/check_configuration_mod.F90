@@ -50,9 +50,12 @@ contains
                                            geometry_planar
     use transport_config_mod,        only: scheme,                             &
                                            scheme_horz_cosmic,                 &
+                                           scheme_method_of_lines,             &
                                            operators,                          &
                                            operators_fv,                       &
-                                           consistent_metric
+                                           consistent_metric,                  &
+                                           fv_flux_order,                      &
+                                           fv_advective_order
     use mixing_config_mod,           only: viscosity,                          &
                                            viscosity_mu
     use damping_layer_config_mod,    only: dl_base,                            &
@@ -186,6 +189,17 @@ contains
         write( log_scratch_space, '(A)' ) 'COSMIC scheme only implemented for transport only algorithms'
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
       end if 
+      if ( scheme == scheme_method_of_lines .and. &
+           operators == operators_fv ) then
+        if ( mod(fv_flux_order,2_i_def) /= 0_i_def ) then
+          write( log_scratch_space, '(A)' ) 'fv_flux_order must be even'
+          call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+        end if
+        if ( mod(fv_advective_order,2_i_def) /= 0_i_def ) then
+          write( log_scratch_space, '(A)' ) 'fv_advective_order must be even'
+          call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+        end if
+      end if
 
       ! Check the mixing namelist
       if ( viscosity .and. geometry == geometry_spherical ) then

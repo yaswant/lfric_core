@@ -45,6 +45,7 @@ module init_mesh_mod
                                         scheme_horz_cosmic,   &
                                         scheme_yz_bip_cosmic, &
                                         scheme_cosmic_3D
+  use mixing_config_mod,          only: smagorinsky
 
   use ugrid_2d_mod,               only: ugrid_2d_type
   use ugrid_file_mod,             only: ugrid_file_type
@@ -216,10 +217,11 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
 
   ! Determine max_stencil_depth
   max_stencil_depth = 1
+  ! Smagorinsky (or boundary layers) appears to need larger haloes
+  if ( smagorinsky ) max_stencil_depth = max(max_stencil_depth,2)
   if (operators == operators_fv) then
     ! Need larger haloes for fv operators
-    max_fv_stencil = &
-        int(real(max(fv_flux_order,fv_advective_order)+1)/2.0,i_def)
+    max_fv_stencil = max(fv_flux_order,fv_advective_order)/2
     max_stencil_depth = max(max_stencil_depth,max_fv_stencil)
   end if
 

@@ -34,8 +34,10 @@ use idealised_config_mod,       only : test_cold_bubble_x,           &
                                        test_isot_atm,                &
                                        test_isot_cold_atm,           &
                                        test_const_lapse_rate,        &
-                                       test_dry_cbl
-use initial_density_config_mod, only : r1, x1, y1, z1, r2, x2, y2, z2, &
+                                       test_dry_cbl,                 &
+                                       test_cos_phi,                 &
+                                       test_cosine_bubble
+use initial_density_config_mod, only : r1, x1, y1, z1, r2, x2, y2, z2,    &
                                        tracer_max, tracer_background
 use base_mesh_config_mod,       only : geometry, &
                                        geometry_spherical
@@ -167,10 +169,10 @@ contains
     case (test_warm_bubble, test_warm_bubble_3d ) 
       call reference_profile(pressure, density, temperature, chi, choice)
 
-    case (test_GAUSSIAN_HILL)
+    case (test_gaussian_hill)
       h1 = tracer_max*exp( -(l1/r1)**2 )
       h2 = tracer_max*exp( -(l2/r2)**2 )
-      pressure = h1 +h2
+      pressure = h1 + h2
 
     case (test_cosine_hill)
       if ( l1 < r1 ) then
@@ -249,6 +251,16 @@ contains
     case(test_dry_cbl)
       call reference_profile(pressure, density, temperature, chi, choice)
 
+    case( test_cos_phi )
+      pressure = tracer_max*cos(lat)**4
+
+    case( test_cosine_bubble ) 
+      l1 = sqrt( ((chi(1) - x1)/r1)**2 + ((chi(3) - y1)/r2)**2 )
+      if ( l1 < 1.0_r_def ) then
+        pressure = tracer_background + tracer_max*cos(0.5_r_def*l1*PI)**2
+      else
+        pressure = tracer_background
+      end if
     case default
       write( log_scratch_space, '(A)' )  'Invalid pressure profile choice, stopping'
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )

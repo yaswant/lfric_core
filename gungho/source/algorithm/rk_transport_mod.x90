@@ -9,12 +9,12 @@
 !>         multistage explicit Runge-Kutta algorithm.
 module rk_transport_mod
 
-  use constants_mod,                     only: r_def, i_def
+  use constants_mod,                     only: r_def, i_def, pi
   use log_mod,                           only: log_event,         &
                                                log_scratch_space, &
                                                LOG_LEVEL_INFO,    &
                                                LOG_LEVEL_TRACE
-
+  use fs_continuity_mod,                 only: W1
   ! Configuration options
   use finite_element_config_mod,         only: element_order, supg
   use timestepping_config_mod,           only: dt
@@ -31,27 +31,39 @@ module rk_transport_mod
                                                fv_flux_order,      &
                                                fv_advective_order, &
                                                operators_fv,       &
-                                               operators_fem
+                                               operators_fem,        &
+                                               oned_reconstruction,            &
+                                               consistent_metric
 
   ! PsyKAl-lite kernels
-  use psykal_lite_mod,                   only: invoke_sample_poly_flux, &
-                                               invoke_sample_poly_adv
+  use psykal_lite_mol_mod,               only: psykal_lite_mol_init,           &
+                                               psykal_lite_mol_final,          &
+                                               invoke_poly1d_flux,             &
+                                               invoke_poly1d_flux_coeffs,      &
+                                               invoke_poly1d_vert_flux,        &
+                                               invoke_poly1d_vert_flux_coeffs, &
+                                               invoke_poly2d_flux,             &
+                                               invoke_poly2d_flux_coeffs,      &
+                                               invoke_poly1d_adv_recon,        &
+                                               invoke_poly1d_advective_coeffs, &
+                                               invoke_poly2d_adv_recon,        &
+                                               invoke_poly2d_advective_coeffs, &
+                                               invoke_poly1d_vert_adv_coeffs,  &
+                                               invoke_poly1d_vert_adv
+
   ! PsyKAl PSYClone kernels
   use rrho_kernel_mod,                   only: rrho_kernel_type
   use flux_rhs_kernel_mod,               only: flux_rhs_kernel_type
   use enforce_bc_kernel_mod,             only: enforce_bc_kernel_type
   use rtheta_kernel_mod,                 only: rtheta_kernel_type
   use rtheta_supg_kernel_mod,            only: rtheta_supg_kernel_type
-
-
-  use sample_poly_flux_kernel_mod,       only: sample_poly_flux_init, &
-                                               sample_poly_flux_final
-  use sample_poly_adv_kernel_mod,        only: sample_poly_adv_init,  &
-                                               sample_poly_adv_final
+  use poly_advective_kernel_mod,         only: poly_advective_kernel_type
+  use consistent_wind_kernel_mod,        only: consistent_wind_kernel_type
 
   ! Derived Types
   use field_mod,                         only: field_type
   use function_space_mod,                only: function_space_type
+  use function_space_collection_mod,     only: function_space_collection
   use quadrature_xyoz_mod,               only: quadrature_xyoz_type
   use operator_mod,                      only: operator_type
 
@@ -73,9 +85,18 @@ module rk_transport_mod
   type( field_type )              :: mt_lumped
   type( field_type )              :: rho0, theta0
   type( field_type )              :: ones
+  type( field_type )              :: theta_av
+  type( field_type )              :: advective_av_chi3, theta_metrics, chi3_at_wt
 
-  integer(i_def) :: flux_stencil_extent, &
-                    advective_stencil_extent
+  ! Needed for nonuniform fv operators
+  type( field_type ), allocatable :: flux_coeffs(:,:), vert_flux_coeffs(:,:), &
+                                     adv_coeffs(:,:),  vert_adv_coeffs(:,:)
+
+  integer(i_def) :: flux_stencil_extent,      &
+                    advective_stencil_extent, &
+                    flux2d_stencil_size,      &
+                    advective2d_stencil_size
+  integer(i_def) :: nfaces_h, nfaces_v
 
   public :: rk_transport_init
   public :: rk_transport_step
@@ -91,9 +112,18 @@ contains
   !> @param[inout] rho Density like field
   !> @param[inout] theta Temperature like field
   subroutine rk_transport_init( mesh_id, u, rho, theta)
-    use mesh_mod,                          only: mesh_type
-    use mesh_collection_mod,               only: mesh_collection
     use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
+    use sample_field_kernel_mod,           only: sample_field_kernel_type
+    use quadrature_xyoz_mod,               only: quadrature_xyoz_type
+    use quadrature_face_mod,               only: quadrature_face_type
+    use quadrature_edge_mod,               only: quadrature_edge_type
+    use quadrature_rule_gaussian_mod,      only: quadrature_rule_gaussian_type
+    use quadrature_rule_gauss_lobatto_mod, &
+                                           only: quadrature_rule_gauss_lobatto_type
+    use multiplicity_kernel_mod,           only: multiplicity_kernel_type
+    use sample_field_kernel_mod,           only: sample_field_kernel_type
+    use reference_element_mod,             only: reference_element_type
+    use mesh_mod,                          only: mesh_type
     implicit none
 
     ! Mesh id
@@ -104,12 +134,25 @@ contains
     type(function_space_type), pointer :: u_fs     => null()
     type(function_space_type), pointer :: rho_fs   => null()
     type(function_space_type), pointer :: theta_fs => null()
-    type( mesh_type ),         pointer :: mesh     => null()
 
     ! Timestepping variables
-    integer :: stage
+    integer(i_def)               :: stage
     type(operator_type), pointer :: mm_wt => null()
 
+    type( field_type ), pointer :: chi(:) => null()
+    type( field_type ), pointer :: md_w3 => null(), md_wt => null()
+    type( field_type )          :: wt_multiplicity
+    integer(i_def)              :: direction, polynomial
+
+    type( quadrature_xyoz_type )           :: qr
+    type( quadrature_face_type )           :: qrf
+    type( quadrature_edge_type )           :: qre
+    type( quadrature_rule_gaussian_type )  :: gaussian_quadrature
+    type( quadrature_rule_gauss_lobatto_type )  :: gauss_lobatto_quadrature
+    class(reference_element_type), pointer :: reference_element => null()
+    type(mesh_type),               pointer :: mesh => null()
+    integer(i_def)                         :: face_quad_order
+    integer(i_def)                         :: nqp_xy, nqp_z, nqp_xyz
     if ( subroutine_timers ) call timer('rk_transport_alg')
 
     allocate ( rr_prediction(num_rk_stage) )
@@ -140,9 +183,14 @@ contains
 
     if ( operators == operators_fv ) then
       if ( element_order == 0 ) then
-        mesh => mesh_collection%get_mesh( mesh_id )
-        call sample_poly_flux_init(fv_flux_order, mesh%get_nlayers())
-        call sample_poly_adv_init (fv_advective_order, mesh%get_nlayers())
+        ! Get topology information from the reference element
+        mesh              => theta%get_mesh()
+        reference_element => mesh%get_reference_element()
+        ! Number of horizontal neighbours
+        nfaces_h = reference_element%get_number_horizontal_faces()
+        ! Number of vertical neighbours is (and always will be) 2
+        nfaces_v = reference_element%get_number_vertical_faces() 
+
         ! Compute stencil extents
         flux_stencil_extent      = int(real(fv_flux_order+1)/2.0,i_def)
         advective_stencil_extent = int(real(fv_advective_order+1)/2.0,i_def)
@@ -156,6 +204,145 @@ contains
                    setval_c(ones,      1.0_r_def), &
                    setval_c(mt_lumped, 0.0_r_def), &
                    matrix_vector_kernel_type(mt_lumped, ones, mm_wt) )
+
+      ! Compute stencil for nonuniform polynomial fit   
+      ! Initialise PSy layer arrays (this will not be needed when
+      ! multi-dimensional field arrays are supported)
+      if ( oned_reconstruction ) then
+        call psykal_lite_mol_init(theta, rho,                         &
+                                  fv_flux_order, fv_flux_order+1,     &
+                                  fv_advective_order,                 &
+                                  fv_advective_order+1,               &
+                                  nfaces_h, nfaces_v)
+      else 
+        flux2d_stencil_size = 1    
+        do polynomial = 1, fv_flux_order
+          if ( mod(polynomial,2) == 0 ) then
+            flux2d_stencil_size = flux2d_stencil_size + nfaces_h
+          else
+            flux2d_stencil_size = flux2d_stencil_size + nfaces_h*polynomial
+          end if
+        end do
+        advective2d_stencil_size = 1    
+        do polynomial = 1, fv_advective_order
+          if ( mod(polynomial,2) == 0 ) then
+            advective2d_stencil_size = advective2d_stencil_size + nfaces_h
+          else
+            advective2d_stencil_size = advective2d_stencil_size + nfaces_h*polynomial
+          end if
+        end do
+        call psykal_lite_mol_init(theta, rho, &
+                                  fv_flux_order, flux2d_stencil_size, &
+                                  fv_advective_order, advective2d_stencil_size, &
+                                  nfaces_h, nfaces_v)
+      end if
+   
+      chi => get_coordinates()
+      nqp_xyz = fv_flux_order+1
+      qr = quadrature_xyoz_type(nqp_xyz, gaussian_quadrature)
+      mesh              => rho%get_mesh()
+      reference_element => mesh%get_reference_element()
+      if ( oned_reconstruction ) then
+        face_quad_order = 1
+      else
+        face_quad_order = fv_flux_order+1
+      end if
+      qrf = quadrature_face_type(face_quad_order, .true., .false., &
+                                 reference_element, gaussian_quadrature)
+      call log_event( "Gungho: computing horizontal flux coeffs", LOG_LEVEL_INFO )
+      md_w3 => get_mass_matrix_diagonal(w3_id)
+      if ( oned_reconstruction ) then
+        allocate( flux_coeffs(fv_flux_order+1, nfaces_h) )
+        do direction = 1,nfaces_h
+          do polynomial = 1,fv_flux_order+1
+            flux_coeffs(polynomial,direction) = field_type( vector_space = rho_fs )
+          end do
+        end do
+        call invoke_poly1d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                        fv_flux_order,                    &
+                                        flux_stencil_extent, nfaces_h )
+      else
+        allocate( flux_coeffs(flux2d_stencil_size, nfaces_h) )
+        do direction = 1,nfaces_h
+          do polynomial = 1,flux2d_stencil_size
+            flux_coeffs(polynomial,direction) = field_type( vector_space = rho_fs )
+          end do
+        end do
+        call invoke_poly2d_flux_coeffs( flux_coeffs, md_w3, chi, qr, qrf, &
+                                        fv_flux_order,                    &
+                                        flux2d_stencil_size, nfaces_h )
+      end if
+      call log_event( "Gungho: computing vertical flux coeffs", LOG_LEVEL_INFO )
+      ! Vertical flux coeffs
+      allocate( vert_flux_coeffs(fv_flux_order+1, nfaces_v) )
+      do direction = 1,nfaces_v
+        do polynomial = 1,fv_flux_order+1
+          vert_flux_coeffs(polynomial,direction) = field_type( vector_space = rho_fs )
+        end do
+      end do
+      nqp_xyz = 1
+      qrf = quadrature_face_type(nqp_xyz, .false., .true., &
+                                 reference_element, gaussian_quadrature)
+
+      call invoke_poly1d_vert_flux_coeffs( vert_flux_coeffs, md_w3, chi, &
+                                           qr, qrf, fv_flux_order, nfaces_v )
+      if ( subroutine_timers ) call timer('rk_transport_alg: V flux coeffs')
+
+      ! Compute advective coeffcients
+      ! This needs a quadrature rule with GLL points in the vertical
+      call log_event( "Gungho: computing horizontal advective coeffs", LOG_LEVEL_INFO )
+      nqp_xy = fv_advective_order+3
+      nqp_z = 2
+      qr = quadrature_xyoz_type(nqp_xy, nqp_xy, nqp_z, &
+                                gauss_lobatto_quadrature)
+      qre = quadrature_edge_type(face_quad_order, .true., .false., &
+                                 reference_element, gaussian_quadrature)
+      md_wt => get_mass_matrix_diagonal(wt_id)
+      theta_av = field_type( vector_space =                                    &
+          function_space_collection%get_fs(mesh_id, element_order, W1) )
+      if ( oned_reconstruction ) then
+        allocate( adv_coeffs(fv_advective_order+1, nfaces_h) )
+        do direction = 1,nfaces_h
+          do polynomial = 1,fv_advective_order+1
+            adv_coeffs(polynomial,direction) = field_type( vector_space = theta_fs )
+          end do
+        end do
+        call invoke_poly1d_advective_coeffs( adv_coeffs, md_wt, chi, qr, qre,  &
+                                             fv_advective_order,               &
+                                             advective_stencil_extent, nfaces_h )
+      else
+        allocate( adv_coeffs(advective2d_stencil_size, nfaces_h) )
+        do direction = 1,nfaces_h
+          do polynomial = 1,advective2d_stencil_size
+            adv_coeffs(polynomial,direction) = field_type( vector_space = theta_fs )
+          end do
+        end do
+        call invoke_poly2d_advective_coeffs( adv_coeffs, md_wt, chi, qr, &
+                                             qre, fv_advective_order,    &
+                                             advective2d_stencil_size,   &
+                                             nfaces_h )
+      end if
+      call log_event( "Gungho: computing vertical advective coeffs", LOG_LEVEL_INFO )
+      ! Vertical advective coeffs
+      allocate( vert_adv_coeffs(fv_advective_order+2, nfaces_v) )
+      do direction = 1,nfaces_v
+        do polynomial = 1,fv_advective_order+2
+          vert_adv_coeffs(polynomial,direction) = field_type( vector_space = theta_fs )
+        end do
+      end do
+      call invoke_poly1d_vert_adv_coeffs( vert_adv_coeffs, md_wt, chi, & 
+                                          fv_advective_order, nfaces_v )
+
+      if ( consistent_metric ) then
+        advective_av_chi3 = field_type(vector_space = theta_av%get_function_space() )
+        theta_metrics     = field_type(vector_space = theta_fs )
+        chi3_at_wt        = field_type(vector_space = theta_fs )
+        wt_multiplicity   = field_type(vector_space = theta_fs )
+        call invoke( setval_c(wt_multiplicity, 0.0_r_def),       &
+                     multiplicity_kernel_type(wt_multiplicity),  &
+                     sample_field_kernel_type( chi3_at_wt, wt_multiplicity, chi(3)) )
+      end if
+      if ( subroutine_timers ) call timer('rk_transport_alg: V adv coeffs')
     else
       ones  = field_type( vector_space = rho_fs)
       call invoke( setval_c(ones, 1.0_r_def) )
@@ -165,7 +352,7 @@ contains
     rho0   = rho
     theta0 = theta
 
-    nullify( mm_wt, mesh, u_fs, rho_fs, theta_fs )
+    nullify( mm_wt, u_fs, rho_fs, theta_fs, mesh, reference_element )
 
     if ( subroutine_timers ) call timer('rk_transport_alg')
 
@@ -199,7 +386,7 @@ contains
     ! Temps for retrieving objects back from runtime constants
     type(operator_type), pointer :: mm_w3_inv => null()
     type(field_type), pointer    :: mt_lumped_inv => null()
-
+    type(field_type)             :: consistent_wind
     mt_lumped_inv => get_inverse_lumped_mass_matrix(theta_space_id)
 
     if ( subroutine_timers ) call timer('rk_transport_alg')
@@ -220,10 +407,53 @@ contains
       select case(operators)
         case(operators_fv)
           ! Use polynomial reconstruction
-          call invoke_sample_poly_flux( mass_flux, u, rho, &
-                                        flux_stencil_extent )
-          call invoke_sample_poly_adv( rt_prediction(stage), theta, u, mt_lumped_inv, &
-                                       chi, advective_stencil_extent )
+          call invoke( setval_c(theta_av, 0.0_r_def) )
+          if ( oned_reconstruction ) then
+            call invoke_poly1d_flux( mass_flux, u, rho, flux_coeffs, &
+                                     fv_flux_order, flux_stencil_extent, nfaces_h )
+            call invoke_poly1d_adv_recon( theta_av, u, theta, adv_coeffs, &
+                                          fv_advective_order, advective_stencil_extent, &
+                                          nfaces_h )
+            ! Horizontal advection of metric terms
+            if ( consistent_metric ) then 
+              call invoke( setval_c(advective_av_chi3, 0.0_r_def) )
+              call invoke_poly1d_adv_recon( advective_av_chi3, u, &
+                                            chi3_at_wt, adv_coeffs, &
+                                            fv_advective_order, advective_stencil_extent, &
+                                            nfaces_h )
+            end if
+          else
+            ! Use 2d flux code
+            call invoke_poly2d_flux( mass_flux, u, rho, flux_coeffs, &
+                                     fv_flux_order, flux2d_stencil_size, nfaces_h )
+            call invoke_poly2d_adv_recon( theta_av, u, theta, adv_coeffs, &
+                                          fv_advective_order, advective2d_stencil_size, &
+                                          nfaces_h )
+            ! Horizontal advection of metric terms
+            if ( consistent_metric ) & 
+              call invoke_poly2d_adv_recon( advective_av_chi3, u, &
+                                            chi3_at_wt, adv_coeffs, &
+                                            fv_advective_order, advective2d_stencil_size, &
+                                            nfaces_h )
+          end if
+          call invoke( poly_advective_kernel_type( rt_prediction(stage), &
+                                                   u, theta_av) )
+
+          ! Compute vertical components of mass flux
+          call invoke_poly1d_vert_flux( mass_flux, u, rho, &
+                                        vert_flux_coeffs, &
+                                        fv_flux_order, nfaces_v)
+
+          ! Compute vertical components of advective update
+          consistent_wind = u
+          if ( consistent_metric ) then
+            call invoke( poly_advective_kernel_type(theta_metrics, u, advective_av_chi3), &
+            ! Modify advecting wind
+                         consistent_wind_kernel_type(consistent_wind, u, theta_metrics, chi) )
+          end if
+          call invoke_poly1d_vert_adv( rt_prediction(stage), consistent_wind, theta, &
+                                       vert_adv_coeffs, &
+                                       fv_advective_order, nfaces_v)
         case(operators_fem)      
           ! Use FEM projection
           ! Initialise fields
@@ -275,6 +505,7 @@ contains
     end do
 
     nullify( mm_w3_inv, mt_lumped_inv, chi )
+    if ( subroutine_timers ) call timer('rk_transport_alg')
 
   end subroutine rk_transport_step
 
@@ -291,47 +522,66 @@ contains
     type( field_type ), intent(in) :: rho, theta
  
     type( field_type )                 :: drho, dtheta, l2_rho, l2_theta
-    type(function_space_type), pointer :: rho_fs   => null()
-    type(function_space_type), pointer :: theta_fs => null()
-    type(operator_type),       pointer :: mm_wt => null(), mm_w3 => null()
-    real(kind=r_def)                   :: l2_rho_scalar, l2_theta_scalar
+    type(function_space_type), pointer :: rho_fs   => null(), &
+                                          theta_fs => null()
+    type(operator_type),       pointer :: mm_wt => null(), &
+                                          mm_w3 => null()
+    real(kind=r_def)                   :: l2_rho_diff, l2_theta_diff, &
+                                          l2_rho_analytic, l2_theta_analytic
+
+    if ( subroutine_timers ) call timer('rk_transport_alg')
 
     ! Compute L errors
+    theta_fs => theta%get_function_space()
     rho_fs   => rho%get_function_space()
-    theta_fs =>  theta%get_function_space()
 
-    drho   = field_type( vector_space = rho_fs )
-    dtheta = field_type( vector_space = theta_fs )
-    call invoke( X_minus_Y(drho,   rho,   rho0  ), &
-                 X_minus_Y(dtheta, theta, theta0) )
+    dtheta   = field_type( vector_space = theta_fs )
+    l2_theta = field_type( vector_space = theta_fs )
+    drho     = field_type( vector_space = rho_fs )
+    l2_rho   = field_type( vector_space = rho_fs )
 
-    ! L2 error
     mm_w3 => get_mass_matrix(w3_id)
     mm_wt => get_mass_matrix(theta_space_id)
-    l2_theta = field_type( vector_space = theta_fs )
-    l2_rho   = field_type( vector_space = rho_fs )
-    call invoke( name = "Compute L2 error for theta and rho",        &
-    ! Initialise fields
-                 setval_c(l2_theta, 0.0_r_def),                      &
-                 setval_c(l2_rho,   0.0_r_def),                      &
-    ! Matrix-vector multiplication
-                 matrix_vector_kernel_type(l2_theta, dtheta, mm_wt), &
-                 matrix_vector_kernel_type(l2_rho,   drho,   mm_w3), &
-    ! Compute L2 error for theta
-                 X_innerproduct_Y(l2_theta_scalar, dtheta, l2_theta), &
-    ! Compute L2 error for rho
-                 X_innerproduct_Y(l2_rho_scalar, drho, l2_rho) )
 
-    ! Write out L2 errors
-    write( log_scratch_space, '(A, E15.8)' ) "L2 theta = ", sqrt(l2_theta_scalar)
-    call log_event( log_scratch_space, LOG_LEVEL_info )
-    write( log_scratch_space, '(A, E15.8)' ) "L2 rho   = ", sqrt(l2_rho_scalar)
-    call log_event( log_scratch_space, LOG_LEVEL_info )
+    call invoke( name = "Compute L2 error for theta and rho",           &
+                 X_minus_Y(drho,   rho,   rho0  ),                      &
+                 X_minus_Y(dtheta, theta, theta0),                      &
+                 setval_c(l2_theta, 0.0_r_def),                         &
+                 setval_c(l2_rho,   0.0_r_def),                         &
+    ! Compute L2 error for theta and rho
+                 matrix_vector_kernel_type(l2_theta, dtheta, mm_wt),    &
+                 matrix_vector_kernel_type(l2_rho,   drho,   mm_w3),    &
+                 X_innerproduct_Y(l2_theta_diff, dtheta, l2_theta),     &
+                 X_innerproduct_Y(l2_rho_diff,   drho,   l2_rho),       &
+                 setval_c(l2_theta, 0.0_r_def),                         &
+                 setval_c(l2_rho,   0.0_r_def),                         &
+    ! Compute L2 norm of analytic results
+                 matrix_vector_kernel_type(l2_theta, theta0, mm_wt),    &
+                 matrix_vector_kernel_type(l2_rho,   rho0,   mm_w3),    &
+                 X_innerproduct_Y(l2_theta_analytic, theta0, l2_theta), &
+                 X_innerproduct_Y(l2_rho_analytic,   rho0,   l2_rho)    &
+               )
 
-    call sample_poly_flux_final()
-    call sample_poly_adv_final()
+    ! Write out normalised L2 errors
+    write( log_scratch_space, '(A, E15.8)' ) &
+      "L2 theta = ", sqrt(l2_theta_diff)/sqrt(l2_theta_analytic)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO ) 
+    write( log_scratch_space, '(A, E15.8)' ) &
+      "L2 rho   = ", sqrt(l2_rho_diff)/sqrt(l2_rho_analytic)
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
-    nullify( mm_wt, mm_w3, rho_fs, theta_fs )
+    ! Write out Linf errors
+    call dtheta%log_absmax(LOG_LEVEL_INFO, 'L inf theta')
+    call drho%log_absmax(LOG_LEVEL_INFO,   'L inf rho')
+
+    if ( operators == operators_fv .and. element_order == 0 ) then
+      deallocate( flux_coeffs, vert_flux_coeffs, &
+                  adv_coeffs, vert_adv_coeffs )
+    end if
+
+    ! Deallocate PSy layer arrays (this will not be needed when
+    ! multi-dimensional field arrays are supported)
+    call psykal_lite_mol_final()
 
     if ( subroutine_timers ) call timer('rk_transport_alg')
 

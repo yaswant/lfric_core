@@ -29,7 +29,12 @@ module reference_element_mod
                       number_edges
     integer(i_def) :: number_horizontal_vertices, &
                       number_horizontal_faces,    &
-                      number_horizontal_edges
+                      number_horizontal_edges,    &
+                      number_vertical_faces
+    integer(i_def) :: number_2d_vertices, &
+                      number_2d_faces,    &
+                      number_2d_edges
+
     ! Vertex coodinates
     real(r_def), allocatable :: vertex_coords(:,:)
     ! Coodinates of the centre of each edge.
@@ -58,9 +63,12 @@ module reference_element_mod
     private
     procedure :: reference_element_init
     procedure :: reference_element_final
-    procedure, public :: get_number_horizontal_vertices
+    procedure, public :: get_number_2d_vertices
+    procedure, public :: get_number_2d_edges
+    procedure, public :: get_number_2d_faces
     procedure, public :: get_number_horizontal_edges
     procedure, public :: get_number_horizontal_faces
+    procedure, public :: get_number_vertical_faces
     procedure, public :: get_number_vertices
     procedure, public :: get_number_edges
     procedure, public :: get_number_faces
@@ -218,9 +226,13 @@ module reference_element_mod
   ! arguments if we can, but for the moment they are the same for
   ! all our children.
   integer(i_def), parameter :: vert_per_face   = 4
-  integer(i_def), parameter :: vert_per_edge   = 2
   integer(i_def), parameter :: edge_per_face   = 4
   integer(i_def), parameter :: edge_per_vertex = 3
+
+  ! The numbers of vertices per edge and faces per edge
+  ! are invariant and will never change no matter what
+  ! shape element is used
+  integer(i_def), parameter :: vert_per_edge   = 2
   integer(i_def), parameter :: face_per_edge   = 2
 
   ! Useful constants.
@@ -485,14 +497,22 @@ contains
     integer(i_def), parameter :: number_of_volumes = 1
 
     ! 2D cell information
-    this%number_horizontal_vertices = horiz_vertices
-    this%number_horizontal_faces = horiz_faces
-    this%number_horizontal_edges = horiz_edges
+    this%number_2d_vertices = horiz_vertices
+    this%number_2d_faces    = horiz_faces
+    this%number_2d_edges    = horiz_edges
 
     ! Vertical extrusion
-    this%number_vertices = 2 * this%number_horizontal_vertices
-    this%number_faces = this%number_horizontal_faces + 2
-    this%number_edges = 3 * this%number_horizontal_edges
+    this%number_vertical_faces = 2_i_def
+    this%number_vertices       = 2 * this%number_2d_vertices
+    this%number_faces          = this%number_2d_faces &
+                               + this%number_vertical_faces
+    this%number_edges          = 2 * this%number_2d_edges &
+                                   + this%number_2d_vertices
+
+    ! Information about the horizontal entities of the 
+    ! 3D reference element
+    this%number_horizontal_faces = this%number_2d_faces
+    this%number_horizontal_edges = 2*this%number_2d_edges
 
     ! Allocate and populate arrays
     allocate( this%vertex_entities(this%number_vertices) )
@@ -563,23 +583,56 @@ contains
   end subroutine reference_element_final
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief Gets the number of vertices in the horizontal.
+  !> @brief Gets the number of vertices of the 2d reference shape.
   !>
   !> @return Positive integer.
   !>
-  pure function get_number_horizontal_vertices( this )
+  pure function get_number_2d_vertices( this )
 
     implicit none
 
     class(reference_element_type), intent(in) :: this
-    integer(i_def) :: get_number_horizontal_vertices
+    integer(i_def) :: get_number_2d_vertices
 
-    get_number_horizontal_vertices = this%number_horizontal_vertices
+    get_number_2d_vertices = this%number_2d_vertices
 
-  end function get_number_horizontal_vertices
+  end function get_number_2d_vertices
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief Gets the number of edges in the horizontal.
+  !> @brief Gets the number of edges of the 2d reference shape.
+  !>
+  !> @return Positive integer.
+  !>
+  pure function get_number_2d_edges( this )
+
+    implicit none
+
+    class(reference_element_type), intent(in) :: this
+    integer(i_def) :: get_number_2d_edges
+
+    get_number_2d_edges = this%number_2d_edges
+
+  end function get_number_2d_edges
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Gets the number of facets of the 2d reference shape.
+  !>
+  !> @return Positive integer.
+  !>
+  pure function get_number_2d_faces( this )
+
+    implicit none
+
+    class(reference_element_type), intent(in) :: this
+    integer(i_def) :: get_number_2d_faces
+
+    get_number_2d_faces = this%number_2d_faces
+
+  end function get_number_2d_faces
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Gets the number of edges in the horizontal, these are edges with
+  !>        tengents in the horizontal directions
   !>
   !> @return Positive integer.
   !>
@@ -595,7 +648,8 @@ contains
   end function get_number_horizontal_edges
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief Gets the number of faces intersected by a horizontal plane.
+  !> @brief Gets the number of faces in the horizontal, these are faces whose 
+  !>        normals are in the horizontal directions
   !>
   !> @return Positive integer.
   !>
@@ -609,6 +663,23 @@ contains
     get_number_horizontal_faces = this%number_horizontal_faces
 
   end function get_number_horizontal_faces
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Gets the number of faces in the vertical, these are faces whose 
+  !>        normals are in the vertical direction. The answer will always be 2
+  !>
+  !> @return Positive integer.
+  !>
+  pure function get_number_vertical_faces( this )
+
+    implicit none
+
+    class(reference_element_type), intent(in) :: this
+    integer(i_def) :: get_number_vertical_faces
+
+    get_number_vertical_faces = this%number_vertical_faces
+
+  end function get_number_vertical_faces
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Gets the number of edges in the reference element.

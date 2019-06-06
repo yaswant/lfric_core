@@ -28,10 +28,10 @@ module kinetic_energy_gradient_kernel_mod_test
   implicit none
 
   private
-  public :: kinetic_enenrgy_gradient_test_type, test_all
+  public :: kinetic_energy_gradient_test_type, test_all
 
   @TestCase
-  type, extends(MPITestCase) :: kinetic_enenrgy_gradient_test_type
+  type, extends(MPITestCase) :: kinetic_energy_gradient_test_type
     private
     type( quadrature_xyoz_type )       :: qr
     type(quadrature_xyoz_proxy_type)   :: qr_proxy
@@ -46,7 +46,7 @@ module kinetic_energy_gradient_kernel_mod_test
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type kinetic_enenrgy_gradient_test_type
+  end type kinetic_energy_gradient_test_type
 
   integer(i_def), parameter :: element_order = 0
 
@@ -62,7 +62,7 @@ contains
 
     implicit none
 
-    class(kinetic_enenrgy_gradient_test_type), intent(inout) :: this
+    class(kinetic_energy_gradient_test_type), intent(inout) :: this
 
     type(field_proxy_type)    :: chi_p(3)
     type(field_proxy_type)    :: r_u_proxy
@@ -135,7 +135,7 @@ contains
 
     implicit none
 
-    class(kinetic_enenrgy_gradient_test_type), intent(inout) :: this
+    class(kinetic_energy_gradient_test_type), intent(inout) :: this
 
     deallocate( this%basis_w2, this%diff_basis_w2, &
                 this%diff_basis_w0 )
@@ -159,7 +159,7 @@ contains
 
     implicit none
 
-    class(kinetic_enenrgy_gradient_test_type), intent(inout) :: this
+    class(kinetic_energy_gradient_test_type), intent(inout) :: this
 
     real(r_def), parameter :: dx = 6000.0_r_def, &
                               dy = 1000.0_r_def, &

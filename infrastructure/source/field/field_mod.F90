@@ -80,6 +80,7 @@ module field_mod
     procedure, public :: log_field
     procedure, public :: log_dofs
     procedure, public :: log_minmax
+    procedure, public :: log_absmax
 
     !> Function returns the enumerated integer for the functions_space on which
     !! the field lives
@@ -767,7 +768,35 @@ contains
 
   end subroutine log_minmax
 
+  !> Sends the max of the absolute value of field to the log
+  !!
+  !! @param[in] log_level The level to use for logging.
+  !! @param[in] label A title added to the log before the data is written out.
+  !!
+  subroutine log_absmax( self, log_level, label )
 
+    use log_mod,    only : log_event, log_scratch_space, LOG_LEVEL_DEBUG
+    use scalar_mod, only : scalar_type
+    implicit none
+
+    class( field_type ), target, intent(in) :: self
+    integer(i_def),              intent(in) :: log_level
+    character( * ),              intent(in) :: label
+    integer(i_def)                          :: undf
+    type(scalar_type)                       :: fmax
+
+    undf = self%vspace%get_last_dof_owned()
+    fmax = scalar_type( maxval( abs(self%data(1:undf)) ) )
+ 
+    write( log_scratch_space, '( A, A, E16.8 )' ) &
+         trim( label ), " = ", fmax%get_max()
+    call log_event( log_scratch_space, log_level )
+
+  end subroutine log_absmax
+
+  !> Function to integer id of the function space from the field
+  !>
+  !> @return fs
   function which_function_space(self) result(fs)
     implicit none
     class(field_type), intent(in) :: self

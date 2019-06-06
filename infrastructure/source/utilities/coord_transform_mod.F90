@@ -22,7 +22,7 @@ public :: llr2xyz
 public :: xyz2ll
 public :: xyz2llr
 public :: starea2
-public :: spdist
+public :: spherical_distance
 public :: cartesian_distance
 public :: sphere2cart_vector
 public :: cart2sphere_vector
@@ -201,7 +201,6 @@ subroutine xyz2llr(x,y,z,long,lat,r)
 
 end subroutine xyz2llr
 
-
 !-------------------------------------------------------------------------------
 !>  @brief  Calculates the area of a spherical triangle.
 !!
@@ -210,48 +209,40 @@ end subroutine xyz2llr
 !!           The formula below is more robust to roundoff error than the better
 !!           known sum of angle - PI formula
 !!
-!!  @param[in]   x0    Coordinate of a triangle corner.
-!!  @param[in]   y0    Coordinate of a triangle corner.
-!!  @param[in]   z0    Coordinate of a triangle corner.
-!!  @param[in]   x1    Coordinate of a triangle corner.
-!!  @param[in]   y1    Coordinate of a triangle corner.
-!!  @param[in]   z1    Coordinate of a triangle corner.
-!!  @param[in]   x2    Coordinate of a triangle corner.
-!!  @param[in]   y2    Coordinate of a triangle corner.
-!!  @param[in]   z2    Coordinate of a triangle corner.
-!!  @param[out]  area  Area of the spherical triangle.
+!!  @param[in]   x0    Coordinate of a triangle corner (x0,y0,z0).
+!!  @param[in]   x1    Coordinate of a triangle corner (x1,y1,z1).
+!!  @param[in]   x2    Coordinate of a triangle corner (x2,y2,z2).
+!!  @return  area  Area of the spherical triangle.
 !-------------------------------------------------------------------------------
-subroutine starea2(x0,y0,z0,x1,y1,z1,x2,y2,z2,area)
+function starea2(x0,x1,x2) result(area)
   implicit none
 
-  !Arguments
-  real(kind=r_def), intent(in)  :: x0, y0, z0   
-  real(kind=r_def), intent(in)  :: x1, y1, z1
-  real(kind=r_def), intent(in)  :: x2, y2, z2
-  real(kind=r_def), intent(out) :: area
+  ! Arguments
+  real(kind=r_def), dimension(3), intent(in)  :: x0, x1, x2   
+  real(kind=r_def)                            :: area
 
-  !Internal variables
+  ! Internal variables
   real(kind=r_def) :: d0,d1,d2,s,t0,t1,t2,t3
 
-  !Distances between pairs of points
-  call spdist(x0,y0,z0,x1,y1,z1,d2)
-  call spdist(x1,y1,z1,x2,y2,z2,d0)
-  call spdist(x2,y2,z2,x0,y0,z0,d1)
+  ! Distances between pairs of points
+  d2 = spherical_distance(x0,x1)
+  d0 = spherical_distance(x1,x2)
+  d1 = spherical_distance(x2,x0)
 
-  !Half perimeter
+  ! Half perimeter
   s=0.5_r_def*(d0+d1+d2)
 
-  !Tangents
+  ! Tangents
   t0 = tan(0.5_r_def*(s-d0))
   t1 = tan(0.5_r_def*(s-d1))
   t2 = tan(0.5_r_def*(s-d2))
   t3 = tan(0.5_r_def*s)
 
-  !Area
+  ! Area
   area = 4.0_r_def*atan(sqrt(t0*t1*t2*t3))
 
   return
-end subroutine starea2
+end function starea2
 
 !-------------------------------------------------------------------------------
 !> @brief  Calculates the spherical distance between two points.
@@ -259,35 +250,24 @@ end subroutine starea2
 !! @details  Calculates the spherical distance s between two points with 
 !!           Cartesian coordinates (x1,y1,z1), (x2,y2,z2) on the unit sphere.
 !!
-!! @param[in]  x1  First Cartesian coordinate.
-!! @param[in]  y1  First Cartesian coordinate.
-!! @param[in]  z1  First Cartesian coordinate.
-!! @param[in]  x2  Second Cartesian coordinate.
-!! @param[in]  y2  Second Cartesian coordinate.
-!! @param[in]  z2  Second Cartesian coordinate.
-!! @param[out] s   Spherical distance between the points.
+!! @param[in]  x1  First Cartesian coordinate (x1,y1,z1).
+!! @param[in]  x2  Second Cartesian coordinate (x2,y2,z2).
+!! @return     s   Spherical distance between the points.
 !-------------------------------------------------------------------------------
-subroutine spdist(x1,y1,z1,x2,y2,z2,s)
+function spherical_distance(x1,x2) result(s)
+  ! Calculate the spherical distance S between two points with Cartesian
+  ! coordinates (X1,Y1,Z1), (X2,Y2,Z2)
   implicit none
 
-  !Arguments
-  real(kind=r_def), intent(in)  :: x1, y1, z1, x2, y2, z2
-  real(kind=r_def), intent(out) :: s
-
-  !Internal variables
-  real(kind=r_def) :: dx, dy, dz
-  real(kind=r_def) :: ad
+  real(kind=r_def), dimension(3), intent(in) :: x1, x2
+  real(kind=r_def)                           :: s, ad
+  real(kind=r_def), dimension(3)             :: dx
 
   dx = x2 - x1
-  dy = y2 - y1
-  dz = z2 - z1
-
-  ad = sqrt(dx*dx + dy*dy + dz*dz)
+  ad = sqrt(sum(dx*dx))
   s = 2.0_r_def*asin(0.5_r_def*ad)
 
-  return
-end subroutine spdist
-
+end function spherical_distance
 
 !-------------------------------------------------------------------------------
 !> @brief  Calculates the central angle between two points

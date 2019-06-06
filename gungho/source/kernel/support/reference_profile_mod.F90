@@ -50,8 +50,6 @@ contains
 !! @param[in] itest_option Choice of idealised profile
 subroutine reference_profile(exner_s, rho_s, theta_s, x, itest_option)
 
-use idealised_config_mod,           only : key_from_test
-
 implicit none
 
 real(kind=r_def),    intent(in)           :: x(3)
@@ -80,7 +78,7 @@ else                     ! BIPERIODIC PLANE DOMAIN
           test_isot_atm )
       nsq_over_g = bvf_square/gravity
       theta_s = theta_surf * exp ( nsq_over_g * z )
-      exner_s = exner_surf - gravity**2/(Cp*theta_surf*bvf_square)   &
+      exner_s = exner_surf - gravity**2/(Cp * theta_surf * bvf_square)   &
                    * (1.0_r_def - exp ( - nsq_over_g * z ))
     case( test_isot_cold_atm)
       theta_s = theta_surf * exp ( gravity / (theta_surf * cp) * z )
@@ -106,8 +104,8 @@ else                     ! BIPERIODIC PLANE DOMAIN
         ! Isothermal
         nsq_over_g = bvf_square/gravity
         theta_s = theta_surf * exp ( nsq_over_g * z )
-        exner_s = exner_surf - gravity**2 / (Cp * theta_surf * bvf_square) &
-                  * (1.0_r_def - exp ( - nsq_over_g * z ))
+        exner_s = exner_surf - gravity**2/(Cp * theta_surf * bvf_square)   &
+                     * (1.0_r_def - exp ( - nsq_over_g * z ))
       end if
     !> @todo No values for the following idealised tests were provided and
     !>       this risked unexpected divide by zero errors. These errors are
@@ -118,10 +116,8 @@ else                     ! BIPERIODIC PLANE DOMAIN
       theta_s = 1.0_r_def
       exner_s = 1.0_r_def
     case default
-      write( log_scratch_space,                                          &
-             '("reference_profile: Unrecognised idealised test: ", A)' ) &
-           key_from_test( itest_option )
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+      theta_s = theta_surf
+      exner_s = exner_surf
   end select
   ! Calculate rho for all biperiodic tests
   rho_s   = p_zero/(Rd*theta_s) * exner_s ** ((1.0_r_def - kappa)/kappa)

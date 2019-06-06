@@ -285,7 +285,8 @@ contains
                                                invoke_weighted_div_bd_kernel_type,         &
                                                invoke_weighted_proj_2theta_bd_kernel_type, &
                                                invoke_weighted_proj_theta2_bd_kernel_type
-    use finite_element_config_mod,       only: element_order
+    use finite_element_config_mod,       only: element_order, &
+                                               nqp_exact
     use function_space_mod,              only: function_space_type
     use runtime_constants_mod,           only: get_coordinates, &
                                                get_div, &
@@ -349,11 +350,12 @@ contains
        call wtheta_multigrid_function_space_chain%set_current(wt_fs%get_id())
     end if
 
-    ! qrf set once outside MG loop
+    ! quadrature rules set once outside MG loop
     mesh => ref_state(igh_t)%get_mesh()
     reference_element => mesh%get_reference_element()
     qrf = quadrature_face_type(element_order+2, .true., .false., &
                                reference_element, quadrature_rule)
+    qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
 
 
     do level = 1, multigrid_levels
@@ -364,7 +366,6 @@ contains
        chi    => get_coordinates(level)
     
        ! Operators for the equation of state
-       qr = quadrature_xyoz_type(element_order+3, quadrature_rule)
        const1 = (1.0_r_def-kappa)/kappa
        call invoke( eos_operators_kernel_type(m3_exner_star(level), m3_rho_star(level), &
                     p3theta(level), &

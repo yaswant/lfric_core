@@ -24,7 +24,7 @@ module stencil_dofmap_mod_test
   private
 
   ! Set arbitrary number of dofs per cell
-  integer,parameter :: NDF = 3
+  integer(kind=i_def),parameter :: NDF = 3
 
   public :: stencil_dofmap_test_type, stencil_dofmap_test_constructor, &
             get_parameters, test_stencil_dofmaps

@@ -1,0 +1,111 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> Test the flux computation using 2d polynomials 
+module poly2d_flux_kernel_mod_test
+
+  use constants_mod, only : i_def, r_def
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: test_all
+
+  @TestCase
+  type, extends(TestCase), public :: poly2d_flux_test_type
+    private
+  contains
+    procedure test_all
+  end type poly2d_flux_test_type
+
+contains
+
+  @Test
+  subroutine test_all( this )
+
+    use poly2d_flux_kernel_mod, only: poly2d_flux_code
+
+    implicit none 
+
+    class(poly2d_flux_test_type), intent(inout) :: this
+
+    real(r_def), parameter :: tol = 1.0e-12_r_def
+    real(r_def) :: answer
+
+    integer(i_def), parameter :: nlayers = 1
+    integer(i_def), parameter :: ndf_w2 = 4
+    integer(i_def), parameter :: ndf_w3 = 1
+    integer(i_def), parameter :: stencil_size = 5
+    integer(i_def), parameter :: undf_w2 = ndf_w2*nlayers
+    integer(i_def), parameter :: undf_w3 = ndf_w3*nlayers*stencil_size
+    integer(i_def), parameter :: order = 2
+
+    integer(i_def), dimension(ndf_w2)              :: map_w2
+    integer(i_def), dimension(ndf_w3,stencil_size) :: smap
+
+    real(r_def), dimension(3,ndf_w2,ndf_w2) :: basis_w2
+    real(r_def), dimension(3,4)             :: out_face_normal
+
+    real(r_def), dimension(undf_w2)           :: flux
+    real(r_def), dimension(undf_w2)           :: wind
+    real(r_def), dimension(undf_w3)           :: density
+    real(r_def), dimension(stencil_size,4,undf_w3) :: coeff
+    
+    smap(1,:) = (/ 1, 2, 3, 4, 5 /)
+    map_w2(:) = (/ 1, 2, 3, 4 /)
+
+    out_face_normal = 0.0_r_def
+    out_face_normal(1,1) = -1.0_r_def
+    out_face_normal(2,2) = -1.0_r_def
+    out_face_normal(1,3) =  1.0_r_def
+    out_face_normal(2,4) =  1.0_r_def
+
+    wind(:) = 1.0_r_def
+    
+    basis_w2 = 0.0_r_def
+    basis_w2(1,1,1) = 1.0_r_def
+    basis_w2(2,2,2) = -1.0_r_def
+    basis_w2(1,3,3) = 1.0_r_def
+    basis_w2(2,4,4) = -1.0_r_def
+   
+    density(:) = (/ 3.0_r_def, 1.0_r_def, 1.0_r_def, 5.0_r_def, 5.0_r_def /)
+    
+    coeff(:,2,1) = (/ 5.0_r_def/6.0_r_def, 0.0_r_def, 2.0_r_def/6.0_r_def, 0.0_r_def, -1.0_r_def/6.0_r_def /)
+    coeff(:,3,1) = (/ 5.0_r_def/6.0_r_def, -1.0_r_def/6.0_r_def, 0.0_r_def, 2.0_r_def/6.0_r_def, 0.0_r_def /)
+
+    flux = -1.0_r_def
+
+    call poly2d_flux_code( nlayers,              &
+                           flux,                 &
+                           wind,                 &
+                           density,              &
+                           coeff,                &
+                           ndf_w2,               &
+                           undf_w2,              &
+                           map_w2,               &
+                           basis_w2,             &
+                           ndf_w3,               &
+                           undf_w3,              &
+                           stencil_size,         &
+                           smap,                 &
+                           4_i_def,              &
+                           stencil_size,         &
+                           out_face_normal )
+    
+    answer = 2.0_r_def
+    @assertEqual(answer, flux(2) , tol)
+    answer = 4.0_r_def
+    @assertEqual(answer, flux(3) , tol)
+    ! These flux points should not have been computed so check
+    ! they are unchanged
+    answer = -1.0_r_def
+    @assertEqual(answer, flux(1) , tol)
+    @assertEqual(answer, flux(4) , tol)
+
+  end subroutine test_all
+
+end module poly2d_flux_kernel_mod_test

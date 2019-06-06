@@ -740,7 +740,7 @@ contains
                       self%ncolours,                                        &
                       self%ncells_per_colour,                               &
                       self%cells_in_colour,                                 &
-                      self%reference_element%get_number_horizontal_faces(), &
+                      self%reference_element%get_number_2d_faces(),         &
                       npanels,                                              &
                       self%ncells_global_mesh,                              &
                       gid_from_lid(:) )
