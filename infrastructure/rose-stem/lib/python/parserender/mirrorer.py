@@ -254,7 +254,7 @@ class UploaderFile(Uploader):
 ##############################################################################
 class UploaderFTP(Uploader):
   def __init__( self, host, credentials=None ):
-    self._client = ftplib.FTP( host )
+    self._client = ftplib.FTP( host, timeout=30 )
 
     if credentials:
       username, password = credentials.getCredentials()
