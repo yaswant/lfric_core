@@ -10,6 +10,7 @@ module init_physics_prognostics_alg_mod
   use field_collection_mod,           only : field_collection_type
   use init_cloud_twod_fields_alg_mod, only : init_cloud_twod_fields_alg
   use init_physics_incs_alg_mod,      only : init_physics_incs_alg
+  use init_jules_alg_mod,             only : init_jules_alg
 
   implicit none
 
@@ -23,10 +24,14 @@ contains
   !> @param[inout] cloud_fields Collection of FD cloud fields
   !> @param[inout] twod_fields Collection of two-d fields
   !> @param[inout] physics_incs Collection of physics increments
+  !> @param[inout] jules_ancils Ancillary fields for Jules
+  !> @param[inout] jules_prognostics Prognostic fields for Jules
   subroutine init_physics_prognostics_alg( derived_fields, &
                                            cloud_fields, &
                                            twod_fields, &
-                                           physics_incs )
+                                           physics_incs, &
+                                           jules_ancils, &
+                                           jules_prognostics )
 
     implicit none
 
@@ -35,6 +40,8 @@ contains
     type(field_collection_type), intent(inout) :: cloud_fields
     type(field_collection_type), intent(inout) :: derived_fields
     type(field_collection_type), intent(inout) :: physics_incs
+    type(field_collection_type), intent(inout) :: jules_ancils
+    type(field_collection_type), intent(inout) :: jules_prognostics
 
 
     ! Initialise cloud fields
@@ -43,6 +50,8 @@ contains
     ! Set the increments to 0 initially
     call init_physics_incs_alg(physics_incs)
 
+    ! initialise jules fields
+    call init_jules_alg(jules_ancils, jules_prognostics)
 
 
   end subroutine init_physics_prognostics_alg

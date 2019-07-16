@@ -1,0 +1,58 @@
+!------------------------------------------------------------------------------
+! (c) Crown copyright 2018 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!------------------------------------------------------------------------------
+! @brief Calculate the solar illumination angles and flux
+
+module illuminate_alg_mod
+
+use field_mod,                    only: field_type
+use field_collection_mod,         only: field_collection_type
+use quadrature_xyoz_mod,          only: quadrature_xyoz_type
+use quadrature_rule_gaussian_mod, only: quadrature_rule_gaussian_type
+
+use illuminate_kernel_mod, only: illuminate_kernel_type
+
+implicit none
+private
+
+!------------------------------------------------------------------------------
+! Contained functions/subroutines
+!------------------------------------------------------------------------------
+public :: illuminate_alg_step
+
+contains
+
+! @param[in,out] twod_fields    2D fields
+! @param[in]     chi            Coordinate array
+
+subroutine illuminate_alg_step(twod_fields, chi)
+
+  implicit none
+
+  type( field_collection_type ), intent(inout) :: twod_fields
+  type( field_type ),            intent(in)    :: chi(3)
+
+  type( quadrature_xyoz_type )          :: qr
+  type( quadrature_rule_gaussian_type ) :: quadrature_rule
+
+  ! Unpacked fields from collections
+  type( field_type ), pointer :: cos_zenith_angle   => null()
+  type( field_type ), pointer :: lit_fraction       => null()
+  type( field_type ), pointer :: stellar_irradiance => null()
+
+  cos_zenith_angle   =>    twod_fields%get_field('cos_zenith_angle')
+  lit_fraction       =>    twod_fields%get_field('lit_fraction')
+  stellar_irradiance =>    twod_fields%get_field('stellar_irradiance')
+
+  qr = quadrature_xyoz_type(1, quadrature_rule)
+
+
+  call invoke( illuminate_kernel_type(                               &
+                 cos_zenith_angle, lit_fraction, stellar_irradiance, &
+                 chi, qr) )
+
+end subroutine illuminate_alg_step
+
+end module illuminate_alg_mod

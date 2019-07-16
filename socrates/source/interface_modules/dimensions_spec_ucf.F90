@@ -29,7 +29,5 @@ integer, parameter :: npd_cloud_parameter = 30
 ! Number of cloud parameters
 integer, parameter :: npd_humidities = 21
 ! Number of humidities
-integer, parameter :: npd_phase_term = 1
-! Number of terms in the phase function
 
 end module dimensions_spec_ucf

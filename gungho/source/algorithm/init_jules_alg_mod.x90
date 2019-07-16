@@ -1,0 +1,104 @@
+!-------------------------------------------------------------------------------
+!(c) Crown copyright 2018 Met Office. All rights reserved.
+!The file LICENCE, distributed with this code, contains details of the terms
+!under which the code may be used.
+!-------------------------------------------------------------------------------
+! @brief Initialisation for the Jules surface code
+
+module init_jules_alg_mod
+
+  ! Derived Types
+  use field_mod,            only: field_type
+  use field_collection_mod, only: field_collection_type
+
+  implicit none
+
+  integer :: n_surf_tile, n_land_tile, n_sea_tile, n_sea_ice_tile
+  integer :: first_land_tile, first_sea_tile, first_sea_ice_tile
+
+  private
+  public :: init_jules_alg, &
+    n_surf_tile, n_land_tile, n_sea_tile, n_sea_ice_tile, &
+    first_land_tile, first_sea_tile, first_sea_ice_tile
+
+contains
+
+  ! @brief Prepares the Jules fields, currently hard-wired but will be
+  !        read from ancils or dumps here
+  ! @param[out] jules_ancils      Ancillary fields for Jules
+  ! @param[out] jules_prognostics Prognostic fields for Jules
+  subroutine init_jules_alg(jules_ancils, jules_prognostics)
+
+    use initial_jules_kernel_mod, only: initial_jules_kernel_type
+
+    implicit none
+
+    type(field_collection_type), intent(inout) :: jules_ancils
+    type(field_collection_type), intent(inout) :: jules_prognostics
+
+    ! Unpacked fields from collections
+    type( field_type ), pointer :: tile_fraction      => null()
+    type( field_type ), pointer :: leaf_area_index    => null()
+    type( field_type ), pointer :: canopy_height      => null()
+    type( field_type ), pointer :: sd_orog            => null()
+    type( field_type ), pointer :: soil_albedo        => null()
+    type( field_type ), pointer :: soil_roughness     => null()
+    type( field_type ), pointer :: albedo_obs_sw      => null()
+    type( field_type ), pointer :: albedo_obs_vis     => null()
+    type( field_type ), pointer :: albedo_obs_nir     => null()
+
+    type( field_type ), pointer :: tile_temperature   => null()
+    type( field_type ), pointer :: tile_snow_mass     => null()
+    type( field_type ), pointer :: tile_snow_rgrain   => null()
+    type( field_type ), pointer :: snow_soot          => null()
+    type( field_type ), pointer :: chloro_sea         => null()
+    type( field_type ), pointer :: sea_ice_thickness  => null()
+    type( field_type ), pointer :: sea_ice_pond_frac  => null()
+    type( field_type ), pointer :: sea_ice_pond_depth => null()
+
+
+    tile_fraction   => jules_ancils%get_field('tile_fraction')
+    leaf_area_index => jules_ancils%get_field('leaf_area_index')
+    canopy_height   => jules_ancils%get_field('canopy_height')
+    sd_orog         => jules_ancils%get_field('sd_orog')
+    soil_albedo     => jules_ancils%get_field('soil_albedo')
+    soil_roughness  => jules_ancils%get_field('soil_roughness')
+    albedo_obs_sw   => jules_ancils%get_field('albedo_obs_sw')
+    albedo_obs_vis  => jules_ancils%get_field('albedo_obs_vis')
+    albedo_obs_nir  => jules_ancils%get_field('albedo_obs_nir')
+
+    tile_temperature   => jules_prognostics%get_field('tile_temperature')
+    tile_snow_mass     => jules_prognostics%get_field('tile_snow_mass')
+    tile_snow_rgrain   => jules_prognostics%get_field('tile_snow_rgrain')
+    snow_soot          => jules_prognostics%get_field('snow_soot')
+    chloro_sea         => jules_prognostics%get_field('chloro_sea')
+    sea_ice_thickness  => jules_prognostics%get_field('sea_ice_thickness')
+    sea_ice_pond_frac  => jules_prognostics%get_field('sea_ice_pond_frac')
+    sea_ice_pond_depth => jules_prognostics%get_field('sea_ice_pond_depth')
+
+
+    ! Hardwire number of tiles
+    n_land_tile       = 9
+    n_sea_tile        = 1
+    n_sea_ice_tile    = 1
+
+    first_land_tile    = 1
+    first_sea_tile     = n_land_tile + 1
+    first_sea_ice_tile = n_land_tile + n_sea_tile + 1
+
+    n_surf_tile = n_land_tile + n_sea_tile + n_sea_ice_tile
+
+
+    ! kernel to set fields to idealised, globally constant values
+    call invoke(initial_jules_kernel_type( &
+      tile_fraction, leaf_area_index, canopy_height, &
+      sd_orog, soil_albedo, soil_roughness, &
+      albedo_obs_sw, albedo_obs_vis, albedo_obs_nir, &
+      tile_temperature, tile_snow_mass, tile_snow_rgrain, &
+      snow_soot, chloro_sea, &
+      sea_ice_thickness, sea_ice_pond_frac, sea_ice_pond_depth, &
+      n_surf_tile, n_sea_ice_tile))
+
+  end subroutine init_jules_alg
+
+end module init_jules_alg_mod

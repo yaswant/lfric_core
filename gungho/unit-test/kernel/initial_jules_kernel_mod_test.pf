@@ -1,0 +1,281 @@
+!-----------------------------------------------------------------------------
+! Copyright (c) 2019,  Met Office, on behalf of HMSO and Queen's Printer
+! For further details please refer to the file LICENCE.original which you
+! should have received as part of this distribution.
+!-----------------------------------------------------------------------------
+
+! Test the initial_jules_kernel
+
+module initial_jules_kernel_mod_test
+
+  use constants_mod, only : r_def, i_def
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public:: test_of_initial_jules
+
+  @TestCase
+  type, extends(MPITestCase), public :: jules_test_type
+    private
+    real(r_def), allocatable :: &
+      tile_fraction(:),      answer_tile_fraction(:),      &
+      leaf_area_index(:),    answer_leaf_area_index(:),    &
+      canopy_height(:),      answer_canopy_height(:),      &
+      sd_orog(:),            answer_sd_orog(:),            &
+      soil_albedo(:),        answer_soil_albedo(:),        &
+      soil_roughness(:),     answer_soil_roughness(:),     &
+      albedo_obs_sw(:),      answer_albedo_obs_sw(:),      &
+      albedo_obs_vis(:),     answer_albedo_obs_vis(:),     &
+      albedo_obs_nir(:),     answer_albedo_obs_nir(:),     &
+      tile_temperature(:),   answer_tile_temperature(:),   &
+      tile_snow_mass(:),     answer_tile_snow_mass(:),     &
+      tile_snow_rgrain(:),   answer_tile_snow_rgrain(:),   &
+      snow_soot(:),          answer_snow_soot(:),          &
+      chloro_sea(:),         answer_chloro_sea(:),         &
+      sea_ice_thickness(:),  answer_sea_ice_thickness(:),  &
+      sea_ice_pond_frac(:),  answer_sea_ice_pond_frac(:),  &
+      sea_ice_pond_depth(:), answer_sea_ice_pond_depth(:)
+  contains
+    procedure setUp
+    procedure tearDown
+    procedure test_of_initial_jules
+  end type jules_test_type
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    implicit none
+
+    class(jules_test_type), intent(inout) :: this
+
+    integer :: undf_tile
+    integer :: undf_pft
+    integer :: undf_2d
+    integer :: undf_sice
+
+    undf_tile = 11_i_def
+    undf_pft  = 5_i_def
+    undf_2d   = 1_i_def
+    undf_sice = 1_i_def
+
+    allocate( this%tile_fraction(undf_tile)      )
+    allocate( this%leaf_area_index(undf_pft)     )
+    allocate( this%canopy_height(undf_pft)       )
+    allocate( this%sd_orog(undf_2d)              )
+    allocate( this%soil_albedo(undf_2d)          )
+    allocate( this%soil_roughness(undf_2d)       )
+    allocate( this%albedo_obs_sw(undf_2d)        )
+    allocate( this%albedo_obs_vis(undf_2d)       )
+    allocate( this%albedo_obs_nir(undf_2d)       )
+    allocate( this%tile_temperature(undf_tile)   )
+    allocate( this%tile_snow_mass(undf_tile)     )
+    allocate( this%tile_snow_rgrain(undf_tile)   )
+    allocate( this%snow_soot(undf_2d)            )
+    allocate( this%chloro_sea(undf_2d)           )
+    allocate( this%sea_ice_thickness(undf_sice)  )
+    allocate( this%sea_ice_pond_frac(undf_sice)  )
+    allocate( this%sea_ice_pond_depth(undf_sice) )
+
+    allocate( this%answer_tile_fraction(undf_tile)      )
+    allocate( this%answer_leaf_area_index(undf_pft)     )
+    allocate( this%answer_canopy_height(undf_pft)       )
+    allocate( this%answer_sd_orog(undf_2d)              )
+    allocate( this%answer_soil_albedo(undf_2d)          )
+    allocate( this%answer_soil_roughness(undf_2d)       )
+    allocate( this%answer_albedo_obs_sw(undf_2d)        )
+    allocate( this%answer_albedo_obs_vis(undf_2d)       )
+    allocate( this%answer_albedo_obs_nir(undf_2d)       )
+    allocate( this%answer_tile_temperature(undf_tile)   )
+    allocate( this%answer_tile_snow_mass(undf_tile)     )
+    allocate( this%answer_tile_snow_rgrain(undf_tile)   )
+    allocate( this%answer_snow_soot(undf_2d)            )
+    allocate( this%answer_chloro_sea(undf_2d)           )
+    allocate( this%answer_sea_ice_thickness(undf_sice)  )
+    allocate( this%answer_sea_ice_pond_frac(undf_sice)  )
+    allocate( this%answer_sea_ice_pond_depth(undf_sice) )
+
+  end subroutine setUp
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine tearDown( this )
+
+    implicit none
+
+    class(jules_test_type), intent(inout) :: this
+
+    deallocate( this%answer_tile_fraction,      this%tile_fraction,     &
+                this%answer_leaf_area_index,    this%leaf_area_index,   &
+                this%answer_canopy_height,      this%canopy_height,     &
+                this%answer_sd_orog,            this%sd_orog,           &
+                this%answer_soil_albedo,        this%soil_albedo,       &
+                this%answer_soil_roughness,     this%soil_roughness,    &
+                this%answer_albedo_obs_sw,      this%albedo_obs_sw,     &
+                this%answer_albedo_obs_vis,     this%albedo_obs_vis,    &
+                this%answer_albedo_obs_nir,     this%albedo_obs_nir,    &
+                this%answer_tile_temperature,   this%tile_temperature,  &
+                this%answer_tile_snow_mass,     this%tile_snow_mass,    &
+                this%answer_tile_snow_rgrain,   this%tile_snow_rgrain,  &
+                this%answer_snow_soot,          this%snow_soot,         &
+                this%answer_chloro_sea,         this%chloro_sea,        &
+                this%answer_sea_ice_thickness,  this%sea_ice_thickness, &
+                this%answer_sea_ice_pond_frac,  this%sea_ice_pond_frac, &
+                this%answer_sea_ice_pond_depth, this%sea_ice_pond_depth )
+
+  end subroutine tearDown
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test( npes=[1] )
+  subroutine test_of_initial_jules( this )
+
+    use initial_jules_kernel_mod, only : initial_jules_code
+
+    implicit none
+
+    class(jules_test_type), intent(inout) :: this
+
+    real(kind=r_def), parameter :: tol = 1.0e-14_r_def
+
+    integer :: i, nlayers
+    integer :: n_surf_tile
+    integer :: n_sea_ice_tile
+
+    integer              :: ndf_tile, undf_tile
+    integer, allocatable :: map_tile(:)
+    integer              :: ndf_pft, undf_pft
+    integer, allocatable :: map_pft(:)
+    integer              :: ndf_2d, undf_2d
+    integer, allocatable :: map_2d(:)
+    integer              :: ndf_sice, undf_sice
+    integer, allocatable :: map_sice(:)
+
+    n_surf_tile = 11_i_def
+    n_sea_ice_tile = 1_i_def
+
+    ndf_tile  = n_surf_tile
+    undf_tile = n_surf_tile
+    allocate(map_tile(ndf_tile))
+    do i=1_i_def, ndf_tile
+      map_tile(i) = i
+    end do
+
+    ndf_pft  = 5_i_def
+    undf_pft = 5_i_def
+    allocate(map_pft(ndf_pft))
+    do i=1_i_def, ndf_pft
+      map_pft(i) = i
+    end do
+
+    ndf_2d  = 1_i_def
+    undf_2d = 1_i_def
+    allocate(map_2d(ndf_2d))
+    do i=1_i_def, ndf_2d
+      map_2d(i) = i
+    end do
+
+    ndf_sice  = n_sea_ice_tile
+    undf_sice = n_sea_ice_tile
+    allocate(map_sice(ndf_sice))
+    do i=1_i_def, ndf_sice
+      map_sice(i) = i
+    end do
+
+    ! Set correct answers
+    this%answer_tile_fraction(:)           = 0.0_r_def
+    this%answer_tile_fraction(map_tile(8)) = 1.0_r_def
+
+    this%answer_leaf_area_index(map_pft(1)) = 5.0_r_def
+    this%answer_leaf_area_index(map_pft(2)) = 4.0_r_def
+    this%answer_leaf_area_index(map_pft(3)) = 2.0_r_def
+    this%answer_leaf_area_index(map_pft(4)) = 4.0_r_def
+    this%answer_leaf_area_index(map_pft(5)) = 1.0_r_def
+
+    this%answer_canopy_height(map_pft(1)) = 19.01_r_def
+    this%answer_canopy_height(map_pft(2)) = 16.38_r_def
+    this%answer_canopy_height(map_pft(3)) =  1.46_r_def
+    this%answer_canopy_height(map_pft(4)) =  1.26_r_def
+    this%answer_canopy_height(map_pft(5)) =  1.59_r_def
+
+    this%answer_sd_orog(:)            = 0.0_r_def
+    this%answer_soil_albedo(:)        = 0.1065_r_def
+    this%answer_soil_roughness(:)     = 0.0_r_def
+    this%answer_albedo_obs_sw(:)      = 0.0_r_def
+    this%answer_albedo_obs_vis(:)     = 0.0_r_def
+    this%answer_albedo_obs_nir(:)     = 0.0_r_def
+    this%answer_tile_temperature(:)   = 295.0_r_def
+    this%answer_tile_snow_mass(:)     = 0.0_r_def
+    this%answer_tile_snow_rgrain(:)   = 300.0_r_def
+    this%answer_snow_soot(:)          = 0.0_r_def
+    this%answer_chloro_sea(:)         = 5.0e-7_r_def
+    this%answer_sea_ice_thickness(:)  = 0.0_r_def
+    this%answer_sea_ice_pond_frac(:)  = 0.0_r_def
+    this%answer_sea_ice_pond_depth(:) = 0.0_r_def
+
+    ! Make up initial wrong fields
+    this%tile_fraction(:)      = -9.0_r_def
+    this%leaf_area_index(:)    = -9.0_r_def
+    this%canopy_height(:)      = -9.0_r_def
+    this%sd_orog(:)            = -9.0_r_def
+    this%soil_albedo(:)        = -9.0_r_def
+    this%soil_roughness(:)     = -9.0_r_def
+    this%albedo_obs_sw(:)      = -9.0_r_def
+    this%albedo_obs_vis(:)     = -9.0_r_def
+    this%albedo_obs_nir(:)     = -9.0_r_def
+    this%tile_temperature(:)   = -9.0_r_def
+    this%tile_snow_mass(:)     = -9.0_r_def
+    this%tile_snow_rgrain(:)   = -9.0_r_def
+    this%snow_soot(:)          = -9.0_r_def
+    this%chloro_sea(:)         = -9.0_r_def
+    this%sea_ice_thickness(:)  = -9.0_r_def
+    this%sea_ice_pond_frac(:)  = -9.0_r_def
+    this%sea_ice_pond_depth(:) = -9.0_r_def
+
+    call initial_jules_code(nlayers,                       &
+                            this%tile_fraction(:),         &
+                            this%leaf_area_index(:),       &
+                            this%canopy_height(:),         &
+                            this%sd_orog(:),               &
+                            this%soil_albedo(:),           &
+                            this%soil_roughness(:),        &
+                            this%albedo_obs_sw(:),         &
+                            this%albedo_obs_vis(:),        &
+                            this%albedo_obs_nir(:),        &
+                            this%tile_temperature(:),      &
+                            this%tile_snow_mass(:),        &
+                            this%tile_snow_rgrain(:),      &
+                            this%snow_soot(:),             &
+                            this%chloro_sea(:),            &
+                            this%sea_ice_thickness(:),     &
+                            this%sea_ice_pond_frac(:),     &
+                            this%sea_ice_pond_depth(:),    &
+                            n_surf_tile,                   &
+                            n_sea_ice_tile,                &
+                            ndf_tile, undf_tile, map_tile, &
+                            ndf_pft, undf_pft, map_pft,    &
+                            ndf_2d, undf_2d, map_2d,       &
+                            ndf_sice, undf_sice, map_sice)
+
+    @assertEqual( this%answer_tile_fraction(:),      this%tile_fraction(:),      tol )
+    @assertEqual( this%answer_leaf_area_index(:),    this%leaf_area_index(:),    tol )
+    @assertEqual( this%answer_canopy_height(:),      this%canopy_height(:),      tol )
+    @assertEqual( this%answer_sd_orog(:),            this%sd_orog(:),            tol )
+    @assertEqual( this%answer_soil_albedo(:),        this%soil_albedo(:),        tol )
+    @assertEqual( this%answer_soil_roughness(:),     this%soil_roughness(:),     tol )
+    @assertEqual( this%answer_albedo_obs_sw(:),      this%albedo_obs_sw(:),      tol )
+    @assertEqual( this%answer_albedo_obs_vis(:),     this%albedo_obs_vis(:),     tol )
+    @assertEqual( this%answer_albedo_obs_nir(:),     this%albedo_obs_nir(:),     tol )
+    @assertEqual( this%answer_tile_temperature(:),   this%tile_temperature(:),   tol )
+    @assertEqual( this%answer_tile_snow_mass(:),     this%tile_snow_mass(:),     tol )
+    @assertEqual( this%answer_tile_snow_rgrain(:),   this%tile_snow_rgrain(:),   tol )
+    @assertEqual( this%answer_snow_soot(:),          this%snow_soot(:),          tol )
+    @assertEqual( this%answer_chloro_sea(:),         this%chloro_sea(:),         tol )
+    @assertEqual( this%answer_sea_ice_thickness(:),  this%sea_ice_thickness(:),  tol )
+    @assertEqual( this%answer_sea_ice_pond_frac(:),  this%sea_ice_pond_frac(:),  tol )
+    @assertEqual( this%answer_sea_ice_pond_depth(:), this%sea_ice_pond_depth(:), tol )
+
+  end subroutine test_of_initial_jules
+
+end module initial_jules_kernel_mod_test

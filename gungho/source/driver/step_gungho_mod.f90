@@ -41,6 +41,7 @@ module step_gungho_mod
 
   !> @brief Steps the gungho app through one timestep
   !> @param[in] mesh_id The identifier of the primary mesh
+  !> @param[in] twod_mesh_id The identifier of the two-dimensional mesh
   !> @param[inout] prognostic_fields A collection of all the prognostic fields
   !> @param[inout] diagnostic_fields A collection of all the diagnostic fields
   !> @param[inout] mr Array of fields containing the mixing ratios
@@ -49,8 +50,11 @@ module step_gungho_mod
   !> @param[inout] cloud_fields Collection of cloud fields
   !> @param[inout] twod_fields 2D field collection for physics
   !> @param[inout] physics_incs Collection of physics increments
+  !> @param[inout] jules_ancils Collection of Jules ancillaries
+  !> @param[inout] jules_prognostics Collection of Jules prognostics
   !> @param[in] timestep number of current timestep
   subroutine step_gungho(mesh_id,           &
+                         twod_mesh_id,      &
                          prognostic_fields, &
                          diagnostic_fields, &
                          mr,                &
@@ -59,11 +63,14 @@ module step_gungho_mod
                          cloud_fields,      &
                          twod_fields,       &
                          physics_incs,      &
+                         jules_ancils,      &
+                         jules_prognostics, &
                          timestep)
 
     implicit none
 
     integer(i_def),                intent(in)    :: mesh_id
+    integer(i_def),                intent(in)    :: twod_mesh_id
     type( field_collection_type ), intent(inout) :: prognostic_fields
     type( field_collection_type ), intent(inout) :: diagnostic_fields
     type( field_type ),            intent(inout) :: mr(nummr)
@@ -72,6 +79,8 @@ module step_gungho_mod
     type( field_collection_type ), intent(inout) :: cloud_fields
     type( field_collection_type ), intent(inout) :: twod_fields
     type( field_collection_type ), intent(inout) :: physics_incs
+    type( field_collection_type ), intent(inout) :: jules_ancils
+    type( field_collection_type ), intent(inout) :: jules_prognostics
     integer(i_def),                intent(in)    :: timestep
 
     type( field_type), pointer :: theta => null()
@@ -99,9 +108,10 @@ module step_gungho_mod
     else  ! Not transport_only
       select case( method )
         case( method_semi_implicit )  ! Semi-Implicit
-          call iter_alg_step(u, rho, theta, exner, mr, moist_dyn, xi,      &
-                             derived_fields, cloud_fields, twod_fields,    &
-                             physics_incs, timestep)
+          call iter_alg_step(u, rho, theta, exner, mr, moist_dyn, xi,       &
+                             derived_fields, cloud_fields, twod_fields,     &
+                             physics_incs, jules_ancils, jules_prognostics, &
+                             timestep, twod_mesh_id)
         case( method_rk )             ! RK
           call rk_alg_step(u, rho, theta, moist_dyn, exner, xi)
       end select

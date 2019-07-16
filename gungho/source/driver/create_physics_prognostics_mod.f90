@@ -36,16 +36,19 @@ contains
   !> @param[out]   cloud_fields Collection of FD cloud fields
   !> @param[out]   twod_fields Collection of two dimensional fields
   !> @param[out]   physics_incs Collection of physics increments
+  !> @param[out]   jules_ancils Ancillary fields for Jules
+  !> @param[out]   jules_prognostics Prognostic fields for Jules
   subroutine create_physics_prognostics( mesh_id, twod_mesh_id, &
                                          depository, &
                                          prognostic_fields, &
                                          derived_fields, cloud_fields, &
-                                         twod_fields, physics_incs )
+                                         twod_fields, physics_incs, &
+                                         jules_ancils, jules_prognostics )
 
     implicit none
 
-    integer(i_def), intent(in)               :: mesh_id
-    integer(i_def), intent(in)               :: twod_mesh_id
+    integer(i_def), intent(in) :: mesh_id
+    integer(i_def), intent(in) :: twod_mesh_id
 
     ! Collections of fields
     type(field_collection_type), intent(inout) :: depository
@@ -54,11 +57,20 @@ contains
     type(field_collection_type), intent(out) :: cloud_fields
     type(field_collection_type), intent(out) :: derived_fields
     type(field_collection_type), intent(out) :: physics_incs
+    type(field_collection_type), intent(out) :: jules_ancils
+    type(field_collection_type), intent(out) :: jules_prognostics
 
     ! pointers to vector spaces
-    type(function_space_type), pointer  :: vector_space => null()
+    type(function_space_type), pointer :: vector_space => null()
 
-    type( field_type ), pointer   :: theta => null()
+    type( field_type ), pointer :: theta => null()
+ 
+    ! Each column of a higher-order discontinuous field will be used to
+    ! represent multi-dimensional quantities like tiles, plant functional
+    ! types and sea ice categories. Set parameters for the orders required:
+    integer(i_def) :: tile_order = 2 ! Enough space for 27 tiles
+    integer(i_def) :: pft_order  = 1 ! Enough space for 8 plant functional types
+    integer(i_def) :: sice_order = 1 ! Enough space for 8 sea ice categories
 
     integer(i_def) :: theta_space
     logical(l_def) :: checkpoint_restart_flag
@@ -195,9 +207,9 @@ contains
     ! either for use by subsequent parametrizations or as diagnostics
     !========================================================================
     physics_incs = field_collection_type(name='physics_incs')
-    vector_space => function_space_collection%get_fs(mesh_id, 0, Wtheta)
     checkpoint_restart_flag = .false. ! no need to dump any of these
 
+    vector_space => function_space_collection%get_fs(mesh_id, 0, Wtheta)
     call add_physics_field(physics_incs, depository, prognostic_fields, &
       'dt_bl', vector_space, checkpoint_restart_flag)
     call add_physics_field(physics_incs, depository, prognostic_fields, &
@@ -225,6 +237,84 @@ contains
       'du_conv', vector_space, checkpoint_restart_flag)
     call add_physics_field(physics_incs, depository, prognostic_fields, &
       'dv_conv', vector_space, checkpoint_restart_flag)
+
+    vector_space=> function_space_collection%get_fs(twod_mesh_id, 0, W3) 
+    call add_physics_field(physics_incs, depository, prognostic_fields, &
+      'lw_down_surf', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(physics_incs, depository, prognostic_fields, &
+      'sw_down_surf', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(physics_incs, depository, prognostic_fields, &
+      'sw_direct_surf', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(physics_incs, depository, prognostic_fields, &
+      'sw_down_blue_surf', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(physics_incs, depository, prognostic_fields, &
+      'sw_direct_blue_surf', vector_space, checkpoint_restart_flag, twod=.true.)
+
+
+    !========================================================================
+    ! Surface fields (a temporary treatment for multi-dimensional fields
+    !                 using higher-order fields)
+    !========================================================================
+
+    ! Jules ancillaries
+    jules_ancils = field_collection_type(name='jules_ancils')
+    checkpoint_restart_flag = .false.
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, tile_order, W3)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'tile_fraction', vector_space, checkpoint_restart_flag, twod=.true.)
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, pft_order, W3)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'leaf_area_index', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'canopy_height', vector_space, checkpoint_restart_flag, twod=.true.)
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, 0, W3)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'sd_orog', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'soil_albedo', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'soil_roughness', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'albedo_obs_sw', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'albedo_obs_vis', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_ancils, depository, prognostic_fields, &
+      'albedo_obs_nir', vector_space, checkpoint_restart_flag, twod=.true.)
+
+    ! Jules prognostics
+    jules_prognostics = field_collection_type(name='jules_prognostics')
+    checkpoint_restart_flag = .false.
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, tile_order, W3)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'tile_temperature', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'tile_snow_mass', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'tile_snow_rgrain', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'lw_up_tile', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'sw_up_tile', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'sw_up_blue_tile', vector_space, checkpoint_restart_flag, twod=.true.)
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, 0, W3)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'snow_soot', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'chloro_sea', vector_space, checkpoint_restart_flag, twod=.true.)
+
+    vector_space => function_space_collection%get_fs(twod_mesh_id, sice_order, W3)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'sea_ice_thickness', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'sea_ice_pond_frac', vector_space, checkpoint_restart_flag, twod=.true.)
+    call add_physics_field(jules_prognostics, depository, prognostic_fields, &
+      'sea_ice_pond_depth', vector_space, checkpoint_restart_flag, twod=.true.)
 
   end subroutine create_physics_prognostics
 

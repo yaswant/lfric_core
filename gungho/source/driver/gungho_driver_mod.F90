@@ -35,6 +35,7 @@ module gungho_driver_mod
   use map_fd_to_prognostics_mod,  only : map_fd_to_prognostics
   use moist_dyn_factors_alg_mod,  only : moist_dyn_factors_alg
   use initial_cloud_alg_mod,      only : initial_cloud_alg
+  use init_jules_alg_mod,         only : init_jules_alg
   use init_physics_incs_alg_mod,  only : init_physics_incs_alg
   use init_physics_prognostics_alg_mod, &
                                   only : init_physics_prognostics_alg
@@ -96,6 +97,10 @@ module gungho_driver_mod
 
   ! Depository of shared fields
   type( field_collection_type ), target :: depository
+
+  ! Surface fields
+  type( field_collection_type ) :: jules_ancils
+  type( field_collection_type ) :: jules_prognostics
 
   ! Field collections
   type( field_collection_type ) :: prognostic_fields
@@ -187,7 +192,8 @@ contains
                                        depository, &
                                        prognostic_fields, &
                                        derived_fields, cloud_fields, &
-                                       twod_fields, physics_incs )
+                                       twod_fields, physics_incs, &
+                                       jules_ancils, jules_prognostics )
     end if
 
     !-------------------------------------------------------------------------
@@ -223,7 +229,9 @@ contains
           call init_physics_prognostics_alg(derived_fields, &
                                             cloud_fields, &
                                             twod_fields, &
-                                            physics_incs)
+                                            physics_incs, &
+                                            jules_ancils, &
+                                            jules_prognostics)
         end if
 
       case ( init_option_checkpoint_dump )
@@ -236,11 +244,13 @@ contains
         ! Update factors for moist dynamics
         call moist_dyn_factors_alg(moist_dyn, mr)
 
-        ! if no cloud scheme, reset cloud variables
         if (use_physics) then
+          ! if no cloud scheme, reset cloud variables
           if ( cloud == cloud_none ) then  
             call initial_cloud_alg(cloud_fields)
           end if
+          ! re-initialise jules fields
+          call init_jules_alg(jules_ancils, jules_prognostics)
           ! Set the increments to 0 initially
           call init_physics_incs_alg(physics_incs)
         end if
@@ -252,10 +262,13 @@ contains
           ! Initialise FD prognostic fields from a UM2LFRic dump     
 
           ! Create FD prognostic fields
-          call create_fd_prognostics(mesh_id, fd_fields)                          
+          call create_fd_prognostics(mesh_id, fd_fields)
 
           ! Read in from a UM2LFRic dump file
           call init_fd_prognostics_dump(fd_fields)
+
+          ! Initialise jules fields
+          call init_jules_alg(jules_ancils, jules_prognostics)
 
           ! Set physics increments to 0
           call init_physics_incs_alg(physics_incs)
@@ -367,6 +380,7 @@ contains
 
       ! Perform a timestep
       call step_gungho( mesh_id,           &
+                        twod_mesh_id,      &
                         prognostic_fields, &
                         diagnostic_fields, &
                         mr,                &
@@ -375,6 +389,8 @@ contains
                         cloud_fields,      &
                         twod_fields,       &
                         physics_incs,      &
+                        jules_ancils,      &
+                        jules_prognostics, &
                         timestep )
 
       write( log_scratch_space, '(A,I0)' ) 'End of timestep ', timestep

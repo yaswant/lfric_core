@@ -96,8 +96,18 @@ contains
     use jules_soil_mod, only: dzsoil, dzsoil_io
     use jules_surface_mod, only: l_epot_corr, cor_mo_iter, iscrntdiag,     &
          isrfexcnvgust, Limit_ObukhovL, ip_scrndecpl2, IP_SrfExWithCnv
-    use jules_surface_types_mod, only: nnpft, npft, nnvg, ntype, urban,    &
-         lake, soil, ice
+    use jules_surface_types_mod, only: nnpft, npft, nnvg, ntype, brd_leaf, &
+        ndl_leaf, c3_grass, c4_grass, shrub, urban, lake, soil, ice
+    use jules_radiation_mod, only: i_sea_alb_method, l_albedo_obs,         &
+        l_dolr_land_black, l_embedded_snow, l_mask_snow_orog,              &
+        l_sea_alb_var_chl, l_snow_albedo, l_spec_alb_bs, l_spec_albedo,    &
+        l_spec_sea_alb
+    use init_jules_alg_mod, only: n_land_tile, n_sea_ice_tile
+    use nvegparm, only:                                                    &
+        albsnc_nvg, albsnf_nvgu, albsnf_nvg, albsnf_nvgl, emis_nvg, vf_nvg
+    use pftparm, only:                                                     &
+        albsnc_max, albsnc_min, albsnf_maxu, albsnf_maxl,                  &
+        alniru, alnir, alnirl, alparu, alpar, alparl, emis_pft
     use g_wave_input_mod, only: ussp_launch_factor,                        &
     	                          wavelstar, l_add_cgw, cgw_scale_factor
 
@@ -150,10 +160,10 @@ contains
     row_length   = 1
     rows         = 1
     land_field   = 1
-    ntiles       = 9
+    ntiles       = n_land_tile
     sm_levels    = 4
-    nice         = 1
-    nice_use     = 1
+    nice         = n_sea_ice_tile
+    nice_use     = n_sea_ice_tile
     tr_vars      = 0
 
     ! Set up array sizes for a single column model
@@ -173,6 +183,11 @@ contains
     npft  = 5
     nnvg  = 4
     ntype = 9
+    brd_leaf = 1
+    ndl_leaf = 2
+    c3_grass = 3
+    c4_grass = 4
+    shrub = 5
     urban = 6
     lake  = 7
     soil  = 8
@@ -180,6 +195,39 @@ contains
     call init_lsm_um()
     call allocate_jules_arrays(land_field,ntiles,sm_levels,nice_use,nice_use)
     dzsoil => dzsoil_io(1:sm_levels)
+
+    ! Set up JULES radiation values (GL7 config: jules_radiation)
+    i_sea_alb_method=3
+    l_albedo_obs=.false.
+    l_dolr_land_black=.false.
+    l_embedded_snow=.true.
+    l_mask_snow_orog=.true.
+    l_sea_alb_var_chl=.false.
+    l_snow_albedo=.false.
+    l_spec_alb_bs=.true.
+    l_spec_albedo=.true.
+    l_spec_sea_alb=.true.
+
+    ! Set up JULES nvegparm values (GL7 config: jules_nvegparm)
+    albsnc_nvg=(/ 0.4,0.8,0.8,0.8 /)
+    albsnf_nvg=(/ 0.18,0.12,-1.00,0.75 /)
+    albsnf_nvgl=(/ 0.05,0.06,0.03,0.75 /)
+    albsnf_nvgu=(/ 0.20,0.15,0.80,0.75 /)
+    emis_nvg=(/ 0.970,0.985,0.900,0.990 /)
+    vf_nvg=(/ 1.0,1.0,0.0,0.0 /)
+
+    ! Set up JULES pftparm values (GL7 config: jules_pftparm) 
+    albsnc_max=(/ 2.50000e-1,2.50000e-1,6.00000e-1,6.00000e-1,4.00000e-1 /)
+    albsnc_min=(/ 3.00000e-1,3.00000e-1,8.00000e-1,8.00000e-1,8.00000e-1 /)
+    albsnf_maxl=(/ 0.095,0.059,0.128,0.106,0.077 /)
+    albsnf_maxu=(/ 0.215,0.132,0.288,0.239,0.173 /)
+    alnir=(/ 0.45,0.35,0.58,0.58,0.58 /)
+    alnirl=(/ 0.30,0.23,0.39,0.39,0.39 /)
+    alniru=(/ 0.75,0.65,0.95,0.95,0.87 /)
+    alpar=(/ 0.10,0.07,0.10,0.10,0.10 /)
+    alparl=(/ 0.06,0.04,0.06,0.06,0.06 /)
+    alparu=(/ 0.15,0.11,0.25,0.25,0.25 /)
+    emis_pft=(/ 0.98,0.99,0.98,0.98,0.98 /)
 
     ! Set physics timestep from Gungho timestep
     timestep=dt
