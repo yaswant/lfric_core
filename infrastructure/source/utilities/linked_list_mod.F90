@@ -188,7 +188,7 @@ function item_exists(this, id, start, finish) result(exists)
 
 
   ! temp ptr to loop through list
-  type(linked_list_item_type),pointer      :: loop
+  type(linked_list_item_type),pointer      :: loop => null()
 
   ! assume item does not exist at first
 
@@ -205,16 +205,20 @@ function item_exists(this, id, start, finish) result(exists)
 
   ! Check the main list between the specified limits
   do
-    ! if it isn't pointing at anything or we finished just exit
-    if ( .not. associated(loop) .or. (present(finish) &
-                                .and. associated(loop,finish)) )exit
-     if (loop%payload%get_id() == id) then
-      exists = .true.
-      exit
-     else
-      exists = .false.
+     ! if it isn't pointing at anything or we finished just exit
+     ! Compilers may interpret the order of evaluation of conditionals
+     ! This structure avoids ambiguity
+     if(.not.associated(loop)) exit
+     if(present(finish)) then
+        if(associated(loop,finish)) exit
      end if
-    loop=>loop%next
+     if (loop%payload%get_id() == id) then
+        exists = .true.
+        exit
+     else
+        exists = .false.
+     end if
+     loop=>loop%next
   end do
 
 return
@@ -260,56 +264,60 @@ subroutine insert_item(self, new_data, insert_point, placement)
 
   else
 
-    ! There is at least one item in the list so insert
-    ! according to insert_point and placement arguments
-    ! if present
-    if (present(placement) .and. placement == before ) then
+     ! There is at least one item in the list so insert
+     ! according to insert_point and placement arguments
+     ! if present
+     ! Compilers may interpret the order of evaluation of conditionals differently
+     ! This structure avoids ambiguity
+     if (present(placement) ) then
+        if (placement == before ) then
 
-      ! is insert point present?
-      ! is it the start of the list?
-      if ( present(insert_point) ) then
-        if ( associated(insert_point,self%head)) then
-          ! need to insert before the list head
-          ! Nullify prev of new item
-          new_item%prev => null()
-          ! point prev of head to new item
-          self%head%prev => new_item
-          ! point next of new item to head
-          new_item%next => self%head
-          ! make new item the head
-          self%head => new_item
-          ! and current
-          self%current => new_item
-          self%length = self%length + 1
+           ! is insert point present?
+           ! is it the start of the list?
+           if ( present(insert_point) ) then
+              if ( associated(insert_point,self%head)) then
+                 ! need to insert before the list head
+                 ! Nullify prev of new item
+                 new_item%prev => null()
+                 ! point prev of head to new item
+                 self%head%prev => new_item
+                 ! point next of new item to head
+                 new_item%next => self%head
+                 ! make new item the head
+                 self%head => new_item
+                 ! and current
+                 self%current => new_item
+                 self%length = self%length + 1
 
-        else
-          ! insert_point is not start of list so go ahead
-          ! and insert before it
-          new_item%prev => insert_point%prev
-          new_item%next => insert_point
-          if(associated(insert_point%prev)) insert_point%prev%next => new_item
-          insert_point%prev => new_item
-          insert_point => new_item
-          ! point current at new element
-          self%current => new_item
-          self%length = self%length + 1
+              else
+                 ! insert_point is not start of list so go ahead
+                 ! and insert before it
+                 new_item%prev => insert_point%prev
+                 new_item%next => insert_point
+                 if(associated(insert_point%prev)) insert_point%prev%next => new_item
+                 insert_point%prev => new_item
+                 insert_point => new_item
+                 ! point current at new element
+                 self%current => new_item
+                 self%length = self%length + 1
 
+              end if
+
+           else ! just insert before whatever is current
+              ! insert before current
+              ! point prev of new item at prev of current item
+              new_item%prev => self%current%prev
+              ! point new next at current
+              new_item%next => self%current
+              ! point prev next at new
+              if(associated(self%current%prev)) self%current%prev%next => new_item
+              ! point current prev at new
+              self%current%prev => new_item
+              ! point current at new element
+              self%current => new_item
+              self%length = self%length + 1
+           end if
         end if
-
-      else ! just insert before whatever is current
-        ! insert before current
-        ! point prev of new item at prev of current item
-        new_item%prev => self%current%prev
-        ! point new next at current
-        new_item%next => self%current
-        ! point prev next at new
-        if(associated(self%current%prev)) self%current%prev%next => new_item
-        ! point current prev at new
-        self%current%prev => new_item
-        ! point current at new element
-        self%current => new_item
-        self%length = self%length + 1
-      end if
     else ! no placement specified, inserting after
       ! is insert point present?
       if ( present(insert_point) ) then

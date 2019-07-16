@@ -95,7 +95,7 @@ contains
     if (chi_proxy(2)%is_dirty(depth=1)) call chi_proxy(2)%halo_exchange(depth=1)
     if (chi_proxy(3)%is_dirty(depth=1)) call chi_proxy(3)%halo_exchange(depth=1)
 
-    mesh => rho%get_mesh()
+    mesh => rho_proxy%vspace%get_mesh()
     do cell = 1, mesh%get_last_halo_cell(1)
 
       map_w3 => rho_proxy%vspace%get_cell_dofmap( cell )
@@ -171,13 +171,12 @@ contains
 
     integer(i_def) :: nfaces_h
 
-    mesh              => theta%get_mesh()
-    reference_element => mesh%get_reference_element()
-
-
     r_theta_bd_proxy = r_theta_bd%get_proxy()
     theta_proxy      = theta%get_proxy()
     u_proxy          = u%get_proxy()
+
+    mesh              => theta_proxy%vspace%get_mesh()
+    reference_element => mesh%get_reference_element()
 
     cross_stencil_w2 => u_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
     cross_stencil_w2_map => cross_stencil_w2%get_whole_dofmap()
@@ -290,14 +289,14 @@ contains
     integer(i_def)           :: nfaces_h
     real(r_def), allocatable :: out_face_normal(:,:)
 
-    mesh => exner%get_mesh()
-    reference_element => mesh%get_reference_element()
-    nfaces_h = reference_element%get_number_2d_faces()
-
     r_u_bd_proxy = r_u_bd%get_proxy()
     exner_proxy  = exner%get_proxy()
     theta_proxy  = theta%get_proxy()
 
+    mesh => exner_proxy%vspace%get_mesh()
+    reference_element => mesh%get_reference_element()
+    nfaces_h = reference_element%get_number_2d_faces()
+    
     do ifac = 1, num_moist_factors
       moist_dyn_proxy(ifac)= moist_dyn(ifac)%get_proxy()
     end do
@@ -422,13 +421,13 @@ contains
     integer(i_def)           :: nfaces_h
     real(r_def), allocatable :: out_face_normal(:,:)
 
-    mesh => exner%get_mesh()
-    reference_element => mesh%get_reference_element()
-    nfaces_h = reference_element%get_number_2d_faces()
-
     r_u_bd_proxy = r_u_bd%get_proxy()
     exner_proxy  = exner%get_proxy()
     theta_proxy  = theta%get_proxy()
+
+    mesh => exner_proxy%vspace%get_mesh()
+    reference_element => mesh%get_reference_element()
+    nfaces_h = reference_element%get_number_2d_faces()
 
     cross_stencil_w3 => exner_proxy%vspace%get_stencil_dofmap(STENCIL_CROSS, 1)
     cross_stencil_w3_map => cross_stencil_w3%get_whole_dofmap()
@@ -555,7 +554,7 @@ contains
       !
       ! Create a mesh object
       !
-      mesh              => div_star%get_mesh()
+      mesh              => div_star_proxy%fs_to%get_mesh()
       reference_element => mesh%get_reference_element()
 
       nfaces_h = reference_element%get_number_2d_faces()
@@ -689,7 +688,7 @@ contains
       !
       ! Create a mesh object
       !
-      mesh              => p2theta%get_mesh()
+      mesh              => p2theta_proxy%fs_from%get_mesh()
       reference_element => mesh%get_reference_element()
 
       nfaces_h = reference_element%get_number_2d_faces()
@@ -817,7 +816,7 @@ contains
       !
       ! Create a mesh object
       !
-      mesh              => ptheta2%get_mesh()
+      mesh              => ptheta2_proxy%fs_from%get_mesh()
       reference_element => mesh%get_reference_element()
 
       nfaces_h = reference_element%get_number_2d_faces()
@@ -1086,7 +1085,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
+    mesh => field_res_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -1131,7 +1130,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
+    mesh => field_res_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
     
     do dplp = 1, depth
@@ -1253,7 +1252,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
+    mesh => field_res_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -1437,7 +1436,7 @@ contains
     end do
     !$omp end parallel do
 
-    mesh => z%get_mesh()
+    mesh => z_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -1515,7 +1514,7 @@ contains
     if (chi_p(3)%is_dirty(depth=1)) then
        call chi_p(3)%halo_exchange(depth=1)
     end if
-    mesh => nodal_coords(1)%get_mesh()
+    mesh => x_p(1)%vspace%get_mesh()
 
     do cell = 1, mesh%get_last_halo_cell(1)
        map_x   => x_p(1)%vspace%get_cell_dofmap( cell )
@@ -1622,7 +1621,7 @@ contains
   ndf  = l_p%vspace%get_ndf()
   nodes => l_p%vspace%get_nodes( )
 
-  mesh => level%get_mesh()
+  mesh => l_p%vspace%get_mesh()
   do cell = 1,mesh%get_last_halo_cell(1)
     map => l_p%vspace%get_cell_dofmap(cell)
     call compute_dof_level_code(l_p%vspace%get_nlayers(),                 &
@@ -1702,7 +1701,7 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_app
 
     rho_stencil_size = map_x_w3%get_size()
 
-    mesh => a0%get_mesh()
+    mesh => a0_proxy%vspace%get_mesh()
 
     swap = .false.
     do d = 1,mesh%get_halo_depth()
@@ -1856,7 +1855,7 @@ subroutine invoke_subgrid_coeffs(a0,a1,a2,rho,cell_orientation,direction,rho_app
     ndf_w3  = rho_x_proxy%vspace%get_ndf()
     nlayers = rho_x_proxy%vspace%get_nlayers()
 
-    mesh => rho_x%get_mesh()
+    mesh => rho_x_proxy%vspace%get_mesh()
 
     map_w3 => rho_x_proxy%vspace%get_whole_dofmap()
 
@@ -2057,7 +2056,7 @@ subroutine invoke_fv_mass_fluxes( rho,            &
   end do
   if ( swap ) call rho_proxy%halo_exchange(depth=stencil_extent)
 
-  mesh => rho%get_mesh()
+  mesh => rho_proxy%vspace%get_mesh()
   ! NOTE: The default looping limits for this type of field would be 
   ! mesh%get_last_halo_cell(1) but this kernel requires a modified loop limit
   ! in order to function correctly. See ticket #1058.
@@ -2163,7 +2162,7 @@ subroutine invoke_calc_deppts(  u_n,                  &
 
   nlayers = u_n_proxy%vspace%get_nlayers()
 
-  mesh => u_n%get_mesh()
+  mesh => u_n_proxy%vspace%get_mesh()
   !NOTE: The default looping limits for this type of field would be 
   ! mesh%get_last_halo_cell(1) but this kernel requires a modified loop limit
   ! in order to function correctly. See ticket #1058.
@@ -2225,7 +2224,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2269,7 +2268,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => y%get_mesh()
+    mesh => y_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2315,7 +2314,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2369,7 +2368,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field_res%get_mesh()
+    mesh => field_res_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2414,7 +2413,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2460,7 +2459,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2537,7 +2536,7 @@ end subroutine invoke_calc_deppts
     ndf_chi  = chi_proxy(1)%vspace%get_ndf( )
     undf_chi = chi_proxy(1)%vspace%get_undf()
 
-    mesh => theta_inc%get_mesh()
+    mesh => theta_inc_proxy%vspace%get_mesh()
 
     if (theta_inc_proxy%is_dirty(depth=1)) CALL theta_inc_proxy%halo_exchange(depth=1)
     if (   chi_proxy(1)%is_dirty(depth=1)) CALL    chi_proxy(1)%halo_exchange(depth=1)
@@ -2614,7 +2613,7 @@ end subroutine invoke_calc_deppts
     ndf_chi  = chi_proxy(1)%vspace%get_ndf( )
     undf_chi = chi_proxy(1)%vspace%get_undf()
 
-    mesh => u_inc%get_mesh()
+    mesh => u_inc_proxy%vspace%get_mesh()
 
     if (    u_inc_proxy%is_dirty(depth=1)) CALL     u_inc_proxy%halo_exchange(depth=1)
     if (   chi_proxy(1)%is_dirty(depth=1)) CALL    chi_proxy(1)%halo_exchange(depth=1)
@@ -2724,11 +2723,11 @@ end subroutine invoke_calc_deppts
     integer, pointer        :: cross_stencil_w3_map(:,:,:) => null()
     integer                 :: cross_stencil_w3_size
 
-    mesh => w2_field%get_mesh()
 
     cell_orientation_proxy = cell_orientation%get_proxy()
     w2_field_proxy = w2_field%get_proxy()
-
+    mesh => w2_field_proxy%vspace%get_mesh()
+    
     nlayers = cell_orientation_proxy%vspace%get_nlayers()
     ndf_w3  = cell_orientation_proxy%vspace%get_ndf( )
     undf_w3 = cell_orientation_proxy%vspace%get_undf()
@@ -2788,7 +2787,7 @@ end subroutine invoke_calc_deppts
     !
     ! Create a mesh object
     !
-    mesh => op%get_mesh()
+    mesh => op_proxy%fs_to%get_mesh()
     !
     ! Get size of operator array
     !
@@ -2846,7 +2845,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2889,7 +2888,7 @@ end subroutine invoke_calc_deppts
     end do
     !$omp end parallel do
 
-    mesh => field1%get_mesh()
+    mesh => field1_proxy%vspace%get_mesh()
     depth = mesh%get_halo_depth()
 
     do dplp = 1, depth
@@ -2950,7 +2949,7 @@ end subroutine invoke_calc_deppts
     ndf_w2  = mass_flux_x_proxy%vspace%get_ndf( )
     undf_w2 = mass_flux_x_proxy%vspace%get_undf()
 
-    mesh   => mass_flux_x%get_mesh()
+    mesh   => mass_flux_x_proxy%vspace%get_mesh()
     map_w3 => cell_orientation_proxy%vspace%get_whole_dofmap()
     map_w2 => mass_flux_x_proxy%vspace%get_whole_dofmap()
 
@@ -3045,7 +3044,7 @@ end subroutine invoke_calc_deppts
     ndf_w2  = x_field_out_proxy%vspace%get_ndf( )
     undf_w2 = x_field_out_proxy%vspace%get_undf()
 
-    mesh   => x_field_out%get_mesh()
+    mesh   => x_field_out_proxy%vspace%get_mesh()
     map_w2 => x_field_out_proxy%vspace%get_whole_dofmap()
     map_w3 => cell_orientation_proxy%vspace%get_whole_dofmap()
 
@@ -3122,7 +3121,7 @@ end subroutine invoke_calc_deppts
     dep_wind_y_p = dep_wind_y%get_proxy()
     detj_at_w2_p = detj_at_w2%get_proxy()
 
-    mesh => u_piola_x%get_mesh()
+    mesh => u_piola_x_p%vspace%get_mesh()
     halo_depth = mesh%get_halo_depth()
     call detj_at_w2_p%halo_exchange(depth=halo_depth)
 
@@ -3218,7 +3217,7 @@ end subroutine invoke_calc_deppts
     ndf_w2  = wind_x_in_proxy%vspace%get_ndf( )
     undf_w2 = wind_x_in_proxy%vspace%get_undf()
 
-    mesh => orientation_of_cells%get_mesh()
+    mesh => orientation_proxy%vspace%get_mesh()
 
 
     if (direction == x_direction) then
@@ -3320,7 +3319,7 @@ end subroutine invoke_calc_deppts
     if (chi_proxy(2)%is_dirty(depth=1)) call chi_proxy(2)%halo_exchange(depth=1)
     if (chi_proxy(3)%is_dirty(depth=1)) call chi_proxy(3)%halo_exchange(depth=1)
 
-    mesh => exner%get_mesh()
+    mesh => exner_proxy%vspace%get_mesh()
     do cell = 1, mesh%get_last_halo_cell(1)
 
       map_w3 => exner_proxy%vspace%get_cell_dofmap( cell )
@@ -3399,7 +3398,7 @@ end subroutine invoke_calc_deppts
     !
     ! Create a mesh object
     !
-    mesh => exner%get_mesh()
+    mesh => exner_proxy%vspace%get_mesh()
     !
     !
     ! Initialise number of DoFs for wtheta
