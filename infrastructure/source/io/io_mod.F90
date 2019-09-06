@@ -221,7 +221,7 @@ subroutine xios_domain_init(xios_ctx, mpi_comm, dtime, &
     ! Note although this file is going to be read XIOS needs this
     ! to be set otherwise horrible things happen
 
-    dump_freq%second = timestep_end*dtime
+    dump_freq%second = dtime
 
     call xios_get_handle("read_lfric_fd_dump",dumpfile_hdl)
     call xios_set_attr(dumpfile_hdl,name=dump_fname, enabled=.true.)

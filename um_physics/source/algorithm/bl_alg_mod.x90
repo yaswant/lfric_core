@@ -33,6 +33,8 @@ contains
   !>         NB This version uses winds in w3 space (i.e. A-grid)
   !>            and doesn't currently feed-back wind increments
   !>@param[in,out] dtheta_bl         Theta increment
+  !>@param[in,out] du_bl           'u' increment
+  !>@param[in,out] dv_bl           'v' increment
   !>@param[in,out] mr                Mixing ratios
   !>@param[in]     outer             Outer loop counter
   !>@param[in]     theta             Theta in its native (wth) space
@@ -52,8 +54,8 @@ contains
   !>@param[in,out] visc_h_blend      Blended BL-Smag diffusion coefficient for scalars
   !>@param[in,out] jules_ancils      Ancillary fields for Jules
   !>@param[in,out] jules_prognostics Prognostic fields for Jules
-  subroutine bl_alg_step(dtheta_bl, mr, outer, theta, rho, mr_n, exner,   &
-                         shear, delta, max_diff_smag,                     &
+  subroutine bl_alg_step(dtheta_bl, du_bl, dv_bl, mr, outer, theta, rho,  &
+                         mr_n, exner, shear, delta, max_diff_smag,        &
                          height_w3, height_wth,                           & 
                          derived_fields, cloud_fields, twod_fields,       &
                          physics_incs, visc_m_blend, visc_h_blend,        &
@@ -65,7 +67,7 @@ contains
 
     implicit none
 
-    type( field_type ), intent( inout )     :: dtheta_bl, mr(nummr)
+    type( field_type ), intent( inout )     :: dtheta_bl, du_bl, dv_bl, mr(nummr)
     type( field_type ), intent( in )        :: theta, rho, exner, mr_n(nummr)
     type( field_type ), intent( in )        :: height_w3, height_wth
     type( field_type ), intent( in )        :: shear, delta, max_diff_smag
@@ -367,7 +369,7 @@ contains
                            gross_prim_prod, net_prim_prod,                     &
                            cos_zenith_angle, sw_up_tile, sw_down_surf,         &
                            lw_down_surf, sw_down_blue_surf,                    &
-                           dtheta_bl,                                          &
+                           dtheta_bl, du_bl, dv_bl,                            &
                            dt_bl, dmv_bl, dt_conv, dmv_conv, dmcl_conv,        &
                            dmcf_conv,  du_conv, dv_conv,                       &
                            dtl_mphys, dmt_mphys,                               &

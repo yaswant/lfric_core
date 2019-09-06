@@ -33,6 +33,9 @@ module fast_physics_alg_mod
   ! Moisture species
   use mr_indices_mod,       only: nummr
 
+  ! Wind mapping
+  use map_fd_to_prognostics_alg_mod, only: set_wind
+
 #ifdef UM_PHYSICS
   ! UM BL scheme
   use bl_alg_mod,  only: bl_alg_step
@@ -104,6 +107,9 @@ contains
 
     ! Local fields (should be created at initialization, but done here for the time being)
     type( field_type ) :: dtheta_bl
+    type( field_type ) :: du_bl
+    type( field_type ) :: dv_bl
+    type( field_type ) :: dw_bl
 
     logical :: boundary_layer_done ! Flag to indicate that boundary_layer has been calculated
     logical :: convection_done ! Flag to indicate that convection has been calculated
@@ -141,9 +147,15 @@ contains
       ! Algorithm that calls the UM Boundary Layer scheme
       call log_event( 'fast_physics: Running Boundary layer', LOG_LEVEL_INFO )
       call dtheta%copy_field_properties(dtheta_bl)
-      call invoke( setval_c(dtheta_bl, 0.0_r_def) )
-      call bl_alg_step(dtheta_bl, mr, outer, theta, rho, mr_n, exner,         &
-                       shear, delta, max_diff_smag,                           &
+      call rho%copy_field_properties(du_bl)
+      call rho%copy_field_properties(dv_bl)
+      call theta%copy_field_properties(dw_bl)
+      call invoke( setval_c(dtheta_bl, 0.0_r_def), &
+                   setval_c(du_bl, 0.0_r_def),     &
+                   setval_c(dv_bl, 0.0_r_def),     &
+                   setval_c(dw_bl, 0.0_r_def) )
+      call bl_alg_step(dtheta_bl, du_bl, dv_bl, mr, outer, theta, rho, mr_n,  &
+                       exner, shear, delta, max_diff_smag,                    &
                        height_w3, height_wth, derived_fields, cloud_fields,   &
                        twod_fields, physics_incs, visc_m_blend, visc_h_blend, &
                        jules_ancils, jules_prognostics)
@@ -157,6 +169,7 @@ contains
     ! boundary layer as part of the implicit solution
     !=====================================
     if (boundary_layer_done) then
+      call set_wind(du, du_bl, dv_bl, dw_bl)
       call invoke(inc_X_plus_Y(dtheta, dtheta_bl))
     end if
 

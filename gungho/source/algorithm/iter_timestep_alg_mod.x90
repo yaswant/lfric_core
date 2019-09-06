@@ -24,21 +24,21 @@ module iter_timestep_alg_mod
                                        cloud_um
 
   use formulation_config_mod,    only: use_moisture, use_physics, dlayer_on, &
-                                       use_wavedynamics,          &
-                                       dry_static_adjust,         &
+                                       use_wavedynamics,                     &
+                                       dry_static_adjust,                    &
                                        exner_from_eos
   use io_config_mod,             only: subroutine_timers
-  use mixed_solver_config_mod,   only: guess_np1,                                &
+  use mixed_solver_config_mod,   only: guess_np1,                            &
                                        reference_reset_freq
-  use timestepping_config_mod,   only: dt, alpha, &
-                                       outer_iterations, inner_iterations, &
+  use timestepping_config_mod,   only: dt, alpha,                            &
+                                       outer_iterations, inner_iterations,   &
                                        spinup_period, spinup_alpha, spinup_winds
   use derived_config_mod,        only: bundle_size
   use runtime_constants_mod,     only: get_qr, get_coordinates, get_height, &
                                        get_mass_matrix, get_da_at_w2,       &
                                        get_delta_at_wtheta, w3inv_id,       &
                                        get_max_diff,                        &
-                                       theta_space_id, w2_id,               &
+                                       theta_space_id, w2_id, dl_id, w2_id, &
                                        get_normalisation
   use fs_continuity_mod,         only: W3, Wtheta
 
@@ -62,6 +62,7 @@ module iter_timestep_alg_mod
   use tracer_smagorinsky_diff_kernel_mod, only: tracer_smagorinsky_diff_kernel_type
   use momentum_smagorinsky_kernel_mod,    only: momentum_smagorinsky_kernel_type
   use moist_dyn_factors_kernel_mod,       only: moist_dyn_factors_kernel_type
+  use enforce_lower_bound_kernel_mod,     only: enforce_lower_bound_kernel_type
 
   ! Derived Types
   use field_mod,                 only: field_type
@@ -122,7 +123,7 @@ module iter_timestep_alg_mod
   ! 'State' items private to the algorithm that need to be 
   !  created once but used every step
 
-  ! latest estimate of the prognostic fields throughout the timestep
+  ! latest estimate of the prognostic fields through the iterative solver
   type( field_type ), allocatable :: state(:)
   ! prognostic fields at time level n, i.e. start of timestep
   type( field_type ), allocatable :: state_n(:)
@@ -346,6 +347,7 @@ contains
     type( field_type ), pointer :: u_normalisation => null()
     type(operator_type), pointer :: m3_inv => null()
     type(operator_type), pointer :: mm_wt => null()
+    type(operator_type), pointer :: mm_vel    => null()
     type( field_type ), pointer  :: dA => null() ! Areas of faces
     type( field_type ), pointer  :: delta => null() ! Horizontal edge length
     type( field_type ), pointer  :: max_diff_smag => null() ! Max Smagorinsky diffusion allowed in this run
@@ -362,7 +364,7 @@ contains
     type( field_type ), pointer :: u3_in_w3_star  => null()
     type( field_type ), pointer :: exner_theta  => null()
 
-    integer(kind=i_def):: outer, inner, iter
+    integer(kind=i_def):: outer, inner, iter, i_mr
     real(kind=r_def)   :: varalpha, varbeta ! alpha, beta weight to use
                                             ! these may differ from input values
                                             ! during the spinup period
@@ -382,6 +384,12 @@ contains
     delta => get_delta_at_wtheta()
     max_diff_smag => get_max_diff()
     mm_wt => get_mass_matrix(theta_space_id) 
+    ! Using modified velocity mass matrix if using damping layer
+    if(dlayer_on) then
+      mm_vel => get_mass_matrix(dl_id)
+    else
+      mm_vel => get_mass_matrix(w2_id)
+    end if 
     !--------------------------------------------------------------------
     ! Pass updated fields into state
     !--------------------------------------------------------------------
@@ -405,8 +413,15 @@ contains
     call check_fields(state)
 
     ! Update state_n and mr_n with start of timestep values
+    if (use_moisture) then
+      do i_mr = 1, nummr
+        call invoke( enforce_lower_bound_kernel_type (mr(i_mr), 0.0_r_def) )
+      end do
+      call copy_bundle(mr, mr_n, nummr)
+      call copy_bundle(mr, mr_after_slow, nummr)
+    end if
     call copy_bundle(state, state_n, bundle_size)
-    call copy_bundle(mr, mr_n, nummr)
+    call copy_bundle(state, state_after_slow, bundle_size)
 
     !==========================================================================
     ! Fields for physics
@@ -439,30 +454,32 @@ contains
       call invoke( setval_c(dtheta, 0.0_r_def), &
                    setval_c(du, 0.0_r_def) )
       call slow_physics(du, dtheta, state_n(igh_t), state_n(igh_d),     &
-                        state_n(igh_p), mr_n, mr,                       &
+                        state_n(igh_p), mr_n, mr_after_slow,            &
                         derived_fields, cloud_fields, twod_fields,      &
                         radstep_fields, physics_incs,                   &
                         jules_ancils, jules_prognostics,                &
                         height_w3, height_wth, chi, timestep,           &
                         twod_mesh_id)
+      if (use_moisture) then
+        do i_mr = 1, nummr
+          call invoke( enforce_lower_bound_kernel_type (mr_after_slow(i_mr), 0.0_r_def) )
+        end do
+      end if
+
       ! update state prognostics including map back of winds
       call invoke(name="update_from_slow_physics",                      &
-                  inc_X_plus_Y(state(igh_t), dtheta),                   &
+                  inc_X_plus_Y(state_after_slow(igh_t), dtheta),        &
                   inc_X_times_Y(du,dA),                                 &
-                  inc_X_plus_Y(state(igh_u), du)                        &
+                  inc_X_plus_Y(state_after_slow(igh_u), du)             &
                   )
       call log_event( "slow physics: completed slow physics.", LOG_LEVEL_INFO )
     end if !use_physics
 
-    ! Update state_after_slow and mr_after_slow with 
-    ! start of timestep + slow physics values
-    call copy_bundle(state, state_after_slow, bundle_size)
     if (use_moisture) then
-      call copy_bundle(mr, mr_after_slow, nummr)
-      call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr))
+      call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr_n))
     end if
 
-    call rhs_alg(rhs_n, varbeta*dt, state_after_slow, moist_dyn, .false., .false.)
+    call rhs_alg(rhs_n, varbeta*dt, state_after_slow, state_n, moist_dyn, .false., .false.)
 
     !==========================================================================
     ! Start the Outer (advection) loop
@@ -472,22 +489,30 @@ contains
       if (use_wavedynamics) then
 
         ! Set advecting velocity & terms
-        call invoke( aX_plus_bY(u_adv, varbeta, state_after_slow(igh_u), varalpha, state(igh_u)) )
+        call invoke( aX_plus_bY(u_adv, 0.5_r_def, state_n(igh_u), 0.5_r_def, state(igh_u)) )
         call advection_alg(rhs_adv, state_after_slow, u_adv, state_n(igh_u), state(igh_u) )
         if ( use_moisture )then
           ! Advect mr_after_slow values with latest advecting velocity 
           call advection_mr_alg(mr_inc, mr_after_slow, u_adv)
           ! Update latest value for mr
           call add_bundle(mr_inc, mr_after_slow, mr, nummr)
+          do i_mr = 1, nummr
+            call invoke( enforce_lower_bound_kernel_type (mr(i_mr), 0.0_r_def) )
+          end do
+          call invoke(moist_dyn_factors_kernel_type(moist_dyn, mr))
         end if
         call bundle_ax(dt, rhs_adv, rhs_adv, bundle_size) 
-
+        
+      else
+        if ( use_moisture ) call copy_bundle(mr_after_slow, mr, nummr)
       end if !use_wavedynamics
 
       if (use_physics) then
         ! setting predictors for fast physics
         theta_star  => derived_fields%get_field('theta_star')
         u_star  => derived_fields%get_field('u_star')
+        call invoke( setval_c(dtheta, 0.0_r_def), &
+                     setval_c(du, 0.0_r_def) )
         
         if (use_wavedynamics) then
           ! theta_star can be directly guessed from advection terms
@@ -495,15 +520,15 @@ contains
           call mass_matrix_solver_alg(theta_star, inc(igh_t))
 
           ! Compute u_star = u_np1 + M^-1(-rhs_np1 + rhs_n + rhs_a)
-          call rhs_alg(rhs_np1, -varalpha*dt, state, moist_dyn, .false., dlayer_on)      
-          call invoke( inc_aX_plus_Y(-1.0_r_def, rhs_np1(igh_u), rhs_n(igh_u)),&
+          call rhs_alg(rhs_np1, -varalpha*dt, state, state, moist_dyn, .false., dlayer_on)      
+          call invoke( inc_aX_plus_Y(-1.0_r_def, rhs_np1(igh_u), rhs_n(igh_u)), &
                        inc_X_plus_Y(rhs_np1(igh_u), rhs_adv(igh_u)) )
           call mass_matrix_solver_alg(inc(igh_u), rhs_np1(igh_u) )
           call invoke( X_plus_Y(u_star, inc(igh_u), state(igh_u)) )
         else
           ! predictors are just the current state
-          call invoke( setval_X(theta_star, state(igh_t)), &
-                       setval_X(u_star, state(igh_u)) )
+          call invoke( setval_X(theta_star, state_after_slow(igh_t)), &
+                       setval_X(u_star, state_after_slow(igh_u) ))
         end if !use_wavedynamics
 
         ! map physics predictors into required spaces
@@ -520,8 +545,6 @@ contains
         !--------------------------------------------------------------------
         ! Call the fast physics terms
         !--------------------------------------------------------------------
-        call invoke( setval_c(dtheta, 0.0_r_def), &
-                     setval_c(du, 0.0_r_def) )
         call fast_physics(du, dtheta, mr, outer, state_n(igh_t),        &
                           state_n(igh_d), state_n(igh_p), mr_n,         &
                           shear, delta, max_diff_smag,                  &
@@ -530,15 +553,20 @@ contains
                           physics_incs, height_w3, height_wth,          &
                           jules_ancils, jules_prognostics)
 
+        if (use_moisture) then
+          do i_mr = 1, nummr
+            call invoke( enforce_lower_bound_kernel_type (mr(i_mr), 0.0_r_def) )
+          end do
+        end if
+
         if (use_wavedynamics) then
-          ! copy increments into rhs_phys, including convert to weak form theta
-          ! NB there is no update to pressure or density, currently awaiting
-          ! winds to be added here
+          ! copy increments into rhs_phys, including premultiplication by mass matrix
           ! need to reset rhs_phys to 0 because matrix_vector_kernel_type
           ! increments the field rather than over-writing it
           call set_bundle_scalar(0.0_r_def, rhs_phys, bundle_size)
-          call invoke(name="update_rhs_phys_from_fast_physics",               &
-                    matrix_vector_kernel_type(rhs_phys(igh_t), dtheta, mm_wt) &
+          call invoke(name="update_rhs_phys_from_fast_physics",                &
+                    matrix_vector_kernel_type(rhs_phys(igh_t), dtheta, mm_wt), &
+                    matrix_vector_kernel_type( rhs_phys(igh_u), du, mm_vel )   &
                     )
         end if
 
@@ -573,7 +601,7 @@ contains
             call compute_si_operators(reference_state)
           end if
 
-          call rhs_alg(rhs_np1, -varalpha*dt, state, moist_dyn, .true., dlayer_on)
+          call rhs_alg(rhs_np1, -varalpha*dt, state, state, moist_dyn, .true., dlayer_on)
 
           !--------------------------------------------------------------------
           ! Solve for the increments
@@ -644,8 +672,8 @@ contains
 
       else ! when use_wavedynamics=false, just add increments here
 
-        !NB This is currently only updating theta
-        call invoke(inc_X_plus_Y(state(igh_t), dtheta) )
+        call invoke(X_plus_Y(state(igh_t), state_after_slow(igh_t), dtheta), &
+                    X_plus_Y(state(igh_u), state_after_slow(igh_u), du))
 
       end if ! use_wavedynamics
 

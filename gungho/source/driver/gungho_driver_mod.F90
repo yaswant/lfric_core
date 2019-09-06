@@ -379,7 +379,7 @@ contains
       ! Update XIOS calendar if we are using it for diagnostic output or checkpoint
       if ( use_xios_io ) then
         call log_event( "Gungho: Updating XIOS timestep", LOG_LEVEL_INFO )
-        call xios_update_calendar(timestep)
+        call xios_update_calendar(timestep - timestep_start + 1)
       end if
 
       write( log_scratch_space, '("/", A, "\ ")' ) repeat( "*", 76 )

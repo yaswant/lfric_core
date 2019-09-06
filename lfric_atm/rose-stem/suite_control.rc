@@ -20,6 +20,7 @@
                                                       'wet_conv_bl_cld_scm_checkrestart',
                                                       'robert-moist-smag',
                                                       'robert-moist-blended-smag',
+                                                      'aquaplanet-short',
                                                       'aquaplanet',
 						      ],
                                      } %}
@@ -78,9 +79,18 @@
                      plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:m_v:u1_in_w3:u2_in_w3:u3_in_w3 T000000:T000100:T000200 $PLOT_DIR")',
     'run_application("lfric_atm", "aquaplanet",
                      resolutions=[("C12",300.0)],
+		     env={"crun":2, "nrun":72,
+                          "directives":{"C12":{"mpi_parts":6,
+                                               "threads":1,
+                                               "wallclock":"00:12:00"},
+                                       }, 
+                         }
+		     )',
+    'run_application("lfric_atm", "aquaplanet-short",
+                     resolutions=[("C12",300.0)],
 		     env={"crun":2, "nrun":1,
                           "directives":{"C12":{"mpi_parts":6,
-                                                 "threads":1,
+                                               "threads":1,
                                                "wallclock":"00:10:00"},
                                        }, 
                          }

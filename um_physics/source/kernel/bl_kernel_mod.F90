@@ -33,7 +33,7 @@ module bl_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_kernel_type
     private
-    type(arg_type) :: meta_args(122) = (/            &
+    type(arg_type) :: meta_args(124) = (/            &
         arg_type(GH_INTEGER,  GH_READ),              &! outer
         arg_type(GH_FIELD,   GH_READ,   WTHETA),     &! theta_in_wth
         arg_type(GH_FIELD,   GH_READ,   W3),         &! rho_in_w3
@@ -97,6 +97,8 @@ module bl_kernel_mod
         arg_type(GH_FIELD,   GH_READ,  ANY_SPACE_1), & ! lw_down_surf
         arg_type(GH_FIELD,   GH_READ,  ANY_SPACE_1), & ! sw_down_surf_blue
         arg_type(GH_FIELD,   GH_WRITE,  WTHETA),     &! dtheta_bl
+        arg_type(GH_FIELD,   GH_WRITE,  W3),         &! du_bl
+        arg_type(GH_FIELD,   GH_WRITE,  W3),         &! dv_bl
         arg_type(GH_FIELD,   GH_WRITE,  WTHETA),     &! dt_bl
         arg_type(GH_FIELD,   GH_WRITE,  WTHETA),     &! dmv_bl
         arg_type(GH_FIELD,   GH_READWRITE,  WTHETA), &! dt_conv
@@ -250,6 +252,8 @@ contains
   !> @param[in]     lw_down_surf        Downwelling LW radiation at surface
   !> @param[in]     sw_down_surf_blue   Photosynthetically active SW down
   !> @param[out]    dtheta_bl     BL theta increment
+  !> @param[out]    du_bl         BL 'u' increment
+  !> @param[out]    dv_bl         BL 'v' increment
   !> @param[out]    dt_bl         BL temperature increment
   !> @param[out]    dmv_bl        BL vapour increment
   !> @param[in,out] dt_conv       Convection temperature increment
@@ -391,6 +395,8 @@ contains
                      lw_down_surf,                          &
                      sw_down_surf_blue,                     &
                      dtheta_bl,                             &
+                     du_bl,                                 &
+                     dv_bl,                                 &
                      dt_bl,                                 &
                      dmv_bl,                                &
                      dt_conv,                               &
@@ -545,6 +551,7 @@ contains
     integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
     integer(kind=i_def), dimension(ndf_2d),  intent(in) :: map_2d
 
+    real(kind=r_def), dimension(undf_w3), intent(inout) :: du_bl, dv_bl
     real(kind=r_def), dimension(undf_wth), intent(out)  :: dtheta_bl, dt_bl,   &
                                                            dmv_bl
     real(kind=r_def), dimension(undf_wth), intent(inout):: m_v, m_cl, m_ci,    &
@@ -1953,6 +1960,11 @@ contains
       ! diagnostic increments
       dt_bl(map_wth(1)+k)  = t_latest(1,1,k) - dt_bl(map_wth(1)+k)
       dmv_bl(map_wth(1)+k) = q_latest(1,1,k) - dmv_bl(map_wth(1)+k)
+      ! wind increments
+      du_bl(map_w3(1) + k - 1) = r_u(1,1,k) &
+         - (u1_star(map_w3(1) + k-1) - u1_in_w3(map_w3(1) + k-1))
+      dv_bl(map_w3(1) + k - 1) = r_v(1,1,k) &
+         - (u2_star(map_w3(1) + k-1) - u2_in_w3(map_w3(1) + k-1))
     end do
     ! copy down lowest level to surface as done in UM
     dtheta_bl(map_wth(1) + 0) = dtheta_bl(map_wth(1) + 1)

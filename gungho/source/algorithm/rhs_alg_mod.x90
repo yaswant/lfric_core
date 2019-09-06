@@ -66,12 +66,13 @@ contains
   !>         the appropriate part of the full right hand side
   !> @param[in,out] rhs The state vector to compute
   !> @param[in]     alpha_dt The offcentering parameter times the timestep
+  !> @param[in]     base_state The model prognostic state to which increments are added
   !> @param[in]     state The current model prognostic state
   !> @param[in]     moist_dyn Factors relating to moist dynamics
   !> @param[in]     compute_eos Flag to control computation of the equation of
   !!                state
   !> @param[in]     dlayer_rhs Use damping layer in rhs yes/no
-  subroutine rhs_alg(rhs, alpha_dt, state, moist_dyn, compute_eos, dlayer_rhs)
+  subroutine rhs_alg(rhs, alpha_dt, base_state, state, moist_dyn, compute_eos, dlayer_rhs)
   
     implicit none
 
@@ -79,6 +80,7 @@ contains
     logical,                      intent(in)    :: dlayer_rhs
   
     ! Form of state and rhs is [u,theta,rho,exner] 
+    type(field_type), target,     intent(in)    :: base_state(bundle_size)
     type(field_type), target,     intent(in)    :: state(bundle_size)
     type(field_type),             intent(in)    :: moist_dyn(num_moist_factors)
     type(field_type),             intent(inout) :: rhs(bundle_size)
@@ -93,6 +95,9 @@ contains
                                  u            => null(), &
                                  theta        => null(), &
                                  rho          => null(), &
+                                 u_base       => null(), &
+                                 theta_base   => null(), &
+                                 rho_base     => null(), &
                                  exner        => null()
 
     type(field_type)                       :: rhs_tmp, rhs_eos
@@ -124,6 +129,10 @@ contains
     theta => state(igh_t)
     rho   => state(igh_d)
     exner => state(igh_p)
+
+    u_base     => base_state(igh_u)
+    theta_base => base_state(igh_t)
+    rho_base   => base_state(igh_d)
  
     rhs_tmp = field_type( vector_space=rhs(igh_u)%get_function_space() )
     rhs_eos = field_type( vector_space=rhs(igh_p)%get_function_space() )
@@ -146,7 +155,7 @@ contains
                  hydrostatic_kernel_type( rhs_tmp, exner, theta, moist_dyn,  &
                                           geopotential, qr ),                &
                  kinetic_energy_gradient_kernel_type( rhs_tmp, u, chi, qr ), &
-                 matrix_vector_kernel_type( rhs(igh_u), u, mm_vel ) )
+                 matrix_vector_kernel_type( rhs(igh_u), u_base, mm_vel ) )
 
      ! Compute the vorticity
     mesh_id = u%get_mesh_id()
@@ -178,9 +187,9 @@ contains
  
     call invoke( name = "Compute rhs_theta and rhs_rho",                    &
     ! Compute rhs_theta
-                 matrix_vector_kernel_type( rhs(igh_t), theta, mm_wtheta ), &
+                 matrix_vector_kernel_type( rhs(igh_t), theta_base, mm_wtheta ), &
     ! Compute rhs_rho
-                 setval_X( rhs(igh_d), rho ) )
+                 setval_X( rhs(igh_d), rho_base ) )
     if ( compute_eos ) then
       qr = quadrature_xyoz_type(1, gaussian_quadrature)
       call invoke( name = "Compute rhs_eos",                                       &

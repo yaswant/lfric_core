@@ -379,7 +379,7 @@
        <field id="restart_stellar_eqn_of_time_rts" name="stellar_eqn_of_time_rts" long_name="Stellar equation of time" unit="1" operation="instant" domain_ref="checkpoint_W3_2D" />
       </file>
 
-      <file id="lfric_diag" name="lfric_diag" output_freq="10ts" convention="UGRID" enabled=".TRUE.">
+      <file id="lfric_diag" name="lfric_diag" output_freq="6h" convention="UGRID" enabled=".TRUE.">
 	<field_group group_ref="derived_fields" />
         <field field_ref="theta"/>
         <field field_ref="dt_bl"/>
@@ -507,7 +507,7 @@
         <field field_ref="stellar_irradiance_rts"/>
       </file>
 
-      <file id="lfric_averages" name="lfric_averages" output_freq="10ts" convention="UGRID" enabled=".TRUE.">
+      <file id="lfric_averages" name="lfric_averages" output_freq="12h" convention="UGRID" enabled=".TRUE.">
         <field field_ref="theta" operation="average" />
         <field field_ref="w_physics" operation="average" />
         <field field_ref="u1" operation="average" />
