@@ -14,6 +14,7 @@ module gungho_driver_mod
   use time_config_mod,            only : timestep_start, &
                                          timestep_end
   use field_mod,                  only : field_type
+  use gungho_model_data_mod,      only : gungho_model_data_type
   use formulation_config_mod,     only : use_physics
   use function_space_collection_mod, &
                                   only : function_space_collection
@@ -75,8 +76,6 @@ module gungho_driver_mod
                                          LOG_LEVEL_INFO,     &
                                          LOG_LEVEL_TRACE
   use mesh_collection_mod,        only : mesh_collection
-  use mr_indices_mod,             only : nummr
-  use moist_dyn_mod,              only : num_moist_factors
 #ifdef UM_PHYSICS
   use planet_constants_mod,       only : set_planet_constants
 #endif
@@ -96,34 +95,9 @@ module gungho_driver_mod
   character(len=*), parameter :: xios_id   = "lfric_client"
   character(len=*), parameter :: xios_ctx  = "gungho_atm"
 
-  ! Depository of shared fields
-  type( field_collection_type ), target :: depository
-
-  ! Surface fields
-  type( field_collection_type ) :: jules_ancils
-  type( field_collection_type ) :: jules_prognostics
-
-  ! Field collections
-  type( field_collection_type ) :: prognostic_fields
-  type( field_collection_type ) :: diagnostic_fields
-  type( field_collection_type ) :: derived_fields
-  type( field_collection_type ) :: cloud_fields
-  type( field_collection_type ) :: twod_fields
-  type( field_collection_type ) :: radstep_fields
-  type( field_collection_type ) :: physics_incs
-  type( field_collection_type ) :: fd_fields
-
-
-  ! Auxiliary prognostic fields
-  ! Moisture mixing ratios
-  type( field_type ) :: mr(nummr)
-
-  ! Moist dynamics
-  type( field_type ) :: moist_dyn(num_moist_factors)
-
-  ! A pointer used for retrieving fields from collections
-  ! when iterating over them
-  type( field_type ), pointer :: field_ptr  => null()
+  
+  ! Model run working data set
+  type (gungho_model_data_type) :: model_data
 
   ! Coordinate field
   type(field_type), target :: chi(3)
@@ -180,24 +154,30 @@ contains
     call create_runtime_constants(mesh_id, twod_mesh_id, chi)
 
     ! Create the depository, prognostics and diagnostics field collections.
-    depository = field_collection_type(name='depository')
-    prognostic_fields = field_collection_type(name="prognostics")
-    diagnostic_fields = field_collection_type(name="diagnostics")
+    model_data%depository = field_collection_type(name='depository')
+    model_data%prognostic_fields = field_collection_type(name="prognostics")
+    model_data%diagnostic_fields = field_collection_type(name="diagnostics")
 
     ! Create gungho prognostics and auxilliary (diagnostic) fields
-    call create_gungho_prognostics( mesh_id, depository, &
-                                    prognostic_fields, diagnostic_fields, &
-                                    mr, moist_dyn )
+    call create_gungho_prognostics( mesh_id,                          & 
+                                    model_data%depository,          &
+                                    model_data%prognostic_fields,   &
+                                    model_data%diagnostic_fields,   &
+                                    model_data%mr,                  &
+                                    model_data%moist_dyn )
 
     ! Create prognostics used by physics
     if (use_physics) then
-      call create_physics_prognostics( mesh_id, twod_mesh_id, &
-                                       depository, &
-                                       prognostic_fields, &
-                                       derived_fields, cloud_fields, &
-                                       twod_fields, radstep_fields, &
-                                       physics_incs, &
-                                       jules_ancils, jules_prognostics )
+      call create_physics_prognostics( mesh_id, twod_mesh_id,        &
+                                       model_data%depository,        &
+                                       model_data%prognostic_fields, &
+                                       model_data%derived_fields,    &
+                                       model_data%cloud_fields,      &
+                                       model_data%twod_fields,       &
+                                       model_data%radstep_fields,    &
+                                       model_data%physics_incs,      &
+                                       model_data%jules_ancils,      &
+                                       model_data%jules_prognostics )
     end if
 
     !-------------------------------------------------------------------------
@@ -226,16 +206,18 @@ contains
         ! Initialise prognostics analytically according to
         ! namelist options
 
-        call init_gungho_prognostics_alg(prognostic_fields, diagnostic_fields, &
-                                         mr, moist_dyn)
+        call init_gungho_prognostics_alg( model_data%prognostic_fields, &
+                                          model_data%diagnostic_fields, &
+                                          model_data%mr,                & 
+                                          model_data%moist_dyn )
 
         if (use_physics) then
-          call init_physics_prognostics_alg(derived_fields, &
-                                            cloud_fields, &
-                                            twod_fields, &
-                                            physics_incs, &
-                                            jules_ancils, &
-                                            jules_prognostics)
+          call init_physics_prognostics_alg( model_data%derived_fields, &
+                                             model_data%cloud_fields,   &
+                                             model_data%twod_fields,    &
+                                             model_data%physics_incs,   &
+                                             model_data%jules_ancils,   &
+                                             model_data%jules_prognostics )
         end if
 
       case ( init_option_checkpoint_dump )
@@ -243,20 +225,20 @@ contains
         ! Initialize prognostics using a checkpoint file
         ! from a previous run
 
-        call read_checkpoint(prognostic_fields, timestep_start-1)
+        call read_checkpoint( model_data%prognostic_fields, timestep_start-1 )
 
         ! Update factors for moist dynamics
-        call moist_dyn_factors_alg(moist_dyn, mr)
+        call moist_dyn_factors_alg( model_data%moist_dyn, model_data%mr )
 
         if (use_physics) then
           ! if no cloud scheme, reset cloud variables
           if ( cloud == cloud_none ) then  
-            call initial_cloud_alg(cloud_fields)
+            call initial_cloud_alg( model_data%cloud_fields )
           end if
           ! re-initialise jules fields
-          call init_jules_alg(jules_ancils, jules_prognostics)
+          call init_jules_alg( model_data%jules_ancils, model_data%jules_prognostics )
           ! Set the increments to 0 initially
-          call init_physics_incs_alg(physics_incs)
+          call init_physics_incs_alg( model_data%physics_incs )
         end if
 
       case ( init_option_fd_start_dump )
@@ -266,23 +248,25 @@ contains
           ! Initialise FD prognostic fields from a UM2LFRic dump     
 
           ! Create FD prognostic fields
-          call create_fd_prognostics(mesh_id, fd_fields)
+          call create_fd_prognostics( mesh_id, model_data%fd_fields )
 
           ! Read in from a UM2LFRic dump file
-          call init_fd_prognostics_dump(fd_fields)
+          call init_fd_prognostics_dump( model_data%fd_fields )
 
           ! Initialise jules fields
-          call init_jules_alg(jules_ancils, jules_prognostics)
+          call init_jules_alg( model_data%jules_ancils, model_data%jules_prognostics )
 
           ! Set physics increments to 0
-          call init_physics_incs_alg(physics_incs)
+          call init_physics_incs_alg( model_data%physics_incs )
 
           ! Populate prognostics from input finite difference fields
-          call map_fd_to_prognostics(prognostic_fields, diagnostic_fields, &
-                                     mr, moist_dyn,         &
-                                     cloud_fields,          &
-                                     twod_fields,           &
-                                     fd_fields)
+          call map_fd_to_prognostics( model_data%prognostic_fields,          &
+                                      model_data%diagnostic_fields,          &
+                                      model_data%mr,                         &
+                                      model_data%moist_dyn,                  &
+                                      model_data%cloud_fields,               &
+                                      model_data%twod_fields,                &
+                                      model_data%fd_fields )
 
         else
           call log_event("Gungho: Prognostic initialisation from an FD dump not valid "// &
@@ -311,10 +295,10 @@ contains
           call log_event( "Gungho: No ancillaries to be read for this run.", LOG_LEVEL_INFO )
         case ( ancil_option_aquaplanet )
           call log_event( "Gungho: Reading ancillaries from aquaplanet dump ", LOG_LEVEL_INFO )
-          call init_aquaplanet_ancils(twod_fields)
+          call init_aquaplanet_ancils( model_data%twod_fields )
         case ( ancil_option_analytic )
           call log_event( "Gungho: Setting ancillaries from analytic representation ", LOG_LEVEL_INFO )
-          call init_analytic_ancils(twod_fields)
+          call init_analytic_ancils( model_data%twod_fields )
         case default
           ! No valid ancil option selected
           call log_event("Gungho: No valid ancillary initialisation option selected, "// &
@@ -324,7 +308,7 @@ contains
       ! All reading has been done, map the SST into the correct
       ! location of the multi-dimensional field
       put_field = .true.
-      call update_tstar_alg(twod_fields, jules_prognostics, put_field)
+      call update_tstar_alg( model_data%twod_fields, model_data%jules_prognostics, put_field )
 
     end if
 
@@ -337,14 +321,14 @@ contains
       if ( write_diag ) then
 
         ! Calculation and output of diagnostics
-        call gungho_diagnostics_driver( mesh_id, &
-                                        prognostic_fields, &
-                                        diagnostic_fields, &
-                                        mr, &
-                                        moist_dyn, &
-                                        cloud_fields, &
-                                        derived_fields, &
-                                        ts_init, &
+        call gungho_diagnostics_driver( mesh_id,                      &
+                                        model_data%prognostic_fields, &
+                                        model_data%diagnostic_fields, &
+                                        model_data%mr,                &
+                                        model_data%moist_dyn,         &
+                                        model_data%cloud_fields,      &
+                                        model_data%derived_fields,    &
+                                        ts_init,                      &
                                         nodal_output_on_w3 )
 
       end if
@@ -356,9 +340,11 @@ contains
     call set_planet_constants()
 #endif
 
-    call init_gungho( mesh_id, &
-                      prognostic_fields,diagnostic_fields, &
-                      mr, twod_fields, &
+    call init_gungho( mesh_id,                      &
+                      model_data%prognostic_fields, &
+                      model_data%diagnostic_fields, &
+                      model_data%mr,                &
+                      model_data%twod_fields,       &
                       timestep_start )
 
   end subroutine initialise
@@ -388,19 +374,19 @@ contains
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
       ! Perform a timestep
-      call step_gungho( mesh_id,           &
-                        twod_mesh_id,      &
-                        prognostic_fields, &
-                        diagnostic_fields, &
-                        mr,                &
-                        moist_dyn,         &
-                        derived_fields,    &
-                        cloud_fields,      &
-                        twod_fields,       &
-                        radstep_fields,    &
-                        physics_incs,      &
-                        jules_ancils,      &
-                        jules_prognostics, &
+      call step_gungho( mesh_id,                      &
+                        twod_mesh_id,                 &
+                        model_data%prognostic_fields, &
+                        model_data%diagnostic_fields, &
+                        model_data%mr,                &
+                        model_data%moist_dyn,         &
+                        model_data%derived_fields,    &
+                        model_data%cloud_fields,      &
+                        model_data%twod_fields,       &
+                        model_data%radstep_fields,    &
+                        model_data%physics_incs,      &
+                        model_data%jules_ancils,      &
+                        model_data%jules_prognostics, &
                         timestep )
 
       write( log_scratch_space, '(A,I0)' ) 'End of timestep ', timestep
@@ -416,14 +402,14 @@ contains
         call log_event("Gungho: writing diagnostic output", LOG_LEVEL_INFO)
 
         ! Calculation and output diagnostics
-        call gungho_diagnostics_driver( mesh_id, &
-                                        prognostic_fields, &
-                                        diagnostic_fields, &
-                                        mr, &
-                                        moist_dyn, &
-                                        cloud_fields, &
-                                        derived_fields, &
-                                        timestep, &
+        call gungho_diagnostics_driver( mesh_id,                      &
+                                        model_data%prognostic_fields, &
+                                        model_data%diagnostic_fields, &
+                                        model_data%mr,                &
+                                        model_data%moist_dyn,         &
+                                        model_data%cloud_fields,      &
+                                        model_data%derived_fields,    &
+                                        timestep,                     &
                                         nodal_output_on_w3 )
       end if
 
@@ -442,20 +428,20 @@ contains
     if (use_physics) then
       ! All running has been done, map the SST back into the dumped field
       put_field = .false.
-      call update_tstar_alg(twod_fields, jules_prognostics, put_field)
+      call update_tstar_alg( model_data%twod_fields, model_data%jules_prognostics, put_field )
     end if
 
     ! Write checkpoint files if required
     if( checkpoint_write ) then
-       call write_checkpoint(prognostic_fields, timestep_end)
+       call write_checkpoint( model_data%prognostic_fields, timestep_end )
     end if
 
-    call final_gungho( mesh_id,           &
-                       prognostic_fields, &
-                       diagnostic_fields, &
-                       mr,                &
-                       twod_fields,       &
-                       fd_fields,         &
+    call final_gungho( mesh_id,                      &
+                       model_data%prognostic_fields, &
+                       model_data%diagnostic_fields, &
+                       model_data%mr,                &
+                       model_data%twod_fields,       &
+                       model_data%fd_fields,         &
                        program_name )
 
     call final_runtime_constants()
