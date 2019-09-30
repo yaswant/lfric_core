@@ -10,6 +10,8 @@ module gungho_model_data_mod
   use moist_dyn_mod,              only : num_moist_factors
   use field_mod,                  only : field_type
   use field_collection_mod,       only : field_collection_type
+  use log_mod,                    only : log_event, &
+                                         LOG_LEVEL_INFO
 
   implicit none
 
@@ -17,7 +19,7 @@ module gungho_model_data_mod
 
   !> Holds the working data set for a model run.
   !>
-  type, public :: gungho_model_data_type
+  type :: model_data_type
 
     private
 
@@ -55,6 +57,35 @@ module gungho_model_data_mod
     !> FD fields used to read initial conditions from LFRic-Input files
     type( field_collection_type ), public :: fd_fields
 
-  end type gungho_model_data_type
+  end type model_data_type
+
+  public model_data_type, finalise_model_data
+
+contains
+
+  !>@brief Routine to destroy all the field collections in the working data set
+  !> @param[inout] model_data The working data set for a model run
+  subroutine finalise_model_data( model_data )
+ 
+    implicit none
+
+      type(model_data_type), intent(inout) :: model_data
+
+      ! Clear all the fields in each field collection
+      call model_data%depository%clear()
+      call model_data%prognostic_fields%clear()
+      call model_data%diagnostic_fields%clear()
+      call model_data%jules_ancils%clear()
+      call model_data%jules_prognostics%clear()
+      call model_data%derived_fields%clear()
+      call model_data%cloud_fields%clear()
+      call model_data%twod_fields%clear()
+      call model_data%radstep_fields%clear()
+      call model_data%physics_incs%clear()
+      call model_data%fd_fields%clear()
+
+      call log_event( 'finalise_model_data: all fields have been cleared', LOG_LEVEL_INFO )
+
+  end subroutine finalise_model_data
 
 end module gungho_model_data_mod

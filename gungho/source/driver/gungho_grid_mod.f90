@@ -12,14 +12,14 @@ module gungho_grid_mod
   use field_mod,                      only : field_type
   use global_mesh_collection_mod,     only : global_mesh_collection, &
                                              global_mesh_collection_type
-  use init_mesh_mod,                  only : init_mesh
-  use init_fem_mod,                   only : init_fem
+  use create_mesh_mod,                only : init_mesh, final_mesh
+  use create_fem_mod,                 only : init_fem, final_fem
   use mpi_mod,                        only : get_comm_size, get_comm_rank
 
   implicit none
 
   private
-  public initialise_grid
+  public initialise_grid, finalise_grid
 
 contains
 
@@ -55,5 +55,15 @@ contains
     deallocate(global_mesh_collection)
 
   end subroutine initialise_grid
+
+  !> @brief Finalises grid related information used by the model
+  subroutine finalise_grid()
+
+    implicit none
+
+    call final_mesh()
+    call final_fem()
+ 
+  end subroutine finalise_grid
 
 end module gungho_grid_mod

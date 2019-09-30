@@ -12,14 +12,14 @@ module gravity_wave_grid_mod
   use field_mod,                      only : field_type
   use global_mesh_collection_mod,     only : global_mesh_collection, &
                                              global_mesh_collection_type
-  use init_mesh_mod,                  only : init_mesh
-  use init_fem_mod,                   only : init_fem
+  use create_mesh_mod,                only : init_mesh
+  use create_fem_mod,                 only : init_fem
   use fs_continuity_mod,              only : W3
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection_type, &
                                              function_space_collection
   use function_space_chain_mod,       only : function_space_chain_type
-  use init_multigrid_mesh_mod,        only : mesh_ids
+  use create_multigrid_mesh_mod,      only : mesh_ids
   use log_mod,                        only : log_event,          &
                                              log_scratch_space,  &
                                              LOG_LEVEL_INFO

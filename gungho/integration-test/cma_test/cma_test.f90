@@ -42,7 +42,7 @@ program cma_test
   use function_space_collection_mod,  only : function_space_collection
   use configuration_mod,              only : read_configuration, &
                                              ensure_configuration
-  use init_mesh_mod,                  only : init_mesh
+  use create_mesh_mod,                only : init_mesh
   use log_mod,                        only : log_event,         &
                                              log_scratch_space, &
                                              initialise_logging, &

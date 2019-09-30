@@ -12,8 +12,8 @@ module cell_locator_driver_mod
   use constants_mod,                  only : i_def, r_def
   use cli_mod,                        only : get_initial_filename
   use cell_locator_mod,               only : load_configuration
-  use init_mesh_mod,                  only : init_mesh
-  use init_fem_mod,                   only : init_fem
+  use create_mesh_mod,                only : init_mesh
+  use create_fem_mod,                 only : init_fem
   use yaxt,                           only : xt_initialize, xt_finalize
   use global_mesh_collection_mod,     only : global_mesh_collection, &
                                              global_mesh_collection_type

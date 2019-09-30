@@ -19,9 +19,9 @@ module transport_driver_mod
   use configuration_mod,              only: final_configuration
   use transport_mod,                  only: transport_load_configuration, &
                                             program_name
-  use init_fem_mod,                   only: init_fem
+  use create_fem_mod,                 only: init_fem
+  use create_mesh_mod,                only: init_mesh
   use init_transport_mod,             only: init_transport
-  use init_mesh_mod,                  only: init_mesh
   use io_mod,                         only: xios_domain_init
   use diagnostics_io_mod,             only: write_scalar_diagnostic,          &
                                             write_vector_diagnostic

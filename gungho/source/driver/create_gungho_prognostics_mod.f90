@@ -60,18 +60,18 @@ contains
                                        mr, moist_dyn)
     implicit none
 
-    integer(i_def), intent(in)                 :: mesh_id
+    integer(i_def), intent(in)                :: mesh_id
 
-    type(field_collection_type), intent(inout) :: depository
-    type(field_collection_type), intent(inout) :: prognostic_fields
-    type(field_collection_type), intent(inout) :: diagnostic_fields
+    type(field_collection_type), intent(out)  :: depository
+    type(field_collection_type), intent(out)  :: prognostic_fields
+    type(field_collection_type), intent(out)  :: diagnostic_fields
 
-    type( field_type ), intent(inout), target  :: mr(nummr)
-    type( field_type ), intent(inout)          :: moist_dyn(num_moist_factors)
+    type( field_type ), intent(inout), target :: mr(nummr)
+    type( field_type ), intent(inout)         :: moist_dyn(num_moist_factors)
 
-    type( field_type ), pointer                :: tmp_ptr
+    type( field_type ), pointer               :: tmp_ptr
 
-    integer(i_def)                             :: imr
+    integer(i_def)                            :: imr
 
     procedure(write_interface), pointer :: tmp_write_ptr => null()
     procedure(checkpoint_write_interface), pointer :: tmp_checkpoint_write_ptr => null()
@@ -81,6 +81,11 @@ contains
     type( field_type )                         :: u, rho, theta, exner
 
     call log_event( 'GungHo: Creating prognostics...', LOG_LEVEL_INFO )
+
+    ! Create the depository, prognostics and diagnostics field collections.
+    depository = field_collection_type(name='depository')
+    prognostic_fields = field_collection_type(name="prognostics")
+    diagnostic_fields = field_collection_type(name="diagnostics")
 
     ! Create prognostic fields
     theta = field_type( vector_space = &

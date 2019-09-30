@@ -4,11 +4,12 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
-!> @brief init functionality for fem specific choices for model
+!> @brief init and final for fem specific choices for model
 
-!> @details Creates a collection of function spaces and the coordinate field (chi)
+!> @details Create and destroy a collection of function spaces and the coordinate 
+!>          field (chi)
 
-module init_fem_mod
+module create_fem_mod
 
   use constants_mod,                  only : i_def, i_native
   use finite_element_config_mod,      only : element_order, coordinate_order
@@ -29,11 +30,13 @@ module init_fem_mod
                                              LOG_LEVEL_INFO,    &
                                              log_scratch_space
   use multigrid_config_mod,           only : l_multigrid, multigrid_chain_nitems, ugrid
-  use init_multigrid_mesh_mod,        only : mesh_ids
+  use create_multigrid_mesh_mod,      only : mesh_ids
 
 
   implicit none
 
+  private
+  public :: init_fem, final_fem
 
   contains
 
@@ -157,4 +160,17 @@ module init_fem_mod
 
   end subroutine init_fem
 
-end module init_fem_mod
+  !> @brief Finalises the function_space_collection
+  subroutine final_fem()
+
+    implicit none
+
+    if (allocated(function_space_collection)) then
+      call function_space_collection%clear()
+      deallocate(function_space_collection)
+    end if
+
+
+  end subroutine final_fem
+
+end module create_fem_mod

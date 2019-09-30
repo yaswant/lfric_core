@@ -14,15 +14,15 @@ module gungho_driver_mod
   use time_config_mod,            only : timestep_start, &
                                          timestep_end
   use field_mod,                  only : field_type
-  use gungho_model_data_mod,      only : gungho_model_data_type
+  use gungho_model_data_mod,      only : model_data_type, &
+                                         finalise_model_data
   use formulation_config_mod,     only : use_physics
   use function_space_collection_mod, &
                                   only : function_space_collection
   use field_collection_mod,       only : field_collection_type
-  use final_gungho_mod,           only : final_gungho
   use gungho_diagnostics_driver_mod, &
                                   only : gungho_diagnostics_driver
-  use gungho_grid_mod,            only : initialise_grid
+  use gungho_grid_mod,            only : initialise_grid, finalise_grid
   use gungho_infrastructure_mod,  only : initialise_infrastructure, &
                                          finalise_infrastructure
   use gungho_io_mod,              only : initialise_io, &
@@ -31,6 +31,9 @@ module gungho_driver_mod
                                   only : create_gungho_prognostics
   use create_physics_prognostics_mod, &
                                   only : create_physics_prognostics
+
+  use create_fd_prognostics_mod,  &
+                                  only : create_fd_prognostics
   use init_gungho_prognostics_alg_mod, &
                                   only : init_gungho_prognostics_alg
   use map_fd_to_prognostics_alg_mod,  only : map_fd_to_prognostics
@@ -42,7 +45,8 @@ module gungho_driver_mod
                                   only : init_physics_prognostics_alg
   use update_tstar_alg_mod,       only : update_tstar_alg
   use runtime_constants_mod,      only : create_runtime_constants
-  use init_gungho_mod,            only : init_gungho
+  use gungho_model_mod,           only : initialise_model, & 
+                                         finalise_model
   use io_mod,                     only : write_checkpoint, &
                                          read_checkpoint
   use io_config_mod,              only : write_diag,           &
@@ -80,7 +84,7 @@ module gungho_driver_mod
   use planet_constants_mod,       only : set_planet_constants
 #endif
   use runtime_constants_mod,      only : final_runtime_constants
-  use step_gungho_mod,            only : step_gungho
+  use gungho_step_mod,            only : step
   use timer_mod,                  only : timer, output_timer
   use xios
   use count_mod,                  only : count_type, halo_calls
@@ -97,7 +101,7 @@ module gungho_driver_mod
 
   
   ! Model run working data set
-  type (gungho_model_data_type) :: model_data
+  type (model_data_type) :: model_data
 
   ! Coordinate field
   type(field_type), target :: chi(3)
@@ -153,13 +157,31 @@ contains
     ! matrix diagonal fields and the geopotential field
     call create_runtime_constants(mesh_id, twod_mesh_id, chi)
 
-    ! Create the depository, prognostics and diagnostics field collections.
-    model_data%depository = field_collection_type(name='depository')
-    model_data%prognostic_fields = field_collection_type(name="prognostics")
-    model_data%diagnostic_fields = field_collection_type(name="diagnostics")
+#ifdef UM_PHYSICS
+    ! Set derived planet constants and presets
+    call set_planet_constants()
+#endif
+
+    !-------------------------------------------------------------------------
+    ! Select how to initialise model prognostic fields
+    !-------------------------------------------------------------------------
+
+    ! This way of setting up the initialisation options is not ideal, but
+    ! pragmatic for now and avoids extra namelist changes. It should be
+    ! reviewed in the next round of driver layer refactoring
+
+    ! Get the specified namelist options for prognostic initialisation
+    prognostic_init_choice = init_option
+    ancil_choice = ancil_option
+
+    ! If checkpoint reading has been specified then override these options
+    if (checkpoint_read) then
+      prognostic_init_choice = init_option_checkpoint_dump
+      ancil_choice = ancil_option_none
+    end if
 
     ! Create gungho prognostics and auxilliary (diagnostic) fields
-    call create_gungho_prognostics( mesh_id,                          & 
+    call create_gungho_prognostics( mesh_id,                        & 
                                     model_data%depository,          &
                                     model_data%prognostic_fields,   &
                                     model_data%diagnostic_fields,   &
@@ -180,23 +202,11 @@ contains
                                        model_data%jules_prognostics )
     end if
 
-    !-------------------------------------------------------------------------
-    ! Select how to initialize model prognostic fields
-    !-------------------------------------------------------------------------
-
-    ! This way of setting up the initialisation options is not ideal, but
-    ! pragmatic for now and avoids extra namelist changes. It should be
-    ! reviewed in the next round of driver layer refactoring
- 
-    ! Get the specified namelist options for prognostic initialisation
-    prognostic_init_choice = init_option
-    ancil_choice = ancil_option
-
-    ! If checkpoint reading has been specified then override these options
-    if (checkpoint_read) then
-      prognostic_init_choice = init_option_checkpoint_dump
-      ancil_choice = ancil_option_none
-    end if
+    ! Create FD prognostic fields
+    select case ( prognostic_init_choice )
+      case ( init_option_fd_start_dump )
+        if (use_physics) call create_fd_prognostics(mesh_id, model_data%fd_fields)
+    end select
 
     ! Initialise prognostic fields appropriately
     select case ( prognostic_init_choice )
@@ -246,9 +256,6 @@ contains
         if (use_physics) then
 
           ! Initialise FD prognostic fields from a UM2LFRic dump     
-
-          ! Create FD prognostic fields
-          call create_fd_prognostics( mesh_id, model_data%fd_fields )
 
           ! Read in from a UM2LFRic dump file
           call init_fd_prognostics_dump( model_data%fd_fields )
@@ -335,17 +342,12 @@ contains
 
     end if
 
-#ifdef UM_PHYSICS
-    ! Set derived planet constants and presets
-    call set_planet_constants()
-#endif
-
-    call init_gungho( mesh_id,                      &
-                      model_data%prognostic_fields, &
-                      model_data%diagnostic_fields, &
-                      model_data%mr,                &
-                      model_data%twod_fields,       &
-                      timestep_start )
+    call initialise_model( mesh_id,                      &
+                           model_data%prognostic_fields, &
+                           model_data%diagnostic_fields, &
+                           model_data%mr,                &
+                           model_data%twod_fields,       &
+                           timestep_start )
 
   end subroutine initialise
 
@@ -374,20 +376,20 @@ contains
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
       ! Perform a timestep
-      call step_gungho( mesh_id,                      &
-                        twod_mesh_id,                 &
-                        model_data%prognostic_fields, &
-                        model_data%diagnostic_fields, &
-                        model_data%mr,                &
-                        model_data%moist_dyn,         &
-                        model_data%derived_fields,    &
-                        model_data%cloud_fields,      &
-                        model_data%twod_fields,       &
-                        model_data%radstep_fields,    &
-                        model_data%physics_incs,      &
-                        model_data%jules_ancils,      &
-                        model_data%jules_prognostics, &
-                        timestep )
+      call step( mesh_id,                      &
+                 twod_mesh_id,                 &
+                 model_data%prognostic_fields, &
+                 model_data%diagnostic_fields, &
+                 model_data%mr,                &
+                 model_data%moist_dyn,         &
+                 model_data%derived_fields,    &
+                 model_data%cloud_fields,      &
+                 model_data%twod_fields,       &
+                 model_data%radstep_fields,    &
+                 model_data%physics_incs,      &
+                 model_data%jules_ancils,      &
+                 model_data%jules_prognostics, &
+                 timestep )
 
       write( log_scratch_space, '(A,I0)' ) 'End of timestep ', timestep
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
@@ -436,13 +438,15 @@ contains
        call write_checkpoint( model_data%prognostic_fields, timestep_end )
     end if
 
-    call final_gungho( mesh_id,                      &
-                       model_data%prognostic_fields, &
-                       model_data%diagnostic_fields, &
-                       model_data%mr,                &
-                       model_data%twod_fields,       &
-                       model_data%fd_fields,         &
-                       program_name )
+    call finalise_model( mesh_id,                      &
+                         model_data%prognostic_fields, &
+                         model_data%diagnostic_fields, &
+                         model_data%mr,                &
+                         model_data%twod_fields,       &
+                         model_data%fd_fields,         &
+                         program_name )
+
+    call finalise_model_data( model_data )
 
     call final_runtime_constants()
 
@@ -462,15 +466,7 @@ contains
 
     call finalise_io()
 
-    if (allocated(mesh_collection)) then
-      call mesh_collection%clear()
-      deallocate(mesh_collection)
-    end if
-
-    if (allocated(function_space_collection)) then
-      call function_space_collection%clear()
-      deallocate(function_space_collection)
-    end if
+    call finalise_grid()
 
     call log_event( program_name//' completed.', LOG_LEVEL_ALWAYS )
 

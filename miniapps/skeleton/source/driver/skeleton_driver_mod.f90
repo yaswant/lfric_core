@@ -12,8 +12,8 @@ module skeleton_driver_mod
   use constants_mod,              only : i_def, i_native
   use convert_to_upper_mod,       only : convert_to_upper
   use cli_mod,                    only : get_initial_filename
-  use init_mesh_mod,              only : init_mesh
-  use init_fem_mod,               only : init_fem
+  use create_mesh_mod,            only : init_mesh
+  use create_fem_mod,             only : init_fem
   use init_skeleton_mod,          only : init_skeleton
   use yaxt,                       only : xt_initialize, xt_finalize
   use global_mesh_collection_mod, only : global_mesh_collection, &

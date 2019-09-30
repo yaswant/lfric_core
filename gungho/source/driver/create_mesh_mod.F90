@@ -3,10 +3,10 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used
 !-----------------------------------------------------------------------------
-!> @brief Sets up prtitioned 3D mesh(es)
-!> @details This code generates reads global ugrid meshes and sets up
-!>          partitioned 3D mesh(es)
-module init_mesh_mod
+!> @brief Set up and destroy partitioned 3D mesh(es)
+!> @details Contains routines to: i) read global ugrid meshes and set up 
+!>          partitioned 3D mesh(es) ii) destroy partitioned mesh(es)
+module create_mesh_mod
 
   use base_mesh_config_mod,       only: filename, prime_mesh_name, geometry, &
                                         geometry_spherical
@@ -20,7 +20,7 @@ module init_mesh_mod
   use global_mesh_mod,            only: global_mesh_type
   use global_mesh_collection_mod, only: global_mesh_collection
   use gungho_extrusion_mod,       only: create_extrusion, create_shifted_extrusion
-  use init_multigrid_mesh_mod,    only: init_multigrid_mesh
+  use create_multigrid_mesh_mod,  only: init_multigrid_mesh
   use log_mod,                    only: log_event,         &
                                         log_scratch_space, &
                                         LOG_LEVEL_INFO,    &
@@ -51,6 +51,9 @@ module init_mesh_mod
   use ugrid_file_mod,             only: ugrid_file_type
 
   implicit none
+
+  private
+  public :: init_mesh, final_mesh
 
 contains
 
@@ -321,4 +324,16 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
   return
 end subroutine init_mesh
 
-end module init_mesh_mod
+!> @brief Finalises the mesh_collection
+subroutine final_mesh()
+
+  implicit none
+
+  if (allocated(mesh_collection)) then
+    call mesh_collection%clear()
+    deallocate(mesh_collection)
+  end if
+ 
+end subroutine final_mesh
+
+end module create_mesh_mod

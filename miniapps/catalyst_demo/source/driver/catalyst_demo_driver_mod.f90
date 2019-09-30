@@ -22,9 +22,9 @@ module catalyst_demo_driver_mod
   use gw_alg_mod,                     only: gravity_wave_alg_init, &
                                             gravity_wave_alg_step, &
                                             gravity_wave_alg_final
-  use init_fem_mod,                   only: init_fem
+  use create_fem_mod,                 only: init_fem
+  use create_mesh_mod,                only: init_mesh
   use init_catalyst_demo_mod,         only: init_catalyst_demo
-  use init_mesh_mod,                  only: init_mesh
   use io_mod,                         only: xios_domain_init,   &
                                             ts_fname
   use diagnostics_io_mod,             only: write_scalar_diagnostic, &

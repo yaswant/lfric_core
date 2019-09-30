@@ -43,7 +43,7 @@ module init_catalyst_demo_mod
   use function_space_collection_mod,  only : function_space_collection
   use function_space_chain_mod,       only : function_space_chain_type
 
-  use init_multigrid_mesh_mod,        only : mesh_ids
+  use create_multigrid_mesh_mod,      only : mesh_ids
   use multigrid_config_mod,           only : l_multigrid, &
                                              ugrid,       &
                                              multigrid_chain_nitems

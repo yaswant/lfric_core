@@ -4,7 +4,7 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 
-module init_multigrid_mesh_mod
+module create_multigrid_mesh_mod
 
 use base_mesh_config_mod,       only: prime_mesh_name
 use constants_mod,              only: i_def, str_def
@@ -93,4 +93,4 @@ deallocate(extrusion)
 return
 end subroutine init_multigrid_mesh
 
-end module init_multigrid_mesh_mod
+end module create_multigrid_mesh_mod

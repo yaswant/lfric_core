@@ -9,7 +9,7 @@
 !> @details Handles the stepping (for a single timestep) of the
 !>          gungho app
 
-module step_gungho_mod
+module gungho_step_mod
 
   use conservation_algorithm_mod,     only : conservation_algorithm
   use constants_mod,                  only : i_def
@@ -35,7 +35,7 @@ module step_gungho_mod
   implicit none
 
   private
-  public step_gungho
+  public step
 
   contains
 
@@ -54,20 +54,20 @@ module step_gungho_mod
   !> @param[inout] jules_ancils Collection of Jules ancillaries
   !> @param[inout] jules_prognostics Collection of Jules prognostics
   !> @param[in] timestep number of current timestep
-  subroutine step_gungho(mesh_id,           &
-                         twod_mesh_id,      &
-                         prognostic_fields, &
-                         diagnostic_fields, &
-                         mr,                &
-                         moist_dyn,         &
-                         derived_fields,    &
-                         cloud_fields,      &
-                         twod_fields,       &
-                         radstep_fields,    &
-                         physics_incs,      &
-                         jules_ancils,      &
-                         jules_prognostics, &
-                         timestep)
+  subroutine step(mesh_id,           &
+                  twod_mesh_id,      &
+                  prognostic_fields, &
+                  diagnostic_fields, &
+                  mr,                &
+                  moist_dyn,         &
+                  derived_fields,    &
+                  cloud_fields,      &
+                  twod_fields,       &
+                  radstep_fields,    &
+                  physics_incs,      &
+                  jules_ancils,      &
+                  jules_prognostics, &
+                  timestep)
 
     implicit none
 
@@ -126,6 +126,6 @@ module step_gungho_mod
 
     end if
 
-  end subroutine step_gungho
+  end subroutine step
 
-end module step_gungho_mod
+end module gungho_step_mod

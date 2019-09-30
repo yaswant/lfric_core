@@ -17,8 +17,8 @@ use finite_element_config_mod,  only: element_order
 use global_mesh_collection_mod, only: global_mesh_collection, &
                                       global_mesh_collection_type
 use init_io_dev_mod,            only: init_io_dev
-use init_fem_mod,               only: init_fem
-use init_mesh_mod,              only: init_mesh
+use create_fem_mod,             only: init_fem
+use create_mesh_mod,            only: init_mesh
 use configuration_mod,          only: final_configuration
 use io_dev_mod,                 only: load_configuration, program_name
 use io_mod,                     only: xios_domain_init
