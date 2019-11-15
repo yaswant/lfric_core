@@ -20,13 +20,16 @@ module gungho_diagnostics_driver_mod
                                              write_vorticity_diagnostic
   use field_collection_mod,           only : field_collection_type, &
                                              field_collection_iterator_type
+  use gungho_model_data_mod,          only : model_data_type
   use field_mod,                      only : field_type
-  use formulation_config_mod,         only : use_moisture,   &
+  use formulation_config_mod,         only : use_moisture, &
                                              use_physics
   use fs_continuity_mod,              only : W3, Wtheta
   use moist_dyn_mod,                  only : num_moist_factors
   use mr_indices_mod,                 only : nummr, mr_names
   use section_choice_config_mod,      only : cloud, cloud_um
+  use log_mod,                        only : log_event, &
+                                             LOG_LEVEL_INFO
 
   implicit none
 
@@ -37,37 +40,28 @@ contains
 
   !> @brief Outputs simple diagnostics from Gungho/LFRic
   !> @param[in] mesh_id The identifier of the primary mesh
-  !> @param[in] prognostic_fields A collection containing
-  !>                  the prognostic fields
-  !> @param[in] diagnostic_fields A collection containing
-  !>                  the diagnostic fields
-  !> @param[in] mr Array of fields containing the mixing ratios
-  !> @param[in] moist_dyn Array of fields containing factors for moist dynamics
-  !> @param[in] cloud_fields   A collection containing the cloud fields
+  !> @param[in] model_data The working data set for the model run
   !> @param[in] timestep The timestep at which the fields are valid
   !> @param[in] nodal_output_on_w3 Flag that determines if vector fields
   !>                  should be projected to W3 for nodal output
   subroutine gungho_diagnostics_driver( mesh_id, &
-                                        prognostic_fields, &
-                                        diagnostic_fields, &
-                                        mr, &
-                                        moist_dyn, &
-                                        cloud_fields, &
-                                        derived_fields, &
+                                        model_data, &
                                         timestep, &
                                         nodal_output_on_w3 )
 
     implicit none
 
-    integer(i_def), intent(in)              :: mesh_id
-    type(field_collection_type), intent(in) :: prognostic_fields
-    type(field_collection_type), intent(in) :: diagnostic_fields
-    type( field_type ), intent(in)          :: mr(nummr)
-    type( field_type ), intent(in)          :: moist_dyn(num_moist_factors)
-    type(field_collection_type), intent(in) :: cloud_fields
-    type(field_collection_type), intent(in) :: derived_fields
-    integer(i_def),   intent(in)            :: timestep
-    logical,          intent(in)            :: nodal_output_on_w3
+    integer(i_def), intent(in)                :: mesh_id
+    type(model_data_type), target, intent(in) :: model_data
+    integer(i_def), intent(in)                :: timestep
+    logical, intent(in)                       :: nodal_output_on_w3
+
+    type( field_collection_type ), pointer :: prognostic_fields => null()
+    type( field_collection_type ), pointer :: diagnostic_fields => null()
+    type( field_type ),            pointer :: mr(:) => null()
+    type( field_type ),            pointer :: moist_dyn(:) => null()
+    type( field_collection_type ), pointer :: derived_fields => null()
+    type( field_collection_type ), pointer :: cloud_fields => null()
 
     type( field_type), pointer :: theta => null()
     type( field_type), pointer :: u => null()
@@ -84,6 +78,16 @@ contains
     character(str_def) :: name
 
     integer :: i, fs
+
+    call log_event("Gungho: writing diagnostic output", LOG_LEVEL_INFO)
+
+    ! Get pointers to field collections for use downstream
+    prognostic_fields => model_data%prognostic_fields
+    diagnostic_fields => model_data%diagnostic_fields
+    mr => model_data%mr
+    moist_dyn => model_data%moist_dyn
+    derived_fields => model_data%derived_fields
+    cloud_fields => model_data%cloud_fields
 
     ! Can't just iterate through the prognostic/diagnostic collections as
     ! some fields are scalars and some fields are vectors, so explicitly

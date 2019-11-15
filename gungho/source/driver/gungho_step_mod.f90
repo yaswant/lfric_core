@@ -15,11 +15,16 @@ module gungho_step_mod
   use constants_mod,                  only : i_def
   use diagnostics_calc_mod,           only : write_density_diagnostic
   use field_collection_mod,           only : field_collection_type
+  use gungho_model_data_mod,          only : model_data_type
   use field_mod,                      only : field_type
   use formulation_config_mod,         only : transport_only
   use io_config_mod,                  only : write_diag, &
                                              write_minmax_tseries
   use log_mod,                        only : LOG_LEVEL_INFO
+  use log_mod,                        only : log_event, &
+                                             log_scratch_space, &
+                                             LOG_LEVEL_INFO, &
+                                             LOG_LEVEL_TRACE
   use minmax_tseries_mod,             only : minmax_tseries
   use mr_indices_mod,                 only : nummr
   use iter_timestep_alg_mod,          only : iter_alg_step
@@ -35,64 +40,63 @@ module gungho_step_mod
   implicit none
 
   private
-  public step
+  public gungho_step
 
   contains
 
   !> @brief Steps the gungho app through one timestep
   !> @param[in] mesh_id The identifier of the primary mesh
   !> @param[in] twod_mesh_id The identifier of the two-dimensional mesh
-  !> @param[inout] prognostic_fields A collection of all the prognostic fields
-  !> @param[inout] diagnostic_fields A collection of all the diagnostic fields
-  !> @param[inout] mr Array of fields containing the mixing ratios
-  !> @param[inout] moist_dyn Array of fields containing factors for moist dynamics
-  !> @param[inout] derived_fields Collection of FD fields derived from FE fields
-  !> @param[inout] cloud_fields Collection of cloud fields
-  !> @param[inout] twod_fields 2D field collection for physics
-  !> @param[inout] radstep_fields Collection of radiation timestep fields
-  !> @param[inout] physics_incs Collection of physics increments
-  !> @param[in]    orography_fields Collection of orography fields
-  !> @param[inout] jules_ancils Collection of Jules ancillaries
-  !> @param[inout] jules_prognostics Collection of Jules prognostics
+  !> @param[inout] model_data The working data set for the model run
   !> @param[in] timestep number of current timestep
-  subroutine step(mesh_id,           &
-                  twod_mesh_id,      &
-                  prognostic_fields, &
-                  diagnostic_fields, &
-                  mr,                &
-                  moist_dyn,         &
-                  derived_fields,    &
-                  cloud_fields,      &
-                  twod_fields,       &
-                  radstep_fields,    &
-                  physics_incs,      &
-                  orography_fields,  &
-                  jules_ancils,      &
-                  jules_prognostics, &
-                  timestep)
+  subroutine gungho_step(mesh_id,      &
+                         twod_mesh_id, &
+                         model_data,   &
+                         timestep)
 
     implicit none
 
-    integer(i_def),                intent(in)    :: mesh_id
-    integer(i_def),                intent(in)    :: twod_mesh_id
-    type( field_collection_type ), intent(inout) :: prognostic_fields
-    type( field_collection_type ), intent(inout) :: diagnostic_fields
-    type( field_type ),            intent(inout) :: mr(nummr)
-    type( field_type ),            intent(inout) :: moist_dyn(num_moist_factors)
-    type( field_collection_type ), intent(inout) :: derived_fields
-    type( field_collection_type ), intent(inout) :: cloud_fields
-    type( field_collection_type ), intent(inout) :: twod_fields
-    type( field_collection_type ), intent(inout) :: radstep_fields
-    type( field_collection_type ), intent(inout) :: physics_incs
-    type( field_collection_type ), intent(in)    :: orography_fields
-    type( field_collection_type ), intent(inout) :: jules_ancils
-    type( field_collection_type ), intent(inout) :: jules_prognostics
-    integer(i_def),                intent(in)    :: timestep
+    integer(i_def),                  intent(in)    :: mesh_id
+    integer(i_def),                  intent(in)    :: twod_mesh_id
+    type( model_data_type ), target, intent(inout) :: model_data
+    integer(i_def),                  intent(in)    :: timestep
+
+    type( field_collection_type ), pointer :: prognostic_fields => null()
+    type( field_collection_type ), pointer :: diagnostic_fields => null()
+    type( field_type ),            pointer :: mr(:) => null()
+    type( field_type ),            pointer :: moist_dyn(:) => null()
+    type( field_collection_type ), pointer :: derived_fields => null()
+    type( field_collection_type ), pointer :: cloud_fields => null()
+    type( field_collection_type ), pointer :: twod_fields => null()
+    type( field_collection_type ), pointer :: radstep_fields => null()
+    type( field_collection_type ), pointer :: physics_incs => null()
+    type( field_collection_type ), pointer :: orography_fields => null()
+    type( field_collection_type ), pointer :: jules_ancils => null()
+    type( field_collection_type ), pointer :: jules_prognostics => null()
 
     type( field_type), pointer :: theta => null()
     type( field_type), pointer :: u => null()
     type( field_type), pointer :: rho => null()
     type( field_type), pointer :: exner => null()
+
+    write( log_scratch_space, '("/", A, "\ ")' ) repeat( "*", 76 )
+    call log_event( log_scratch_space, LOG_LEVEL_TRACE )
+    write( log_scratch_space, '(A,I0)' ) 'Start of timestep ', timestep
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+    ! Get pointers to field collections for use downstream
+    prognostic_fields => model_data%prognostic_fields
+    diagnostic_fields => model_data%diagnostic_fields
+    mr => model_data%mr
+    moist_dyn => model_data%moist_dyn
+    derived_fields => model_data%derived_fields
+    cloud_fields => model_data%cloud_fields
+    twod_fields => model_data%twod_fields
+    radstep_fields => model_data%radstep_fields
+    physics_incs => model_data%physics_incs
+    orography_fields => model_data%orography_fields
+    jules_ancils => model_data%jules_ancils
+    jules_prognostics => model_data%jules_prognostics
 
     ! Get pointers to fields in the prognostic/diagnostic field collections
     ! for use downstream
@@ -129,6 +133,11 @@ module gungho_step_mod
 
     end if
 
-  end subroutine step
+    write( log_scratch_space, '(A,I0)' ) 'End of timestep ', timestep
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '("\", A, "/ ")' ) repeat( "*", 76 )
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+  end subroutine gungho_step
 
 end module gungho_step_mod
