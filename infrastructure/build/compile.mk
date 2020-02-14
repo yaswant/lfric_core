@@ -43,19 +43,51 @@ MACRO_ARGS := $(addprefix -D,$(PRE_PROCESS_MACROS))
 
 include programs.mk
 
+PROGRAMS ?= $(basename $(notdir $(PROG_OBJS)))
+
 # Convert the program names to all caps, append "_OBJS" to the end and
 # dereference that to get a list of all objects needed by all programs:
 #
 ALL_OBJECTS = $(foreach proj, $(shell echo $(PROGRAMS) | tr a-z A-Z), $($(proj)_OBJS))
 
-##############################################################################
-.PHONY: applications
 -include $(COMPILE_OPTIONS)
-applications: $(addprefix $(BIN_DIR)/,$(PROGRAMS))
 
+.PHONY: applications
+applications: $(addprefix $(BIN_DIR)/, $(PROGRAMS))
+
+##############################################################################
+include $(LFRIC_BUILD)/lfric.mk
+
+BIN_DIR   ?= $(ROOT)/bin
+
+# If the compiler produces module files, tell it where to put them
+#
+ifdef F_MOD_DESTINATION_ARG
+  MODULE_DESTINATION_ARGUMENT = $(F_MOD_DESTINATION_ARG)$(dir $@)
+endif
+
+ifdef CRAY_ENVIRONMENT
+  $(warning Running on a Cray, selecting static linking)
+  LINK_TYPE ?= static
+else
+  LINK_TYPE ?= dynamic
+endif
+
+# Work out what to do with external libraries.
+#
+ifeq "$(LINK_TYPE)" "static"
+  override EXTERNAL_STATIC_LIBRARIES  := $(EXTERNAL_STATIC_LIBRARIES) $(EXTERNAL_DYNAMIC_LIBRARIES)
+  override EXTERNAL_DYNAMIC_LIBRARIES :=
+else ifeq "$(LINK_TYPE)" "dynamic"
+  # Nothing further needs to be done.
+else
+  $(error Unrecognised LINK_TYPE. Must be either "static" or "dynamic")
+endif
+
+##############################################################################
 $(BIN_DIR)/%: %.x | $(BIN_DIR)
-	$(call MESSAGE,Installing,$@)
-	$(Q)cp $< $@
+	$(call MESSAGE,Installing,$*)
+	$(Q)cp $< $(BIN_DIR)/$(notdir $*)
 
 .PRECIOUS: %.x
 %.x: $$($$(shell echo $$* | tr a-z A-Z)_OBJS)
@@ -89,33 +121,3 @@ $(BIN_DIR):
 # Dependencies
 #
 include dependencies.mk
-
-##############################################################################
-include $(LFRIC_BUILD)/lfric.mk
-
-BIN_DIR   ?= $(ROOT)/bin
-PROGRAMS  ?= $(basename $(notdir $(PROG_OBJS)))
-
-# If the compiler produces module files, tell it where to put them
-#
-ifdef F_MOD_DESTINATION_ARG
-  MODULE_DESTINATION_ARGUMENT = $(F_MOD_DESTINATION_ARG)$(dir $@)
-endif
-
-ifdef CRAY_ENVIRONMENT
-  $(warning Running on a Cray, selecting static linking)
-  LINK_TYPE ?= static
-else
-  LINK_TYPE ?= dynamic
-endif
-
-# Work out what to do with external libraries.
-#
-ifeq "$(LINK_TYPE)" "static"
-  override EXTERNAL_STATIC_LIBRARIES  := $(EXTERNAL_STATIC_LIBRARIES) $(EXTERNAL_DYNAMIC_LIBRARIES)
-  override EXTERNAL_DYNAMIC_LIBRARIES :=
-else ifeq "$(LINK_TYPE)" "dynamic"
-  # Nothing further needs to be done.
-else
-  $(error Unrecognised LINK_TYPE. Must be either "static" or "dynamic")
-endif

@@ -77,12 +77,6 @@ include build/lfric.mk
 
 export FFLAGS  := $(FFLAGS) $(OPENMP_ARG)
 export LDFLAGS := $(LDFLAGS) $(OPENMP_ARG)
-ANY_UNIT_TESTS := $(shell if [ -d unit-test ] ; then \
-                            find unit-test -name *test.pf ; \
-                          fi )
-ANY_INTEGRATION_TESTS := $(shell if [ -d integration-test ] ; then \
-                                   find integration-test -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \; ; \
-                                 fi )
 
 
 ##############################################################################
@@ -110,75 +104,31 @@ document-api: api-documentation
 # Unit tests
 #
 .PHONY: unit-tests
-unit-tests: export PROJECT      = infrastructure
-unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-tests
-unit-tests: export BIN_DIR     ?= $(PROJECT_DIR)/test
-unit-tests: export PROGRAMS     = infrastructure_unit_tests
+unit-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
-unit-tests: export FFLAGS      += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
-ifeq ($(strip $(ANY_UNIT_TESTS)),)
-unit-tests:
-	$(call MESSAGE,No unit-tests to process.)
-else
-unit-tests:run-unit-tests
+unit-tests: export FFLAGS += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
+unit-tests: export META_FILE_DIR = rose-meta/lfric-infrastructure/HEAD
+unit-tests: export PROGRAMS = infrastructure_unit_tests
+unit-tests: export PROJECT = infrastructure
+unit-tests: export SOURCE_DIR = source
+unit-tests: export TEST_DIR = unit-test
+unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-tests
+unit-tests: do-unit-tests
 	$(Q)echo > /dev/null
-endif
-
-.PHONY: generate-unit-tests
-generate-unit-tests: ALWAYS
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk \
-	          SOURCE_DIR=source \
-	          WORKING_DIR=$(WORKING_DIR) \
-                  META_FILE_DIR=$(META_FILE_DIR) \
-                  FIX_ENUMS_OPT=$(FIX_ENUMS_OPT)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=unit-test \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Qcp -r unit-test/data $(WORKING_DIR)/
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/pfunit.mk \
-                  PROJECT=infrastructure \
-                  SOURCE_DIR=unit-test \
-                  WORKING_DIR=$(WORKING_DIR)
 
 
 ##############################################################################
 # Integration tests
 #
 .PHONY: integration-tests
-integration-tests: export PROJECT        = infrastructure
-integration-tests: export WORKING_DIR   := $(WORKING_DIR)/integration-tests
-integration-tests: export BIN_DIR       ?= $(PROJECT_DIR)/test
-ifeq ($(strip $(ANY_INTEGRATION_TESTS)),)
-integration-tests:
-	$(call MESSAGE,No integration-tests to process.)
-else
-integration-tests: $(addprefix integration-test-run/,$(basename $(shell find integration-test -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \;)))
+integration-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
+integration-tests: export META_FILE_DIR = integration-test/configuration_test
+integration-tests: export PROJECT = infrastructure
+integration-tests: export SOURCE_DIR = source
+integration-tests: export TEST_DIR = integration-test
+integration-tests: export WORKING_DIR := $(WORKING_DIR)/integration-tests
+integration-tests: do-integration-tests
 	$(Q)echo > /dev/null
-endif
-
-.PHONY: generate-integration-tests
-generate-integration-tests: ALWAYS
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk \
-                  PROJECT=infrastructure \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR) \
-                  META_FILE_DIR=integration-test/configuration_test \
-                  FIX_ENUMS_OPT=$(FIX_ENUMS_OPT)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=integration-test \
-                  WORKING_DIR=$(WORKING_DIR)
 
 
 ##############################################################################

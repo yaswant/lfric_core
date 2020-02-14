@@ -31,6 +31,13 @@
 PROJECT_NAME = mesh_tools
 PROFILE ?= fast-debug
 
+# This top level makefile is very order sensitive. Source code extraction and
+# generation must happen in a certain order. Due to this we turn off
+# multithreading for this file only. Any called recursively (i.e. with $(MAKE))
+# run in parallel. Unless they specify NOTPARALLEL as well.
+#
+.NOTPARALLEL:
+
 export IGNORE_DEPENDENCIES = netcdf MPI yaxt pfunit_mod planet_constants_mod xios mod_wait
 export EXTERNAL_DYNAMIC_LIBRARIES = netcdff netcdf hdf5 yaxt yaxt_c
 
@@ -53,12 +60,6 @@ include $(ROOT_DIR)/infrastructure/build/lfric.mk
 
 export FFLAGS  += $(OPENMP_ARG)
 export LDFLAGS += $(OPENMP_ARG)
-ANY_UNIT_TESTS := $(shell if [ -d unit-test ] ; then \
-                            find ./unit-test -name *test.pf ;\
-                          fi)
-ANY_INTEGRATION_TESTS := $(shell if [ -d integration-test ] ; then \
-                                   find integration-test -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \; ; \
-                                 fi )
 
 ##############################################################################
 # Launch gscan to monitor suites from this suite-group
@@ -94,10 +95,10 @@ build: export FFLAGS += $(FFLAGS_DEBUG) $(FFLAGS_WARNINGS) $(FFLAGS_RISKY_OPTIMI
 else
   $(error Unrecognised profile "$(PROFILE)". Must be one of full-debug, fast-debug or production)
 endif
-build: PROJECT      = mesh_tools
-build: WORKING_DIR := $(WORKING_DIR)/mesh_tools
 build: BIN_DIR     ?= $(PROJECT_DIR)/bin
 build: PROGRAMS    := $(basename $(notdir $(shell find source -maxdepth 1 -name '*.[Ff]90' -print)))
+build: PROJECT      = mesh_tools
+build: WORKING_DIR := $(WORKING_DIR)/mesh_tools
 build: ALWAYS
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
                   SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source \
@@ -123,41 +124,33 @@ build: ALWAYS
 # Unit tests
 #
 .PHONY: unit-tests
-unit-tests: export PROJECT      = mesh_tools
-unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-test
-unit-tests: export BIN_DIR     ?= $(PROJECT_DIR)/test
-unit-tests: export PROGRAMS     = mesh_tools_unit_tests
+unit-tests: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source
+unit-tests: export BIN_DIR ?= test
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
-unit-tests: export FFLAGS      += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
-ifeq ($(strip $(ANY_UNIT_TESTS)),)
-unit-tests:
-	$(call MESSAGE,No unit-tests to process.)
-else
-unit-tests:run-unit-tests
+unit-tests: export FFLAGS += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
+unit-tests: export META_FILE_DIR = rose-meta/lfric-mesh_tools/HEAD
+unit-tests: export PROGRAMS = mesh_tools_unit_tests
+unit-tests: export PROJECT = mesh_tools
+unit-tests: export SOURCE_DIR = source
+unit-tests: export TEST_DIR = unit-test
+unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-test
+unit-tests: do-unit-tests
 	$(Q)echo > /dev/null
-endif
 
-.PHONY: generate-unit-tests
-generate-unit-tests: ALWAYS
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
-                  SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
-                  SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk \
-                  PROJECT=$(PROJECT) \
-	          SOURCE_DIR=source \
-                  WORKING_DIR=$(WORKING_DIR) \
-                  META_FILE_DIR=$(META_FILE_DIR) \
-                  FIX_ENUMS_OPT=$(FIX_ENUMS_OPT)
-	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/pfunit.mk \
-                  PROJECT=mesh_tools \
-                  SOURCE_DIR=unit-test \
-                  WORKING_DIR=$(WORKING_DIR)
+
+##############################################################################
+# Integration tests
+#
+.PHONY: integration-tests
+integration-tests: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source
+integration-tests: export BIN_DIR ?= test
+integration-tests: export META_FILE_DIR = rose-meta/lfric-mesh_tools/HEAD
+integration-tests: export PROJECT = gungho
+integration-tests: export SOURCE_DIR = source
+integration-tests: export TEST_DIR = integration-test
+integration-tests: export WORKING_DIR := $(WORKING_DIR)/integration-tests
+integration-tests: do-integration-tests
+	$(Q)echo > /dev/null
 
 
 ##############################################################################

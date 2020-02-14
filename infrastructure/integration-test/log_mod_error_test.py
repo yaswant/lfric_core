@@ -33,7 +33,11 @@ class log_mod_error_serial_test( MpiTest ):
     expectedMessage = ' An error was logged.'
 
     if returncode == 0:
-      raise TestFailed( 'Logging an error did not cause termination to end' )
+        raise TestFailed('Logging an error did not cause termination to end')
+    elif returncode == 127:
+        raise TestFailed('Test executable not found')
+    elif returncode > 128:
+        raise TestFailed('Execution fault such as segmentation fault')
 
     if out != '':
       message = 'Expected no output on standard out but found: {out}' \

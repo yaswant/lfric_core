@@ -9,6 +9,13 @@ PROJECT_NAME = lfric_atm
 PROFILE ?= fast-debug
 LFRIC_TARGET_PLATFORM ?= generic-x86
 
+# This top level makefile is very order sensitive. Source code extraction and
+# generation must happen in a certain order. Due to this we turn off
+# multithreading for this file only. Any called recursively (i.e. with $(MAKE))
+# run in parallel. Unless they specify NOTPARALLEL as well.
+#
+.NOTPARALLEL:
+
 export IGNORE_DEPENDENCIES = netcdf MPI yaxt pfunit_mod xios mod_wait
 export EXTERNAL_DYNAMIC_LIBRARIES = yaxt yaxt_c netcdff netcdf hdf5 \
                                     $(CXX_RUNTIME_LIBRARY)
@@ -73,11 +80,11 @@ build: export FFLAGS += $(FFLAGS_DEBUG) $(FFLAGS_WARNINGS) $(FFLAGS_RISKY_OPTIMI
 else
   $(error Unrecognised profile "$(PROFILE)". Must be one of full-debug, fast-debug or production)
 endif
-build: PROJECT      = lfric_atm
-build: SCRATCH_DIR := $(WORKING_DIR)/um-scratch
-build: WORKING_DIR := $(WORKING_DIR)/lfric-atm
 build: BIN_DIR     ?= $(PROJECT_DIR)/bin
 build: PROGRAMS    := $(basename $(notdir $(shell find source -maxdepth 1 -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \;)))
+build: PROJECT      = lfric_atm
+build: SCRATCH_DIR := $(WORKING_DIR)/um-scratch
+build: WORKING_DIR := $(WORKING_DIR)/lfric_atm
 build: export platform_config_dir=$(strip $(shell grep -E "$(LFRIC_TARGET_PLATFORM)\s*:\s*$(FORTRAN_COMPILER)\s*:" $(PROJECT_DIR)/fcm-make/target-map.txt | cut -d : -f 3))
 build: export optimisation_level=$(strip $(shell grep -E "$(PROFILE)\s*:\s*" $(PROJECT_DIR)/fcm-make/optimisation-map.txt | cut -d : -f 2))
 build: ALWAYS
@@ -148,6 +155,37 @@ build: ALWAYS
 
 
 ##############################################################################
+# Unit tests
+#
+.PHONY: unit-tests
+unit-tests: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source
+unit-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
+unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
+unit-tests: export FFLAGS += $(FFLAGS_DEBUG) $(FFLAGS_NO_OPTIMISATION) $(FFLAGS_INIT)
+unit-tests: export PROGRAMS = lfric_atm_unit_tests
+unit-tests: export PROJECT = lfric_atm 
+unit-tests: export SOURCE_DIR = source
+unit-tests: export TEST_DIR = unit-test
+unit-tests: export WORKING_DIR := $(WORKING_DIR)/unit-tests
+unit-tests: do-unit-tests
+	$(Q)echo > /dev/null
+
+
+##############################################################################
+# Integration tests
+#
+.PHONY: integration-tests
+integration-tests: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source
+integration-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
+integration-tests: export PROJECT =lfric_atm 
+integration-tests: export SOURCE_DIR = source
+integration-tests: export TEST_DIR = unit-test
+integration-tests: export WORKING_DIR := $(WORKING_DIR)/integration-tests
+integration-tests: do-integration-tests
+	$(Q)echo > /dev/null
+
+
+##############################################################################
 # Clean
 #
 .PHONY: clean
@@ -157,8 +195,8 @@ clean: partial-clean
 
 .PHONY: partial-clean pclean
 partial-clean pclean: ALWAYS
-	$(call MESSAGE,Removing,"lfric_atm workspace")
-	$(Q)-rm -r $(WORKING_DIR)/lfric-atm
-	$(call MESSAGE,Removing,"lfric_atm binaries")
+	$(call MESSAGE,Removing,"LFRic atmosphere  workspace")
+	$(Q)-rm -r $(WORKING_DIR)/lfric_atm
+	$(call MESSAGE,Removing,"LFRic atmosphere binaries")
 	$(Q)-if [ -d bin ] ; then rm -r bin ; fi
 

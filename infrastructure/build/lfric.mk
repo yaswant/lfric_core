@@ -151,20 +151,21 @@ endif
 
 export Q QUIET_ARG VERBOSE_REDIRECT
 
-# Fix enumeration arguments between builds, only for technical
-# development
 # Set flag to perform a fresh rose stem suite
+
 CLEAN_OPT = '--new'
 ifeq '$(PURGE_SUITES)' '0'
-  CLEAN_OPT = ''
+  CLEAN_OPT =
 endif
 
-# Set flag to perform a fresh rose stem suite
+# Fix enumeration arguments between builds, only for technical
+# development
+
 FIX_ENUMS ?= 0
 ifeq '$(FIX_ENUMS)' '1'
   FIX_ENUMS_OPT = '--norandom_enums'
 else
-  FIX_ENUMS_OPT = ''
+  FIX_ENUMS_OPT =
 endif
 
 # We only want to send terminal control characters if there is a terminal to
@@ -269,30 +270,127 @@ launch-test-suite:
 	done
 
 ##############################################################################
+# Extract parts of other projects.
+#
+.PHONY: %/extract
+%/extract:
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
+	            SOURCE_DIR=$* WORKING_DIR=$(WORKING_DIR)
+
+
+##############################################################################
+# Invoke PSyclone to generate PSy layer.
+#
+# Psyclone is called on the original source but that source may use other
+# modules so extraction must be complete first.
+#
+.PHONY: %/psyclone
+%/psyclone: $$(addsuffix /extract, $$*)
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
+	            SOURCE_DIR=$* \
+	            WORKING_DIR=$(WORKING_DIR)
+
+
+##############################################################################
+# Invoke Configurator to generate namelist handling code.
+#
+# Configurator is called on the original source but that source may use other
+# modules so extraction must be complete first.
+#
+.PHONY: %/configure
+%/configure: PROJECT ?= $(lastword $(filter-out source, $(subst /, ,$*)))
+%/configure: $$(addsuffix /extract, $$*)
+	$(Q)$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/configuration.mk \
+	            PROJECT=$(PROJECT) \
+	            SOURCE_DIR=$* \
+	            WORKING_DIR=$(WORKING_DIR)
+
+
+##############################################################################
 # Run unit tests.
 #
-.PHONY: run-unit-tests
-run-unit-tests: generate-unit-tests
-	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
-	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
-                    PRE_PROCESS_MACROS=$(PRE_PROCESS_MACROS)
+.PHONY: do-unit-tests
+do-unit-tests: export ANY_TESTS := $(strip $(shell find $(SOURCE_DIR) -name *test.pf))
+do-unit-tests:
+	$(Q)$(MAKE) $(QUIET_ARG) do-unit-test/detect \
+	            ADDITIONAL_EXTRACTION=$(ADDITIONAL_EXTRACTION) \
+	            ANY_TESTS=$(ANY_TESTS) \
+	            BIN_DIR=$(BIN_DIR) \
+	            EXTERNAL_STATIC_LIBRARIES="$(EXTERNAL_STATIC_LIBRARIES)" \
+	            PROGRAMS=$(PROGRAMS) \
+	            PROJECT=$(PROJECT) \
+	            SOURCE_DIR=$(SOURCE_DIR) \
+	            TEST_DIR=$(TEST_DIR) \
+	            WORKING_DIR=$(WORKING_DIR)
+
+.PHONY: do-unit-test/%
+do-unit-test/detect: $(if $(ANY_TESTS), do-unit-test/found, \
+                                        do-unit-test/none)
+	$(Q)echo >/dev/null
+
+do-unit-test/none:
+	$(Q)$(call MESSAGE,Unit tests,'None to run')
+
+do-unit-test/found: do-unit-test/build
 	$(call MESSAGE,Running,$(PROGRAMS))
-	$(Q)cd $(WORKING_DIR); mpiexec -n 4 $(BIN_DIR)/$(PROGRAMS) $(DOUBLE_VERBOSE_ARG)
+	$(Q)cd $(WORKING_DIR); \
+            mpiexec -n 4 $(BIN_DIR)/$(PROGRAMS) $(DOUBLE_VERBOSE_ARG)
+
+do-unit-test/build: WITHOUT_PROGRAMS = 1
+do-unit-test/build: PROCESS_TARGETS = $(SOURCE_DIR) $(ADDITIONAL_EXTRACTION)
+do-unit-test/build: $$(addsuffix /configure, $$(PROCESS_TARGETS)) \
+                    $$(addsuffix /psyclone, $$(PROCESS_TARGETS)) \
+                    $$(addsuffix /extract, $$(TEST_DIR))
+	$(Q)mkdir -p $(WORKING_DIR)
+	$(Q)if [ -d $(TEST_DIR)/data ] ; then \
+	        cp -r $(TEST_DIR)/data $(WORKING_DIR); fi
+	$(Q)$(MAKE) $(QUIET_ARG) pfunit \
+	            SOURCE_DIR=$(TEST_DIR) WORKING_DIR=$(WORKING_DIR)
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG) \
+                    -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk \
+                    PRE_PROCESS_MACROS=$(PRE_PROCESS_MACROS)
 
 
 ##############################################################################
 # Run integration tests.
 #
-.PHONY: integration-test-run/%
-integration-test-run/%: export PYTHONPATH := $(PYTHONPATH):$(LFRIC_BUILD)
-integration-test-run/%: generate-integration-tests
-	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk PROGRAMS=$(notdir $*)
-	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk    \
-                    PROGRAMS=$(notdir $*) PRE_PROCESS_MACROS=$(PRE_PROCESS_MACROS) \
-                    FFLAGS="$(FFLAGS) $(FFLAGS_DEBUG) $(FFLAGS_RUNTIME)"
+.PHONY: do-integration-tests
+do-integration-tests: export ANY_TESTS = $(patsubst $(TEST_DIR)/%,%,$(basename $(shell find $(TEST_DIR) -name '*.[Ff]90' -exec egrep -l "^\s*program" {} \; 2>/dev/null)))
+do-integration-tests:
+	$(Q)$(MAKE) $(QUIET_ARG) do-integration-test/detect \
+	            ADDITIONAL_EXTRACTION=$(ADDITIONAL_EXTRACTION) \
+	            ANY_TESTS="$(ANY_TESTS)" \
+	            BIN_DIR=$(BIN_DIR) \
+	            META_FILE_DIR=$(META_FILE_DIR) \
+	            PRE_PROCESS_MACROS=$(PRE_PROCESS_MACROS) \
+	            PROGRAMS="$(ANY_TESTS)" \
+	            PROJECT_NAME=$(PROJECT_NAME) \
+	            SOURCE_DIR=$(SOURCE_DIR) \
+	            TEST_DIR=$(TEST_DIR) \
+	            WORKING_DIR=$(WORKING_DIR)
+
+.PHONY: do-integration-test/%
+do-integration-test/detect: $(if $(ANY_TESTS), \
+                                 $(ANY_TESTS:%=do-integration-test/run/%), \
+                                 do-integration-test/none)
+	$(Q)echo >/dev/null
+
+do-integration-test/none:
+	$(Q)$(call MESSAGE,Integration tests,'None to run')
+
+do-integration-test/run/%: export PYTHONPATH := $(PYTHONPATH):$(LFRIC_BUILD)
+do-integration-test/run/%: do-integration-test/build
 	$(call MESSAGE,Running,$*)
-	$(Q)cd $(dir $*); \
+	$(Q)cd $(TEST_DIR)/$(dir $*); \
 	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
+
+do-integration-test/build: PROCESS_TARGETS = $(SOURCE_DIR) $(TEST_DIR) $(ADDITIONAL_EXTRACTION)
+do-integration-test/build: $$(addsuffix /configure, $$(PROCESS_TARGETS)) \
+                           $$(addsuffix /psyclone, $$(PROCESS_TARGETS))
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/analyse.mk
+	$(Q)$(MAKE) $(QUIET_ARG) -C $(WORKING_DIR) -f $(LFRIC_BUILD)/compile.mk
+
 
 ##############################################################################
 # Generate configuration source.

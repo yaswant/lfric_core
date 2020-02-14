@@ -60,7 +60,7 @@ $(WORKING_DIR)/%.f90: $(WORKING_DIR)/%.x90
 
 .PRECIOUS: $(WORKING_DIR)/%.x90
 $(WORKING_DIR)/%.x90: $(SOURCE_DIR)/%.x90 \
-		      | $$(patsubst $$(PERCENT)/,$$(PERCENT),$$(dir $$@))
+                      | $$(patsubst $$(PERCENT)/,$$(PERCENT),$$(dir $$@))
 	$(call MESSAGE,Preprocessing,$<)
 	$(Q)$(FPP) $(FPPFLAGS) $(MACRO_ARGS) $< $@
 

@@ -20,8 +20,11 @@ $(CONFIG_DIR)/rose-meta.json $(CONFIG_DIR)/config_namelists.txt: $(META_FILE_DIR
 	$(call MESSAGE,Generating namelist configuration file.)
 	$(Q)mkdir -p $(dir $@)
 	$(Q)rose_picker $(META_FILE_DIR)/rose-meta.conf    \
-                        -directory $(CONFIG_DIR)           \
-                        -include_dirs $(ROOT_DIR)
+	                -directory $(CONFIG_DIR)           \
+	                -include_dirs $(ROOT_DIR)
+	# It's not clear why this is needed but as of 5/2/20 the diagnostic
+	# application test suite fails without it.
+	$(Q)sleep 10
 
 .INTERMEDIATE: $(CONFIG_DIR)/build_config_loaders
 $(CONFIG_DIR)/build_config_loaders: $(CONFIG_DIR)/rose-meta.json
