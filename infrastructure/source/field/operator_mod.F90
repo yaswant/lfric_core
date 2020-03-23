@@ -431,8 +431,9 @@ contains
          * (self%ndof_interior_from+self%ndof_face_from)
     ! Divide alpha, beta, gamma_m and gamma_p by gcd(alpha,beta)
     call self%divide_by_gcd()
-    ! Bandwidth = 1+ceil((gamma_m+gamma_m)/beta)
-    self%bandwidth = 1+ceiling((self%gamma_m+self%gamma_p)/(1.0_8*self%beta),i_def)
+    ! Bandwidth = 1+ceil((gamma_m+gamma_p)/beta)
+    self%bandwidth = 1+ceiling( (real( (self%gamma_m+self%gamma_p), kind=r_def) / &
+         (real(self%beta,kind=r_def))),i_def)
     ! allocate memory
     call self%allocate_memory()
     self%columnwise_matrix(:,:,:) = 0.0_r_def
@@ -476,8 +477,8 @@ contains
     self%gamma_p = gamma_p
    ! Divide alpha, beta, gamma_m and gamma_p by gcd(alpha,beta)
     call self%divide_by_gcd()
-   ! Bandwidth = 1+ceil((gamma_m+gamma_m)/beta)
-    self%bandwidth = 1+ceiling((self%gamma_m+self%gamma_p)/(1.0_8*self%beta),i_def)
+   ! Bandwidth = 1+ceil((gamma_m+gamma_p)/beta)
+    self%bandwidth = 1+ceiling((self%gamma_m+self%gamma_p)/(real(self%beta,kind=r_def)),i_def)
    ! allocate memory
     call self%allocate_memory()
     self%columnwise_matrix(:,:,:) = 0.0_r_def

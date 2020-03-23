@@ -10,20 +10,11 @@
 module columnwise_op_asm_m2v_lumped_inv_kernel_mod_test
 
   use constants_mod,                 only : i_def, r_def
-  use function_space_collection_mod, only : function_space_collection_type, &
-                                            function_space_collection
-  use mesh_collection_mod,           only : mesh_collection_type, &
-                                            mesh_collection
-  use field_mod,                     only : field_type, field_proxy_type
-  use fs_continuity_mod,             only : W2V
-  use function_space_mod,            only : function_space_type
-
-  use operator_mod,                  only : operator_type,                 &
-                                            operator_proxy_type,           &
-                                            columnwise_operator_type,      &
-                                            columnwise_operator_proxy_type
-  use yaxt,                          only : xt_initialize, xt_finalize
-  use mpi_mod,                       only : store_comm, clear_comm
+  use get_unit_test_m3x3_q3x3x3_sizes_mod, &
+       only : get_w2v_m3x3_q3x3x3_size
+  use get_unit_test_m3x3_dofmap_mod, only : get_w2v_m3x3_dofmap
+  use get_unit_test_m3x3_cma_data_mod, &
+                                     only : get_w2v_w2v_m3x3_cma_data
   use pFUnit_Mod
 
   implicit none
@@ -32,93 +23,36 @@ module columnwise_op_asm_m2v_lumped_inv_kernel_mod_test
   public :: test_all
 
   @TestCase
-  type, extends(MPITestCase), public :: columnwise_op_asm_m2v_lumped_inv_test_type
+  type, extends(TestCase), public :: columnwise_op_asm_m2v_lumped_inv_test_type
     private
-    type(function_space_type), pointer :: w2v_fs => null()
-    type(operator_type)                :: mm
-    type(columnwise_operator_type)     :: columnwise_mm
-    integer(i_def)                     :: mesh_id
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
   end type columnwise_op_asm_m2v_lumped_inv_test_type
 
-  integer(i_def), parameter :: element_order = 0
-
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use finite_element_config_mod, only : cellshape_quadrilateral
-    use feign_config_mod,          only : feign_finite_element_config
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
-
     implicit none
 
     class(columnwise_op_asm_m2v_lumped_inv_test_type), intent(inout) :: this
-
-    integer :: i
-    integer :: alpha, beta, gamma_m, gamma_p
-
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
-    !Store the MPI communicator for later use
-    call store_comm(this%getMpiCommunicator())
-
-    call feign_finite_element_config(           &
-             cellshape=cellshape_quadrilateral, &
-             coordinate_order=0,                &
-             element_order=0,                   &
-             rehabilitate=.true.,               &
-             vorticity_in_w1=.false. )
-
-    ! Create top level mesh collection
-    mesh_collection = mesh_collection_type()
-    ! Create top level function space collection
-    function_space_collection = function_space_collection_type()
-
-    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
-
-
-    this%w2v_fs => function_space_collection%get_fs( this%mesh_id, &
-                                                     element_order, &
-                                                     W2V )
-
-    this%mm = operator_type( this%w2v_fs, this%w2v_fs )
-
-    alpha = 1
-    beta = 1
-    gamma_m = 0
-    gamma_p = 0
-    this%columnwise_mm = columnwise_operator_type( this%w2v_fs, this%w2v_fs, &
-                                                   alpha, beta, gamma_m, gamma_p )
 
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tearDown( this )
 
-    use configuration_mod,        only: final_configuration
-
     implicit none
 
     class(columnwise_op_asm_m2v_lumped_inv_test_type), intent(inout) :: this
 
-    call function_space_collection%clear()
-    call final_configuration()
-
-    ! Finalise YAXT
-    call xt_finalize()
-    ! Clear the stored MPI communicator
-    call clear_comm()
-
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test( npes=[1] )
+  @Test
   subroutine test_all( this )
 
     use columnwise_op_asm_m2v_lumped_inv_kernel_mod, only : &
@@ -128,58 +62,71 @@ contains
 
     class(columnwise_op_asm_m2v_lumped_inv_test_type), intent(inout) :: this
 
-    real(r_def), parameter                          :: tol = 1.0e-6_r_def
-    real(kind=r_def)                                :: answer
-    integer                                         :: i, j, k, cell
-    integer                                         :: nlayers, ndf
-    type(operator_proxy_type)                       :: mm_p
-    type(columnwise_operator_proxy_type)            :: columnwise_mm_p
-    real(kind=r_def), allocatable, dimension(:,:,:) :: local_stencil
+    real(kind=r_def), parameter :: tol = 1.0e-6_r_def
+    real(kind=r_def)            :: answer
+    integer(kind=i_def)         :: i, j, k, cell
+    integer(kind=i_def)         :: nlayers, ndf, unused, ncell_2d, ncell_3d
+    integer(kind=i_def)         :: alpha, beta, g_m, g_p, bw, nrow, ncol
 
-    ! Test mass matrix kernel
-    mm_p = this%mm%get_proxy()
-    columnwise_mm_p = this%columnwise_mm%get_proxy()
+    integer(kind=i_def), allocatable, dimension(:,:)   :: map
+    integer(kind=i_def), allocatable, dimension(:,:)   :: col_bmap
+    integer(kind=i_def), allocatable, dimension(:)     :: ind_map
+    real(kind=r_def),    allocatable, dimension(:,:,:) :: col_mat_mm
+    real(kind=r_def),    allocatable, dimension(:,:,:) :: local_stencil
 
-    nlayers  = columnwise_mm_p%fs_from%get_nlayers()
-    ndf  = columnwise_mm_p%fs_from%get_ndf()
+    nlayers = 3
+    call get_w2v_m3x3_q3x3x3_size( ndf, unused, ncell_2d, unused, unused, &
+         unused, unused, nlayers=nlayers)
+    call get_w2v_m3x3_dofmap( map )
+    ! set ncell_3d to be 1*nlayers, as only a single column is required for the test.
+    ncell_2d = 1
+    ncell_3d = ncell_2d * nlayers
+    allocate(local_stencil(ndf,ndf,ncell_3d))
 
-    allocate(local_stencil(ndf,ndf,mm_p%ncell_3d))
+    call get_w2v_w2v_m3x3_cma_data(ndf, ncell_2d, nlayers, map, alpha, beta, &
+                                 g_m, g_p, bw, nrow, ncol, &
+                                 ind_map, col_bmap)
+    allocate(col_mat_mm( bw, nrow, ncell_2d ))
 
     cell = 1
 
-    do i=1, mm_p%ncell_3d
+    do i=1, ncell_3d
        local_stencil(:,:,i) = reshape( (/ 1.0_r_def/3.0_r_def, 1.0_r_def/6.0_r_def,    &
                                           1.0_r_def/6.0_r_def, 1.0_r_def/3.0_r_def /), &
                                           (/2, 2/) )
     end do
 
-    call columnwise_op_asm_m2v_lumped_inv_kernel_code(cell,                              &
-                                                      nlayers,                           &
-                                                      columnwise_mm_p%ncell_2d,          &
-                                                      mm_p%ncell_3d,                     &
-                                                      local_stencil,                     &
-                                                      columnwise_mm_p%columnwise_matrix, &
-                                                      columnwise_mm_p%nrow,              &
-                                                      columnwise_mm_p%bandwidth,         &
-                                                      columnwise_mm_p%alpha,             &
-                                                      columnwise_mm_p%beta,              &
-                                                      columnwise_mm_p%gamma_m,           &
-                                                      columnwise_mm_p%gamma_p,           &
-                                                      ndf,                               &
-                                                      columnwise_mm_p%column_banded_dofmap_to)
-    do i = 1, columnwise_mm_p%nrow
-      if ( (i == 1) .or. (i == columnwise_mm_p%nrow) ) then
+    call columnwise_op_asm_m2v_lumped_inv_kernel_code(cell,                 &
+                                                      nlayers,              &
+                                                      ncell_2d,             &
+                                                      ncell_3d,             &
+                                                      local_stencil,        &
+                                                      col_mat_mm,           &
+                                                      nrow,                 &
+                                                      bw,                   &
+                                                      alpha,                &
+                                                      beta,                 &
+                                                      g_m,                  &
+                                                      g_p,                  &
+                                                      ndf,                  &
+                                                      col_bmap)
+    do i = 1, nrow
+      if ( (i == 1) .or. (i == nrow) ) then
         ! First and final row should be ( 3 )
         answer = 3.0_r_def
-        @assertEqual(answer, columnwise_mm_p%columnwise_matrix(1,i,1), tol)
+        @assertEqual(answer, col_mat_mm(1,i,1), tol)
       else
         ! All other rows should be ( 3/2 )
         answer = (3.0_r_def/2.0_r_def)
-        @assertEqual(answer, columnwise_mm_p%columnwise_matrix(1,i,1), tol)
+        @assertEqual(answer, col_mat_mm(1,i,1), tol)
       end if
     end do
 
     deallocate(local_stencil)
+    deallocate(col_mat_mm)
+    deallocate(map)
+    deallocate(col_bmap)
+    deallocate(ind_map)
 
   end subroutine test_all
 

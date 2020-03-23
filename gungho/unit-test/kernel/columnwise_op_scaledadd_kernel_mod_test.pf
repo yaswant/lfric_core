@@ -10,18 +10,9 @@
 module columnwise_op_scaledadd_kernel_mod_test
 
   use constants_mod,                 only : i_def, r_def
-  use function_space_collection_mod, only : function_space_collection_type, &
-                                            function_space_collection
-  use mesh_collection_mod,           only : mesh_collection_type, &
-                                            mesh_collection
-  use field_mod,                     only : field_type, field_proxy_type
-  use fs_continuity_mod,             only : Wtheta, W3
-  use function_space_mod,            only : function_space_type
 
-  use operator_mod,                  only : columnwise_operator_type, &
-                                            columnwise_operator_proxy_type
-  use yaxt,                          only : xt_initialize, xt_finalize
-  use mpi_mod,                       only : store_comm, clear_comm
+  use get_unit_test_m3x3_cma_data_mod, &
+       only : get_cma_size, get_cma_prod_size
   use pFUnit_Mod
 
   implicit none
@@ -30,14 +21,8 @@ module columnwise_op_scaledadd_kernel_mod_test
   public :: test_all
 
   @TestCase
-  type, extends(MPITestCase), public :: columnwise_op_scaledadd_test_type
+  type, extends(TestCase), public :: columnwise_op_scaledadd_test_type
     private
-    type(function_space_type), pointer :: wtheta_fs => null()
-    type(function_space_type), pointer :: w3_fs => null()
-    type(columnwise_operator_type)     :: columnwise_op_mass, &
-                                          columnwise_op_DT_D, &
-                                          columnwise_op_mass_DT_D
-    integer(i_def)                     :: mesh_id
   contains
     procedure setUp
     procedure tearDown
@@ -49,87 +34,23 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use finite_element_config_mod, only : cellshape_quadrilateral
-    use feign_config_mod,          only : feign_finite_element_config
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
-
     implicit none
 
     class(columnwise_op_scaledadd_test_type), intent(inout) :: this
-
-    type(columnwise_operator_type)     :: columnwise_op_D, &
-                                          columnwise_op_DT
-
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
-    !Store the MPI communicator for later use
-    call store_comm(this%getMpiCommunicator())
-
-    call feign_finite_element_config(           &
-             cellshape=cellshape_quadrilateral, &
-             coordinate_order=0,                &
-             element_order=0,                   &
-             rehabilitate=.true.,               &
-             vorticity_in_w1=.false. )
-
-    ! Create top level mesh collection
-    mesh_collection = mesh_collection_type()
-    ! Create top level function space collection
-    function_space_collection = function_space_collection_type()
-
-    ! Dummy mesh mod has 9 cells, 3 layers and is uniform in vertical
-    this%mesh_id = mesh_collection%add_unit_test_mesh( PLANE_BI_PERIODIC )
-
-    this%wtheta_fs => function_space_collection%get_fs( this%mesh_id, &
-                                                    0, &
-                                                    Wtheta )
-
-    this%w3_fs => function_space_collection%get_fs( this%mesh_id, &
-                                                    0, &
-                                                    W3 )
-
-    ! mass matrix M
-    this%columnwise_op_mass = columnwise_operator_type (this%w3_fs, &
-                                                        this%w3_fs )
-
-    ! divergence and gradient D and D^T
-    columnwise_op_D    = columnwise_operator_type( this%wtheta_fs, &
-                                                   this%w3_fs )
-    columnwise_op_DT   = columnwise_operator_type( this%w3_fs, &
-                                                   this%wtheta_fs )
-    ! D^T.D
-    this%columnwise_op_DT_D =  &
-         columnwise_op_DT%columnwise_operator_product( &
-         columnwise_op_D )
-
-    ! M + D^T.D
-    this%columnwise_op_mass_DT_D = &
-         this%columnwise_op_mass%columnwise_operator_sum( &
-         this%columnwise_op_DT_D )
 
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tearDown( this )
 
-    use configuration_mod,        only: final_configuration
-
     implicit none
 
     class(columnwise_op_scaledadd_test_type), intent(inout) :: this
 
-    call function_space_collection%clear()
-    call final_configuration()
-
-    ! Finalise YAXT
-    call xt_finalize()
-    ! Clear the stored MPI communicator
-    call clear_comm()
-
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test( npes=[1] )
+  @Test
   subroutine test_all( this )
 
     use columnwise_op_scaledadd_kernel_mod, only : &
@@ -141,14 +62,17 @@ contains
 
     real(r_def), parameter :: tol = 1.0e-6_r_def
 
-    integer :: i, j, cell
+    integer(kind=i_def) :: i, j, cell
+    integer(kind=i_def) :: ncell_2d, nlayers, unused, ndf_w3, ndf_wt
+    integer(kind=i_def) :: ndf_face_wt, ndf_interior_wt, ndf_face_w3, ndf_interior_w3
+    integer(kind=i_def) :: alpha_33, beta_33, bw_33, g_m_33, g_p_33, nrow_33, ncol_33
+    integer(kind=i_def) :: alpha_prod, beta_prod, bw_prod, g_m_prod, g_p_prod, &
+         nrow_prod, ncol_prod
+    integer(kind=i_def) :: alpha_T3, beta_T3, bw_T3, g_m_T3, g_p_T3, nrow_T3, ncol_T3
+    integer(kind=i_def) :: alpha_3T, beta_3T, bw_3T, g_m_3T, g_p_3T, nrow_3T, ncol_3T
 
     ! scaling factor
-    real(kind=r_def) :: alpha, beta
-
-    type(columnwise_operator_proxy_type) :: columnwise_op_mass_p,      &
-                                            columnwise_op_DT_D_p,      &
-                                            columnwise_op_mass_DT_D_p
+    real(kind=r_def) :: mu, nu
 
     ! dense representations of the operators mass, D^T.D and
     ! mass + beta*D^T.D
@@ -156,92 +80,122 @@ contains
                                                      densematrix_DT_D,     &
                                                      densematrix_mass_DT_D
 
+    real(kind=r_def), allocatable, dimension(:,:,:) :: clm_mat_M, &
+                                                       clm_mat_DTD, &
+                                                       clm_mat_DTD_M
+
     integer(kind=i_def) :: j_minus, j_plus
     real(kind=r_def) :: matrixentry ! sparse matrix entry to compare in test
 
-    ! Tesbt mass matrix kernel
-    columnwise_op_mass_p = this%columnwise_op_mass%get_proxy()
-    columnwise_op_DT_D_p = this%columnwise_op_DT_D%get_proxy()
-    columnwise_op_mass_DT_D_p = this%columnwise_op_mass_DT_D%get_proxy()
+    ! set some sizes - no maps are required
+    nlayers         = 3_i_def
+    ncell_2d        = 1_i_def  ! Only 1 column required for test
 
-    cell = 1
-    alpha = 2.4_r_def
-    beta = 3.7_r_def
+    ndf_face_w3     = 0_i_def
+    ndf_interior_w3 = 1_i_def
+    ndf_w3          = 1_i_def
+
+    ndf_face_wt     = 1_i_def
+    ndf_interior_wt = 0_i_def
+    ndf_wt          = 2_i_def
+
+    ! get some CMA sizes
+    call get_cma_size(nlayers, ndf_w3, ndf_w3, &
+         ndf_face_w3, ndf_interior_w3, ndf_face_w3, ndf_interior_w3, &
+         alpha_33, beta_33, g_m_33, g_p_33, bw_33, ncol_33, nrow_33)
+    call get_cma_size(nlayers, ndf_w3, ndf_wt, &
+         ndf_face_w3, ndf_interior_w3, ndf_face_wt, ndf_interior_wt, &
+         alpha_3T, beta_3T, g_m_3T, g_p_3T, bw_3T, ncol_3T, nrow_3T)
+    call get_cma_size(nlayers, ndf_wt, ndf_w3, &
+         ndf_face_wt, ndf_interior_wt, ndf_face_w3, ndf_interior_w3, &
+         alpha_T3, beta_T3, g_m_T3, g_p_T3, bw_T3, ncol_T3, nrow_T3)
+
+    call get_cma_prod_size(alpha_3T, beta_3T, g_m_3T, g_p_3T, nrow_3T, &
+                           alpha_T3, beta_T3, g_m_T3, g_p_T3, nrow_T3, &
+                           alpha_prod, beta_prod, g_m_prod, g_p_prod, bw_prod, nrow_prod, ncol_prod)
+    cell = 1_i_def
+    mu = 2.4_r_def
+    nu = 3.7_r_def
+
+    ! Spaces for operators
+    ! mass matrix is W3W3
+    ! D  is WTW3
+    ! DT is W3WT
+    ! DT.D is W3W3
+    ! DT.D + M is W3W3
 
     ! construct banded and dense matrix representation,
-    allocate(densematrix_mass( columnwise_op_mass_p%nrow,      &
-                               columnwise_op_mass_p%ncol) )
-    allocate(densematrix_DT_D( columnwise_op_mass_p%nrow,      &
-                                    columnwise_op_mass_p%ncol) )
-    allocate(densematrix_mass_DT_D( columnwise_op_mass_p%nrow, &
-                                    columnwise_op_mass_p%ncol) )
+    allocate(densematrix_mass( nrow_33, ncol_33) )
+    allocate(densematrix_DT_D( nrow_prod, ncol_prod) )
+    allocate(densematrix_mass_DT_D( nrow_prod, ncol_prod) )
+
     densematrix_mass(:,:) = 0.0_r_def
     densematrix_DT_D(:,:) = 0.0_r_def
     densematrix_mass_DT_D(:,:) = 0.0_r_def
 
-    columnwise_op_mass_p%columnwise_matrix(:,:,:) = 0.0_r_def
-    columnwise_op_DT_D_p%columnwise_matrix(:,:,:) = 0.0_r_def
+    allocate(clm_mat_M(bw_33,nrow_33, ncell_2d))
+    allocate(clm_mat_DTD(bw_prod,nrow_33, ncell_2d))
+    allocate(clm_mat_DTD_M(bw_prod,nrow_33, ncell_2d))
+
+    clm_mat_M(:,:,:)   = 0.0_r_def
+    clm_mat_DTD(:,:,:) = 0.0_r_def
 
     ! Populate matrix entries
-    do i = 1, columnwise_op_mass_p%nrow
-       columnwise_op_DT_D_p%columnwise_matrix(1,i,cell) = +1.0_r_def
-       columnwise_op_DT_D_p%columnwise_matrix(2,i,cell) = +2.0_r_def
-       columnwise_op_DT_D_p%columnwise_matrix(3,i,cell) = +1.0_r_def
-       columnwise_op_mass_p%columnwise_matrix(1,i,cell) = +1.0_r_def
+    do i = 1_i_def, nrow_33
+       clm_mat_DTD(1,i,cell) = +1.0_r_def
+       clm_mat_DTD(2,i,cell) = +2.0_r_def
+       clm_mat_DTD(3,i,cell) = +1.0_r_def
+       clm_mat_M(1,i,cell)   = +1.0_r_def
        densematrix_mass(i,i) = +1.0_r_def
-       if(i>1) then
-          densematrix_DT_D(i,i-1) = +1.0_r_def
+       if(i>1_i_def) then
+          densematrix_DT_D(i,i-1_i_def) = +1.0_r_def
        end if
        densematrix_DT_D(i,i)   = +2.0_r_def
-       if(i<columnwise_op_mass_p%nrow) then
-          densematrix_DT_D(i,i+1) = +1.0_r_def
+       if(i<nrow_33) then
+          densematrix_DT_D(i,i+1_i_def) = +1.0_r_def
        end if
     end do
-    call columnwise_op_scaledadd_kernel_code(cell,      &
-         columnwise_op_mass_p%ncell_2d,                 &
-         columnwise_op_mass_p%columnwise_matrix,        &
-         columnwise_op_mass_p%nrow,                     &
-         columnwise_op_mass_p%ncol,                     &
-         columnwise_op_mass_p%bandwidth,                &
-         columnwise_op_mass_p%alpha,                    &
-         columnwise_op_mass_p%beta,                     &
-         columnwise_op_mass_p%gamma_m,                  &
-         columnwise_op_mass_p%gamma_p,                  &
-         columnwise_op_DT_D_p%columnwise_matrix,        &
-         columnwise_op_DT_D_p%nrow,                     &
-         columnwise_op_DT_D_p%ncol,                     &
-         columnwise_op_DT_D_p%bandwidth,                &
-         columnwise_op_DT_D_p%alpha,                    &
-         columnwise_op_DT_D_p%beta,                     &
-         columnwise_op_DT_D_p%gamma_m,                  &
-         columnwise_op_DT_D_p%gamma_p,                  &
-         columnwise_op_mass_DT_D_p%columnwise_matrix,   &
-         columnwise_op_mass_DT_D_p%nrow,                &
-         columnwise_op_mass_DT_D_p%ncol,                &
-         columnwise_op_mass_DT_D_p%bandwidth,           &
-         columnwise_op_mass_DT_D_p%alpha,               &
-         columnwise_op_mass_DT_D_p%beta,                &
-         columnwise_op_mass_DT_D_p%gamma_m,             &
-         columnwise_op_mass_DT_D_p%gamma_p,             &
-         alpha,                                         &
-         beta)
+    call columnwise_op_scaledadd_kernel_code(cell,                        &
+                                             ncell_2d,                    &
+                                             clm_mat_M,                   &
+                                             nrow_33,                     &
+                                             ncol_33,                     &
+                                             bw_33,                       &
+                                             alpha_33,                    &
+                                             beta_33,                     &
+                                             g_m_33,                      &
+                                             g_p_33,                      &
+                                             clm_mat_DTD,                 &
+                                             nrow_prod,                   &
+                                             ncol_prod,                   &
+                                             bw_prod,                     &
+                                             alpha_prod,                  &
+                                             beta_prod,                   &
+                                             g_m_prod,                    &
+                                             g_p_prod,                    &
+                                             clm_mat_DTD_M,               &
+                                             nrow_prod,                   &
+                                             ncol_prod,                   &
+                                             bw_prod,                     &
+                                             alpha_prod,                  &
+                                             beta_prod,                   &
+                                             g_m_prod,                    &
+                                             g_p_prod,                      &
+                                             mu,                          &
+                                             nu)
 
     ! Same calculation with dense matrices
-    densematrix_mass_DT_D(:,:) = alpha * densematrix_mass(:,:) &
-                               + beta  * densematrix_DT_D(:,:)
+    densematrix_mass_DT_D(:,:) = mu * densematrix_mass(:,:) &
+                               + nu  * densematrix_DT_D(:,:)
 
     ! Check result by comparing non-zero matrix entries in columnwise and
     ! dense matrices
-    do i = 1, columnwise_op_mass_DT_D_p%nrow
-       j_minus = ceiling( ( columnwise_op_mass_DT_D_p%alpha*i  &
-                          - columnwise_op_mass_DT_D_p%gamma_p) &
-                          / (1.0_r_def*columnwise_op_mass_DT_D_p%beta),i_def )
-       j_plus = floor( ( columnwise_op_mass_DT_D_p%alpha*i  &
-                          + columnwise_op_mass_DT_D_p%gamma_m) &
-                          / (1.0_r_def*columnwise_op_mass_DT_D_p%beta),i_def )
-       do j = MAX(1,j_minus), MIN( columnwise_op_mass_DT_D_p%ncol, j_plus)
-          matrixentry &
-             = columnwise_op_mass_DT_D_p%columnwise_matrix(j-j_minus+1,i,cell)
+    do i = 1_i_def, nrow_prod
+       j_minus = ceiling( ( alpha_prod*i - g_p_prod) / (1.0_r_def*beta_prod),i_def )
+       j_plus = floor( ( alpha_prod*i + g_m_prod) / (1.0_r_def*beta_prod),i_def )
+       do j = MAX(1,j_minus), MIN( ncol_prod, j_plus)
+    matrixentry &
+             = clm_mat_DTD_M(j-j_minus+1,i,cell)
           @assertEqual( densematrix_mass_DT_D(i,j), matrixentry, tol )
 
        end do
@@ -250,6 +204,10 @@ contains
     deallocate(densematrix_mass)
     deallocate(densematrix_DT_D)
     deallocate(densematrix_mass_DT_D)
+
+    deallocate(clm_mat_M)
+    deallocate(clm_mat_DTD)
+    deallocate(clm_mat_DTD_M)
 
   end subroutine test_all
 
