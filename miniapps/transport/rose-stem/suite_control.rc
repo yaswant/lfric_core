@@ -1,10 +1,27 @@
+{%- set row    = "'row'" %}
+{%- set column = "'column'" %}
+{%- set auto   = "'auto'" %}
+{%- set custom = "'custom'" %}
+
 {%- set projectName = 'transport' %}
 {%- set projectDir  = 'transport' %}
 {%- set miniappFlag = True %}
 {%- set fix_enums   = False %}
 
-{# Set the  compiler debug profile for runs in this suite #}
-{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{# Default setting to enable xios for all tasks in this suite. Is overrided if #}
+{# 'use_xios' ["True"|"False"] is specified in the specific task directives    #}
+{%- set default_use_xios = "False" %}
+
+{# Default number of mpi ranks to be used by the xios server if unspecified    #}
+{# directly in suite.rc task. Although it is set, it should only have any      #}
+{# impact if xios is being used, i.e. if xios_nodes > 0. These aren't the most #}
+{# intuitive variable names as they're using the existing naming convention    #}
+{# They should be changed at a later date to be something more intuitive.      #}
+{%- set default_mpi_parts_xios = 0 %}
+
+{# Set the compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], #}
+{# omission defaults to 'fast-debug'                     #}
 {%- set run_application_profile = '' %}
 
 {%- set appDiagStemName = 'diagTransport' %}
@@ -23,7 +40,7 @@
                                                       'corner_cosine_hill',
                                                       'equator_cosine_hill'] } %}
 
-{%- set canned_configurations  = ['transport'] %}
+{%- set canned_configurations = ['transport'] %}
 
 {%- set groups = {
 'developer': [
@@ -31,9 +48,10 @@
     'check_style_graph()',
     'api_documentation_graph(publish=True)',
     'run_application("transport", "cosine_hill_45deg",
+                     env={"nrun":288, "directives":{"default":{"mpi_parts":6}}},
                      resolutions=[("C32",4050.0)],
                      plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR density T000000:T000032:T000064:T000096:T000128:T000160:T000192:T000224:T000256 -1 -91 0 $PLOT_DIR" )',
-    'run_application("transport", "transport-biperiodic",
+    'run_application("transport", "transport-biperiodic",env={"nrun":100},
                      resolutions=[("BiP40x40-5x5",1.0)],
                      plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR density T000000:T000020:T000040:T000060:T000080:T000100 -1 -91 0 $PLOT_DIR" )',
     'run_application("transport", "yz_biperiodic_cosmic",
@@ -51,10 +69,11 @@
 
 'nightly': [
     'run_application( "transport", "divergence_cosmic", precisions=["32","64"],
-                      resolutions=[("C32",1.0)],
+                      resolutions=[("C32",1.0)], env={"nrun":500,
+                                                      "directives":{"default":{"mpi_parts":6} } },
                       plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR density T000000:T000050:T000100:T000150:T000200:T000250 -1 -91 0 $PLOT_DIR" )',
     'run_application( "transport", "biperiodic-cosmic", precisions=["32","64"],
-                      resolutions=[("BiP200x200-5x5",1.0)],
+                      resolutions=[("BiP200x200-5x5",1.0)], env={"nrun":500},
                       plotstr="biperiodic-cosmic_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 200 200 density T000000:T000500 $PLOT_DIR" )',
     'run_application( "transport", "equator_cosine_hill",
                       resolutions=[("C48",4050.0)],

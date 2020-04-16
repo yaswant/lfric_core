@@ -195,7 +195,7 @@
 /
 
 &partitioning
-  auto        = .true.
+  panel_decomposition = 'auto'
 /
 
 &multigrid

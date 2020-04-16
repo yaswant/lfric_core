@@ -25,7 +25,7 @@ l_multigrid=.false.,
 /
 
 &partitioning
-auto=.true.,
+  panel_decomposition = 'auto'
 /
 
 &finite_element
@@ -33,6 +33,7 @@ cellshape='quadrilateral',
 coordinate_order=2,
 element_order=0,
 rehabilitate=.true.,
+supg=.false.,
 vorticity_in_w1=.false.,
 /
 

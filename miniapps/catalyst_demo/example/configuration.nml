@@ -18,6 +18,7 @@
   element_order    = 0
   coordinate_order = 2
   rehabilitate     = .true.
+  supg             = .false.
   vorticity_in_w1  = .true.
 /
 
@@ -38,23 +39,12 @@
   sbr_angle_lon  = 0.0
 /
 
-&initialization
- init_option = 'analytic'
- ancil_option = 'none'
-/
-
-&files
-  diag_stem_name            = 'gravity_wave'
-  checkpoint_stem_name      = "restartGravityWave"
-  start_dump_filename       = 'UM2LFRic_dump'
-  start_dump_directory      = './'
-/
 
 &io
-  use_xios_io               = .true.
-  write_conservation_diag   = .false.
+  diag_stem_name            = 'gravity_wave'
+  restart_stem_name         = "restartGravityWave"
+  use_xios_io               = .false.
   write_diag                = .true.
-  write_dump                = .false.
   diagnostic_frequency      = 36
   nodal_output_on_w3        = .false.
   subroutine_timers         = .true.
@@ -63,14 +53,19 @@
   checkpoint_write          = .false.
 /
 
-&logging
-  run_log_level='info'
+&time
+ timestep_start             = 1
+ timestep_end               = 36
 /
 
-&time
-  calendar = 'timestep'
-  timestep_start = '1'
-  timestep_end = '36'
+&visualisation
+  write_catalyst_output    = .true.
+  visualisation_frequency  = 1
+  visualisation_stem_name  = 'catalyst_output'
+  use_python_vis_pipeline  = .true.
+  vis_llr_projection       = .false.
+  radius_scale_factor      = 1.7e-5
+  python_vis_pipeline_name = 'pipelines/spherical_slice_rendered.py'
 /
 
 &planet
@@ -100,12 +95,13 @@
   guess_np1                      = .F
   reference_reset_freq           = 1
   normalise                      = .true.,
+  use_operators                  = .T,
 /
 
 &helmholtz_solver
   gcrk                           = 4,
   method                         = 'bicgstab',
-  preconditioner                 = 'tridiagonal',
+  preconditioner                 = 'diagonal',
   si_pressure_tolerance          = 1.0e-4,
   si_pressure_maximum_iterations = 199,
   normalise                      = .true.,
@@ -122,7 +118,7 @@
 /
 
 &partitioning
-  auto        = .true.
+  panel_decomposition = 'auto'
 /
 
 &domain_size
@@ -136,13 +132,4 @@
   l_multigrid = .false.
   multigrid_chain_nitems = 4
   ugrid      = 'prime', 'mesh_C12.nc', 'mesh_C6.nc', 'mesh_C3.nc'
-/
-
-&section_choice
-aerosol='none',
-boundary_layer='none',
-cloud='none',
-convection='none',
-microphysics='none',
-radiation='none'
 /

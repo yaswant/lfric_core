@@ -1,10 +1,27 @@
+{%- set row    = "'row'" %}
+{%- set column = "'column'" %}
+{%- set auto   = "'auto'" %}
+{%- set custom = "'custom'" %}
+
 {%- set projectName = 'io_dev' %}
 {%- set projectDir  = 'io_dev' %}
 {%- set miniappFlag = True %}
 {%- set fix_enums   = False %}
 
-{# Set the  compiler debug profile for runs in this suite #}
-{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{# Default setting to enable xios for all tasks in this suite. Is overrided if #}
+{# 'use_xios' ["True"|"False"] is specified in the specific task directives    #}
+{%- set default_use_xios = "True" %}
+
+{# Default number of mpi ranks to be used by the xios server if unspecified    #}
+{# directly in suite.rc task. Although it is set, it should only have any      #}
+{# impact if xios is being used, i.e. if xios_nodes > 0. These aren't the most #}
+{# intuitive variable names as they're using the existing naming convention    #}
+{# They should be changed at a later date to be something more intuitive.      #}
+{%- set default_mpi_parts_xios = 0 %}
+
+{# Set the compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], #}
+{# omission defaults to 'fast-debug'                     #}
 {%- set run_application_profile = '' %}
 
 {%- set appDiagStemName = 'diagIoDev' %}
@@ -15,7 +32,7 @@
 
 {%- set application_configurations = { 'io_dev' : ['default'] } %}
 
-{%- set canned_configurations  = ['io_dev'] %}
+{%- set canned_configurations = ['io_dev'] %}
 
 {%- set groups = {
 'developer': [
@@ -23,7 +40,8 @@
     'check_style_graph()',
     'api_documentation_graph(publish=True)',
     'run_application("io_dev", "default", resolutions=[("C12",1800)],
-                     env={"directives":{"default":{"mpi_parts":6,
+                     env={"nrun":4,
+                          "directives":{"default":{"mpi_parts":6,
                                                    "threads":1,
                                                    "xios_nodes":1,
                                                    "wallclock":"00:05:00"}}},

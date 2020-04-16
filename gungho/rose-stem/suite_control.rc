@@ -1,10 +1,27 @@
+{%- set row    = "'row'" %}
+{%- set column = "'column'" %}
+{%- set auto   = "'auto'" %}
+{%- set custom = "'custom'" %}
+
 {%- set projectName = 'gungho' %}
 {%- set projectDir  = 'gungho' %}
 {%- set miniappFlag = False %}
 {%- set fix_enums   = False %}
 
-{# Set the  compiler debug profile for runs in this suite #}
-{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{# Default setting to enable xios for all tasks in this suite. Is overrided if #}
+{# 'use_xios' ["True"|"False"] is specified in the specific task directives    #}
+{%- set default_use_xios = "True" %}
+
+{# Default number of mpi ranks to be used by the xios server if unspecified    #}
+{# directly in suite.rc task. Although it is set, it should only have any      #}
+{# impact if xios is being used, i.e. if xios_nodes > 0. These aren't the most #}
+{# intuitive variable names as they're using the existing naming convention    #}
+{# They should be changed at a later date to be something more intuitive.      #}
+{%- set default_mpi_parts_xios = 0 %}
+
+{# Set the compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], #}
+{# omission defaults to 'fast-debug'                     #}
 {%- set run_application_profile = '' %}
 
 {%- set appDiagStemName = 'diagGungho' %}
@@ -12,6 +29,43 @@
 {%- set mesh_rdef       = "64" %}
 {%- set mesh_build      = "fast-debug" %}
 {%- set MAXRUNAHEAD     = 15 %}
+
+{#========================================================================#}
+{# MPI partitions & Panel decomposition                                   #}
+{#========================================================================#}
+{# Directive configuration for your task can be controlled                #}
+{# using a dictionary, recognised entries are as follows                  #}
+{#                                                                        #}
+{# "mpi_parts" : Total number of process ranks for the task. Replaces     #}
+{#               $TOTAL_RANKS environment variable in the app             #}
+{# "panel_decomp" : Decompositon of partitions PER PANEL,                 #}
+{#                  options are [auto|row|column|custom]                  #}
+{# "xproc", "yproc" : Number of process ranks in x,y directions,          #}
+{#                    only in effect if "panel_decomp":auto               #}
+{# "use_xios" : Flag to enable/disable xios, [True|False]                 #}
+{#              default is True                                           #}
+{# "xios_nodes" : Number of extra nodes to reserve for the xios server    #}
+{#                xios is used for IO (enabled if >0),                    #}
+{# "mpi_parts_xios": Number of mpi ranks to be used by an xios            #}
+{#                   server. If >0 xios is used in server mode.           #}
+{#                   Has no effect if xios_nodes <1                       #}
+{#                                                                        #}
+{# NOTE: To enable xios server mode, valid entries are required for       #}
+{#       "use_xios", "xios_nodes" and "mpi_parts_xios"                    #}
+{#                                                                        #}
+{# Example:  run task entry                                               #}
+{#  'run_application(                                                     #}
+{#        "gungho", "default", resolutions=[("BiP75x4-4000x2000",10.0)],  #}
+{#        env={"nrun":10,                                                 #}
+{#             "directives":{"default":{"mpi_parts":3,                    #}
+{#                                      "panel_decomp":' + column + ',    #}
+{#                                      "xproc":1,                        #}
+{#                                      "yproc":3,                        #}
+{#                                      "use_xios":"True",                #}
+{#                                      "xios_nodes":1,                   #}
+{#                                      "mpi_parts_xios":1} } } )'        #}
+{#========================================================================#}
+
 
 {%- set application_configurations = { 'gungho' : [ 'runge-kutta', 'semi-implicit',
                                                     'transport-rk', 'transport-rk-bip',
@@ -32,7 +86,7 @@
                                                     'schar_cart_8s', 'schar_cart_8s_inconsistent', 'schar_cart_40s', 'bell_3d_cart',
                                                     'baroclinic48', 'baroclinic96', 'default' ] } %}
 
-{%- set canned_configurations  = ['gungho'] %}
+{%- set canned_configurations = ['gungho'] %}
 
 {%- set groups = {
   'developer': [
@@ -41,81 +95,104 @@
     'api_documentation_graph(publish=True)',
     'design_documentation_graph(publish=True)',
     'run_application("gungho", "agnesi_orog_cartesian",
-                     resolutions=[("BiP40x4-100x100",3.0)] )',
+                     resolutions=[("BiP40x4-100x100",3.0)],
+                     env={"nrun":3})',
     'run_application("gungho", "baroclinic",
                      resolutions=[("C24",3600.0)],
                      support_meshes=["C12","C6","C3"],
                      env={"crun":1, "nrun":240,
-                          "directives":{"default":{"mpi_parts":6,"threads":4,"wallclock":"01:00:00"} } },
+                          "directives":{"default":{"mpi_parts":6,
+                                                   "threads":4,
+                                                   "wallclock":"01:00:00"} } },
                      plotstr="baroclinic.py $NODAL_DATA_DIR/lfric_diag.nc $PLOT_DIR dcmip u1:u2:u3:surface_pressure_temperature")',
     'run_application("gungho", "biperiodic_p0_gw",
                      resolutions=[("BiP300x4-1000x2000",10.0)],
+                     env={"crun":1, "nrun":300,
+                          "directives":{"default":{"use_xios":"False"} } },
                      plotstr="gw_cart_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 300 4 theta T000000:T000100:T000200:T000300 $PLOT_DIR" )',
     'run_application("gungho", "biperiodic_p1_gw",
                      resolutions=[("BiP75x4-4000x2000",10.0)],
                      env={"crun":1, "nrun":300,
-                          "directives":{"default":{"mpi_parts":3,
+                          "directives":{"default":{"mpi_parts":3,"panel_decomp":' + row + ',
                                                    "threads":2,
+                                                   "use_xios":"False",
                                                    "wallclock":"00:59:00"} } },
                      plotstr="gw_high_order_cart_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 150 8 theta T000000:T000100:T000200:T000300 $PLOT_DIR" )',
     'run_application("gungho", "runge-kutta",
                      resolutions=[("C12",1.0)], env={"nrun":30} )',
     'run_application("gungho", "semi-implicit",
-                     resolutions=[("C12",10.0)], env={"nrun":3} )',
+                     resolutions=[("C12",10.0)], env={"nrun":3, "use_xios":"False"} )',
     'run_application("gungho", "static_isentropic_x",
-                     resolutions=[("BiP4x4-600x400",10.0)], env={"nrun":10},
+                     resolutions=[("BiP4x4-600x400",10.0)],
+                     env={"nrun":10,
+                          "directives":{"default":{"use_xios":"False"} } },
                      plotstr="dofs.py ' + appDiagStemName + ' $NODAL_DATA_DIR w3projection_u1:w3projection_u2:w3projection_u3 T000000:T000010 $PLOT_DIR")',
     'run_application("gungho", "static_isentropic_y",
-                     resolutions=[("BiP4x4-600x400",10.0)], env={"nrun":10},
+                     resolutions=[("BiP4x4-600x400",10.0)],
+                     env={"nrun":10,
+                          "directives":{"default":{"use_xios":"False"} } },
                      plotstr="dofs.py ' + appDiagStemName + ' $NODAL_DATA_DIR w3projection_u1:w3projection_u2:w3projection_u3 T000000:T000010 $PLOT_DIR")',
     'run_application("gungho", "static_isothermal_x",
-                     resolutions=[("BiP4x4-600x400",10.0)], env={"nrun":10},
+                     resolutions=[("BiP4x4-600x400",10.0)],
+                     env={"nrun":10,
+                          "directives":{"default":{"use_xios":"False"} } },
                      plotstr="dofs.py ' + appDiagStemName + ' $NODAL_DATA_DIR w3projection_u1:w3projection_u2:w3projection_u3 T000000:T000010 $PLOT_DIR")',
     'run_application("gungho", "static_isothermal_y",
-                     resolutions=[("BiP4x4-600x400",10.0)], env={"nrun":10},
+                     resolutions=[("BiP4x4-600x400",10.0)],
+                     env={"nrun":10,
+                          "directives":{"default":{"use_xios":"False"} } },
                      plotstr="dofs.py ' + appDiagStemName + ' $NODAL_DATA_DIR w3projection_u1:w3projection_u2:w3projection_u3 T000000:T000010 $PLOT_DIR")',
     'run_application("gungho", "straka_y",
                      resolutions=[("BiP4x128-400x400",10.0)],
+                     env={"nrun":90,
+                          "directives":{"default":{"mpi_parts":4,
+                                                   "panel_decomp":' + column + ',
+                                                   "use_xios":"False"} } },
                      plotstr="straka_plot_y.py ' + appDiagStemName + ' $NODAL_DATA_DIR 4 128 theta T000090 $PLOT_DIR" )',
     'run_application("gungho", "straka_y_ugrid",
                      resolutions=[("BiP4x128-400x400",10.0)],
-                     env={"directives":{"default":{"mpi_parts":4,
+                     env={"nrun":90,
+                          "directives":{"default":{"mpi_parts":4,"panel_decomp":' + row + ',
                                                    "threads":1,
-                                                   "xios_nodes":1,
                                                    "wallclock":"00:20:00"} } },
                      checkkgo=False,
                      plotstr="straka_plot_y_ugrid.py $NODAL_DATA_DIR/lfric_diag.nc 4 128 theta T90 $PLOT_DIR")',
     'run_application("gungho", "straka_200m",
                      resolutions=[("BiP256x4-200x200",5.0)],
                      env={"crun":1, "nrun":180,
-                          "directives":{"default":{"mpi_parts":8,
+                          "directives":{"default":{"mpi_parts":8,"panel_decomp":' + row + ',
                                                    "threads":1,
                                                    "wallclock":"02:00:00"} } },
                      plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 256 4 theta T000180 $PLOT_DIR" )',
     'run_application("gungho", "straka_x",
                      resolutions=[("BiP128x4-400x400",10.0)],
                      env={"crun":1, "nrun":90,
-                          "directives":{"default":{"mpi_parts":4,
+                          "directives":{"default":{"mpi_parts":4,"panel_decomp":' + row + ',
                                                    "threads":1,
                                                    "wallclock":"02:00:00"}}},
                      plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 128 4 theta T000090 $PLOT_DIR" )',
     'run_application("gungho", "straka_x-cosmic",
                      resolutions=[("BiP128x4-400x400",10.0)],
                      env={"crun":1, "nrun":90,
-                          "directives":{"default":{"mpi_parts":4,
+                          "directives":{"default":{"mpi_parts":4,"panel_decomp":' + row + ',
                                                    "threads":1,
                                                    "wallclock":"02:00:00"}}},
                      plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 128 4 theta T000090 $PLOT_DIR" )',
     'run_application("gungho", "robert",
                      resolutions=[("BiP50x4-20x20",2.5)],
-                     env={"crun":3, "nrun":144},
+                     env={"crun":3, "nrun":144,
+                          "directives":{"default":{"mpi_parts":5,"panel_decomp":' + row + '}}},
                      plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:w3projection_xi2 T000000:T000288:T000432 $PLOT_DIR")',
-    'run_application( "gungho", "robert-moist",           resolutions=[("BiP50x4-20x20",2.0)], env={"crun":3, "nrun":100},
+    'run_application( "gungho", "robert-moist",           resolutions=[("BiP50x4-20x20",2.0)], env={"crun":3, "nrun":100,
+                          "directives":{"default":{"mpi_parts":5,"panel_decomp":' + row +'}}},
                       plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:w3projection_xi2:m_v T000000:T000100:T000200:T000300 $PLOT_DIR")',
-    'run_application( "gungho", "robert-moist-smag",      resolutions=[("BiP50x4-20x20",2.0)], env={"crun":3, "nrun":100},
+    'run_application( "gungho", "robert-moist-smag",      resolutions=[("BiP50x4-20x20",2.0)], env={"crun":3, "nrun":100,
+                          "directives":{"default":{"mpi_parts":5,"panel_decomp":' + row +' }}},
                       plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:w3projection_xi2:m_v:w3projection_u1:w3projection_u2:w3projection_u3 T000000:T000100:T000200:T000300 $PLOT_DIR")',
     'run_application("gungho", "sbr-cosmic",
-                     resolutions=[("C24",1800.0)], env={"nrun":60},
+                     resolutions=[("C24",1800.0)],
+                     env={"nrun":60,
+                          "directives":{"default":{"mpi_parts":6, "use_xios":"False"}}},
                      plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR theta:rho:w3projection_u1:w3projection_u2:w3projection_u3 T000060 180 50 15 $PLOT_DIR",
                      publish=True )',
     'run_application("gungho", "hs_short",
@@ -125,7 +202,6 @@
                                   ("C24",900.0):10},
                           "directives":{"default":{"mpi_parts":6,
                                                    "threads":1,
-                                                   "xios_nodes":1,
                                                    "wallclock":"00:06:00"}}},
                      plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR")',
     'run_application("gungho", "gh_profile", resolutions=[("C32",900.0)],
@@ -139,25 +215,32 @@
     'run_application("gungho", "agnesi_orog_cartesian_long",
                      resolutions=[("BiP180x4-800x800", 10.0)],
                      env={"crun":1, "nrun":100,
-                          "directives":{"default":{"mpi_parts":18,
-                                                   "threads":1,
+                          "directives":{"default":{"mpi_parts":18,"panel_decomp":' + row + ',
+                                                   "threads":1, "use_xios":"False",
                                                    "wallclock":"00:40:00"} } },
                      plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T000100 2 2 nhmw zoom_1 lines $PLOT_DIR",
                      publish=True )',
     'run_application("gungho", "biperiodic_p0_gw_fem",
                      resolutions=[("BiP300x4-1000x2000",10.0)],
+                     env={"nrun":300, "directives":{"default":{"use_xios":"False"} } },
                      plotstr="gw_cart_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 300 4 theta T000000:T000100:T000200:T000300 $PLOT_DIR",
                      publish=True )',
     'run_application("gungho", "dcmip301",
-                     resolutions=[("C24",10.0)],
+                     resolutions=[("C24",10.0)], env={"crun":1, "nrun":360,
+                                                      "directives":{"default":{"mpi_parts":6,
+                                                                               "use_xios":"False"} } },
                      plotstr="dcmip301.py ' + appDiagStemName + ' $NODAL_DATA_DIR theta T000180:T000252:T000324:T000360 $PLOT_DIR",
                      publish=True )',
     'run_application("gungho", "sbr",
-                     resolutions=[("C24",1800.0)], env={"nrun":60},
+                     resolutions=[("C24",1800.0)], env={"crun":1, "nrun":60,
+                                                        "directives":{"default":{"mpi_parts":6,
+                                                                      "use_xios":"False"} } },
                      plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR theta:rho:w3projection_u1:w3projection_u2:w3projection_u3 T000060 180 50 15 $PLOT_DIR",
                      publish=True )',
     'run_application("gungho", "semi-implicit",
-                     resolutions=[("C12",10.0)], env={"nrun":3},
+                     resolutions=[("C12",10.0)], env={"nrun":3,
+                                                      "directives":{"default":{"mpi_parts":1,
+                                                                               "use_xios":"False"} } },
                      publish=True )',
     'run_application("gungho", "static_isothermal_x_long",
                      resolutions=[("BiP4x4-600x400",10.0)], env={"nrun":2000},
@@ -165,8 +248,8 @@
     'run_application("gungho", "warm3dbubble_small",
                      resolutions=[("BiP50x50-20x20",2.5)],
                      env={"crun":1, "nrun":40,
-                          "directives":{"default":{"mpi_parts":20,
-                                                   "threads":1,
+                          "directives":{"default":{"mpi_parts":20,"panel_decomp":' + auto + ',
+                                                   "threads":1, "use_xios":"False",
                                                    "wallclock":"00:30:00"} } },
                      plotstr="warm3dbubble.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 50 theta T000000:T000040 $PLOT_DIR 1",
                      publish=True )',
@@ -178,13 +261,15 @@
                            "directives":{"default":{"mpi_parts":6,"threads":1,"wallclock":"00:30:00"} } },
                            plotstr="errors.py diagDynamo $NODAL_DATA_DIR rho:theta T000144:T000288:T000576:T001152 -1 -91 0 0.1 $PLOT_DIR")',
     'run_application( "gungho", "transport-rk-bip", resolutions=[("BiP300x4-1000x2000",50.0)],
-                      env={"crun":1, "nrun":{"default":600},"directives":{"default":{"mpi_parts":6,"threads":1,"wallclock":"00:15:00"} } },
+                      env={"crun":1, "nrun":{"default":600},"directives":{"default":{"mpi_parts":6,"panel_decomp":\'row\',
+                                                                                     "threads":1,"wallclock":"00:15:00"} } },
                            plotstr="cartesian_mountain_adv_plot.py $NODAL_DATA_DIR 300 4 theta:rho 1 T000100:T000200:T000300:T000400:T000500:T000600 lines $PLOT_DIR")',
     'run_application("gungho", "dcmip200",
                      resolutions=[("C24",600.0)],
                      support_meshes=["C12","C6","C3"],
                      env={"crun":1, "nrun":864,
                           "directives":{"default":{"mpi_parts":6,
+                                                   "use_xios":"False",
                                                    "threads":3,
                                                    "wallclock":"00:40:00"} } },
                      plotstr="slices_orography.py ' + appDiagStemName + ' $NODAL_DATA_DIR u T000864 0 0 0 $PLOT_DIR 2-0-0")',
@@ -193,7 +278,8 @@
             'run_application("gungho", "robert10m",
                              resolutions=[("BiP100x4-10x10",1.25)],checkkgo=False,
                              env={"crun":1, "nrun":432,
-                                  "directives":{"default":{"mpi_parts":10,
+                                  "directives":{"default":{"mpi_parts":10,"panel_decomp":' + row + ',
+                                                           "use_xios":"False",
                                                            "threads":1,
                                                            "wallclock":"01:30:00"} } },
                              plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 100 4 theta:w3projection_xi2 T000000:T000576:T000864 $PLOT_DIR",
@@ -202,7 +288,7 @@
                              resolutions=[("BiP200x4-5x5",0.625)],
                              checkkgo=False,
                              env={"crun":8, "nrun":216,
-                                  "directives":{"default":{"mpi_parts":20,
+                                  "directives":{"default":{"mpi_parts":20,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"01:30:00"} } },
                              plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 200 4 theta:w3projection_xi2 T000000:T001152:T001728 $PLOT_DIR",
@@ -237,12 +323,10 @@
                              env={"crun":10, "nrun": {"default":1440,},
                                   "directives":{"default":{"mpi_parts":144,
                                                            "threads":1,
-                                                           "wallclock":"01:30:00",
-                                                           "xios_nodes":1,},
-                                                           "C48":{"mpi_parts":576,
-                                                                  "threads":1,
-                                                                  "wallclock":"01:30:00",
-                                                                  "xios_nodes":1,}
+                                                           "wallclock":"01:30:00"},
+                                                    "C48":{"mpi_parts":576,
+                                                           "threads":1,
+                                                           "wallclock":"01:30:00"}
                                                }
                                  },
                              plotstr="plot_zonal.py $NODAL_DATA_DIR/lfric_averages.nc $PLOT_DIR",
@@ -251,7 +335,7 @@
                              resolutions=[("BiP1024x4-50x50",0.50)],
                              checkkgo=False,
                              env={"crun":2, "nrun":900,
-                                  "directives":{"default":{"mpi_parts":128,
+                                  "directives":{"default":{"mpi_parts":128,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"01:30:00"} } },
                              plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 1024 4 theta T001800 $PLOT_DIR",
@@ -260,7 +344,7 @@
                              resolutions=[("BiP2048x4-25x25",0.25)],
                              checkkgo=False,
                              env={"crun":2, "nrun":1800,
-                                   "directives":{"default":{"mpi_parts":256,
+                                   "directives":{"default":{"mpi_parts":256,"panel_decomp":\'row\',
                                                             "threads":1,
                                                             "wallclock":"01:45:00"} } },
                              plotstr="straka_plot_x.py ' + appDiagStemName + ' $NODAL_DATA_DIR 2048 4 theta T003600 $PLOT_DIR",
@@ -269,7 +353,7 @@
                              resolutions=[("BiP120x4-2000x2000", 20.0)],
                              checkkgo=False,
                              env={"crun": 1, "nrun": 750,
-                                  "directives":{"default":{"mpi_parts":20,
+                                  "directives":{"default":{"mpi_parts":20,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"03:00:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3  T000750 2 2 hmw zoom_1 lines $PLOT_DIR")',
@@ -277,7 +361,7 @@
                              resolutions=[("BiP360x4-400x400", 5.0)],
                              checkkgo=False,
                              env={"crun": 2, "nrun":900,
-                                  "directives":{"default":{"mpi_parts":72,
+                                  "directives":{"default":{"mpi_parts":72,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"03:00:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T001800 2 2 nhmw zoom_1 lines $PLOT_DIR")',
@@ -285,7 +369,7 @@
                              resolutions=[("BiP200x4-500x500", 8.0)],
                              checkkgo=False,
                              env={"crun": 1, "nrun":2250,
-                                  "directives":{"default":{"mpi_parts":25,
+                                  "directives":{"default":{"mpi_parts":25,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"02:30:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T002250 2 2 schar zoom_1 lines $PLOT_DIR")',
@@ -293,7 +377,7 @@
                              resolutions=[("BiP200x4-500x500", 8.0)],
                              checkkgo=False,
                              env={"crun": 1, "nrun":2250,
-                                  "directives":{"default":{"mpi_parts":25,
+                                  "directives":{"default":{"mpi_parts":25,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"02:30:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T002250 2 2 schar zoom_1 lines $PLOT_DIR")',
@@ -301,7 +385,7 @@
                              resolutions=[("BiP100x100-10x10",1.25)],
                              checkkgo=False,
                              env={"crun":4, "nrun":90,
-                                  "directives":{"default":{"mpi_parts":100,
+                                  "directives":{"default":{"mpi_parts":100,"panel_decomp":' + row + ',
                                                            "threads":3,
                                                            "wallclock":"02:30:00"} } },
                              plotstr="warm3dbubble.py ' + appDiagStemName + ' $NODAL_DATA_DIR 100 100 theta T000000:T000160:T000320 $PLOT_DIR 0")',
@@ -309,7 +393,7 @@
                              resolutions=[("BiP200x200-500x500", 8.0)],
                              checkkgo=False,
                              env={"crun": 15, "nrun":150,
-                                  "directives":{"default":{"mpi_parts":400,
+                                  "directives":{"default":{"mpi_parts":400,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"01:30:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T002250 100 100 schar3d zoom_1 lines $PLOT_DIR")',
@@ -317,7 +401,7 @@
                              resolutions=[("BiP300x200-200x200", 4.0)],
                              checkkgo=False,
                              env={"crun":10, "nrun":90,
-                                  "directives":{"default":{"mpi_parts":600,
+                                  "directives":{"default":{"mpi_parts":600,"panel_decomp":' + row + ',
                                                            "threads":1,
                                                            "wallclock":"02:00:00"} } },
                              plotstr="cartesian_mountain_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR u 3 T000900 159 99 bell zoom_2 lines $PLOT_DIR")',

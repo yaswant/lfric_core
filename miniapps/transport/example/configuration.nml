@@ -117,7 +117,7 @@ outer_iterations=2,
 runge_kutta_method='ssp3',
 /
 &partitioning
-auto=.true.,
+panel_decomposition = 'auto',
 /
 &domain_size
 planar_domain_max_x=1.0,

@@ -84,7 +84,7 @@ l_multigrid=.false.,
 /
 
 &partitioning
-auto=.true.,
+panel_decomposition = 'auto',
 /
 
 &planet

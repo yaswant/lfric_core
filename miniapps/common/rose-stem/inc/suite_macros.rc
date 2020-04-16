@@ -222,12 +222,24 @@
 {%-     if group in groups.keys() %}
 {%-       for mission in groups[group] %}
 {%-         set appName, key, env_dict, macro_name = mission | getEnvMacro() %}
+{%-         set appKey, resPrecisions = mission | get_precision_macro() %}
+
 {%-         if macro_name == 'run_application' %}
 {%-           if appName not in appsToRun %}
 {%-             do appsToRun.append(appName) %}
 {%-           endif %}
-{%            set appKey = key + '_' + science_label %}
-{%-           do scheduledTasksDict.update({appKey: env_dict}) %}
+
+{%-           if resPrecisions %}
+{%-             for precision in resPrecisions %}
+{%                set appKey = key + '_' + TARGET_SCIENCE_COMPILER + '_'
+                             + precision + '-bit_'
+                             + run_application_profile|default('fast-debug', true) %}
+{%-               do scheduledTasksDict.update({appKey: env_dict}) %}
+{%-             endfor %}
+{%-           else %}
+{%              set appKey = key + '_' + science_label %}
+{%-             do scheduledTasksDict.update({appKey: env_dict}) %}
+{%-           endif %}
 {%-         endif %}
 {%-       endfor %}
 {%-     endif %}

@@ -24,7 +24,7 @@
   element_order    = 0
   coordinate_order = 2
   rehabilitate     = .true.
-  vorticity_in_w1  = .true.
+  vorticity_in_w1  = .true. 
 /
 
 &formulation
@@ -33,7 +33,7 @@
   use_moisture         = .false.
   shallow              = .false.
   use_physics          = .false.
-  use_wavedynamics     = .true.
+  use_wavedynamics     = .true. 
   dlayer_on            = .false.
   dry_static_adjust    = .false.
   set_hydrostatic_init = .false.
@@ -74,7 +74,6 @@
 
 &io
   use_xios_io               = .true.
-  write_conservation_diag   = .false.
   write_diag                = .true.
   write_dump                = .false.
   diagnostic_frequency      = 1
@@ -90,9 +89,9 @@
 /
 
 &time
-  calendar='timestep'
-  timestep_start='1'
-  timestep_end='1'
+ calendar='timestep'
+ timestep_start='1'
+ timestep_end='1'
 /
 
 &planet
@@ -169,7 +168,7 @@
 /
 
 &partitioning
-  auto        = .true.
+  panel_decomposition = 'auto'
 /
 
 &multigrid
@@ -190,8 +189,7 @@
 /
 
 &orography
-  orog_init_option = 'none'
-  profile          = 'none'
+  profile   = 'none'
 /
 
 &orography_agnesi_cartesian
@@ -249,10 +247,9 @@ phi_centre_dec      = 0.0
 /
 
 &section_choice
-aerosol='none',
+radiation='none',
 boundary_layer='none',
-cloud='none',
 convection='none',
 microphysics='none',
-radiation='none'
+cloud='none'
 /

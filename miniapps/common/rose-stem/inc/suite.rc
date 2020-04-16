@@ -136,6 +136,30 @@
             PYTHONPATH  = $CYLC_SUITE_RUN_DIR/lib/python
             PATH        = $PATH:$PYTHONPATH/bin
 
+{# Set up Families for platform properties.                #}
+{# These would be platforms specific to a site, i.e. meto  #}
+{# Could be brought in from include file specific to site. #}
+    [[METO-SPICE]]
+        [[[environment]]]
+            HYPERTHREADS    = 1
+            CORES_PER_NODE  = 1
+            NUMA_REGIONS_PER_NODE = 0
+
+    [[METO-XC]]
+        [[[environment]]]
+            HYPERTHREADS    = 1
+            CORES_PER_NODE  = 36
+            NUMA_REGIONS_PER_NODE = 2
+
+    [[METO-XC40]]
+        inherit = METO-XC
+
+    [[METO-XCS]]
+        inherit = METO-XC
+
+    [[MONSOON-XCS]]
+        inherit = METO-XC
+
     [[ LOCAL ]]
         [[[remote]]]
             host = {{ ROSE_ORIG_HOST }}
@@ -143,6 +167,7 @@
             batch system = background
 
     [[TARGET]]
+        inherit = {{TARGET_OPT|upper}}
         [[[remote]]]
             host = {{TARGET_HOST}}
         [[[job]]]
@@ -342,7 +367,9 @@
         pre-script = """
                      {{ensureDestination()}}
                      """
+
         script = rose task-run --app-key=publish_compile
+
         [[[environment]]]
             HOST     = {{TARGET_HOST}}
             CONTEXT  = {{build}}
@@ -527,7 +554,7 @@
                                      compiler_setup[compiler],
                                      TARGET_RUN_SETUP,
                                      TARGET_REVEAL_SETUP )}}
-                       ulimit -s unlimited
+                     ulimit -s unlimited
                      """
 
         script = rose task-run --app-key=canned_test --command-key={{TARGET_RUN_METHOD}}
@@ -539,7 +566,6 @@
             PROCESSES        = {{variables['canned_processes']}}
 {%-           endif %}
             OMP_NUM_THREADS  = 1
-            HYPERTHREADS     = 1
 
         [[[directives]]]
 {%-           for DIRECTIVE in TARGET_RUN_BATCHER_DIRECTIVES %}
@@ -604,6 +630,10 @@
                       mesh_rdef + '-bit_' +
                       mesh_build|lower) %}
 
+##############################################################################
+# {{projectName|upper}} RUN TASKS
+##############################################################################
+
 {%- for appName in appsToRun %}
 {%-   for configuration in application_configurations[appName] %}
 
@@ -634,8 +664,16 @@
 
 {%-                 if 'run_' + configuration_label_res in scheduledTasks %}
 {%-                   set command_key = TARGET_RUN_METHOD %}
-{%-                   set mpi_parts = '' %}
-{%-                   set mpiopt = '' %}
+
+{%-                   set wallclock = "00:15:00" %}
+{%-                   set threads   = 1 %}
+{%-                   set mpi_parts = 1 %}
+
+{%-                   set use_xios        = default_use_xios %}
+{%-                   set xios_nodes      = 0 %}
+{%-                   set xios_server_opt = '' %}
+{%-                   set mpi_parts_xios  = default_mpi_parts_xios %}
+
 {%-                   set run_batcher = TARGET_RUN_BATCHER_DIRECTIVES %}
 
 {%-                   if configuration_label in scheduledTasksDict.keys() %}
@@ -650,22 +688,22 @@
 {#                        Set up different batcher if required.         #}
 {#                        e.g if setting directives requires a parallel #}
 {#                        queue, rather than the default shared queue.  #}
-{%-                       set mpi_parts   = directiveDict['mpi_parts']  %}
-{%-                       set wallclock   = directiveDict['wallclock']  %}
-{%-                       set threads     = directiveDict['threads']    %}
-{%-                       set xios_nodes  = directiveDict['xios_nodes'] if 'xios_nodes' in directiveDict.keys() else 0 %}
-{%-                       set run_batcher = TARGET_PARAM_RUN_BATCHER_DIRECTIVES| directive_modifier(mpi_parts*threads, wallclock, xios_nodes) %}
+{%-                       set mpi_parts      = directiveDict['mpi_parts']      if 'mpi_parts'      in directiveDict.keys() else mpi_parts      %}
+{%-                       set mpi_parts_xios = directiveDict['mpi_parts_xios'] if 'mpi_parts_xios' in directiveDict.keys() else mpi_parts_xios %}
+{%-                       set wallclock      = directiveDict['wallclock']      if 'wallclock'      in directiveDict.keys() else wallclock      %}
+{%-                       set threads        = directiveDict['threads']        if 'threads'        in directiveDict.keys() else threads        %}
+{%-                       set use_xios       = directiveDict['use_xios']       if 'use_xios'       in directiveDict.keys() else use_xios       %}
+{%-                       set xios_nodes     = directiveDict['xios_nodes']     if 'xios_nodes'     in directiveDict.keys() else xios_nodes     %}
 
-{#                        If the mpi is configured by the suite, then we will use       #}
-{#                        the setcores optional configuration, so let's check that here #}
-{%-                       if mpi_parts != '' and xios_nodes >= 1 %}
-{%                          set mpiopt = '--opt-conf-key=setcores_x_xios' %}
+{%-                       if use_xios == "True" and xios_nodes > 0 and mpi_parts_xios > 0 %}
+{%-                         set run_batcher = TARGET_PARAM_RUN_BATCHER_DIRECTIVES| directive_modifier(mpi_parts*threads, wallclock, xios_nodes) %}
+{%-                         set xios_server_opt = '--opt-conf-key=xios_server' %}
 {%                        else %}
-{%-                         set mpiopt = '--opt-conf-key=setcores_x' %}
+{%-                         set run_batcher = TARGET_PARAM_RUN_BATCHER_DIRECTIVES| directive_modifier(mpi_parts*threads, wallclock) %}
 {%-                       endif %}
 
-{%-                     endif %}   {# directives #}
-{%-                   endif %}   {# configuration_label #}
+{%-                     endif %}  {# directives #}
+{%-                   endif %}  {# configuration_label #}
 
 {%-                   if configuration_res == '' %}
 {%                      set pathFragment = appName ~ '/' ~ configuration %}
@@ -673,9 +711,6 @@
 {%                      set pathFragment = appName ~ '/' ~ configuration ~ '/' ~ configuration_res %}
 {%-                   endif %}
 
-##############################################################################
-# {{projectName|upper}} RUN TASKS
-##############################################################################
 
     [[run_{{configuration_label_res}}]]
         inherit = {{appLabel|upper}}_{{label|upper}}, TARGET
@@ -685,7 +720,7 @@
                                      compiler_setup[compiler],
                                      TARGET_RUN_SETUP,
                                      TARGET_REVEAL_SETUP )}}
-                       ulimit -s unlimited
+                     ulimit -s unlimited
 {%-                   for config, extra_meshes in support_meshes.items() %}
 {%-                     for mesh_name in extra_meshes %}
 {%-                       if mesh_name != '' %}
@@ -697,7 +732,7 @@
 {%-                   endfor %}
                      """
 
-        script = rose task-run --app-key={{appName}} --command-key={{command_key}} {{config_opt}} {{res_opt}} {{mpiopt}}
+        script = rose task-run --app-key={{appName}} --command-key={{command_key}} {{config_opt}} {{res_opt}} {{xios_server_opt}} --opt-conf-key=suite_controlled
 
         err-script = """
                      # Copied from the post-script. This has to happen
@@ -777,24 +812,51 @@
 
 {%-                   endif %} {# configuration_label #}
 
-            MESH_DIR        = $OUTPUT_ROOT/{{mesh_label}}/meshes
-            BIN_DIR         = $DESTINATION_DIRECTORY/bin
-            APP_NAME        = {{appName}}
-            DT              = {{dt_values[i]}}
-            CRUN_LENGTH     = $(echo ${crun:-1})
-            OMP_NUM_THREADS = $(echo ${threads:-1})
-            HYPERTHREADS    = 1 # Hardcoded for now
-            MPI_PARTS       = $(echo ${mpi_parts:-})  # We leave this empty if we want the default value from the .conf file
-{%-                 for ENV_VAR in TARGET_RUN_ENV_EXTRA %}
-            {{ENV_VAR}}
-{%-                 endfor %}
-            RESTART_NTS     = $(echo ${nrun:-1})
-            RESTART_NO      = $(echo $[$CYLC_TASK_CYCLE_POINT -1])
-            RESTART         = $(if [ $CYLC_TASK_CYCLE_POINT == $CYLC_SUITE_INITIAL_CYCLE_POINT ] && [ $CYLC_TASK_TRY_NUMBER -eq 1 ]; then echo ""; else echo "true"; fi)
-            RESTART_START   = $(echo $[$RESTART_NO*$RESTART_NTS + 1])
-            RESTART_STOP    = $(echo $[$RESTART_NO*$RESTART_NTS + $RESTART_NTS])
-            RESTART_READ    = $(if [[ $RESTART ]]; then echo ".true."; else echo ".false."; fi)
-            RESTART_WRITE   = $(if [ $CRUN_LENGTH -gt $CYLC_TASK_CYCLE_POINT ]; then echo ".true."; else echo ".false."; fi)
+            MESH_DIR          = $OUTPUT_ROOT/{{mesh_label}}/meshes
+            BIN_DIR           = $DESTINATION_DIRECTORY/bin
+            APP_NAME          = {{appName}}
+            RUN_METHOD        = {{TARGET_RUN_METHOD}}
+            TARGET_PLATFORM   = {{TARGET_OPT}}
+            OMP_NUM_THREADS   = $(echo ${threads:-1})
+            TOTAL_RANKS       = $(echo ${mpi_parts:-1})
+{#-----------------------------------------------------------------#}
+{#    Note: As this is an enumeration it must end up having single #}
+{#          quotes so that the resultant fortran namelist reads it #}
+{#          in correctly, not doing so may result in kgo failures  #}
+{#          for some tasks.                                        #}
+{#-----------------------------------------------------------------#}
+            PANEL_DECOMP      = $(echo \'${panel_decomp:-"auto"}\')
+            XPROC             = $(echo ${xproc:-${mpi_parts:-1}})
+            YPROC             = $(echo ${yproc:-1})
+
+{# Enable/disable XIOS #}
+{%-         if use_xios == "True" %}
+            USE_XIOS_IO        = .true.
+            NODAL_OUTPUT_ON_W3 = .false.
+{# Enable/disable XIOS Server #}
+{%-           if xios_nodes > 0 and mpi_parts_xios > 0 %}
+            XIOS_SERVER_MODE   = True
+            XIOS_SERVER_RANKS  = $(echo ${mpi_parts_xios})
+{%-           else %}
+            XIOS_SERVER_MODE   = False
+            XIOS_SERVER_RANKS  = 0
+{%-           endif %}
+{%-         else %}
+            USE_XIOS_IO        = .false.
+            NODAL_OUTPUT_ON_W3 = .true.
+            XIOS_SERVER_MODE   = False
+            XIOS_SERVER_RANKS  = 0
+{%-         endif %}
+
+            DT            = {{dt_values[i]}}
+            CRUN_LENGTH   = $(echo ${crun:-1})
+            RESTART_NTS   = $(echo ${nrun:-1})
+            RESTART_NO    = $(echo $[$CYLC_TASK_CYCLE_POINT -1])
+            RESTART       = $(if [ $CYLC_TASK_CYCLE_POINT == $CYLC_SUITE_INITIAL_CYCLE_POINT ] && [ $CYLC_TASK_TRY_NUMBER -eq 1 ]; then echo ""; else echo "true"; fi)
+            RESTART_START = $(echo $[$RESTART_NO*$RESTART_NTS + 1])
+            RESTART_STOP  = $(echo $[$RESTART_NO*$RESTART_NTS + $RESTART_NTS])
+            RESTART_READ  = $(if [[ $RESTART ]]; then echo ".true."; else echo ".false."; fi)
+            RESTART_WRITE = $(if [ $CRUN_LENGTH -gt $CYLC_TASK_CYCLE_POINT ]; then echo ".true."; else echo ".false."; fi)
 
         [[[directives]]]
 {%-                   for DIRECTIVE in run_batcher %}
@@ -847,6 +909,7 @@
                      {{TARGET_PLOT_PYTHON_SETUP}}
                      """
         script = rose task-run --app-key=plot
+
         [[[environment]]]
              NODAL_DATA_DIR = $DESTINATION_DIRECTORY/{{pathFragment}}/results
              PLOT_DIR = $DESTINATION_DIRECTORY/{{pathFragment}}/plots
@@ -961,3 +1024,4 @@
 # NULL TASKS
 ##############################################################################
 {{null_tasks()}}
+

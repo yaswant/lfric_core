@@ -1,10 +1,27 @@
+{%- set row    = "'row'" %}
+{%- set column = "'column'" %}
+{%- set auto   = "'auto'" %}
+{%- set custom = "'custom'" %}
+
 {%- set projectName = 'lfric_atm' %}
 {%- set projectDir  = 'lfric_atm' %}
 {%- set miniappFlag = False %}
 {%- set fix_enums   = False %}
 
-{# Set the  compiler debug profile for runs in this suite #}
-{# Options are ['fast-debug'|'full-debug'|'production'], omission defaults to 'fast-debug' #}
+{# Default setting to enable xios for all tasks in this suite. Is overrided if #}
+{# 'use_xios' ["True"|"False"] is specified in the specific task directives    #}
+{%- set default_use_xios = "True" %}
+
+{# Default number of mpi ranks to be used by the xios server if unspecified    #}
+{# directly in suite.rc task. Although it is set, it should only have any      #}
+{# impact if xios is being used, i.e. if xios_nodes > 0. These aren't the most #}
+{# intuitive variable names as they're using the existing naming convention    #}
+{# They should be changed at a later date to be something more intuitive.      #}
+{%- set default_mpi_parts_xios = 0 %}
+
+{# Set the compiler debug profile for runs in this suite #}
+{# Options are ['fast-debug'|'full-debug'|'production'], #}
+{# omission defaults to 'fast-debug'                     #}
 {%- set run_application_profile = '' %}
 
 {%- set appDiagStemName = 'diagLfricAtm' %}
@@ -12,6 +29,41 @@
 {%- set mesh_rdef       = "64" %}
 {%- set mesh_build      = "fast-debug" %}
 {%- set MAXRUNAHEAD     = 2 %}
+
+{#========================================================================#}
+{# MPI partitions & Panel decomposition                                   #}
+{#========================================================================#}
+{# Directive configuration for your task can be controlled                #}
+{# using a dictionary, recognised entries are as follows                  #}
+{#                                                                        #}
+{# "mpi_parts" : Total number of process ranks for the task. Replaces     #}
+{#               $TOTAL_RANKS environment variable in the app             #}
+{# "panel_decomp" : Decompositon of partitions PER PANEL,                 #}
+{#                  options are [auto|row|column|custom]                  #}
+{# "xproc", "yproc" : Number of process ranks in x,y directions,          #}
+{#                    only in effect if "panel_decomp":auto               #}
+{# "use_xios" : Flag to enable/disable xios, [True|False]                 #}
+{# "xios_nodes" : Number of extra nodes to reserve for the xios server    #}
+{#                xios is used for IO (enabled if >0),                    #}
+{# "mpi_parts_xios": Number of mpi ranks to be used by an xios            #}
+{#                   server. If >0 xios is used in server mode.           #}
+{#                   Has no effect if xios_nodes <1                       #}
+{#                                                                        #}
+{# NOTE: To enable xios server mode, valid entries are required for       #}
+{#       "use_xios", "xios_nodes" and "mpi_parts_xios"                    #}
+{#                                                                        #}
+{# Example:  run task entry                                               #}
+{#  'run_application(                                                     #}
+{#        "gungho", "default", resolutions=[("BiP75x4-4000x2000",10.0)],  #}
+{#        env={"nrun":10,                                                 #}
+{#             "directives":{"default":{"mpi_parts":4,                    #}
+{#                                      "panel_decomp":' + column + ',    #}
+{#                                      "xproc":2,                        #}
+{#                                      "yproc":2,                        #}
+{#                                      "use_xios":"True",                #}
+{#                                      "xios_nodes":1,                   #}
+{#                                      "mpi_parts_xios":2} } } )'        #}
+{#========================================================================#}
 
 {%- set application_configurations = { 'lfric_atm' : ['scm_dry_bl',
                                                       'scm_bl',
@@ -45,7 +97,7 @@
                                                       ],
                                      } %}
 
-{%- set canned_configurations  = ['lfric_atm'] %}
+{%- set canned_configurations = ['lfric_atm'] %}
 
 {%- set groups = {
   'developer': [
@@ -53,76 +105,99 @@
     'check_style_graph()',
     'run_application("lfric_atm", "scm_dry_bl",
                      resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_dry_spec_gwd",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_dry_orog_drag",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_smith",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_smith_checkrestart",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
                      env={"crun":2, "nrun":24},
                      plotstr="plot_scm_checkrestart.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_smith_mphys",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_pc2_mphys_rad",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_rad",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_rad_soil",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_ice",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_land",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_land_checkrestart",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
                      env={"crun":2, "nrun":24},
                      plotstr="plot_scm_checkrestart.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_hyd",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_snow",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_llcs",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_grcs_deep",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_pc2_grcs_deep",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_smith_grcs_deep",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_grcs_shallow",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "scm_bl_pc2_grcs_shallow",
-                     resolutions=[("BiP4x4-10000x10000",600.0)] ,
+                     resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "robert_moist_3d_smag",
-                     resolutions=[("BiP50x4-20x20",2.5)] ,
-                     env={"crun":2, "nrun":100},
+                     resolutions=[("BiP50x4-20x20",2.5)],
+                     env={"crun":2, "nrun":100,
+                          "directives":{"default":{"mpi_parts":5,
+                                                   "panel_decomp":' + row + '} } },
                      plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:m_v:u1_in_w3:u2_in_w3:u3_in_w3 T000000:T000100:T000200 $PLOT_DIR")',
     'run_application("lfric_atm", "robert_moist_blended_smag",
-                     resolutions=[("BiP50x4-20x20",2.5)] ,
-                     env={"crun":2, "nrun":100},
+                     resolutions=[("BiP50x4-20x20",2.5)],
+                     env={"crun":2, "nrun":100,
+                          "directives":{"default":{"mpi_parts":5,
+                                                   "panel_decomp":' + row + '} } },
                      plotstr="robert_plot.py ' + appDiagStemName + ' $NODAL_DATA_DIR 50 4 theta:m_v:u1_in_w3:u2_in_w3:u3_in_w3 T000000:T000100:T000200 $PLOT_DIR")',
     'run_application("lfric_atm", "aquaplanet_short",
                      resolutions=[("C12",300.0)],
@@ -131,7 +206,8 @@
                                                "threads":1,
                                                "wallclock":"00:10:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'run_application("lfric_atm", "aquaplanet_short_checkrestart",
                      resolutions=[("C12",300.0)],
@@ -140,7 +216,8 @@
                                                "threads":1,
                                                "wallclock":"00:10:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'run_application("lfric_atm", "aquaplanet",
                      resolutions=[("C12",300.0)],
@@ -149,34 +226,37 @@
                                                "threads":1,
                                                "wallclock":"00:12:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'run_application("lfric_atm", "aquaplanet_rad_smith_homog",
                      resolutions=[("C12",300.0)],
                      env={"crun":2, "nrun":1,
                           "directives":{"C12":{"mpi_parts":6,
-                                                 "threads":1,
+                                               "threads":1,
                                                "wallclock":"00:05:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'run_application("lfric_atm", "aquaplanet_rad_smith_mcica",
                      resolutions=[("C12",300.0)],
                      env={"crun":2, "nrun":1,
                           "directives":{"C12":{"mpi_parts":6,
-                                                 "threads":1,
+                                               "threads":1,
                                                "wallclock":"00:05:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'run_application("lfric_atm", "aquaplanet_rad_pc2_homog",
-                     resolutions=[("C12",300.0)],
                      env={"crun":2, "nrun":1,
                           "directives":{"C12":{"mpi_parts":6,
-                                                 "threads":1,
+                                               "threads":1,
                                                "wallclock":"00:05:00"},
                                        },
-                         }
+                         },
+                     resolutions=[("C12",300.0)]
                      )',
     'check_compilers("lfric_atm", "scm_dry_bl", "fast-debug",
                      resolution=("BiP4x4-10000x10000",600.0))',
@@ -185,6 +265,7 @@
   'nightly': [
     'run_application("lfric_atm", "scm_dry_bl",
                      resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "aquaplanet",
                      resolutions=[("C12",300.0)],
@@ -200,6 +281,7 @@
   'nightly-full-debug': [
     'run_application("lfric_atm", "scm_dry_bl",
                      resolutions=[("BiP4x4-10000x10000",600.0)],
+                     env={"nrun":48},
                      plotstr="plot_scm.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'run_application("lfric_atm", "aquaplanet",
                      resolutions=[("C12",300.0)],

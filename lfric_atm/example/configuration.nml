@@ -163,7 +163,7 @@ orog_init_option='none'
 profile='none',
 /
 &partitioning
-auto=.true.,
+panel_decomposition='auto',
 panel_xproc=1,
 panel_yproc=1,
 /

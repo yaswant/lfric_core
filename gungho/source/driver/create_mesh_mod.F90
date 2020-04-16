@@ -34,7 +34,13 @@ module create_mesh_mod
                                         partitioner_cubedsphere_serial, &
                                         partitioner_cubedsphere,        &
                                         partitioner_planar
-  use partitioning_config_mod,    only: auto, panel_xproc, panel_yproc
+  use partitioning_config_mod,    only: panel_decomposition,        &
+                                        panel_xproc, panel_yproc,   &
+                                        PANEL_DECOMPOSITION_AUTO,   &
+                                        PANEL_DECOMPOSITION_ROW,    &
+                                        PANEL_DECOMPOSITION_COLUMN, &
+                                        PANEL_DECOMPOSITION_CUSTOM
+
   use subgrid_config_mod,         only: dep_pt_stencil_extent, &
                                         rho_approximation_stencil_extent
   use transport_config_mod,       only: scheme, operators,    &
@@ -171,8 +177,10 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
                     LOG_LEVEL_INFO )
   end if
 
+  select case(panel_decomposition)
 
-  if (auto) then
+  case( PANEL_DECOMPOSITION_AUTO )
+
     ! For automatic partitioning, try to partition into the squarest
     ! possible partitions by finding the two factors of ranks_per_panel
     ! that are closest to sqrt(ranks_per_panel). If two factors can't
@@ -195,25 +203,42 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
       call log_event( "Could not automatically partition domain.", &
                       LOG_LEVEL_ERROR )
     end if
-  else
-    ! Not automatic partitioning - use the values provided from the
-    ! partitioning namelist
-    if (panel_xproc*panel_yproc == ranks_per_panel) then
-      xproc = panel_xproc
-      yproc = panel_yproc
-    else
+
+  case( PANEL_DECOMPOSITION_ROW )
+    xproc = ranks_per_panel
+    yproc = 1
+
+  case( PANEL_DECOMPOSITION_COLUMN )
+    xproc = 1
+    yproc = ranks_per_panel
+
+  case( PANEL_DECOMPOSITION_CUSTOM )
+    ! Use the values provided from the partitioning namelist
+    xproc = panel_xproc
+    yproc = panel_yproc
+
+    if (xproc*yproc /= ranks_per_panel) then
       call log_event( "The values of panel_xproc and panel_yproc "// &
                       "are inconsistent with the total number of "// &
                       "processors available.", LOG_LEVEL_ERROR )
     end if
-  end if
 
-  if (total_ranks == 1) then
-    call log_event( 'Using 1 partition', LOG_LEVEL_INFO )
-  else
-    write(partition_desc,'(I0,A,I0)') xproc,'x', yproc
-    write(log_scratch_space, '(A)' ) &
-        'Using '//trim(domain_desc)//trim(partition_desc)//' partitions.'
+  case default
+
+    call log_event( "Missing entry for panel decomposition, "// &
+                    "specify 'auto' if unsure.", LOG_LEVEL_ERROR )
+
+  end select
+
+
+  write(log_scratch_space, '(2(A,I0),A)' )   &
+        'Using ', xproc*yproc*npanels, ' '// &
+        'partition(s) across ', npanels, ' domain'
+  call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
+  if (total_ranks > 1) then
+    write(log_scratch_space, '(2(A,I0))' )   &
+        'Panel decomposition: ', xproc,'x', yproc
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
   end if
 
