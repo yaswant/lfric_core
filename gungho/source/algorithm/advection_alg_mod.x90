@@ -43,7 +43,8 @@ module advection_alg_mod
                                             scheme_method_of_lines
   use runtime_constants_mod,          only: get_detj_at_w2,                 &
                                             get_cell_orientation
-  use formulation_config_mod,         only: si_momentum_equation
+  use formulation_config_mod,         only: si_momentum_equation, &
+                                            vector_invariant
 
   use advective_update_alg_mod,       only: advective_update_alg_init,      &
                                             advective_update_alg_final,     &
@@ -54,9 +55,6 @@ module advection_alg_mod
   implicit none
 
   private
-
-  integer(i_def)           :: nstage
-  real(r_def), allocatable :: ak_adv(:,:)
 
   public  :: advection_alg
   public  :: advection_alg_init
@@ -78,19 +76,6 @@ contains
 
     integer(i_def),  intent(in) :: mesh_id
 
-    if ( time_method == method_rk ) then
-      ! If using explicit timestepping then advection is called once per stage,
-      ! therefore no further sub stages are needed, setting number of stages = 1
-      ! and coeffs = 1 short cuts the rk advection scheme
-      nstage = 1
-      allocate( ak_adv(nstage, nstage) )
-      ak_adv(1,1) = 1.0_r_def
-    else
-      nstage = num_rk_stage
-      allocate( ak_adv(nstage,nstage) )
-      ak_adv = ak
-    end if
-
     ! Set up the mass flux spatial computation
     call flux_alg_init(mesh_id)
     ! Set up the advective update spatial computation
@@ -105,8 +90,6 @@ contains
   subroutine advection_alg_final()
 
     implicit none
-
-    if (allocated(ak_adv)) deallocate( ak_adv )
 
     call flux_alg_final()
     call advective_update_alg_final()
@@ -166,7 +149,7 @@ contains
   ! Advect density field
   call log_event( "Advecting density...", LOG_LEVEL_INFO)
   call advect_field(mass_flux, state(igh_d), advecting_wind, &
-                    scheme, wind_n, wind_np1, .true., dt)
+                    scheme, wind_n, wind_np1, .true., dt, .false.)
 
   if ( scheme == scheme_method_of_lines ) then
     ! Reconstruct the advection increment from the mass flux
@@ -187,7 +170,7 @@ contains
   call log_event( "Advecting potential temperature...", LOG_LEVEL_INFO)
   call u_grad_theta%initialise( state(igh_t)%get_function_space() )
   call advect_field(u_grad_theta, state(igh_t), advecting_wind, &
-                    scheme_method_of_lines, wind_n, wind_np1, .false., dt)
+                    scheme_method_of_lines, wind_n, wind_np1, .false., dt, .false.)
   ! u_grad_theta now contains a pointwise incremente to theta,
   ! i.e. theta_np1 = theta_n - dt*u_grad_theta
   ! Depending upon what the temporal discretisation is this needs
@@ -219,7 +202,7 @@ contains
     call log_event( "Advecting wind...", LOG_LEVEL_INFO)
     call advect_momentum_alg(advection(igh_u), advected_wind, &
                              advecting_wind,&
-                             wind_n, wind_np1, dt)
+                             wind_n, wind_np1, dt, .false.)
   end if
 
   ! Don't advect Exner pressure
@@ -254,7 +237,8 @@ contains
 
     do imr = 1,nummr
       call advect_field( mr_inc(imr), mr(imr), advecting_wind, &
-                         scheme_method_of_lines, wind_n, wind_np1, .false., dt)
+                         scheme_method_of_lines, wind_n, wind_np1, .false., &
+                         dt, .false. )
       ! Make mr_inc into an increment by multiplying by dt
       call invoke( inc_a_times_X(dt, mr_inc(imr)) )
     end do
@@ -293,7 +277,9 @@ contains
     ! The saved version of single_generic_field after slow physics
     type(field_type), pointer :: after_slow_generic_field => null()
 
-    if ( subroutine_timers ) call timer('advection_generic_field_alg')
+    if ( subroutine_timers ) call timer( 'advection_generic_field_alg' )
+
+    call log_event( "Computing generic field advection...", LOG_LEVEL_INFO )
 
     ! Set advecting velocity = 0.5(u_np1 + u_n)
     call advecting_wind%initialise( wind_n%get_function_space() )
@@ -318,7 +304,7 @@ contains
 
         call advect_field( gf_inc, after_slow_generic_field, advecting_wind,  &
                            scheme_method_of_lines, wind_n, wind_np1, .false., &
-                           dt)
+                           dt, .false. )
 
         ! Get the field from the original collection which we want to update
         single_generic_field => generic_fields%get_field(                     &
@@ -348,13 +334,15 @@ contains
   !> @param[in]     wind_n Time level n wind field
   !> @param[in]     wind_np1 Time level n+1 wind field
   !> @param[in]     timestep delta t to advect field by
-  subroutine advect_momentum_alg(rhs, advected_wind, advecting_wind,&
-                                 wind_n, wind_np1, timestep)
+  !> @param[in]     from_si Flag if calling this routine from semi-implicit
+  !!                (instead of advection) routines
+  subroutine advect_momentum_alg( rhs, advected_wind, advecting_wind, &
+                                  wind_n, wind_np1, timestep, from_si )
 
     use convert_hdiv_field_kernel_mod,  only: convert_hdiv_field_kernel_type
     use project_advective_update_kernel_mod, &
                                         only: project_advective_update_kernel_type
-    use fs_continuity_mod,              only: W3
+    use fs_continuity_mod,              only: W3, Wtheta
     use finite_element_config_mod,      only: element_order, &
                                               nqp_exact
     use function_space_collection_mod,  only: function_space_collection
@@ -362,13 +350,15 @@ contains
     use quadrature_rule_gaussian_mod,   only: quadrature_rule_gaussian_type
     use quadrature_xyoz_mod,            only: quadrature_xyoz_type
     use enforce_bc_kernel_mod,          only: enforce_bc_kernel_type
-    use runtime_constants_mod,          only: get_coordinates
+    use runtime_constants_mod,          only: get_coordinates, &
+                                              get_rmultiplicity
     implicit none
 
     type(field_type), intent(inout)     :: rhs
     type(field_type), intent(in)        :: advected_wind, advecting_wind
     type(field_type), intent(in)        :: wind_n, wind_np1
     real(r_def),      intent(in)        :: timestep
+    logical,          intent(in)        :: from_si
 
     type(field_type), dimension(3)      :: u_scalar, adv_wind_update
     type( field_type ),        pointer  :: chi(:) => null()
@@ -392,6 +382,7 @@ contains
       call u_scalar(dir)%initialise( ws_fs )
       call adv_wind_update(dir)%initialise( ws_fs )
     end do
+    call advected_wind%log_minmax( LOG_LEVEL_INFO, 'advected u' )
     call invoke( setval_c(u_scalar(1), 0.0_r_def), &
                  setval_c(u_scalar(2), 0.0_r_def), &
                  setval_c(u_scalar(3), 0.0_r_def), &
@@ -405,7 +396,7 @@ contains
     do dir = 1,3
       call advect_field(adv_wind_update(dir), u_scalar(dir),            &
                         advecting_wind,  scheme_method_of_lines, &
-                        wind_n, wind_np1, .false., timestep)
+                        wind_n, wind_np1, .false., timestep, from_si)
     end do
     ! Compute the updates to the W2 wind field using the physical scalar
     ! update
@@ -431,8 +422,13 @@ contains
   !> @param[in]     advect_density Flag for advecting the density and
   !>                              returning the mass flux
   !> @param[in]     timestep delta t to advect field by
-  subroutine advect_field(advection_inc, field, advecting_wind, adv_scheme, &
-                          wind_n, wind_np1, advect_density, timestep)
+  !> @param[in]     si_advective_terms Flag to avoid using Runge-Kutta
+  !>                substepping
+
+  subroutine advect_field( advection_inc, field, advecting_wind, adv_scheme, &
+                           wind_n, wind_np1, advect_density, timestep,       &
+                           si_advective_terms )
+
 
     use fs_continuity_mod,        only: W3, Wtheta, W2
     use psykal_builtin_light_mod, only: invoke_sign
@@ -448,6 +444,7 @@ contains
     integer(i_def),   intent(in)    :: adv_scheme
     logical(l_def),   intent(in)    :: advect_density
     real(r_def),      intent(in)    :: timestep
+    logical,          intent(in)    :: si_advective_terms
 
     ! For Method of Lines
     type(operator_type), pointer  :: div => null(),      &
@@ -462,6 +459,9 @@ contains
     integer(i_def)                :: stage, s, function_space
     real(r_def)                   :: minus_beta_dt
 
+    integer(i_def)                :: nstage
+    real(r_def), allocatable      :: ak_adv(:,:)
+
     ! For Cosmic
     type(field_type)          :: dep_pts_x, dep_pts_y, dep_pts_z
     type(field_type)          :: wind_divergence
@@ -475,7 +475,21 @@ contains
     select case(adv_scheme)
 
       case(scheme_method_of_lines)
-        ! Use Method of lines scheme to advect field
+
+        if ( time_method == method_rk .or. si_advective_terms ) then
+        ! If using explicit timestepping then advection is called once per stage,
+        ! therefore no further sub stages are needed, setting number of stages = 1
+        ! and coeffs = 1 short cuts the rk advection scheme
+          nstage = 1
+          allocate( ak_adv( nstage, nstage ) )
+          ak_adv(1,1) = 1.0_r_def
+        else
+          nstage = num_rk_stage
+          allocate( ak_adv( nstage, nstage ) )
+          ak_adv = ak
+        end if
+
+       ! Use Method of lines scheme to advect field
         call flux%initialise( advecting_wind%get_function_space() )
         call rhs%initialise( field%get_function_space() )
         call field_inc%initialise( field%get_function_space() )
@@ -502,7 +516,7 @@ contains
                        inc_X_times_Y(field_new, divergence_factor) )
         end if
 
-        if ( .not. advect_density ) then
+        if ( function_space == W3 .and. .not. advect_density ) then
           ! Compute unit wind to make flux alg return recontructed
           ! tracer instead of mass flux
           call unit_wind%initialise( advecting_wind%get_function_space() )
@@ -565,8 +579,9 @@ contains
           end if
         end do
 
-        nullify( div )
-        deallocate( rk_rhs )
+        if ( associated( div ) ) nullify( div )
+        if ( allocated( rk_rhs ) ) deallocate( rk_rhs )
+        if ( allocated( ak_adv ) ) deallocate( ak_adv )
 
       case(scheme_cosmic_3D)
         ! Use Cosmic scheme to advect field

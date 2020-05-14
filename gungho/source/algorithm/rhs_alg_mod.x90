@@ -47,6 +47,8 @@ module rhs_alg_mod
   use fs_continuity_mod,                   only: W1, W2
   use function_space_collection_mod,       only: function_space_collection
   use w2_vorticity_advection_kernel_mod,   only: w2_vorticity_advection_kernel_type
+  use timestepping_config_mod,             only: dt
+  use advection_alg_mod,                   only: advect_momentum_alg
   implicit none
 
   private
@@ -113,6 +115,7 @@ contains
     type (mesh_type),              pointer :: mesh => null()
     integer(i_def)                         :: mesh_id
     integer(i_def)                         :: vorticity_fs
+    type(field_type)                       :: rhs_adv
 
     if ( subroutine_timers ) call timer('rhs_alg')
 
@@ -184,8 +187,10 @@ contains
                                                           chi, qr_exact) )
         end if
       else
-        call log_event("Advective form not implemented for SI timetepping", &
-                       LOG_LEVEL_ERROR)
+        call rhs_adv%initialise( u%get_function_space() )
+        call invoke( setval_c( rhs_adv, 0.0_r_def ) )
+        call advect_momentum_alg( rhs_adv, u, u, u, u, dt, .true. )
+        call invoke( inc_X_plus_Y( rhs_tmp, rhs_adv ) )
       end if
     end if
 

@@ -40,7 +40,7 @@
                                              },
                                          checkkgo=False)'
                              ],
-                'csar-sbr':['run_application("gungho", "sbr_spinupwinds",
+                'csar-sbr':['run_application("gungho", "sbr",
                                       resolutions=[("C24",1800.0),
                                                    ("C48",1800.0),
                                                    ("C96",900.0),
