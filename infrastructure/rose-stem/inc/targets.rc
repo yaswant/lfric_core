@@ -62,7 +62,7 @@
         }
     },
     'meto-xc40' : {
-        'hostname' : 'xc',
+        'hostname' : '$(rose host-select --rank-method=random xc)',
         'batcher' : 'pbs',
         'build_root' : '\$RAMTMP',
         'update' : 'interupt',
@@ -111,7 +111,7 @@
         }
     },
     'meto-xcs' : {
-        'hostname' : 'xcsr',
+        'hostname' : '$(rose host-select --rank-method=random xcsr)',
         'batcher' : 'pbs',
         'build_root' : '\${RAMTMP}',
         'update' : 'polling',
@@ -162,7 +162,7 @@
         }
     },
     'monsoon-xc40' : {
-        'hostname' : 'xcsc',
+        'hostname' : '$(rose host-select --rank-method=random xcsc)',
         'batcher' : 'pbs',
         'build_root' : '\${RAMTMP}',
         'update' : 'polling',
