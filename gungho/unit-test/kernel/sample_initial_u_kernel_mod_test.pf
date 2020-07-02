@@ -152,7 +152,7 @@ contains
 
     ! Compute coordinates
     call get_wchi_3x3x3_field(chi_data(:,1), chi_data(:,2), chi_data(:,3), &
-                              dx, dy, dz, dzdx, map_wchi, nlayers-1)
+                              dx, dy, dz, dzdx, map_wchi, nlayers)
 
     cell = 3
 

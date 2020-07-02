@@ -21,16 +21,16 @@ module create_fem_mod
   use function_space_collection_mod,  only : function_space_collection_type, &
                                              function_space_collection
   use function_space_chain_mod,       only : function_space_chain_type, &
+                                             single_layer_function_space_chain, &
                                              multigrid_function_space_chain, &
                                              W2_multigrid_function_space_chain, &
                                              wtheta_multigrid_function_space_chain
   use assign_coordinate_field_mod,    only : assign_coordinate_field
-  use assign_orography_field_mod,     only : assign_orography_field
   use log_mod,                        only : log_event,         &
                                              LOG_LEVEL_INFO,    &
                                              log_scratch_space
   use multigrid_config_mod,           only : l_multigrid, multigrid_chain_nitems, ugrid
-  use create_multigrid_mesh_mod,      only : mesh_ids
+  use create_multigrid_mesh_mod,      only : mesh_ids, twod_mesh_ids
 
 
   implicit none
@@ -109,7 +109,6 @@ module create_fem_mod
       end do
 
       call assign_coordinate_field(shifted_chi, shifted_mesh_id)
-      call assign_orography_field(shifted_chi, shifted_mesh_id)
 
       nullify( shifted_fs )
    end if
@@ -139,8 +138,14 @@ module create_fem_mod
                0, Wtheta )
           call wtheta_multigrid_function_space_chain%add( fs )
        end do
-    end if
 
+       single_layer_function_space_chain = function_space_chain_type()
+       do mesh_ctr = 1, multigrid_chain_nitems
+          fs => function_space_collection%get_fs( &
+             twod_mesh_ids( mesh_ctr ), 0, W3 )
+          call single_layer_function_space_chain%add( fs )
+       end do
+    end if
 
     nullify( fs )
     call log_event( 'FEM specifics created', LOG_LEVEL_INFO )

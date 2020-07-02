@@ -21,11 +21,58 @@ module orography_helper_functions_mod
   real(kind=r_def) :: domain_length, domain_width
 
   public :: eta2z_linear
+  public :: eta2z_smooth
   public :: z2eta_linear
   public :: calc_domain_size_horizontal
   public :: coord_transform_cart_biperiodic
 
 contains
+  !=============================================================================
+  !> @brief Transforms nondimensional coordinate to physical height using
+  !>        'smooth' method used in the UM
+  !>
+  !> @details Helper routine which calculates physical height from eta
+  !>          (nondimensional) coordinate using 'smooth' method of the UM
+  !>
+  !> @param[in] eta            Nondimensional (terrain following) coordinate
+  !> @param[in] surface_height Surface height (m)
+  !> @param[in] domain_top     Height of the domain (m)
+  !> @param[in] eta_c          Physical height at the interface to constant layers
+  !> @return    z              Physical height (m)
+  !=============================================================================
+  real(kind=r_def) function eta2z_smooth(eta,                &
+                                         surface_height,     &
+                                         domain_top,         &
+                                         stretching_height ) &
+                                         result(z)
+
+    implicit none
+
+    ! Arguments
+    real(kind=r_def), intent(in) :: eta
+    real(kind=r_def), intent(in) :: surface_height
+    real(kind=r_def), intent(in) :: domain_top
+    real(kind=r_def), intent(in) :: stretching_height
+
+    ! Value of eta at stretching_height
+    real(kind=r_def) :: eta_c
+
+    eta_c = stretching_height/domain_top
+
+    ! If physical height is above the top of the domain, then set eta_c=1
+    if ( eta_c > 1.0_r_def ) eta_c=1.0_r_def
+
+    ! Calculate physical height from eta
+    if ( eta < eta_c )then
+      ! Quadratic
+      z = eta*domain_top + (1.0_r_def - eta/eta_c)**2*surface_height
+    else
+      ! Linear
+      z = eta*domain_top
+    end if
+
+    return
+  end function eta2z_smooth
 
   !=============================================================================
   !> @brief Transforms nondimensional coordinate to physical height.

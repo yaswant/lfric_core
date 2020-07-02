@@ -837,6 +837,7 @@
 
 {%-                   endif %} {# configuration_label #}
 
+            BIG_DATA_DIR      = {{TARGET_BIG_DATA_DIR}}
             MESH_DIR          = $OUTPUT_ROOT/{{mesh_label}}/meshes
             BIN_DIR           = $DESTINATION_DIRECTORY/bin
             APP_NAME          = {{appName}}

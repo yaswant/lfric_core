@@ -91,7 +91,7 @@ export Q QUIET_ARG VERBOSE_REDIRECT
 
 # Set flag to perform a fresh rose stem suite
 
-CLEAN_OPT = '--new'
+CLEAN_OPT ?= '--new'
 ifeq '$(PURGE_SUITES)' '0'
   CLEAN_OPT =
 endif

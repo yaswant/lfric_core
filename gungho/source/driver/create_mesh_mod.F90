@@ -69,7 +69,8 @@ contains
 !> @param[out] prime_mesh_id    Mesh id of partitioned prime mesh
 !> @param[out] twod_mesh_id     Mesh id of the 2D (surface) mesh
 !> @param[out] shifted_mesh_id  Mesh id of vertically shifted mesh with an extra level
-subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shifted_mesh_id )
+subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, &
+                      twod_mesh_id, shifted_mesh_id )
 
   implicit none
 
@@ -81,8 +82,6 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
 
   ! Parameters
   integer(i_def), parameter :: max_factor_iters = 10000
-  integer(i_def), parameter :: one_layer = 1
-  real(r_def), parameter    :: atmos_bottom = 0.0_r_def
 
   ! Local variables
   procedure (partitioner_interface), pointer :: partitioner_ptr => null()
@@ -90,7 +89,7 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
   class(extrusion_type),         allocatable :: extrusion
   class(extrusion_type),         allocatable :: shifted_extrusion
   type(partition_type)                       :: partition
-  type(uniform_extrusion_type)               :: extrusion_2d
+  type(uniform_extrusion_type)               :: extrusion_sl
 
   ! max_stencil_depth is the maximum depth (of cells outside the cell over
   ! which the stencil is based) of the stencil to be used on fields with
@@ -309,10 +308,19 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
       "Prime mesh created (id:", prime_mesh_id, ")"
   call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
+  ! Generate a '2d' mesh
+  ! probably only works for cartesian domains, as atmos_bottom hard-wired
+  ! to 0 currently...
+  extrusion_sl = uniform_extrusion_type( 0.0_r_def, 1.0_r_def, 1_i_def )
+  twod_mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr,         &
+                                               partition,               &
+                                               extrusion_sl )
+
   if (l_multigrid) then
     ! Done this way as e do not currently have multiple global
     ! meshes and their associated maps in a single ugrid file
     call init_multigrid_mesh( prime_mesh_id,           &
+                              twod_mesh_id,            &
                               partitioner_ptr,         &
                               xproc, yproc,            &
                               max_stencil_depth,       &
@@ -320,13 +328,6 @@ subroutine init_mesh( local_rank, total_ranks, prime_mesh_id, twod_mesh_id, shif
                               npanels )
   end if
 
-  ! Generate a '2d' mesh
-  ! probably only works for cartesian domains, as atmos_bottom hard-wired
-  ! to 0 currently...
-  extrusion_2d = uniform_extrusion_type( atmos_bottom, domain_top, one_layer )
-  twod_mesh_id = mesh_collection%add_new_mesh( global_mesh_ptr,         &
-                                               partition,               &
-                                               extrusion_2d )
 
   if (present(shifted_mesh_id)) then
     allocate(shifted_extrusion, source=create_shifted_extrusion(extrusion) )

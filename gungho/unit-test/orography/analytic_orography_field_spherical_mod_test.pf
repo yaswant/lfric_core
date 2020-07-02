@@ -6,7 +6,7 @@
 !> @brief Test suite to verify assignment of orography profile to spherical
 !>        coordinates using Witch-of-Agnesi mountain.
 !-------------------------------------------------------------------------------
-module assign_orography_field_spherical_mod_test
+module analytic_orography_field_spherical_mod_test
 
   use constants_mod,              only : i_def, r_def, PI, str_def, &
                                          str_max_filename
@@ -24,10 +24,10 @@ module assign_orography_field_spherical_mod_test
   implicit none
 
   private
-  public :: setUp, tearDown, test_assign_orography_field_spherical
+  public :: setUp, tearDown, test_analytic_orography_field_spherical
 
   @testCase
-  type, public, extends(MPITestCase) :: assign_orography_field_spherical_test_type
+  type, public, extends(MPITestCase) :: analytic_orography_field_spherical_test_type
     real(r_def) :: mountain_height
     real(r_def) :: half_width
     real(r_def) :: lambda_centre_dec
@@ -37,8 +37,8 @@ module assign_orography_field_spherical_mod_test
   contains
     procedure     :: setUp
     procedure     :: tearDown
-    procedure     :: test_assign_orography_field_spherical
-  end type assign_orography_field_spherical_test_type
+    procedure     :: test_analytic_orography_field_spherical
+  end type analytic_orography_field_spherical_test_type
 
   character(str_def), parameter   :: mesh_name     = 'unit_test'
   character(len=str_max_filename) :: filename      = "data/mesh_C16.nc"
@@ -70,14 +70,16 @@ contains
     use feign_config_mod,               only :                  &
                                         feign_base_mesh_config, &
                                         feign_planet_config,    &
+                                        feign_extrusion_config, &
                                         feign_orography_agnesi_spherical_config
     use orography_agnesi_spherical_config_mod, only :              &
                                         lambda_centre, phi_centre, &
                                         lambda_focus, phi_focus
+    use extrusion_config_mod,    only : method_uniform, stretching_method_linear
 
     implicit none
 
-    class(assign_orography_field_spherical_test_type), intent(inout) :: this
+    class(analytic_orography_field_spherical_test_type), intent(inout) :: this
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -121,6 +123,12 @@ contains
                                 lambda_focus_dec  = this%lambda_focus_dec,  &
                                 phi_focus_dec     = this%phi_focus_dec )
 
+    call feign_extrusion_config( method=method_uniform, &
+                                 domain_top=domain_top, &
+                                 number_of_layers=nlayers, &
+                                 stretching_height=1.0_r_def, &
+                                 stretching_method=stretching_method_linear)
+
     ! Initialise Witch-of-Agnesi spherical orography type
     allocate( orography_profile,                                    &
               source = agnesi_spherical_type( this%mountain_height, &
@@ -139,7 +147,7 @@ contains
 
     implicit none
 
-    class(assign_orography_field_spherical_test_type), intent(inout) :: this
+    class(analytic_orography_field_spherical_test_type), intent(inout) :: this
 
     deallocate( orography_profile )
     call global_mesh_collection%clear()
@@ -155,7 +163,7 @@ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   @Test( npes=[1] )
-  subroutine test_assign_orography_field_spherical(this)
+  subroutine test_analytic_orography_field_spherical(this)
 
     use mesh_mod,                       only : mesh_type
     use partition_mod,                  only : partition_type,        &
@@ -164,13 +172,13 @@ contains
     use extrusion_mod,                  only : uniform_extrusion_type
     use extrusion_config_mod,           only : method_uniform
     use planet_config_mod,              only : scaled_radius
-    use assign_orography_field_mod,     only : assign_orography_spherical
+    use assign_orography_field_mod,     only : analytic_orography_spherical
     use coord_transform_mod,            only : xyz2llr, llr2xyz
     use orography_helper_functions_mod, only : eta2z_linear
 
     implicit none
     ! Arguments
-    class(assign_orography_field_spherical_test_type), intent(inout) :: this
+    class(analytic_orography_field_spherical_test_type), intent(inout) :: this
     ! Mesh and partition types
     integer(i_def)                            :: global_mesh_id
     integer(i_def)                            :: mesh_id
@@ -238,7 +246,7 @@ contains
                    chi_1_cart(i), chi_2_cart(i), chi_3_cart(i))
     end do
     ! Test spherical orography assignment
-    call assign_orography_spherical( nlayers, ndf, undf, map, &
+    call analytic_orography_spherical( nlayers, ndf, undf, map, &
                                      height_flat_surface,     &
                                      height_domain_top,       &
                                      chi_1_cart, chi_2_cart, chi_3_cart )
@@ -260,6 +268,6 @@ contains
     @assertEqual( chi_surf, chi_test, tol )
 
     return
-  end subroutine test_assign_orography_field_spherical
+  end subroutine test_analytic_orography_field_spherical
 
-end module assign_orography_field_spherical_mod_test
+end module analytic_orography_field_spherical_mod_test

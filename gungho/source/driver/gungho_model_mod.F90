@@ -266,10 +266,9 @@ module gungho_model_mod
     ! for models with global land mass included (i.e GA/GL)
     call init_altitude( twod_mesh_id, surface_altitude )
 
-    ! Set up orography after XIOS to enable read-in of surface altitude from
-    ! ancillary file - assignment of orography from altitude to be done by #2023
-    call assign_orography_field(chi, mesh_id)
-
+    ! Assignment of orography from surface_altitude
+    call assign_orography_field(chi, mesh_id, surface_altitude)
+    call assign_orography_field(shifted_chi, shifted_mesh_id, surface_altitude)
 
     !-------------------------------------------------------------------------
     ! Setup constants
@@ -279,7 +278,7 @@ module gungho_model_mod
     ! needed by the timestepping algorithms such as mass matrix operators, mass
     ! matrix diagonal fields and the geopotential field
     call create_runtime_constants(mesh_id, twod_mesh_id, chi, &
-                                  shifted_mesh_id, shifted_chi)
+                                  shifted_mesh_id, shifted_chi, surface_altitude)
 
 #ifdef UM_PHYSICS
     ! Set derived planet constants and presets

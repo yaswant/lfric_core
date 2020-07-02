@@ -75,6 +75,7 @@
                                                     'biperiodic_p0_gw_fem',
                                                     'agnesi_orog_cartesian', 'agnesi_orog_cartesian_long',
                                                     'dcmip301', 'robert', 'robert10m', 'robert5m', 'dcmip200',
+						    'dcmip200_realorog', 'dcmip200_realorog_mg', 'dcmip200_realorog_mgprecon',
                                                     'warm3dbubble', 'warm3dbubble_small',
                                                     'robert-moist', 'robert-moist-smag', 'sbr', 'sbr_deep', 'sbr_shallow',
                                                     'sbr-si', 'sbr-cosmic', 'sbr_80km', 'sbr_85km',
@@ -289,6 +290,22 @@
                       env={"crun":1, "nrun":{"default":600},"directives":{"default":{"mpi_parts":6,"panel_decomp":\'row\',
                                                                                      "threads":1,"wallclock":"00:15:00"} } },
                            plotstr="cartesian_mountain_adv_plot.py $NODAL_DATA_DIR 300 4 theta:rho 1 T000100:T000200:T000300:T000400:T000500:T000600 lines $PLOT_DIR")',
+    'run_application("gungho", "dcmip200_realorog",
+                     resolutions=[("C48",600.0)],
+                     support_meshes=["C24","C12","C6"],
+                     env={"crun":1, "nrun":144,
+                          "directives":{"default":{"mpi_parts":24,
+                                                   "threads":1,
+                                                   "wallclock":"00:40:00"} } },
+                     plotstr="")',
+    'run_application("gungho", "dcmip200_realorog_mg",
+                     resolutions=[("C48",600.0)],
+                     support_meshes=["C24","C12","C6"],
+                     env={"crun":1, "nrun":144,
+                          "directives":{"default":{"mpi_parts":24,
+                                                   "threads":1,
+                                                   "wallclock":"00:40:00"} } },
+                     plotstr="")',
     'run_application("gungho", "dcmip200",
                      resolutions=[("C24",600.0)],
                      support_meshes=["C12","C6","C3"],
@@ -448,5 +465,7 @@
 {%- do groups.update(csar_groups) %}
 %include inc/cartesian.rc
 {%- do groups.update(cartesian_groups) %}
+%include inc/orography.rc
+{%- do groups.update(orography_groups) %}
 
 #########################################################################################

@@ -8,7 +8,7 @@
 !>          data read from an ancillary file or data calculated analytically
 module init_altitude_mod
 
-  use constants_mod,                  only : i_def
+  use constants_mod,                  only : i_def, r_def
   use field_mod,                      only : field_type
   use field_parent_mod,               only : read_interface,  &
                                              write_interface
@@ -52,7 +52,7 @@ module init_altitude_mod
 
     ! Set the function space order to be 0 - ancil files currently store data
     ! on 2D face centres
-    integer(i_def), parameter :: element_order = 0
+    integer(i_def), parameter :: surface_order = 0
 
     write(log_scratch_space,'(A,A)') "Initialise surface altitude: "// &
           "Create surface altitude."
@@ -60,9 +60,12 @@ module init_altitude_mod
 
     ! Here we create the 2D surface altitude field
     vector_space => function_space_collection%get_fs( twod_mesh_id, &
-                                                      element_order, W3)
+                                                      surface_order, W3)
 
     call surface_altitude%initialise(vector_space, name=trim('surface_altitude'))
+
+    ! Default is zero
+    call invoke( setval_c(surface_altitude, 0.0_r_def))
 
     select case ( orog_init_option )
 
@@ -71,8 +74,6 @@ module init_altitude_mod
 
         ! Set up analytic orography parameters
         call set_orography_option()
-        ! In the future we will initialise the surface altitude field based on the
-        ! orography configuration switch.
 
       ! Orography read from ancil file
       case ( orog_init_option_ancil )
@@ -97,7 +98,7 @@ module init_altitude_mod
         else
           write(log_scratch_space,'(A,A)') "Initialise surface altitude: "// &
                 "XIOS must be enabled to read surface altitude from ancil."
-          call log_event(log_scratch_space, LOG_LEVEL_INFO)
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
 
         end if
 

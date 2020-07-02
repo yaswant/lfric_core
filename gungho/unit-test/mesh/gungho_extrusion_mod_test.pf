@@ -75,7 +75,7 @@ contains
 
     use base_mesh_config_mod, only : geometry_planar, &
                                      partitioner_planar
-    use extrusion_config_mod, only : method_uniform
+    use extrusion_config_mod, only : method_uniform, stretching_method_linear
 
     implicit none
 
@@ -92,7 +92,9 @@ contains
              f_lat_deg=0.0_r_def )
     call feign_extrusion_config( domain_top=13.5_r_def, &
                                  method=method_uniform, &
-                                 number_of_layers=7_i_def )
+                                 number_of_layers=7_i_def, &
+                                 stretching_height=1.0_r_def, &
+                                 stretching_method=stretching_method_linear)
     call feign_planet_config( gravity=9.98_r_def,       &
                               radius=637100.0_r_def,    &
                               omega=7.27E-5_r_def,      &
@@ -118,7 +120,7 @@ contains
 
     use base_mesh_config_mod, only : geometry_spherical, &
                                      partitioner_cubedsphere
-    use extrusion_config_mod, only : method_geometric
+    use extrusion_config_mod, only : method_geometric, stretching_method_linear
 
     implicit none
 
@@ -136,7 +138,9 @@ contains
 
     call feign_extrusion_config( method=method_geometric,   &
                                  domain_top=600000.0_r_def, &
-                                 number_of_layers=7_i_def )
+                                 number_of_layers=7_i_def,  &
+                                 stretching_height=1.0_r_def, &
+                                 stretching_method=stretching_method_linear )
     call feign_planet_config( gravity=9.98_r_def,       &
                               radius=637100.0_r_def,    &
                               omega=7.27E-5_r_def,      &

@@ -55,7 +55,7 @@ contains
 
     use timestepping_config_mod,   only: method_semi_implicit, &
                                          runge_kutta_method_ssp3
-    use extrusion_config_mod,      only: method_uniform
+    use extrusion_config_mod,      only: method_uniform, stretching_method_linear
     use finite_element_config_mod, only: cellshape_quadrilateral
 
     implicit none
@@ -71,7 +71,9 @@ contains
 
     call feign_extrusion_config( domain_top=6000.0_r_def, &
                                  method=method_uniform,   &
-                                 number_of_layers=3_i_def )
+                                 number_of_layers=3_i_def, &
+                                 stretching_height=1.0_r_def, &
+                                 stretching_method=stretching_method_linear)
 
     call feign_timestepping_config(                              &
              method=method_semi_implicit,                        &

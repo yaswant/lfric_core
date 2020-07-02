@@ -99,6 +99,8 @@ interface function_space_chain_type
 end interface
 
 type(function_space_chain_type), public, allocatable :: &
+                                           single_layer_function_space_chain
+type(function_space_chain_type), public, allocatable :: &
                                            multigrid_function_space_chain
 type(function_space_chain_type), public, allocatable :: &
                                            W2_multigrid_function_space_chain

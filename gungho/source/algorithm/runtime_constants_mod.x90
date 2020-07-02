@@ -35,7 +35,8 @@ module runtime_constants_mod
 
   use multigrid_config_mod,              only: multigrid_chain_nitems, l_multigrid
 
-  use function_space_chain_mod,          only: multigrid_function_space_chain, &
+  use function_space_chain_mod,          only: single_layer_function_space_chain, &
+                                               multigrid_function_space_chain, &
                                                w2_multigrid_function_space_chain, &
                                                wtheta_multigrid_function_space_chain
   use assign_coordinate_field_mod,       only: assign_coordinate_field
@@ -57,6 +58,7 @@ module runtime_constants_mod
   use multiplicity_kernel_mod,           only: multiplicity_kernel_type
 
   ! PsyKAl PSYClone kernels
+  use restrict_kernel_mod,                   only: restrict_kernel_type
   use compute_latlon_kernel_mod,             only: compute_latlon_kernel_type
   use compute_derahm_matrices_kernel_mod,    only: compute_derahm_matrices_kernel_type
   use mg_derahm_mat_kernel_mod,              only: mg_derahm_mat_kernel_type
@@ -124,6 +126,7 @@ module runtime_constants_mod
   type(field_type), allocatable, dimension(:), target    :: w2_normalisation
   type(operator_type), target                            :: coriolis
   type(field_type), allocatable, dimension(:,:), target  :: chi_mg
+  type(field_type), allocatable, dimension(:), target    :: surface_altitude_mg
 
   ! 2D fields
   type(field_type), target                               :: latitude_W3, longitude_W3
@@ -229,13 +232,15 @@ contains
   !> @param[in] shifted_mesh_id Mesh_id for vertically shifted field
   !> @param[in] shifted_chi     chi field for vertically shifted field
   subroutine create_runtime_constants(mesh_id,twod_mesh_id, chi,   &
-                                      shifted_mesh_id, shifted_chi)
+                                      shifted_mesh_id, shifted_chi, &
+                                      surface_altitude)
     implicit none
 
     integer(i_def),             intent(in) :: mesh_id, twod_mesh_id
     type(field_type), target,   intent(in) :: chi(:)
     integer(i_def), optional,   intent(in) :: shifted_mesh_id
     type(field_type), optional, intent(in) :: shifted_chi(:)
+    type(field_type), optional, intent(in) :: surface_altitude
 
     type(function_space_type), pointer :: w0_fs     => null()
     type(function_space_type), pointer :: w1_fs     => null()
@@ -273,9 +278,16 @@ contains
     ! temporaries needed for Multigrid
     integer(kind=i_def)       :: i, level, chi_space, multigrid_levels
     integer(kind=i_def)       :: mg_mesh_id
+    integer(kind=i_def)       :: surface_order
+
+    ! Logical changes depending on presence of optional argument
+    logical :: use_surface_altitude
 
     if ( subroutine_timers ) call timer('runtime_constants_alg')
     call log_event( "Gungho: creating runtime_constants", LOG_LEVEL_INFO )
+
+    use_surface_altitude=.false.
+    if (present(surface_altitude)) use_surface_altitude=.true.
 
     if(l_multigrid) then
        multigrid_levels=multigrid_chain_nitems
@@ -288,6 +300,10 @@ contains
     do i = 1, 3
        call chi(i)%copy_field(chi_mg(i,1))
     end do
+    if ( use_surface_altitude ) then
+      allocate(surface_altitude_mg(multigrid_levels))
+      call surface_altitude%copy_field(surface_altitude_mg(1))
+    end if
      ! Compute coordinates
     if ( coordinate_order == 0 ) then
        chi_space = W0
@@ -298,23 +314,49 @@ contains
     end if
 
     if(l_multigrid) then
-       ! get the mesh_id from the other function space
-       ! need to get the mesh_id to create the chi fs, so get it from the W3 chain
-       w3_fs     => function_space_collection%get_fs( mesh_id, element_order, W3 )
-       call multigrid_function_space_chain%set_current(w3_fs%get_id())
 
-       ! finest level is already done, so loop through levels 2, multigrid_levels
-       do level = 2, multigrid_levels
-          w3_fs=>multigrid_function_space_chain%get_next()
-          mg_mesh_id=w3_fs%get_mesh_id()
-          do i = 1, 3
-             call chi_mg(i,level)%initialise(vector_space = &
-                  function_space_collection%get_fs( &
+      if ( use_surface_altitude ) then
+        ! get the mesh_id from the other function space
+        ! need to get the mesh_id to create the chi fs, so get it from the W3 chain
+        ! First for the surface altitude on single layer fields
+        surface_order = surface_altitude%get_element_order()
+        w3_fs => function_space_collection%get_fs( twod_mesh_id, surface_order, W3 )
+        call single_layer_function_space_chain%set_current( w3_fs%get_id() )
+        do level = 2, multigrid_levels
+          ! Get the surface altitude by restricting the finest level
+          w3_fs => single_layer_function_space_chain%get_next()
+          mg_mesh_id = w3_fs%get_mesh_id()
+          call surface_altitude_mg( level )%initialise( vector_space = &
+             function_space_collection%get_fs(                         &
+             mg_mesh_id, surface_order, W3) )
+          ! We use a simple restriction from fine to coarse levels
+          call invoke( restrict_kernel_type( surface_altitude_mg( level ),   &
+                                             surface_altitude_mg( level-1 ) ) )
+        end do
+      end if
+
+      ! get the mesh_id from the other function space
+      ! need to get the mesh_id to create the chi fs, so get it from the W3 chain
+      ! Now the chi fields
+      w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
+      call multigrid_function_space_chain%set_current( w3_fs%get_id() )
+      ! finest level is already done, so loop through levels 2, multigrid_levels
+      do level = 2, multigrid_levels
+        w3_fs => multigrid_function_space_chain%get_next()
+        mg_mesh_id = w3_fs%get_mesh_id()
+        do i = 1, 3
+          call chi_mg( i,level )%initialise( vector_space = &
+                  function_space_collection%get_fs(         &
                   mg_mesh_id, coordinate_order, chi_space) )
-          end do
-          call assign_coordinate_field(chi_mg(:,level),mg_mesh_id)
-          call assign_orography_field(chi_mg(:,level),mg_mesh_id)
-       end do
+        end do
+        call assign_coordinate_field( chi_mg( :, level ), mg_mesh_id )
+
+        if ( use_surface_altitude )then
+          call assign_orography_field( chi_mg(:,level), mg_mesh_id, &
+                                       surface_altitude_mg( level ) )
+        end if
+      end do
+
     end if
     ! set level = 1 for the finest level MG/ or single level only
     level = 1
