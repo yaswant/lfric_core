@@ -28,6 +28,11 @@
 # TEST_SUITE_TARGETS: Space separated list of target identifiers to be used
 #                     when launching the test suite. Default is "meto-spice
 #                     meto-xc40"
+# SUITE_GROUP_ABRV: Set to a non-zero value to cause the names of the rose
+#                   stem groups to always be abbreviated in the suite name.
+#                   Set to zero to cause the names to always be unabbreviated.
+#                   The default is abbreviated for multi-group runs, but
+#                   unabbreviated for single-group runs.
 #
 ##############################################################################
 
@@ -122,6 +127,7 @@ EMPTY :=
 SPACE := $(EMPTY) # This comment highlights space character.
 PERCENT := %
 OPEN_PAREN := (
+COMMA := ,
 
 # Prerequisite for targets which should always be run.
 #
@@ -191,10 +197,28 @@ api-documentation: ALWAYS
 #
 # SUITE_CONFIG    - Path to rose-stem directory.
 # SUITE_BASE_NAME - Name for suites.
+# SUITE_GROUP_NAME_ABRV - Name(s) of the rose stem group(s) with abbreviations applied.
 #
 .PHONY: launch-test-suite
-launch-test-suite: SUITE_GROUP ?= developer
+SUITE_GROUP ?= developer
+ifneq (,$(findstring $(COMMA),$(SUITE_GROUP)))
+  # Default for multiple groups: abbreviate names of groups in suite name
+  SUITE_GROUP_ABRV ?= 1
+else
+  # Default for single group: keep full name of group in suite name
+  SUITE_GROUP_ABRV ?= 0
+endif
+SUITE_GROUP_NAME_ABRV := $(subst $(COMMA),$(SPACE),$(shell echo $(SUITE_GROUP) | tr '[:lower:]' '[:upper:]'))
+SUITE_GROUP_NAME_ABRV := $(subst $(SPACE),+,$(sort $(SUITE_GROUP_NAME_ABRV)))
+SUITE_GROUP_NAME_ABRV := $(subst WEEKLY,W,$(SUITE_GROUP_NAME_ABRV))
+SUITE_GROUP_NAME_ABRV := $(subst NIGHTLY-FULL-DEBUG,NFD,$(SUITE_GROUP_NAME_ABRV))
+SUITE_GROUP_NAME_ABRV := $(subst NIGHTLY,N,$(SUITE_GROUP_NAME_ABRV))
+SUITE_GROUP_NAME_ABRV := $(subst DEVELOPER,D,$(SUITE_GROUP_NAME_ABRV))
+ifeq ($(SUITE_GROUP_ABRV),0)
 launch-test-suite: SUITE_NAME = $(SUITE_BASE_NAME)-$$target-$(SUITE_GROUP)
+else
+launch-test-suite: SUITE_NAME = $(SUITE_BASE_NAME)-$$target-$(SUITE_GROUP_NAME_ABRV)
+endif
 ifdef VERBOSE
 launch-test-suite: VERBOSE_ARG = --define-suite=VERBOSE=$(VERBOSE)
 endif
