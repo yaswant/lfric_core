@@ -13,7 +13,7 @@ use domain_size_config_mod, only : planar_domain_min_x, &
                                    planar_domain_max_y
 use constants_mod,          only : i_def, i_native, r_def, pi, l_def
 use log_mod,                only : log_event, log_scratch_space, &
-                                   LOG_LEVEL_DEBUG
+                                   log_level, LOG_LEVEL_DEBUG
 
 
 
@@ -228,7 +228,9 @@ contains
       end do
     end do
 
-    ! Diagnostic information
+    ! Diagnostic information from now on.
+    if (log_level() > LOG_LEVEL_DEBUG) return
+
     call log_event('grid connectivity', LOG_LEVEL_DEBUG)
     do i=1, ncells_3d
       write(log_scratch_space,'(7i6)') i, &
@@ -445,6 +447,9 @@ contains
         end if
       end do
     end do
+
+    ! Diagnostic information from now on.
+    if (log_level() > LOG_LEVEL_DEBUG) return
 
     call log_event( 'faces on cells', LOG_LEVEL_DEBUG )
     do cell = 1, ncells_2d

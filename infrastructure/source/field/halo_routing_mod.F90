@@ -140,6 +140,7 @@ function halo_routing_constructor( mesh_id, &
                      global_dof_id( halo_start:halo_finish ), &
                      get_mpi_datatype( fortran_type, fortran_kind ) )
   end do
+  deallocate( global_dof_id )
 end function halo_routing_constructor
 
 !> Gets the mesh_id for which this object is valid

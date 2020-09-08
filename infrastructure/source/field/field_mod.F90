@@ -566,6 +566,7 @@ contains
     use constants_mod, only : r_double, i_def
     use log_mod, only : log_event,         &
                         log_scratch_space, &
+                        log_level,         &
                         LOG_LEVEL_INFO,    &
                         LOG_LEVEL_TRACE
 
@@ -579,6 +580,10 @@ contains
     integer(i_def)          :: layer
     integer(i_def)          :: df
     integer(i_def), pointer :: map(:) => null()
+
+    ! If we are not going to write the field to the log then do
+    ! not write the field to the scratch space.
+    if ( dump_level < log_level() ) return
 
     write( log_scratch_space, '( A, A)' ) trim( label ), " =["
     call log_event( log_scratch_space, dump_level )
@@ -595,6 +600,7 @@ contains
     end do
 
     call log_event( '];', dump_level )
+    return
 
   end subroutine log_field
 
