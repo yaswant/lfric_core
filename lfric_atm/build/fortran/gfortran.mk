@@ -9,3 +9,7 @@
 $(info Project specials for GNU compiler)
 
 export FFLAGS_UM_PHYSICS = -fdefault-real-8
+# lfric_atm dependencies contain code with implicit lossy conversions.
+# We reset the FFLAGS_WARNINGS variable here in order to prevent
+# -Werror induced build failures.
+FFLAGS_WARNINGS          = -Wall

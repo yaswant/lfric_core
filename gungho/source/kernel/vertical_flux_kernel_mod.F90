@@ -140,11 +140,11 @@ subroutine vertical_flux_code( nlayers,             &
   df = 6
   flux(map_w2(df)+k) = 0.0_r_def ! Top boundary condition, zero flux.
 
-  local_density_index = HUGE(i_def)
-  rho_local = HUGE(r_def)
-  a0_local = HUGE(r_def)
-  a1_local = HUGE(r_def)
-  a2_local = HUGE(r_def)
+  local_density_index = HUGE(0_i_def)
+  rho_local = HUGE(0.0_r_def)
+  a0_local = HUGE(0.0_r_def)
+  a1_local = HUGE(0.0_r_def)
+  a2_local = HUGE(0.0_r_def)
 
   do k=0,nlayers-2
     departure_dist = dep_pts(map_w2(df)+k)

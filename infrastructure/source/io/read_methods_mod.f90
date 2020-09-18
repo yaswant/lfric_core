@@ -8,7 +8,7 @@
 !>  @details Holds all routines for reading LFRic fields
 module read_methods_mod
 
-  use constants_mod,                 only: i_def, dp_xios, str_def
+  use constants_mod,                 only: i_def, dp_xios, str_def, r_def
   use field_mod,                     only: field_type, field_proxy_type
   use field_collection_mod,          only: field_collection_type, &
                                            field_collection_iterator_type
@@ -134,18 +134,19 @@ subroutine read_field_edge(xios_field_name, field_proxy)
   call xios_recv_field(xios_field_name, recv_field)
 
   ! Reshape the data to what we require for the LFRic field
+  ! Note the conversion from dp_xios to r_def or i_def
   select type(field_proxy)
 
     type is (field_proxy_type)
     do i = 0, axis_size-1
       field_proxy%data( i+1 : undf : axis_size )  = &
-                  recv_field( i*(domain_size)+1 : (i+1)*domain_size )
+                  real(recv_field( i*(domain_size)+1 : (i+1)*domain_size ), r_def)
     end do
 
     type is (integer_field_proxy_type)
     do i = 0, axis_size-1
       field_proxy%data( i+1 : undf : axis_size )  = &
-                  recv_field( i*(domain_size)+1 : (i+1)*domain_size )
+                  int( recv_field( i*(domain_size)+1 : (i+1)*domain_size ), i_def)
     end do
 
   end select
@@ -191,12 +192,13 @@ subroutine read_field_face(xios_field_name, field_proxy)
 
   ! Different field kinds are selected to access data, which is arranged to get the
   ! correct data layout for the LFRic field - the reverse of what is done for writing
+  ! Note the conversion from dp_xios to r_def or i_def
   select type(field_proxy)
 
     type is (field_proxy_type)
     do i = 0, axis_size-1
       field_proxy%data(i+1:undf:axis_size) = &
-                       recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size)
+                       real(recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size), r_def)
     end do
 
     type is (integer_field_proxy_type)
@@ -252,16 +254,17 @@ subroutine read_field_single_face(xios_field_name, field_proxy)
   select type(field_proxy)
 
     ! Pass the correct data from the recieved field to the field proxy data
+    ! Note the conversion from dp_xios to r_def or i_def
     type is (field_proxy_type)
     do i = 0, ndata-1
       field_proxy%data(i+1:(ndata*domain_size)+i:ndata) = &
-              recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size)
+              real(recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size), r_def)
     end do
 
     type is (integer_field_proxy_type)
     do i = 0, ndata-1
       field_proxy%data(i+1:(ndata*domain_size)+i:ndata) = &
-              recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size)
+              int( recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size), i_def)
     end do
 
   end select
@@ -436,19 +439,22 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   time_index = time_indices(1) - 1
 
   ! Here we give the field proxy the data for the corresponding time entry
+  ! Note the conversion from dp_xios to r_def
   if ( nlayers == 1 ) then
-    field_proxy%data( 1 : undf ) = recv_field( time_index * ( domain_size ) + 1 : &
-                                        time_index * ( domain_size ) + domain_size )
+    field_proxy%data( 1 : undf ) = real(recv_field( time_index * ( domain_size ) + 1 : &
+                                        time_index * ( domain_size ) + domain_size ),  &
+                                        kind=r_def)
 
   else
     ! Set up a temporary array for the 3D time entry before reshaping the data
     ! for the field
     recv_field_twod = recv_field( ( time_index - 1) * ( domain_size * vert_axis_size ) + 1 : &
-                                  ( time_index ) * ( domain_size * vert_axis_size ) )
+                                       ( time_index ) * ( domain_size * vert_axis_size ))
 
     do i = 0, vert_axis_size - 1
       field_proxy%data( i + 1 : undf : vert_axis_size ) = &
-             recv_field_twod( i * ( domain_size ) + 1 : ( i * ( domain_size ) ) + domain_size )
+             real(recv_field_twod( i * ( domain_size ) + 1 : ( i * ( domain_size ) ) + domain_size ), &
+                 kind=r_def)
     end do
   end if
 

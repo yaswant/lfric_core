@@ -50,9 +50,9 @@ contains
     ! correctly sized.
     !
     if (duration > 0_i_timestep) then
-      string_size = log10( real(duration)) + 1
+      string_size = int(log10( real(duration))) + 1
     else if (duration < 0_i_timestep) then
-      string_size = log10( real(-duration)) + 2
+      string_size = int(log10( real(-duration))) + 2
     else
         string_size = 1
     end if
@@ -88,7 +88,7 @@ contains
     ! be correctly sized.
     !
     if (instance > 0_i_timestep) then
-      string_size = log10(real(instance)) + 1
+      string_size = int(log10(real(instance))) + 1
     else if (instance == 0_i_timestep) then
       string_size = 1
     else

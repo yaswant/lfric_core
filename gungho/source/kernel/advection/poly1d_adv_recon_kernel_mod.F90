@@ -142,7 +142,7 @@ subroutine poly1d_adv_recon_code( nlayers,              &
   real(kind=r_def), dimension(nfaces_re_h) :: v_dot_n
   real(kind=r_def)                      :: polynomial_tracer
 
-  real(kind=r_def), dimension(order+1,nfaces_re_h) :: map1d
+  integer(kind=i_def), dimension(order+1,nfaces_re_h) :: map1d
 
   ! Compute 1d map from the cross stencil
   ! i.e for order = 2 the stencil map is

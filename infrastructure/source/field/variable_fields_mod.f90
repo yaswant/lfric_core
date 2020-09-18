@@ -6,7 +6,7 @@
 !>@brief Updates time-varying fields from linked list of time axis objects
 module variable_fields_mod
 
-  use constants_mod,                 only : r_def, str_def
+  use constants_mod,                 only : r_def, r_second, str_def
   use clock_mod,                     only : clock_type
   use field_collection_mod,          only : field_collection_type
   use log_mod,                       only : log_event, &
@@ -38,7 +38,9 @@ contains
     real(r_def) :: time_sec
 
     ! Get time in seconds from clock
-    time_sec = clock%seconds_from_steps(clock%get_step())
+    ! Convert this to r_def because we will pass it to align
+    time_sec = real(clock%seconds_from_steps(clock%get_step()), &
+                    kind=r_def)
 
     ! start at the head of the time_axis linked list
     loop => time_axis_list%get_head()
@@ -85,7 +87,8 @@ contains
     real(r_def) :: time_window(2), time_sec
 
     ! Get time in seconds from clock
-    time_sec = clock%seconds_from_steps(clock%get_step())
+    ! Convert this to r_def because we will compare to time_window
+    time_sec = real(clock%seconds_from_steps(clock%get_step()), r_def)
 
     ! Start at the head of the time_axis linked list
     loop => time_axis_list%get_head()
