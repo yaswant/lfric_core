@@ -1,0 +1,6 @@
+Inner product checksum W0_field = 462CCE3FAD4AD4E4
+Inner product checksum W2H_field = 4634E6DF6CB334E5
+Inner product checksum W2V_field = 462CDEBC7C88F598
+Inner product checksum W3_field = 462503F64BB57366
+Inner product checksum W3_2D_field = 4602B819F1CB3001
+Inner product checksum time_varying_W3_2D_field = 421CCEB797800000

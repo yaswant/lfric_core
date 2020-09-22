@@ -18,18 +18,23 @@ module io_dev_data_mod
   use constants_mod,                    only : i_def
   use field_mod,                        only : field_type
   use field_collection_mod,             only : field_collection_type
-  use log_mod,                          only : log_event,                 &
-                                               LOG_LEVEL_INFO
+  use linked_list_mod,                  only : linked_list_type
+  use log_mod,                          only : log_event,      &
+                                               LOG_LEVEL_INFO, &
+                                               LOG_LEVEL_ERROR
+  use variable_fields_mod,              only : init_variable_fields
   ! Configuration
   use io_config_mod,                    only : write_diag,                &
                                                write_dump
   use initialization_config_mod,        only : init_option,               &
-                                               init_option_fd_start_dump
+                                               init_option_fd_start_dump, &
+                                               ancil_option,              &
+                                               ancil_option_basic_gagl
   ! I/O methods
   use read_methods_mod,                 only : read_state
   use write_methods_mod,                only : write_state
   ! IO_Dev modules
-  use io_dev_init_mod,                  only : create_io_dev_fields
+  use io_dev_init_mod,                  only : setup_io_dev_fields
   use io_dev_init_fields_alg_mod,       only : io_dev_init_fields_alg
   use io_dev_checksum_alg_mod,          only : io_dev_checksum_alg
 
@@ -50,6 +55,8 @@ module io_dev_data_mod
     !> Field collection holding fields for dumps
     type( field_collection_type ), public :: dump_fields
 
+    !> Linked list of time_axis objects for variable fields
+    type( linked_list_type ),      public :: variable_field_times
 
   end type io_dev_data_type
 
@@ -77,10 +84,11 @@ contains
     class( clock_type ),      intent(in)    :: clock
 
     ! Create model data fields
-    call create_io_dev_fields( mesh_id,                &
-                               twod_mesh_id,           &
-                               model_data%core_fields, &
-                               model_data%dump_fields )
+    call setup_io_dev_fields( mesh_id,                        &
+                              twod_mesh_id,                   &
+                              model_data%core_fields,         &
+                              model_data%dump_fields,         &
+                              model_data%variable_field_times )
 
   end subroutine create_model_data
 
@@ -112,6 +120,13 @@ contains
         call read_state( model_data%dump_fields, prefix='input_' )
     end select
 
+    ! If testing initialisation of time-varying I/O
+    select case( ancil_option )
+    case ( ancil_option_basic_gagl )
+      call init_variable_fields( model_data%variable_field_times, &
+                                 clock, model_data%core_fields )
+  end select
+
 
   end subroutine initialise_model_data
 
@@ -141,9 +156,10 @@ contains
     end if
 
     !==================== Write checksum output =====================
-    ! Remove multi-data field from core fields as it cannot currently be passed
-    ! to Psyclone
+    ! Remove multi-data fields from core fields as they cannot currently be passed
+    ! to Psyclone to create checksum
     call model_data%core_fields%remove_field( "multi_data_field" )
+    call model_data%core_fields%remove_field( "time_varying_multi_data_field" )
 
     call io_dev_checksum_alg( model_data%core_fields )
 

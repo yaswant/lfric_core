@@ -9,6 +9,7 @@
    <axis_definition>
     <axis id="vert_axis_half_levels" name="half_levels"/>
     <axis id="vert_axis_full_levels" name="full_levels"/>
+    <axis id="monthly_axis" name="monthly_axis" n_glo="12"/>
     <axis id="multi_data_axis" name="multi_data_axis" n_glo="5"/>
    </axis_definition>
 
@@ -47,6 +48,16 @@
        <domain domain_ref="edge_half_levels"/>
        <axis axis_ref="vert_axis_half_levels"/>
      </grid>
+     <grid id="monthly_half_level_face_grid">
+       <domain domain_ref="face_half_levels"/>
+       <axis axis_ref="vert_axis_half_levels"/>
+       <axis axis_ref="monthly_axis"/>
+     </grid>
+     <grid id="monthly_multi_data_single_level_face_grid">
+       <domain domain_ref="face_half_levels"/>
+       <axis axis_ref="multi_data_axis"/>
+       <axis axis_ref="monthly_axis"/>
+     </grid>
     </grid_definition>
 
     <field_definition prec="8" >
@@ -58,7 +69,9 @@
         <field id="W2V_field" name="W2V_field" long_name="Field on W2-vertical function space" unit="1" grid_ref="full_level_face_grid" />
         <field id="W3_field" name="W3_field" long_name="Field on W3 function space" unit="1" grid_ref="half_level_face_grid" />
         <field id="W3_2D_field" name="W3_2D_field" long_name="Two dimensional field on W3 function space" unit="1" domain_ref="face_half_levels" />
-        <field id="multi_data_field" name="multi_data_field" long_name="Multi_data (ndata=5) field on W3, 2D function space" unit="1" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
+        <field id="multi_data_field" name="multi_data_field" long_name="Multi-data (ndata=5) field on W3, 2D function space" unit="1" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
+        <field id="time_varying_W3_2D_field" name="time_varying_W3_2D_field" long_name="Time-varying, single-level field on W3 function space" unit="1" operation="once" domain_ref="face_half_levels" />
+        <field id="time_varying_multi_data_field" name="time_varying_multi_data_field" long_name="Time-varying, multi-data (ndata=5) field on W3, 2D function space" unit="1" operation="once" axis_ref="multi_data_axis" domain_ref="face_half_levels" />
       </field_group>
 
       <!-- Checkpoint group -->
@@ -87,7 +100,7 @@
         <field id="input_W2H_field" name="W2H_field" long_name="Field on W2H function space" unit="1" operation="once" grid_ref="half_level_edge_grid" />
         <field id="input_W3_field" name="W3_field" long_name="Field on W3 function space" unit="1" operation="once" grid_ref="half_level_face_grid" />
         <field id="input_W3_2D_field" name="W3_2D_field" long_name="Two dimensional field on W3 function space" unit="1" operation="once" domain_ref="face_half_levels" />
-        <field id="input_multi_data_field" name="multi_data_field" long_name="Multi_data (ndata=5) field on W3, 2D function space" unit="1" operation="once" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
+        <field id="input_multi_data_field" name="multi_data_field" long_name="Multi-data (ndata=5) field on W3, 2D function space" unit="1" operation="once" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
        </file>
 
       <!-- File definition for output dump fields -->
@@ -95,7 +108,19 @@
         <field id="output_W2H_field" name="W2H_field" long_name="Field on W2H function space" unit="1" operation="once" grid_ref="half_level_edge_grid" />
         <field id="output_W3_field" name="W3_field" long_name="Field on W3 function space" unit="1" operation="once" grid_ref="half_level_face_grid" />
         <field id="output_W3_2D_field" name="W3_2D_field" long_name="Two dimensional field on W3 function space" unit="1" operation="once" domain_ref="face_half_levels" />
-        <field id="output_multi_data_field" name="multi_data_field" long_name="Multi_data (ndata=5) field on W3, 2D function space" unit="1" operation="once" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
+        <field id="output_multi_data_field" name="multi_data_field" long_name="Multi-data (ndata=5) field on W3, 2D function space" unit="1" operation="once" domain_ref="face_half_levels" axis_ref="multi_data_axis"/>
+      </file>
+
+      <!-- File definition for output dump fields -->
+      <file id="io_dev_time_varying_dump" name="io_dev_time_varying_dump" mode="write" output_freq="1ts" convention="UGRID" enabled=".TRUE.">
+        <field id="output_time_varying_W3_2D_field" name="time_varying_W3_2D_field" long_name="Time-varying, single-level field on W3 function space" unit="1" operation="once" axis_ref="monthly_axis" domain_ref="face_half_levels" />
+        <field id="output_time_varying_multi_data_field" name="time_varying_multi_data_field" long_name="Time-varying, multi-data (ndata=5) field on W3, 2D function space" unit="1" operation="once" grid_ref="monthly_multi_data_single_level_face_grid" />
+      </file>
+
+      <!-- File definition for output dump fields -->
+      <file id="io_dev_time_varying_input" name="io_dev_time_varying_input" mode="read" output_freq="1ts" convention="UGRID" enabled=".FALSE.">
+        <field id="time_varying_W3_2D_field_data" name="time_varying_W3_2D_field" long_name="Time-varying, single-level field on W3 function space" unit="1" operation="once" axis_ref="monthly_axis" domain_ref="face_half_levels" />
+        <field id="time_varying_multi_data_field_data" name="time_varying_multi_data_field" long_name="Time-varying, multi-data (ndata=5) field on W3, 2D function space" unit="1" operation="once" grid_ref="monthly_multi_data_single_level_face_grid" />
       </file>
 
       <!-- File definition for checkpoint write -->

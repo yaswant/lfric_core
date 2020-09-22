@@ -19,9 +19,12 @@ module io_dev_init_files_mod
   use files_config_mod,              only: diag_stem_name,            &
                                            checkpoint_stem_name,      &
                                            start_dump_filename,       &
-                                           start_dump_directory
+                                           start_dump_directory,      &
+                                           time_varying_input_path
   use initialization_config_mod,     only: init_option,               &
-                                           init_option_fd_start_dump
+                                           init_option_fd_start_dump, &
+                                           ancil_option,              &
+                                           ancil_option_basic_gagl
   use io_config_mod,                 only: diagnostic_frequency,      &
                                            checkpoint_write,          &
                                            checkpoint_read,           &
@@ -46,7 +49,8 @@ module io_dev_init_files_mod
     type(xios_file_type)            :: tmp_file
     character(len=str_max_filename) :: checkpoint_write_fname, &
                                        checkpoint_read_fname,  &
-                                       dump_fname
+                                       dump_fname,             &
+                                       ancil_fname
 
     ! Setup diagnostic output file
     if ( write_diag ) then
@@ -100,6 +104,16 @@ module io_dev_init_files_mod
                                     checkpoint_read_fname, clock%get_first_step() - 1, &
                                     field_group_id="checkpoint_fields" )
       call files_list%insert_item(tmp_file)
+    end if
+
+    ! Setup time-varying input files
+    if ( ancil_option == ancil_option_basic_gagl ) then
+      ! Set land area ancil filename from namelist
+      write(ancil_fname,'(A)') trim(start_dump_directory)//'/'// &
+                               trim(time_varying_input_path)
+      call tmp_file%init_xios_file("io_dev_time_varying_input", path=ancil_fname)
+      call files_list%insert_item(tmp_file)
+
     end if
 
   end subroutine init_io_dev_files

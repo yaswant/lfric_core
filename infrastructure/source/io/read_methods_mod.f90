@@ -398,13 +398,15 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   type(field_proxy_type), intent(inout) :: field_proxy
   integer(i_def),         intent(in)    :: time_indices(:)
 
-  integer(i_def) :: undf, fs_id, i, nlayers, time_index
+  integer(i_def) :: undf, fs_id, i, nlayers, ndata, time_index, axis_size
   integer(i_def) :: domain_size, vert_axis_size, time_axis_size
   real(dp_xios), allocatable :: recv_field(:)
-  real(dp_xios), allocatable :: recv_field_twod(:)
+  real(dp_xios), allocatable :: time_slice(:)
 
   ! Get the number of layers to distiniguish between 2D and 3D fields
   nlayers = field_proxy%vspace%get_nlayers()
+  ! Get the size of the multi-data field ndata axis
+  ndata = field_proxy%vspace%get_ndata()
 
   ! Get the size of undf as we only read in up to last owned
   undf = field_proxy%vspace%get_last_dof_owned()
@@ -414,23 +416,22 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   if ( fs_id == W3 ) then
     call xios_get_domain_attr( 'face_half_levels', ni=domain_size )
     call xios_get_axis_attr( 'vert_axis_half_levels', n_glo=vert_axis_size )
-    call xios_get_axis_attr( "monthly_axis", n_glo=time_axis_size )
+    call xios_get_axis_attr( 'monthly_axis', n_glo=time_axis_size )
   else
     call log_event( 'Time varying fields only readable for W3 function space', &
                      LOG_LEVEL_ERROR )
   end if
 
+  ! Assign the axis_size equal to the product vertical axis size and the ndata axis size
+  axis_size = nlayers * ndata
+
   ! Size the array to be what is expected
-  if ( nlayers == 1 ) then
-    allocate( recv_field( domain_size * time_axis_size ) )
-  else
-    allocate( recv_field( domain_size * vert_axis_size * time_axis_size ) )
-    allocate( recv_field_twod( domain_size * vert_axis_size ) )
-  end if
+  allocate( recv_field( domain_size * axis_size * time_axis_size ) )
+  allocate( time_slice( domain_size * axis_size ) )
 
   ! Read the data into a temporary array - this should be in the correct order
   ! as long as we set up the horizontal domain using the global index
-  call xios_recv_field( trim(xios_field_name)//"_data", recv_field )
+  call xios_recv_field( trim(xios_field_name)//'_data', recv_field )
 
   ! We need to reshape and select a subset of the the incoming data to get the
   ! correct time entries for the LFRic field
@@ -438,32 +439,24 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   ! Indices must be zero-based for read purposes
   time_index = time_indices(1) - 1
 
-  ! Here we give the field proxy the data for the corresponding time entry
+  ! Set up a temporary array for the time entry before reshaping the data
+  ! for the field
   ! Note the conversion from dp_xios to r_def
-  if ( nlayers == 1 ) then
-    field_proxy%data( 1 : undf ) = real(recv_field( time_index * ( domain_size ) + 1 : &
-                                        time_index * ( domain_size ) + domain_size ),  &
-                                        kind=r_def)
+  time_slice = real(recv_field( ( time_index ) * ( domain_size * axis_size ) + 1 :  &
+                                ( time_index + 1 ) * ( domain_size * axis_size ) ), &
+                                kind=r_def)
 
-  else
-    ! Set up a temporary array for the 3D time entry before reshaping the data
-    ! for the field
-    recv_field_twod = recv_field( ( time_index - 1) * ( domain_size * vert_axis_size ) + 1 : &
-                                       ( time_index ) * ( domain_size * vert_axis_size ))
-
-    do i = 0, vert_axis_size - 1
-      field_proxy%data( i + 1 : undf : vert_axis_size ) = &
-             real(recv_field_twod( i * ( domain_size ) + 1 : ( i * ( domain_size ) ) + domain_size ), &
-                 kind=r_def)
-    end do
-  end if
+  do i = 0, axis_size - 1
+    field_proxy%data( i + 1 : undf : axis_size ) = &
+           time_slice( i * ( domain_size ) + 1 : ( i * ( domain_size ) ) + domain_size )
+  end do
 
   ! Set halos dirty here as for parallel read we only read in data for owned
   ! dofs and the halos will not be set
   call field_proxy%set_dirty()
 
   deallocate( recv_field )
-  if ( .not. nlayers==1 ) deallocate( recv_field_twod )
+  deallocate( time_slice )
 
 end subroutine read_field_time_var
 

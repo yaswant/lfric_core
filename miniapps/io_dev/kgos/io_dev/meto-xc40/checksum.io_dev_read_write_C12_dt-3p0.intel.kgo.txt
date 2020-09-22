@@ -3,3 +3,4 @@ Inner product checksum W2H_field = 4634E6DF6986AFFB
 Inner product checksum W2V_field = 462CDEBC7C88F598
 Inner product checksum W3_field = 462503F6518E5D47
 Inner product checksum W3_2D_field = 4602B819F0E3061D
+Inner product checksum time_varying_W3_2D_field = 4602B819F1CB3001

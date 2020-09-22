@@ -16,6 +16,7 @@
 
 &initialization
  init_option = 'analytic'
+ ancil_option = 'none'
 /
 
 &files
