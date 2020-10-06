@@ -5,7 +5,9 @@
 !-------------------------------------------------------------------------------
 
 !>  @brief Module for field reading routines
-!>  @details Holds all routines for reading LFRic fields
+!>  @details Holds all routines for reading LFRic fields. All routines are set
+!>           up to read data with dimension ordering according to the
+!>           recommendations in the NetCDF CF standard.
 module read_methods_mod
 
   use constants_mod,                 only: i_def, dp_xios, str_def, r_def
@@ -446,10 +448,12 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   type(field_proxy_type), intent(inout) :: field_proxy
   integer(i_def),         intent(in)    :: time_indices(:)
 
-  integer(i_def) :: undf, fs_id, i, nlayers, ndata, time_index, axis_size
+  integer(i_def) :: undf, fs_id, i, j, nlayers, ndata, time_index, vert_levels
   integer(i_def) :: domain_size, vert_axis_size, time_axis_size
   real(dp_xios), allocatable :: recv_field(:)
-  real(dp_xios), allocatable :: time_slice(:)
+  real(r_def),   allocatable :: ndata_slice(:)
+  real(r_def),   allocatable :: time_slice(:)
+  real(r_def),   allocatable :: field_data(:)
 
   ! Get the number of layers to distiniguish between 2D and 3D fields
   nlayers = field_proxy%vspace%get_nlayers()
@@ -470,41 +474,65 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
                      LOG_LEVEL_ERROR )
   end if
 
-  ! Assign the axis_size equal to the product vertical axis size and the ndata axis size
-  axis_size = nlayers * ndata
+  ! Define vertical levels based on whether we are on a 2D mesh
+  if ( nlayers == 1 ) then
+    vert_levels = 1
+  else
+    vert_levels = vert_axis_size
+  end if
 
-  ! Size the array to be what is expected
-  allocate( recv_field( domain_size * axis_size * time_axis_size ) )
-  allocate( time_slice( domain_size * axis_size ) )
+  ! Size the various array slices
+  allocate( recv_field( domain_size * vert_levels * time_axis_size * ndata ) )
+  allocate( ndata_slice( domain_size * vert_levels * time_axis_size ) )
+  allocate( time_slice( domain_size * vert_levels ) )
+  allocate( field_data( undf ) )
 
-  ! Read the data into a temporary array - this should be in the correct order
-  ! as long as we set up the horizontal domain using the global index
+  ! Read the data into a temporary array
   call xios_recv_field( trim(xios_field_name)//'_data', recv_field )
 
-  ! We need to reshape and select a subset of the the incoming data to get the
-  ! correct time entries for the LFRic field
-  ! Currently we read the first time entry and do no interpolation
-  ! Indices must be zero-based for read purposes
-  time_index = time_indices(1) - 1
+  ! Incoming data is shaped with multi-data axis first, then time axis, so set
+  ! up an array for each multi-data level
+  do i = 0, ndata - 1
 
-  ! Set up a temporary array for the time entry before reshaping the data
-  ! for the field
-  ! Note the conversion from dp_xios to r_def
-  time_slice = real(recv_field( ( time_index ) * ( domain_size * axis_size ) + 1 :  &
-                                ( time_index + 1 ) * ( domain_size * axis_size ) ), &
-                                kind=r_def)
+    !Get first ndata slice - note the conversion from double precision to r_def
+    ndata_slice = real( recv_field( i * ( domain_size * vert_levels * time_axis_size ) + 1 :  &
+                                  ( i + 1 ) * ( domain_size * vert_levels * time_axis_size ) ), &
+                                  kind=r_def )
 
-  do i = 0, axis_size - 1
-    field_proxy%data( i + 1 : undf : axis_size ) = &
-           time_slice( i * ( domain_size ) + 1 : ( i * ( domain_size ) ) + domain_size )
+    ! Reshape data into a single array for each time entry in the time window
+    ! The line below will be "do j = 0, 1" when time-varying field interpolation
+    ! is implemented
+    do j = 0, 0
+      time_index = time_indices(j+1)
+
+      ! Get correct time-entry from current multi-data level
+      time_slice = ndata_slice( ( time_index - 1 ) * ( domain_size * vert_levels ) + 1 :  &
+                                 ( time_index ) * ( domain_size * vert_levels ) )
+
+      ! We require multi-data fields with vertical levels to be multi-data first
+      if ( ndata*vert_levels /= 1 .and. .not. field_proxy%is_ndata_first() ) then
+        write( log_scratch_space,'(A,A)' ) "Only ndata_first ordering supported for read_field_time_var: "// &
+                                      trim( xios_field_name )
+        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
+      else
+        field_data( (j * ndata) + i + 1 : undf : ndata ) = time_slice
+      end if
+
+    end do
+
   end do
+
+  ! Pass reshaped data array to field object via proxy
+  field_proxy%data = field_data
 
   ! Set halos dirty here as for parallel read we only read in data for owned
   ! dofs and the halos will not be set
   call field_proxy%set_dirty()
 
   deallocate( recv_field )
+  deallocate( ndata_slice )
   deallocate( time_slice )
+  deallocate( field_data )
 
 end subroutine read_field_time_var
 

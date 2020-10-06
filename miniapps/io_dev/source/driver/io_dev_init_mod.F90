@@ -211,7 +211,7 @@ module io_dev_init_mod
     end if
 
     ! Initialise field object from specifications
-    call new_field%initialise( vector_space, name=field_name )
+    call new_field%initialise( vector_space, name=field_name, ndata_first=.true. )
 
     ! Set up I/O methods
     if ( fs_id == W0 ) then
