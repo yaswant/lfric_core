@@ -70,6 +70,8 @@ end function halo_routing_collection_constructor
 !>                           will be valid
 !> @param [in] lfric_fs The function space continuity type for which this
 !>                      information will be valid
+!> @param [in] ndata The number of multidata values per dof location for
+!.                   which this information will be valid
 !> @param [in] fortran_type The Fortran type of the data for which this
 !>                      information will be valid
 !> @param [in] fortran_kind The Fortran kind of the data for which this
@@ -79,6 +81,7 @@ function get_halo_routing( self, &
                            mesh_id, &
                            element_order, &
                            lfric_fs, &
+                           ndata, &
                            fortran_type, &
                            fortran_kind )  result(halo_routing)
   implicit none
@@ -90,6 +93,7 @@ function get_halo_routing( self, &
   integer(i_def), intent(in) :: mesh_id
   integer(i_def), intent(in) :: element_order
   integer(i_def), intent(in) :: lfric_fs
+  integer(i_def), intent(in) :: ndata
   integer(i_def), intent(in) :: fortran_type
   integer(i_def), intent(in) :: fortran_kind
 
@@ -97,6 +101,7 @@ function get_halo_routing( self, &
                                               mesh_id, &
                                               element_order, &
                                               lfric_fs, &
+                                              ndata, &
                                               fortran_type, &
                                               fortran_kind )
 
@@ -105,6 +110,7 @@ function get_halo_routing( self, &
     call self%halo_routing_list%insert_item( halo_routing_type( mesh_id, &
                                                                 element_order, &
                                                                 lfric_fs, &
+                                                                ndata, &
                                                                 fortran_type, &
                                                                 fortran_kind ) )
 
@@ -112,6 +118,7 @@ function get_halo_routing( self, &
                                                 mesh_id, &
                                                 element_order, &
                                                 lfric_fs, &
+                                                ndata, &
                                                 fortran_type, &
                                                 fortran_kind )
 
@@ -130,6 +137,7 @@ function get_halo_routing_from_list(self, &
                                     mesh_id, &
                                     element_order, &
                                     lfric_fs, &
+                                    ndata, &
                                     fortran_type, &
                                     fortran_kind) &
     result(instance)
@@ -140,6 +148,7 @@ function get_halo_routing_from_list(self, &
   integer(i_def), intent(in) :: mesh_id
   integer(i_def), intent(in) :: element_order
   integer(i_def), intent(in) :: lfric_fs
+  integer(i_def), intent(in) :: ndata
   integer(i_def), intent(in) :: fortran_type
   integer(i_def), intent(in) :: fortran_kind
 
@@ -167,6 +176,7 @@ function get_halo_routing_from_list(self, &
       if ( mesh_id == listhalo_routing%get_mesh_id() .and. &
            element_order == listhalo_routing%get_element_order() .and. &
            lfric_fs == listhalo_routing%get_lfric_fs() .and. &
+           ndata == listhalo_routing%get_ndata() .and. &
            fortran_type == listhalo_routing%get_fortran_type() .and. &
            fortran_kind == listhalo_routing%get_fortran_kind() ) then
         instance => listhalo_routing

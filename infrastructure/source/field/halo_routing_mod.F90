@@ -38,6 +38,9 @@ module halo_routing_mod
     !> Enumerated value representing the continutity of the function space
     !> that this information is valid for
     integer(i_def) :: lfric_fs
+    !> The number of multidata values per dof location that this information
+    !> is valid for
+    integer(i_def) :: ndata
     !> Description of the type of data in the field to be halo swapped
     integer(i_def) :: fortran_type
     !> Description of the kind of data in the field to be halo swapped
@@ -52,6 +55,9 @@ module halo_routing_mod
     !> Gets the function space continuity type for which the halo_routing
     !> object is valid
     procedure, public :: get_lfric_fs
+    !> Gets the  number of multidata values per dof location for which the
+    !> halo_routing object is valid
+    procedure, public :: get_ndata
     !> Gets the fortran type of the data for which the halo_routing
     !> object is valid
     procedure, public :: get_fortran_type
@@ -69,13 +75,15 @@ module halo_routing_mod
 
 contains
 
-!> Constructor for a halo_routing object
+!> @brief Constructor for a halo_routing object
 !> @param [in] mesh_id Id of the mesh for which this information will
 !>                     be valid
 !> @param [in] element_order The element order for which this information
 !>                           will be valid
 !> @param [in] lfric_fs The function space continuity type for which this
 !>                      information will be valid
+!> @param [in] ndata The number of multidata values per dof location for
+!>                   which this information will be valid
 !> @param [in] fortran_type The Fortran type of the data for which this
 !>                      information will be valid
 !> @param [in] fortran_kind The Fortran kind of the data for which this
@@ -84,6 +92,7 @@ contains
 function halo_routing_constructor( mesh_id, &
                                    element_order, &
                                    lfric_fs, &
+                                   ndata, &
                                    fortran_type, &
                                    fortran_kind ) &
                      result(self)
@@ -93,6 +102,7 @@ function halo_routing_constructor( mesh_id, &
   integer(i_def), intent(in) :: mesh_id
   integer(i_def), intent(in) :: element_order
   integer(i_def), intent(in) :: lfric_fs
+  integer(i_def), intent(in) :: ndata
   integer(i_def), intent(in) :: fortran_type
   integer(i_def), intent(in) :: fortran_kind
 
@@ -107,15 +117,17 @@ function halo_routing_constructor( mesh_id, &
   self%mesh_id = mesh_id
   self%element_order = element_order
   self%lfric_fs = lfric_fs
+  self%ndata = ndata
   self%fortran_type = fortran_type
   self%fortran_kind = fortran_kind
 
   function_space => function_space_collection%get_fs( mesh_id, &
                                                       element_order, &
-                                                      lfric_fs )
+                                                      lfric_fs, &
+                                                      ndata = ndata )
 
   ! set up the global dof index array
-  allocate( global_dof_id( function_space%get_ndof_glob() ) )
+  allocate( global_dof_id( function_space%get_ndof_glob()*ndata ) )
   call function_space%get_global_dof_id(global_dof_id)
 
   mesh => function_space%get_mesh()
@@ -143,7 +155,7 @@ function halo_routing_constructor( mesh_id, &
   deallocate( global_dof_id )
 end function halo_routing_constructor
 
-!> Gets the mesh_id for which this object is valid
+!> @brief Gets the mesh_id for which this object is valid
 !> @return Id of the mesh that this information is valid for
 function get_mesh_id(self) result (mesh_id)
   implicit none
@@ -153,7 +165,7 @@ function get_mesh_id(self) result (mesh_id)
   return
 end function get_mesh_id
 
-!> Gets the element_order for which this object is valid
+!> @brief Gets the element_order for which this object is valid
 !> @return The element order that this information is valid for
 function get_element_order(self) result (element_order)
   implicit none
@@ -163,7 +175,7 @@ function get_element_order(self) result (element_order)
   return
 end function get_element_order
 
-!> Gets the function space continuity type for which this object is valid
+!> @brief Gets the function space continuity type for which this object is valid
 !> @return The function space continuity type that this information is valid for
 function get_lfric_fs(self) result (lfric_fs)
   implicit none
@@ -173,7 +185,19 @@ function get_lfric_fs(self) result (lfric_fs)
   return
 end function get_lfric_fs
 
-!> Gets the Fortran type of the data for which this object is valid
+!> @brief Gets the number of multidata values per dof location for which this
+!>        object is valid
+!> @return The number of multidata values per dof location that this
+!>         information is valid for
+function get_ndata(self) result (ndata)
+  implicit none
+  class(halo_routing_type), intent(in) :: self
+  integer(i_def) :: ndata
+  ndata = self%ndata
+  return
+end function get_ndata
+
+!> @brief Gets the Fortran type of the data for which this object is valid
 !> @return The Fortran type of the data that this information is valid for
 function get_fortran_type(self) result (fortran_type)
   implicit none
@@ -183,7 +207,7 @@ function get_fortran_type(self) result (fortran_type)
   return
 end function get_fortran_type
 
-!> Gets the Fortran kind of the data for which this object is valid
+!> @brief Gets the Fortran kind of the data for which this object is valid
 !> @return The Fortran kind of the data that this information is valid for
 function get_fortran_kind(self) result (fortran_kind)
   implicit none
@@ -193,7 +217,7 @@ function get_fortran_kind(self) result (fortran_kind)
   return
 end function get_fortran_kind
 
-!> Gets a YAXT redistribution map for halo swapping
+!> @brief Gets a YAXT redistribution map for halo swapping
 !> @param [in] depth The depth of halo exchange that the redistribution map
 !>                   will be used for
 !> @return The YAXT redistribution map for a halo exchange of a particular

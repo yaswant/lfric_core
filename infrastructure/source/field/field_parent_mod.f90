@@ -196,6 +196,7 @@ contains
                                              vector_space%get_mesh_id(), &
                                              vector_space%get_element_order(), &
                                              vector_space%which(), &
+                                             vector_space%get_ndata(), &
                                              fortran_type, &
                                              fortran_kind )
     end if

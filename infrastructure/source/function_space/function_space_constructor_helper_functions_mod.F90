@@ -2136,7 +2136,7 @@ contains
               !      (idof-1) * ndata*num_layers +
               !      (k - 1)* ndata +
               !      (m - 1)
-              global_dof_id( dofmap(idof,icell)+(k-1)+(m-1) ) = &
+              global_dof_id( dofmap(idof,icell)+(k-1)*ndata+(m-1) ) = &
                (int(global_cell_id,i_halo_index)-1_i_halo_index)* &
                                                num_dofs*num_ndata*num_layers + &
                (int(idof,i_halo_index)-1_i_halo_index)* num_ndata*num_layers + &

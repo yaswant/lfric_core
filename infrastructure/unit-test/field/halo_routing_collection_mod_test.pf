@@ -87,7 +87,8 @@ contains
 
     class(halo_routing_collection_test_type), intent(inout) :: this
 
-    type(halo_routing_type), pointer :: halo_routing1, halo_routing2, halo_routing3
+    type(halo_routing_type), pointer :: halo_routing1, halo_routing2, &
+                                        halo_routing3, halo_routing4
 
     halo_routing_collection = halo_routing_collection_type()
 
@@ -95,23 +96,35 @@ contains
     ! 1. Asking for two different halo_routing objects returns two different
     !    pointers.
     ! 2, Asking for the same halo_routing twice returns the same pointer twice.
+    ! 3. Asking for two halo_routing objects that differ only in the size
+    !    of their multi-data dimension returns two different pointers.
     halo_routing1 => halo_routing_collection%get_halo_routing(this%mesh_id, &
                                                               0, &
                                                               W3,&
+                                                              1, &
                                                               real_type, &
                                                               r_def)
     halo_routing2 => halo_routing_collection%get_halo_routing(this%mesh_id, &
                                                               1, &
                                                               W2,&
+                                                              1, &
                                                               real_type, &
                                                               r_def)
     halo_routing3 => halo_routing_collection%get_halo_routing(this%mesh_id, &
                                                               0, &
                                                               W3,&
+                                                              1, &
+                                                              real_type, &
+                                                              r_def)
+    halo_routing4 => halo_routing_collection%get_halo_routing(this%mesh_id, &
+                                                              0, &
+                                                              W3,&
+                                                              5, &
                                                               real_type, &
                                                               r_def)
     @assertFalse(associated(halo_routing1, halo_routing2))
     @assertTrue(associated(halo_routing1, halo_routing3))
+    @assertFalse(associated(halo_routing1, halo_routing4))
 
     call halo_routing_collection%clear()
 

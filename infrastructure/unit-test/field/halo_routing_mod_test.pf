@@ -90,10 +90,11 @@ contains
     integer(i_def) :: result
 
     ! Create a halo_routing object with a particular mesh_id, element_order,
-    ! lfric_fs, type and kind
+    ! lfric_fs, ndata, type and kind
     halo_routing = halo_routing_type( this%mesh_id, &
                                       0, &
                                       W3, &
+                                      2, &
                                       real_type, &
                                       r_def )
 
@@ -106,6 +107,9 @@ contains
 
     result = halo_routing%get_lfric_fs()
     @assertEqual( W3, result )
+
+    result = halo_routing%get_ndata()
+    @assertEqual( 2, result )
 
     result = halo_routing%get_fortran_type()
     @assertEqual( real_type, result )

@@ -9,7 +9,7 @@ class halo_routing_collection_mod::halo_routing_collection_type {
   +<<create>>  halo_routing_collection_constructor() : halo_routing_collection_type
   +<<destroy>> halo_routing_collection_destructor()
   +clear()
-  +get_halo_routing(<<in>>mesh_id: integer, <<in>>element_order: integer, <<in>>lfric_fs: integer, <<in>>fortran_type: integer, <<in>>fortran_kind: integer) : integer
+  +get_halo_routing(<<in>>mesh_id: integer, <<in>>element_order: integer, <<in>>lfric_fs: integer, <<in>>ndata: integer, <<in>>fortran_type: integer, <<in>>fortran_kind: integer) : <<pointer>> halo_routing_type
 }
 
 
