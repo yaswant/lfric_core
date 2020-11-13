@@ -303,9 +303,9 @@ contains
     if ( theta_splitting == theta_splitting_none ) then
       ! Currently there is no other theta transport option in the tranport miniapp except splitting
       write( log_scratch_space, '(A)' ) ' WARNING == Invalid option for theta advection for the miniapp transport'
-      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      call log_event( log_scratch_space, LOG_LEVEL_WARNING )
       write( log_scratch_space, '(A)' ) ' In this case theta is not advected and remains at the initial state '
-      call log_event( log_scratch_space, LOG_LEVEL_INFO )
+      call log_event( log_scratch_space, LOG_LEVEL_WARNING )
     end if
 
     !--------------------------------------------------------------------------
