@@ -43,22 +43,24 @@ module init_catalyst_demo_mod
   use function_space_collection_mod,  only : function_space_collection
   use function_space_chain_mod,       only : function_space_chain_type
 
-  use create_multigrid_mesh_mod,      only : mesh_ids
-  use multigrid_config_mod,           only : l_multigrid, &
-                                             ugrid,       &
-                                             multigrid_chain_nitems
+  use formulation_config_mod,         only : l_multigrid
+  use multigrid_config_mod,           only : multigrid_chain_nitems
+
   implicit none
 
 
   contains
 
-  subroutine init_catalyst_demo( mesh_id, twod_mesh_id, chi, multigrid_function_space_chain, &
+  subroutine init_catalyst_demo( mesh_id, twod_mesh_id, multigrid_mesh_ids, &
+                                 chi, multigrid_function_space_chain,       &
                                  wind, pressure, buoyancy )
 
     implicit none
 
-    integer(i_def),                  intent(in)  :: mesh_id
-    integer(i_def),                  intent(in)  :: twod_mesh_id
+    integer(i_def),  intent(in)  :: mesh_id
+    integer(i_def),  intent(in)  :: twod_mesh_id
+    integer(i_def),  intent(in)  :: multigrid_mesh_ids(:)
+
     type(function_space_chain_type), intent(out) :: multigrid_function_space_chain
 
     ! Prognostic fields
@@ -82,11 +84,11 @@ module init_catalyst_demo_mod
     !===============================================================================
     if (l_multigrid) then
 
-      do i=1, multigrid_chain_nitems
+      do i=1, size(multigrid_mesh_ids)
 
         ! Make sure this function_space is in the collection
-        function_space => function_space_collection%get_fs( mesh_ids(i), &
-                                                            0,           &
+        function_space => function_space_collection%get_fs( multigrid_mesh_ids(i), &
+                                                            0,                     &
                                                             W3 )
 
         write( log_scratch_space,"(A,I0,A)")                       &

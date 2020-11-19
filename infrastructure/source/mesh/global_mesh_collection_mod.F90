@@ -15,10 +15,9 @@ module global_mesh_collection_mod
                                     str_max_filename, str_def
   use global_mesh_mod,       only : global_mesh_type
   use linked_list_mod,       only : linked_list_type, linked_list_item_type
-  use log_mod,               only : log_event, log_scratch_space, &
-                                    LOG_LEVEL_ERROR, LOG_LEVEL_TRACE
-
-  use development_config_mod, only : implement_consolidated_multigrid
+  use log_mod,               only : log_event, log_scratch_space,     &
+                                    LOG_LEVEL_ERROR, LOG_LEVEL_TRACE, &
+                                    LOG_LEVEL_INFO, LOG_LEVEL_WARNING
 
   implicit none
 
@@ -54,14 +53,9 @@ module global_mesh_collection_mod
     ! READ DIRECTLY FROM THE UGRID MESH FILE
     type(global_mesh_type),  pointer :: source_global_mesh => null()
 
-    character(str_def), allocatable :: name_tags(:)
-    integer(i_def),     allocatable :: name_ids(:)
-
   contains
     procedure, public  :: add_new_global_mesh
     procedure, public  :: add_unit_test_global_mesh
-    procedure, public  :: set_next_source_mesh
-    procedure, private :: map_global_meshes
 
     procedure, public  :: n_meshes
     procedure, public  :: get_mesh_names
@@ -146,17 +140,10 @@ contains
     integer(i_def)          :: global_mesh_id
     character(str_def)      :: global_mesh_name
     integer(i_def)          :: n_global_meshes
-    type (global_mesh_type), pointer :: global_mesh_at_tail => null()
-
-    integer(i_def) :: source_global_mesh_id
-    integer(i_def) :: target_global_mesh_id
-    integer(i_native) :: i
-
-    ! Pointer to linked list - used for looping through the list
-    type(linked_list_item_type), pointer :: list_item => null()
 
     global_mesh_id = global_mesh_to_add%get_id()
     global_mesh_name = global_mesh_to_add%get_mesh_name()
+
 
     ! 1.0 Perform some checks based on the existings contents
     !     of the collection
@@ -179,70 +166,23 @@ contains
       end if
     end if
 
-    if (implement_consolidated_multigrid) then
+    ! 2.0 Read in the requested mesh topology from file.
+    !=================================================================
+    ! Check list of tag names to see if mesh is already in collection
+    ! As these are assumed to be read in from the same mesh input
+    ! file specifed for a given run, if the name is already in the
+    ! collection it will be the same mesh.
+    if (self%check_for(global_mesh_name)) then
+      write(log_scratch_space,'(A)')        &
+          'Mesh '//trim(global_mesh_name)// &
+          ' already present in collection.'
+      call log_event(log_scratch_space, LOG_LEVEL_WARNING)
+      return
+    end if
 
-      ! Protect this until implementation as the current unit-tests
-      ! (which will be removed on implementation in gungho/lfric_atm)
-      ! use a common mesh tag name (unit-test). they also rely on mesh
-      ! maps being created as global mesh maps are added. This will be
-      ! removed at implementation.
+    ! Now add the requested mesh to the collection
+    call self%global_mesh_list%insert_item( global_mesh_to_add )
 
-
-      ! Check list of tag names to see if mesh is already in collection
-      ! As these are assumed to be read in from the same mesh input
-      ! file specifed for a given run, if the name is already in the
-      ! collection it will be the same mesh.
-      if (self%check_for(global_mesh_to_add%get_mesh_name())) then
-        do i=1, size(self%name_tags)
-          if ( trim(self%name_tags(i)) == &
-                 trim(global_mesh_to_add%get_mesh_name()) ) then
-            return
-          end if
-        end do
-      end if
-
-      ! Now add the requested mesh to the collection
-      call self%global_mesh_list%insert_item( global_mesh_to_add )
-
-    else
-
-      ! ==========================================================
-      ! ORIGINAL CODE
-      ! ==========================================================
-      ! This will be removed if the a followup ticket to implement
-      ! consolidated multigrid into lfric apps.
-
-      ! If there is at least one other mesh in the collection, attempt
-      ! to create a map from it to the global mesh being added
-      if (n_global_meshes >= 1) then
-
-        ! In order to map the global meshes the two global
-        ! meshes should have the same number of panels
-        source_global_mesh_id = self%source_global_mesh%get_id()
-        target_global_mesh_id = global_mesh_id
-
-        call self%global_mesh_list%insert_item( global_mesh_to_add )
-        call self%map_global_meshes( source_global_mesh_id, &
-                                     target_global_mesh_id )
-
-        call self%set_next_source_mesh( target_global_mesh_id )
-
-      else
-
-        call self%global_mesh_list%insert_item( global_mesh_to_add )
-        call self%set_next_source_mesh( global_mesh_id )
-
-      end if
-
-    end if ! Implement_consolidated_multigrid
-
-    nullify( global_mesh_at_tail )
-    nullify( list_item )
-
-    if ( implement_consolidated_multigrid ) &
-        call update_tags( self,             &
-                          global_mesh_name, &
-                          global_mesh_id )
     return
   end subroutine add_new_global_mesh
 
@@ -263,265 +203,10 @@ contains
 
     integer(i_def) :: number_of_meshes
 
-    if (allocated(self%name_tags)) then
-      number_of_meshes = size(self%name_tags)
-    else
-      number_of_meshes = 0
-    end if
+    number_of_meshes = self%global_mesh_list%get_length()
 
     return
   end function n_meshes
-
-
-  !===========================================================================
-  ! Internal routine to generate cell mappings (if possible) between
-  ! subsequent global meshes added to the collection. This routine is present
-  ! as mapping data is not currently available in the global mesh ugrid
-  ! files. Mappings are created on a "per mesh panel" basis and are checked
-  ! against the variable npanels.
-  !
-  !> @deprecated When ugrid files with multiple meshes/mappings are
-  !>             available
-  !
-  subroutine map_global_meshes( self,                   &
-                                source_global_mesh_id,  &
-                                target_global_mesh_id )
-
-    implicit none
-
-    class(global_mesh_collection_type), intent(inout) :: self
-    integer(i_def), intent(in) :: source_global_mesh_id
-    integer(i_def), intent(in) :: target_global_mesh_id
-
-    type (global_mesh_type), pointer :: source_mesh => null()
-    type (global_mesh_type), pointer :: target_mesh => null()
-    type (global_mesh_type), pointer :: coarse_mesh => null()
-    type (global_mesh_type), pointer :: fine_mesh   => null()
-
-    integer(i_def) :: i,j,n,count       ! counters
-    integer(i_def) :: coarse_panel_start_id
-    integer(i_def) :: fine_panel_start_id
-    integer(i_def) :: coarse_panel_end_id
-    integer(i_def) :: fine_panel_end_id
-    integer(i_def) :: coarse_id
-    integer(i_def) :: fine_id
-
-    integer(i_def) :: coarse_edge_cells
-    integer(i_def) :: fine_edge_cells
-    integer(i_def) :: coarse_ncells
-    integer(i_def) :: fine_ncells
-    integer(i_def) :: source_ncells
-    integer(i_def) :: target_ncells
-
-    integer(i_def) :: factor ! ratio of edge_cells
-
-    integer(i_def) :: start_x
-    integer(i_def) :: start_y
-    integer(i_def) :: end_x
-    integer(i_def) :: end_y
-
-    integer(i_def), allocatable :: coarse_panel_ids(:,:)
-    integer(i_def), allocatable :: fine_panel_ids(:,:)
-
-    integer(i_def), allocatable :: coarse_to_fine_gid_map(:,:)
-    integer(i_def), allocatable :: fine_to_coarse_gid_map(:,:)
-    integer(i_def), allocatable :: tmp_panel_ids(:)
-
-
-    ! Check for identical source and target global meshes
-    if (source_global_mesh_id == target_global_mesh_id) then
-      write(log_scratch_space,'(A)') &
-          "Cannot have identical consective global mesh ids"
-      call log_event(log_scratch_space,LOG_LEVEL_TRACE)
-      return
-    end if
-
-    source_mesh => self%get_global_mesh(source_global_mesh_id)
-    target_mesh => self%get_global_mesh(target_global_mesh_id)
-
-    ! Figure out which of the meshes has fewer
-    ! cells i.e. the coarse one
-    source_ncells = source_mesh%get_ncells()
-    target_ncells = target_mesh%get_ncells()
-
-    if ( mod(source_ncells, target_ncells) == 0 .or. &
-        mod(target_ncells, source_ncells) == 0 ) then
-
-      if (source_ncells == target_ncells) then
-        write(log_scratch_space, '(A)')                           &
-            'Meshes have equal number of cells, direct mapping, ' &
-            // 'no mapping created'
-        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-        return
-
-      else if (target_ncells > source_ncells) then
-        coarse_mesh   => source_mesh
-        fine_mesh     => target_mesh
-        coarse_ncells = source_ncells
-        fine_ncells   = target_ncells
-
-      else
-        coarse_mesh   => target_mesh
-        fine_mesh     => source_mesh
-        coarse_ncells = target_ncells
-        fine_ncells   = source_ncells
-
-      end if
-
-    else
-      ! The number of cells in one of these meshes
-      ! needs to be a factor of the number cells in the other.
-      write(log_scratch_space, '(2(A,I0))')                                   &
-          'Unable to generate intermesh connectivity for global meshes: id:', &
-          source_global_mesh_id, ';id:', target_global_mesh_id
-      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-      return
-
-    end if
-
-    coarse_id = coarse_mesh%get_id()
-    fine_id   = fine_mesh%get_id()
-
-    ! Now we know which of the source and target are the
-    ! coarser and finer meshes, generate a coarse_to_fine
-    ! and fine_to_coarse map per panel
-    coarse_edge_cells = int(sqrt(real(coarse_ncells/self%npanels, r_def)), &
-                            i_def)
-    fine_edge_cells   = int(sqrt(real(fine_ncells/self%npanels,   r_def)), &
-                            i_def)
-    factor            = fine_edge_cells/coarse_edge_cells
-
-    allocate( coarse_panel_ids ( coarse_edge_cells, coarse_edge_cells ))
-    allocate( fine_panel_ids   ( fine_edge_cells,   fine_edge_cells   ))
-    allocate( coarse_to_fine_gid_map( factor**2, coarse_ncells ) )
-    allocate( fine_to_coarse_gid_map( 1, fine_ncells ))
-
-    do n=1, self%npanels
-
-      ! Get the id of the initial cell for the panel
-      coarse_panel_start_id = ((n-1)*coarse_ncells / self%npanels) + 1
-      fine_panel_start_id   = ((n-1)*fine_ncells   / self%npanels) + 1
-
-      ! =======================================================
-      ! Populate arrays with ids and reshape to panel layout
-      ! =======================================================
-
-      ! For coarse mesh
-      allocate(tmp_panel_ids(coarse_ncells))
-      count=1
-      coarse_panel_end_id = coarse_panel_start_id + coarse_ncells-1
-      do i=coarse_panel_start_id, coarse_panel_end_id
-        tmp_panel_ids(count) = i
-        count=count+1
-      end do
-
-      coarse_panel_ids = reshape( tmp_panel_ids,(/coarse_edge_cells, &
-                                                  coarse_edge_cells/) )
-      deallocate(tmp_panel_ids)
-
-      ! For fine mesh
-      allocate(tmp_panel_ids(fine_ncells))
-      count=1
-      fine_panel_end_id =  fine_panel_start_id + fine_ncells-1
-      do i=fine_panel_start_id, fine_panel_end_id
-        tmp_panel_ids(count) = i
-        count=count+1
-      end do
-      fine_panel_ids = reshape(tmp_panel_ids,(/fine_edge_cells, &
-                                               fine_edge_cells/))
-      deallocate(tmp_panel_ids)
-
-      ! ===============================
-      ! Populate intermesh gid maps
-      ! ===============================
-
-      ! Coarse to Fine
-      do j=1, coarse_edge_cells
-        start_y = ((j-1)*factor) + 1
-        end_y   = start_y + factor - 1
-        do i=1, coarse_edge_cells
-          start_x = ((i-1)*factor) + 1
-          end_x   = start_x + factor - 1
-
-          coarse_to_fine_gid_map(:,coarse_panel_ids(i,j)) =            &
-              reshape( fine_panel_ids( start_x:end_x, start_y:end_y ), &
-                      (/factor**2/) )
-        end do
-      end do
-
-      ! Fine to Coarse
-      coarse_panel_end_id = coarse_panel_start_id &
-                            + (coarse_ncells/self%npanels) - 1
-
-      do j=coarse_panel_start_id, coarse_panel_end_id
-        do i=1, factor**2
-          fine_to_coarse_gid_map(1, coarse_to_fine_gid_map(i,j)) = j
-        end do
-      end do
-
-    end do
-
-    ! Now we have the intermesh gid maps from coarse to fine
-    ! and fine to coarse meshes. Create a global_mesh_map for each
-    ! direction.
-    call coarse_mesh % add_global_mesh_map( fine_mesh, &
-                                            coarse_to_fine_gid_map )
-    call fine_mesh   % add_global_mesh_map( coarse_mesh, &
-                                            fine_to_coarse_gid_map )
-
-    deallocate( coarse_panel_ids )
-    deallocate( fine_panel_ids   )
-    deallocate( coarse_to_fine_gid_map )
-    deallocate( fine_to_coarse_gid_map )
-
-    nullify(source_mesh, target_mesh, coarse_mesh, fine_mesh)
-
-    return
-  end subroutine map_global_meshes
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief Specifies the global mesh to be used as the source mesh for
-  !>        mapping when the next global mesh is added to the collection.
-  !>
-  !> @deprecated When ugrid files with multiple meshes/mappings are available.
-  !>
-  subroutine set_next_source_mesh(self, global_mesh_id)
-
-    implicit none
-
-    class(global_mesh_collection_type), intent(inout) :: self
-
-    integer(i_def), intent(in) :: global_mesh_id
-
-    ! Pointer to linked list - used for looping through the list
-    class(linked_list_item_type), pointer :: loop => null()
-
-    ! start at the head of the mesh collection linked list
-    loop => self%global_mesh_list%get_head()
-
-    if (self%global_mesh_list%item_exists(global_mesh_id)) then
-      do
-        ! Search list for the id we want
-        if ( global_mesh_id == loop%payload%get_id() ) then
-          ! 'cast' to the global_mesh_type
-          select type(m => loop%payload)
-          type is (global_mesh_type)
-            self%source_global_mesh => m
-          end select
-          exit
-        end if
-        loop => loop%next
-      end do
-    else
-      write(log_scratch_space,'(A)') &
-          "Invalid global mesh id: does not exist in collection"
-      call log_event(log_scratch_space,LOG_LEVEL_ERROR)
-    end if
-
-    nullify(loop)
-
-    return
-  end subroutine set_next_source_mesh
 
 
   !===========================================================================
@@ -562,11 +247,6 @@ contains
     global_mesh_id   = global_mesh%get_id()
     call self%global_mesh_list%insert_item( global_mesh )
 
-    if ( implement_consolidated_multigrid ) &
-        call update_tags( self,             &
-                          global_mesh_name, &
-                          global_mesh_id )
-
     return
   end function add_unit_test_global_mesh
 
@@ -588,31 +268,40 @@ contains
 
     implicit none
 
-    class(global_mesh_collection_type) :: self
-    character(str_def), intent(in)     :: global_mesh_name
+    class(global_mesh_collection_type), intent(in) :: self
+    character(str_def),                 intent(in) :: global_mesh_name
 
-    type(global_mesh_type), pointer    :: global_mesh
+    type(global_mesh_type), pointer :: global_mesh
 
-    integer(i_def) :: n_global_meshes, i
-    integer(i_def) :: global_mesh_id
+    ! Pointer to linked list - used for looping through the list
+    type(linked_list_item_type),pointer :: loop => null()
 
-    n_global_meshes = size(self%name_tags)
+    ! Start at the head of the mesh collection linked list
+    loop => self%global_mesh_list%get_head()
 
     global_mesh => null()
 
-    do i=1 , n_global_meshes
-      if (trim(global_mesh_name) == trim(self%name_tags(i))) then
-        global_mesh_id = self%name_ids(i)
-        global_mesh => global_mesh_collection % get_global_mesh( global_mesh_id )
+    do
+      ! If list is empty or we're at the end of list and
+      ! we didn't find the correct mesh, return a null
+      ! pointer.
+      if ( .not. associated(loop) ) then
+        nullify(global_mesh)
         exit
       end if
+
+      ! 'cast' to the global_mesh_type
+      select type(m => loop%payload)
+        type is (global_mesh_type)
+          global_mesh => m
+          if ( global_mesh_name == global_mesh%get_mesh_name() ) exit
+      end select
+
+      loop => loop%next
+
     end do
 
-    if ( .not. associated(global_mesh) ) then
-      write(log_scratch_space,'(A)') &
-          trim(global_mesh_name)//' not found in the global mesh collection.'
-      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-    end if
+    nullify(loop)
 
     return
   end function get_mesh_by_name
@@ -644,7 +333,7 @@ contains
 
 
     ! Pointer to linked list - used for looping through the list
-    type(linked_list_item_type),pointer :: loop => null()
+    type(linked_list_item_type), pointer :: loop => null()
 
     ! start at the head of the mesh collection linked list
     loop => self%global_mesh_list%get_head()
@@ -687,9 +376,46 @@ contains
     class(global_mesh_collection_type) :: self
     character(str_def), allocatable :: mesh_names(:)
 
-    if (allocated(mesh_names)) deallocate(mesh_names)
-    if (allocated(self%name_tags)) &
-        allocate(mesh_names, source=self%name_tags)
+    integer(i_def) :: n_meshes, i
+
+    type(global_mesh_type), pointer :: global_mesh
+
+    ! Pointer to linked list - used for looping through the list
+    type(linked_list_item_type), pointer :: loop => null()
+
+    n_meshes = self%global_mesh_list%get_length()
+
+    if (n_meshes > 0) then
+
+      allocate(mesh_names(n_meshes))
+      global_mesh => null()
+
+      ! Start at the head of the collection's
+      ! linked-list
+      loop => self%global_mesh_list%get_head()
+
+      do i=1, n_meshes
+        ! If list is empty or we're at the end of list
+        ! and we didn't find a mesh, return a null pointer
+        if ( .not. associated(loop) ) then
+          nullify(global_mesh)
+          exit
+        end if
+
+        ! 'cast' to global_mesh_type
+        select type(m => loop%payload)
+          type is (global_mesh_type)
+            global_mesh => m
+            mesh_names(i) = global_mesh%get_mesh_name()
+        end select
+
+        loop => loop%next
+      end do
+
+      nullify(loop)
+      nullify(global_mesh)
+
+    end if
 
     return
   end function  get_mesh_names
@@ -709,18 +435,51 @@ contains
 
     class(global_mesh_collection_type) :: self
     character(str_def), intent(in) :: mesh_name
-    integer(i_def) :: n_meshes,i
+
     integer(i_def) :: mesh_id
 
-    mesh_id = imdi
+    integer(i_def) :: n_meshes, i
+    type(global_mesh_type), pointer :: global_mesh
+
+    ! Pointer to linked list - used for looping through the list
+    type(linked_list_item_type), pointer :: loop => null()
+
+    mesh_id  = imdi
     n_meshes = self%global_mesh_list%get_length()
 
-    do i=1 , n_meshes
-      if (trim(mesh_name) == trim(self%name_tags(i))) then
-        mesh_id = self%name_ids(i)
-        exit
-      end if
-    end do
+    if (n_meshes > 0) then
+
+      global_mesh => null()
+
+      ! Start at the head of the collection's
+      ! linked-list
+      loop => self%global_mesh_list%get_head()
+
+      do i=1, n_meshes
+        ! If list is empty or we're at the end of list
+        ! and we didn't find a mesh, return a null pointer
+        if ( .not. associated(loop) ) then
+          nullify(global_mesh)
+          exit
+        end if
+
+        ! 'cast' to global_mesh_type
+        select type(m => loop%payload)
+          type is (global_mesh_type)
+            global_mesh => m
+            if (mesh_name == global_mesh%get_mesh_name()) then
+              mesh_id = loop%payload%get_id()
+              exit
+            end if
+        end select
+
+        loop => loop%next
+      end do
+
+      nullify(loop)
+      nullify(global_mesh)
+
+    end if
 
     return
   end function get_mesh_id
@@ -742,12 +501,14 @@ contains
     class(global_mesh_collection_type), intent(in) :: self
     character(str_def),                 intent(in) :: global_mesh_name
 
+    type(global_mesh_type), pointer :: global_mesh => null()
+
     logical :: answer
 
     answer = .false.
-    if (allocated(self%name_tags)) then
-      answer = any(self%name_tags == global_mesh_name)
-    end if
+    global_mesh => self%get_mesh_by_name(global_mesh_name)
+    if ( associated(global_mesh) ) answer = .true.
+    nullify(global_mesh)
 
     return
   end function check_for
@@ -770,85 +531,7 @@ contains
 
     nullify(self%source_global_mesh)
 
-    if (allocated(self%name_tags)) deallocate(self%name_tags)
-    if (allocated(self%name_ids))  deallocate(self%name_ids)
-
     return
   end subroutine clear
-
-  !===========================================================================
-  !> @brief PRIVATE SUBROUTINE: Updates the name_tags and name_ids arrays when
-  !>        a mesh is added to the collection
-  !>
-  !> @param[inout] self    Global mesh collection object to update tags/ids
-  !> @param[in] mesh_name  The mesh tag name to be added, must not already exist
-  !>                       in name_tags array
-  !> @param[in] mesh_id    ID to use to map with the provided mesh name.
-  !>
-  subroutine update_tags( self, mesh_name, mesh_id )
-
-    implicit none
-
-    class(global_mesh_collection_type), intent(inout) :: self
-    character(str_def), intent(in) :: mesh_name
-    integer(i_def), intent(in) :: mesh_id
-
-    character(str_def), allocatable :: new_tag_list(:)
-    integer(i_def),     allocatable :: new_id_list(:)
-    integer(i_def)                  :: i, n_tags
-
-    ! 1. Check that the id provided exists
-    if (.not. self%global_mesh_list%item_exists(mesh_id)) then
-      write(log_scratch_space,'(A,I0,A)')             &
-          'Unable to update tags, global_mesh id: ',  &
-           mesh_id,' not found in collection'
-      call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-    end if
-
-    ! 2. Check to see if the mesh name/mesh_id entry exists already
-    if ( allocated(self%name_tags) ) then
-      do i=1, size(self%name_tags)
-
-        if ( (self%name_tags(i) == mesh_name) .and. &
-             (self%name_ids(i)  == mesh_id) ) then
-          ! Do nothing
-          return
-
-        else if ( (self%name_tags(i) == mesh_name) .and. &
-                  (self%name_ids(i)  /= mesh_id) ) then
-          ! Tag name name used for different mesh, flag error
-          write(log_scratch_space,'(A,I0,A)')      &
-              'Global mesh tag name "'//trim(mesh_name)// &
-              '" already assigned in collection.'
-          call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-
-        end if
-      end do
-
-      ! Tag name not used and id exists, so append new entry
-      n_tags = size(self%name_tags)
-      allocate( new_tag_list(n_tags+1) )
-      allocate( new_id_list(n_tags+1)  )
-
-      new_tag_list(:n_tags)  = self%name_tags(:)
-      new_id_list(:n_tags )  = self%name_ids(:)
-      new_tag_list(n_tags+1) = mesh_name
-      new_id_list(n_tags+1)  = mesh_id
-
-      call move_alloc( new_tag_list, self%name_tags )
-      call move_alloc( new_id_list, self%name_ids )
-
-    else
-
-      ! No tags assigned yet
-      allocate(self%name_tags(1))
-      allocate(self%name_ids(1))
-      self%name_tags(1) = mesh_name
-      self%name_ids(1)  = mesh_id
-
-    end if
-
-    return
-  end subroutine update_tags
 
 end module global_mesh_collection_mod

@@ -40,7 +40,7 @@ contains
     character(*), parameter :: &
                             required_configuration(7) = ['finite_element      ', &
                                                          'base_mesh           ', &
-                                                         'multigrid           ', &
+                                                         'formulation         ', &
                                                          'planet              ', &
                                                          'extrusion           ', &
                                                          'timestepping        ', &

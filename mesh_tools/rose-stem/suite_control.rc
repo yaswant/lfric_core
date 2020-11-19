@@ -15,7 +15,7 @@
                                 'check_style_graph()',
                                 'check_compilers("fast-debug", publish=True)'],
                   'nightly'  : ['check_compilers("full-debug", publish=True)',
-                                'publish_commit']} %}
+                                'publish_commit'] } %}
 
 {%- set mesh_types = ['cubedsphere',
                       'cubedsphere_maps',

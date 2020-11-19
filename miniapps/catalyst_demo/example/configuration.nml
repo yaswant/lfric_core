@@ -128,8 +128,6 @@
   planar_domain_max_y =  1.0
 /
 
-&multigrid
+&formulation
   l_multigrid = .false.
-  multigrid_chain_nitems = 4
-  ugrid      = 'prime', 'mesh_C12.nc', 'mesh_C6.nc', 'mesh_C3.nc'
 /

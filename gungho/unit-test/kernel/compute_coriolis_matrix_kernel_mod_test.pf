@@ -64,17 +64,18 @@ contains
                               rd=300.0_r_def,          &
                               scaling_factor=1.0_r_def )
 
-    call feign_base_mesh_config( filename='foo',                 &
-                                 prime_mesh_name='unit_test',    &
-                                 geometry=geometry_planar,       &
-                                 partitioner=partitioner_planar, &
-                                 fplane=.true.,                  &
+    call feign_base_mesh_config( filename='foo',                    &
+                                 prime_mesh_name='unit_test',       &
+                                 geometry=geometry_planar,          &
+                                 partitioner=partitioner_planar,    &
+                                 fplane=.true.,                     &
                                  f_lat_deg=PI/4.0_r_def )
 
     call feign_formulation_config( dlayer_on=.false.,            &
                                    dry_static_adjust=.false.,    &
                                    exner_from_eos=.false.,       &
                                    init_exner_bt=.false.,        &
+                                   l_multigrid=.false.,          &
                                    rotating=.true.,              &
                                    set_hydrostatic_init=.false., &
                                    shallow=.false.,              &

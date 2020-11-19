@@ -81,6 +81,7 @@ contains
                smp_init_wind = .false. )
 
     call feign_formulation_config(transport_only=.false., rotating=.true., &
+                                  l_multigrid=.false.,                     &
                                   use_moisture=.false.,                    &
                                   shallow=.false., use_physics=.false.,    &
                                   use_wavedynamics=.true.,                 &

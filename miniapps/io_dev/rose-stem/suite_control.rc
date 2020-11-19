@@ -73,6 +73,7 @@
     'check_compilers("io_dev", "default", "full-debug",
                      resolution=("C12", 3.0))' ],
 'nightly': [
-    'null_task_graph()' ] } %}
+    'null_task_graph()' ]
+ } %}
 
 ##############################################################################

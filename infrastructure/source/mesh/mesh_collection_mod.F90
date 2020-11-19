@@ -14,12 +14,10 @@ module mesh_collection_mod
 
   use constants_mod,      only: r_def, i_def, l_def, str_def, imdi
   use mesh_mod,           only: mesh_type
-  use log_mod,            only: log_event, log_scratch_space,     &
-                                LOG_LEVEL_ERROR, LOG_LEVEL_TRACE
+  use log_mod,            only: log_event, log_scratch_space, &
+                                LOG_LEVEL_WARNING, LOG_LEVEL_TRACE
   use linked_list_mod,    only: linked_list_type, &
                                 linked_list_item_type
-
-  use development_config_mod, only: implement_consolidated_multigrid
 
   implicit none
 
@@ -30,9 +28,6 @@ module mesh_collection_mod
     private
 
     type(linked_list_type) :: mesh_list
-
-    character(str_def), allocatable :: name_tags(:)
-    integer(i_def),     allocatable :: name_ids(:)
 
   contains
     private
@@ -90,35 +85,27 @@ function add_new_mesh( self, mesh ) result( mesh_id )
   type(mesh_type),              intent(in)    :: mesh
 
   integer(i_def) :: mesh_id
-  integer(i_def) :: i
 
-  character(str_def) :: name
+  character(str_def) :: mesh_name
 
   mesh_id  = imdi
 
-  name = mesh%get_mesh_name()
+  mesh_name = mesh%get_mesh_name()
 
-  if (implement_consolidated_multigrid) then
-
-    ! Check list of tag names to see if mesh is already in collection
-    if (self%check_for(name)) then
-      do i=1, size(self%name_tags)
-        if ( trim(self%name_tags(i)) == trim(name) ) then
-          write(log_scratch_space,'(A)')                               &
-              'Mesh '//trim(name)//' already present in collection. '//&
-              'Mesh names within a collection should be unique.'
-          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-        end if
-      end do
-    end if
+  ! Check list of tag names to see if mesh is already in collection
+  if (self%check_for(mesh_name)) then
+    write(log_scratch_space,'(A)')  &
+        'Mesh '//trim(mesh_name)//  &
+        ' already present in collection.'
+    call log_event(log_scratch_space, LOG_LEVEL_WARNING)
+    return
   end if
 
   mesh_id = mesh%get_id()
 
   call self%mesh_list%insert_item( mesh )
 
-  if ( implement_consolidated_multigrid ) call update_tags(self, name, mesh_id)
-
+  return
 end function add_new_mesh
 
 
@@ -143,9 +130,6 @@ function add_unit_test_mesh( self, mesh_cfg ) result( mesh_id )
 
   call self%mesh_list%insert_item( mesh )
 
-  if ( implement_consolidated_multigrid ) &
-      call update_tags( self, name, mesh_id )
-
   return
 end function add_unit_test_mesh
 
@@ -169,24 +153,35 @@ function get_mesh_by_name( self, mesh_name ) result( mesh )
 
   type(mesh_type), pointer :: mesh
 
-  integer(i_def) :: n_meshes, i
-  integer(i_def) :: mesh_id
+  ! Pointer to linked list - used for looping through the list
+  type(linked_list_item_type),pointer :: loop => null()
 
-  n_meshes = self%mesh_list%get_length()
+  ! start at the head of the mesh collection linked list
+  loop => self%mesh_list%get_head()
 
   mesh => null()
-  do i=1, n_meshes
-    if (trim(mesh_name) == trim(self%name_tags(i))) then
-      mesh_id = self%name_ids(i)
-      mesh => mesh_collection%get_mesh( self%name_ids(i) )
-      if ( .not. associated(mesh) ) then
-        write(log_scratch_space,'(A)') &
-            trim(mesh_name)//' not found in mesh collection.'
-        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
-      end if
+
+  do
+    ! If list is empty or we're at the end of list and
+    ! we didn't find the correct mesh, return a null
+    ! pointer.
+    if ( .not. associated(loop) ) then
+      nullify(mesh)
       exit
     end if
+
+    ! 'cast' to mesh_type
+    select type(m => loop%payload)
+      type is (mesh_type)
+        mesh => m
+        if ( mesh_name == mesh%get_mesh_name() ) exit
+    end select
+
+    loop => loop%next
+
   end do
+
+  nullify(loop)
 
   return
 
@@ -217,6 +212,8 @@ function get_mesh_by_id( self, mesh_id ) result( mesh )
 
   ! start at the head of the mesh collection linked list
   loop => self%mesh_list%get_head()
+
+  mesh => null()
 
   do
     ! If list is empty or we're at the end of list and we didn't find the
@@ -259,12 +256,14 @@ function check_for(self, mesh_name) result(answer)
   class(mesh_collection_type), intent(in) :: self
   character(str_def),          intent(in) :: mesh_name
 
+  type(mesh_type), pointer :: mesh => null()
+
   logical :: answer
 
   answer = .false.
-  if (allocated(self%name_tags)) then
-    answer = any(self%name_tags == mesh_name)
-  end if
+  mesh => self%get_mesh_by_name(mesh_name)
+  if ( associated(mesh) ) answer = .true.
+  nullify(mesh)
 
   return
 end function check_for
@@ -285,11 +284,8 @@ function n_meshes(self) result(number_of_meshes)
   class(mesh_collection_type), intent(in) :: self
 
   integer(i_def) :: number_of_meshes
-  if (allocated(self%name_tags)) then
-    number_of_meshes = size(self%name_tags)
-  else
-    number_of_meshes = 0
-  end if
+
+  number_of_meshes = self%mesh_list%get_length()
 
   return
 end function n_meshes
@@ -309,13 +305,45 @@ function get_mesh_names(self) result(mesh_names)
 
   character(str_def), allocatable :: mesh_names(:)
 
-  integer(i_def) :: n_meshes
+  integer(i_def) :: n_meshes, i
+
+  type(mesh_type), pointer :: mesh
+
+  ! Pointer to linked list - used for looping through the list
+  type(linked_list_item_type),pointer :: loop => null()
 
   n_meshes = self%mesh_list%get_length()
 
   if (n_meshes > 0) then
-    if (allocated(mesh_names)) deallocate(mesh_names)
-    allocate(mesh_names, source=self%name_tags)
+
+    allocate(mesh_names(n_meshes))
+    mesh => null()
+
+    ! Start at the head of the collection's
+    ! linked-list
+    loop => self%mesh_list%get_head()
+
+    do i=1, n_meshes
+      ! If list is empty or we're at the end of list
+      ! and we didn't find a mesh, return a null pointer
+      if ( .not. associated(loop) ) then
+        nullify(mesh)
+        exit
+      end if
+
+      ! 'cast' to mesh_type
+      select type(m => loop%payload)
+        type is (mesh_type)
+          mesh => m
+          mesh_names(i) = mesh%get_mesh_name()
+      end select
+
+      loop => loop%next
+    end do
+
+    nullify(loop)
+    nullify(mesh)
+
   end if
 
   return
@@ -334,20 +362,53 @@ function get_mesh_id( self, mesh_name ) result( mesh_id )
 
   implicit none
 
-  class(mesh_collection_type) :: self
-  character(str_def), intent(in) :: mesh_name
-  integer(i_def) :: n_meshes, i
+  class(mesh_collection_type), intent(in) :: self
+  character(str_def),          intent(in) :: mesh_name
+
   integer(i_def) :: mesh_id
+  integer(i_def) :: n_meshes
+  integer(i_def) :: i
+  type(mesh_type), pointer :: mesh
 
-  mesh_id = imdi
-  n_meshes = size(self%name_tags)
+  ! Pointer to linked list - used for looping through the list
+  type(linked_list_item_type), pointer :: loop => null()
 
-  do i=1 , n_meshes
-    if (trim(mesh_name) == trim(self%name_tags(i))) then
-      mesh_id = self%name_ids(i)
-      exit
-    end if
-  end do
+  mesh_id  = imdi
+  n_meshes = self%mesh_list%get_length()
+
+  if (n_meshes > 0) then
+
+    mesh => null()
+
+    ! Start at the head of the collection's
+    ! linked-list
+    loop => self%mesh_list%get_head()
+
+    do i=1, n_meshes
+      ! If list is empty or we're at the end of list
+      ! and we didn't find a mesh, return a null pointer
+      if ( .not. associated(loop) ) then
+        nullify(mesh)
+        exit
+      end if
+
+      ! 'cast' to global_mesh_type
+      select type(m => loop%payload)
+        type is (mesh_type)
+          mesh => m
+          if (mesh_name == mesh%get_mesh_name()) then
+            mesh_id = loop%payload%get_id()
+            exit
+          end if
+      end select
+
+      loop => loop%next
+    end do
+
+    nullify(loop)
+    nullify(mesh)
+
+  end if
 
   return
 end function get_mesh_id
@@ -362,9 +423,6 @@ subroutine clear(self)
   class(mesh_collection_type), intent(inout) :: self
 
   call self%mesh_list%clear()
-
-  if (allocated(self%name_tags)) deallocate(self%name_tags)
-  if (allocated(self%name_ids))  deallocate(self%name_ids)
 
 end subroutine clear
 
@@ -381,84 +439,5 @@ subroutine mesh_collection_destructor(self)
 
 end subroutine mesh_collection_destructor
 
-
-!===========================================================================
-!> @brief PRIVATE SUBROUTINE: Updates the name_tags and name_ids
-!>                            arrays when a mesh is added to the
-!>                            collection.
-!>
-!> @param[inout] self       Mesh collection object to update.
-!> @param[in]    mesh_name  The mesh tag name to be added. It must
-!>                          not already exist in name_tags array.
-!> @param[in]    mesh_id    ID to map to the provided mesh name.
-!>
-subroutine update_tags( self, mesh_name, mesh_id )
-
-  implicit none
-
-  class(mesh_collection_type), intent(inout) :: self
-  character(str_def),          intent(in)    :: mesh_name
-  integer(i_def),              intent(in)    :: mesh_id
-
-  character(str_def), allocatable :: new_tag_list(:)
-  integer(i_def),     allocatable :: new_id_list(:)
-  integer(i_def)                  :: i, n_tags
-
-  ! 1. Check that the id provided exists
-  if (.not. self%mesh_list%item_exists(mesh_id)) then
-    write(log_scratch_space,'(A,I0,A)')      &
-        'Unable to update tags, mesh id: ',  &
-         mesh_id,' not found in collection'
-    call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-  end if
-
-  ! 2. Check to see if the mesh name/mesh_id entry exists already
-  if ( allocated(self%name_tags) ) then
-    do i=1, size(self%name_tags)
-
-      if ( (self%name_tags(i) == mesh_name) .and. &
-           (self%name_ids(i)  == mesh_id) ) then
-        ! Do nothing
-        return
-
-      else if ( (self%name_tags(i) == mesh_name) .and. &
-                (self%name_ids(i)  /= mesh_id) ) then
-        ! Tag name name used for different mesh, flag error
-        write(log_scratch_space,'(A,I0,A)')      &
-            'Mesh tag name "'//trim(mesh_name)// &
-            '" already assigned in collection.'
-        call log_event( log_scratch_space, LOG_LEVEL_ERROR )
-
-      end if
-    end do
-
-    ! Tag name not used and id exists, so append new entry
-    n_tags = size(self%name_tags)
-    allocate( new_tag_list(n_tags+1) )
-    allocate( new_id_list(n_tags+1)  )
-
-    new_tag_list(:n_tags)  = self%name_tags(:)
-    new_id_list(:n_tags )  = self%name_ids(:)
-    new_tag_list(n_tags+1) = mesh_name
-    new_id_list(n_tags+1)  = mesh_id
-
-    call move_alloc( new_tag_list, self%name_tags )
-    call move_alloc( new_id_list, self%name_ids )
-
-    if (allocated(new_tag_list)) deallocate( new_tag_list )
-    if (allocated(new_id_list))  deallocate( new_id_list )
-
-  else
-
-    ! No tags assigned yet
-    allocate(self%name_tags(1))
-    allocate(self%name_ids(1))
-    self%name_tags(1) = mesh_name
-    self%name_ids(1)  = mesh_id
-
-  end if
-
-  return
-end subroutine update_tags
 
 end module mesh_collection_mod

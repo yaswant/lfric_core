@@ -8,6 +8,7 @@
 !>
 module transport_driver_mod
 
+  use base_mesh_config_mod,           only: prime_mesh_name
   use checksum_alg_mod,               only: checksum_alg
   use clock_mod,                      only: clock_type
   use configuration_mod,              only: final_configuration
@@ -19,6 +20,7 @@ module transport_driver_mod
   use field_mod,                      only: field_type
   use global_mesh_collection_mod,     only: global_mesh_collection, &
                                             global_mesh_collection_type
+  use mesh_collection_mod,            only: mesh_collection
   use init_clock_mod,                 only: initialise_clock
   use init_transport_mod,             only: init_transport
   use transport_mod,                  only: transport_load_configuration, &
@@ -38,6 +40,7 @@ module transport_driver_mod
                                             LOG_LEVEL_INFO,                   &
                                             LOG_LEVEL_DEBUG,                  &
                                             LOG_LEVEL_TRACE
+  use mesh_collection_mod,            only: mesh_collection
   use io_config_mod,                  only: diagnostic_frequency,             &
                                             nodal_output_on_w3,               &
                                             write_diag,                       &
@@ -143,7 +146,10 @@ contains
     integer(i_def)    :: total_ranks, local_rank
     integer(i_native) :: log_level
 
-    !Store the MPI communicator for later use
+    integer(i_def), allocatable :: multigrid_mesh_ids(:)
+    integer(i_def), allocatable :: multigrid_2d_mesh_ids(:)
+
+    ! Store the MPI communicator for later use
     call store_comm( model_communicator )
 
     call transport_load_configuration( filename )
@@ -201,16 +207,28 @@ contains
               source = global_mesh_collection_type() )
 
     ! Create the mesh
-    call init_mesh( local_rank, total_ranks, mesh_id, twod_mesh_id, shifted_mesh_id )
+    call init_mesh( local_rank, total_ranks, mesh_id,      &
+                    twod_mesh_id=twod_mesh_id,             &
+                    shifted_mesh_id=shifted_mesh_id,       &
+                    multigrid_mesh_ids=multigrid_mesh_ids, &
+                    multigrid_2d_mesh_ids=multigrid_2d_mesh_ids )
 
-    ! FEM  initialisation
-    call init_fem( mesh_id, chi, shifted_mesh_id, shifted_chi )
+    ! FEM initialisation
+    call init_fem( mesh_id, chi,                           &
+                    shifted_mesh_id=shifted_mesh_id,       &
+                    shifted_chi=shifted_chi,               &
+                    multigrid_mesh_ids=multigrid_mesh_ids, &
+                    multigrid_2d_mesh_ids=multigrid_2d_mesh_ids )
 
     ! Transport initialisation
     call init_transport( mesh_id, twod_mesh_id, chi, shifted_mesh_id,                &
                          shifted_chi, wind_n, density, theta, dep_pts_x, dep_pts_y,  &
                          dep_pts_z, increment, wind_divergence,                      &
                          wind_shifted, density_shifted )
+
+    ! Full global meshes no longer required, so reclaim
+    ! the memory from global_mesh_collection
+    if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
     ! Initialise dependencies
     ! scheme_method_of_lines                  -> runge_kutta_init

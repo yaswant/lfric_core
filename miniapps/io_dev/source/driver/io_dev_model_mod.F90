@@ -8,6 +8,7 @@
 module io_dev_model_mod
 
   ! Infrastructure
+  use base_mesh_config_mod,       only : prime_mesh_name
   use clock_mod,                  only : clock_type
   use constants_mod,              only : i_def, i_native, &
                                          PRECISION_REAL
@@ -29,6 +30,7 @@ module io_dev_model_mod
                                          LOG_LEVEL_INFO,     &
                                          LOG_LEVEL_DEBUG,    &
                                          LOG_LEVEL_TRACE
+
   use mpi_mod,                    only : store_comm,    &
                                          get_comm_size, &
                                          get_comm_rank
@@ -143,10 +145,20 @@ module io_dev_model_mod
     ! Create the mesh
     allocate( global_mesh_collection, &
               source = global_mesh_collection_type() )
-    call init_mesh( local_rank, total_ranks, mesh_id, twod_mesh_id )
+
+    call init_mesh( local_rank, total_ranks, mesh_id, &
+                    twod_mesh_id=twod_mesh_id )
 
     ! Create FEM specifics (function spaces and chi field)
     call init_fem( mesh_id, chi )
+
+
+    ! Full global meshes no longer required, so reclaim
+    ! the memory from global_mesh_collection
+    write(log_scratch_space,'(A)') &
+        "Purging global mesh collection."
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
     ! Set up XIOS domain and context
     call init_io_dev_files( files_list, clock )

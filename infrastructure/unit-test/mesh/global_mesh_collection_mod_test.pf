@@ -17,8 +17,6 @@ module global_mesh_collection_mod_test
                                             global_mesh_collection
   use ugrid_mesh_data_mod,            only: ugrid_mesh_data_type
 
-  use yaxt,    only: xt_initialize, xt_finalize
-  use mpi_mod, only: store_comm, clear_comm
   use pFUnit_Mod
 
   implicit none
@@ -29,12 +27,10 @@ module global_mesh_collection_mod_test
             test_cubesphere,                         &
             test_biperiodic,                         &
             test_initial_global_mesh_map_collection, &
-            test_multigrid,                          &
-            test_single_file_multigrid
-
+            test_multigrid
 
   @TestCase
-  type, extends(MPITestCase), public :: global_mesh_collection_test_type
+  type, extends(TestCase), public :: global_mesh_collection_test_type
     private
     type(global_mesh_type) :: CubedSphere
     type(global_mesh_type) :: BiPeriodic
@@ -47,7 +43,6 @@ module global_mesh_collection_mod_test
     procedure :: test_biperiodic
     procedure :: test_initial_global_mesh_map_collection
     procedure :: test_multigrid
-    procedure :: test_single_file_multigrid
 
   end type global_mesh_collection_test_type
 
@@ -57,12 +52,6 @@ module global_mesh_collection_mod_test
   character(str_max_filename), parameter :: &
       BiPeriodicFile  = 'data/mesh_BiP8x8-6000x2000.nc'
 
-  character(str_max_filename), parameter :: &
-      MultiGridFiles(4) =                   &
-                  [ 'data/mesh_C4.nc ',     &! 4x4   panel
-                    'data/mesh_C8.nc ',     &! 8x8   panel
-                    'data/mesh_C16.nc',     &! 16x16 panel
-                    'data/mesh_C32.nc' ]     ! 32x32 panel
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -71,11 +60,6 @@ contains
     implicit none
 
     class(global_mesh_collection_test_type), intent(inout) :: this
-
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
-    !Store the MPI communicator for later use
-    call store_comm(this%getMpiCommunicator())
 
     ! Create top level collections
     global_mesh_collection = global_mesh_collection_type()
@@ -95,15 +79,10 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
-    ! Clear the stored MPI communicator
-    call clear_comm()
-
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @test( npes=[1] )
+  @test
   subroutine test_cubesphere ( this )
 
     implicit none
@@ -116,7 +95,6 @@ contains
     character(str_max_filename)     :: filename
 
     integer (i_def) :: global_mesh_id
-    integer (i_def) :: global_mesh_duplicate_id
     integer (i_def) :: npanels
 
     npanels  = 6
@@ -139,7 +117,7 @@ contains
   end subroutine test_cubesphere
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @test( npes=[1] )
+  @test
   subroutine test_biperiodic ( this )
 
     implicit none
@@ -152,7 +130,6 @@ contains
     character(str_max_filename)     :: filename
 
     integer (i_def) :: global_mesh_id
-    integer (i_def) :: global_mesh_duplicate_id
     integer (i_def) :: npanels
 
     npanels  = 1
@@ -175,7 +152,7 @@ contains
   end subroutine test_biperiodic
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @test( npes=[1] )
+  @test
   subroutine test_initial_global_mesh_map_collection ( this )
 
     implicit none
@@ -185,11 +162,6 @@ contains
     type(global_mesh_type), pointer :: global_mesh => null()
 
     integer (i_def) :: global_mesh_id
-    integer (i_def) :: global_mesh_duplicate_id
-    integer (i_def) :: npanels
-
-    ! Create a mesh collection
-!    global_mesh_collection = global_mesh_collection_type()
 
     ! Add the Unit Test Global Mesh
     global_mesh_id =  global_mesh_collection % add_unit_test_global_mesh()
@@ -204,215 +176,23 @@ contains
   end subroutine test_initial_global_mesh_map_collection
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @test( npes=[1] )
+  @test
   subroutine test_multigrid ( this )
 
-    implicit none
-
-    class(global_mesh_collection_test_type), intent(inout) :: this
-
-    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
-    type(global_mesh_type), pointer :: global_mesh_ptr => null()
-    type(global_mesh_type), pointer :: MultiGrid1_ptr  => null()
-    type(global_mesh_type), pointer :: MultiGrid2_ptr  => null()
-    type(global_mesh_type), pointer :: MultiGrid3_ptr  => null()
-    type(global_mesh_type), pointer :: MultiGrid4_ptr  => null()
-    type(global_mesh_type)          :: MultiGrid
-
-    type(global_mesh_type), pointer :: tmp_global_mesh  => null()
-
-    type(global_mesh_map_type), pointer :: &
-                                       global_mesh_map => null()
-
-    integer (i_def) :: MultiGrid_id(4)
-
-    integer (i_def) :: tmp_int, i
-    integer (i_def) :: npanels
-
-    integer(i_def), allocatable :: test_global_id_map(:,:)
-
-    ! Create a mesh collection
-    global_mesh_collection = global_mesh_collection_type()
-
-    npanels = 6
-
-    do i=1, 4
-      call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(i)), mesh_name)
-      MultiGrid = global_mesh_type( ugrid_mesh_data, npanels )
-      call ugrid_mesh_data%clear()
-      MultiGrid_id(i) = MultiGrid%get_id()
-      call global_mesh_collection%add_new_global_mesh( MultiGrid )
-    end do
-
-    MultiGrid1_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(1) )
-    MultiGrid2_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(2) )
-    MultiGrid3_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(3) )
-    MultiGrid4_ptr => global_mesh_collection%get_global_mesh( MultiGrid_id(4) )
-
-    ! Test ids are different
-    @assertTrue ( MultiGrid_id(1) /= MultiGrid_id(2) )
-    @assertTrue ( MultiGrid_id(2) /= MultiGrid_id(3) )
-    @assertTrue ( MultiGrid_id(3) /= MultiGrid_id(4) )
-
-    !===========================================================================
-    ! Test the number of maps assigned to each global mesh
-    ! Multigrid1  mesh should have 1 maps
-    ! Multigrid2  mesh should have 2 maps
-    ! Multigrid3  mesh should have 2 maps
-    ! Multigrid4  mesh should have 1 maps
-    !===========================================================================
-    ! MultiGrid 1
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
-    @assertAssociated( global_mesh_map )
-
-
-    ! MultiGrid 2
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(1))
-    @assertAssociated( global_mesh_map )
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
-    @assertAssociated( global_mesh_map )
-
-    ! MultiGrid 3
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(3))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
-    @assertAssociated( global_mesh_map )
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(4))
-    @assertAssociated( global_mesh_map )
-
-    ! MultiGrid 4
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(4))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
-    @assertAssociated( global_mesh_map )
-
-
-    ! Check the maps
-    !==============================================================================
-    ! 96 cell --> 384 cell
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(1))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(2))
-
-    tmp_int = global_mesh_map % get_source_id()
-    @assertEqual( tmp_int, MultiGrid_id(1) )
-
-    tmp_int = global_mesh_map % get_target_id()
-    @assertEqual( tmp_int, MultiGrid_id(2) )
-
-    tmp_int = global_mesh_map % get_nsource_cells()
-    @assertEqual( 96, tmp_int )
-
-    tmp_int = global_mesh_map % get_ntarget_cells_per_source_cell()
-    @assertEqual( 4, tmp_int )
-
-
-    ! Check gid map
-    allocate(test_global_id_map(4,1))
-
-    call global_mesh_map % get_cell_map([1], test_global_id_map )  ! On panel 1
-    @assertEqual( [1,2,9,10], test_global_id_map(:,1) )
-
-    call global_mesh_map % get_cell_map([16], test_global_id_map ) ! On panel 1
-    @assertEqual( [55,56,63,64], test_global_id_map(:,1)  )
-
-    call global_mesh_map % get_cell_map([40], test_global_id_map ) ! On panel 3
-    @assertEqual( [151,152,159,160], test_global_id_map(:,1)  )
-
-    call global_mesh_map % get_cell_map([70], test_global_id_map ) ! On panel 5
-    @assertEqual( [275,276,283,284], test_global_id_map(:,1)  )
-
-    deallocate(test_global_id_map)
-
-    ! 384 cell --> 96 cell
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(1))
-
-    tmp_int = global_mesh_map%get_source_id()
-    @assertEqual( tmp_int, MultiGrid_id(2) )
-
-    tmp_int = global_mesh_map%get_target_id()
-    @assertEqual( tmp_int, MultiGrid_id(1) )
-
-    tmp_int = global_mesh_map%get_nsource_cells()
-    @assertEqual( 384, tmp_int )
-
-    tmp_int = global_mesh_map%get_ntarget_cells_per_source_cell()
-    @assertEqual( 1, tmp_int )
-
-
-    ! Check gid map
-    allocate(test_global_id_map(1,1))
-
-    call global_mesh_map%get_cell_map([1], test_global_id_map )   ! On panel 1
-    @assertEqual( [1], test_global_id_map(:,1) )
-
-    call global_mesh_map%get_cell_map([55], test_global_id_map )  ! On panel 1
-    @assertEqual( [16], test_global_id_map(:,1)  )
-
-    call global_mesh_map%get_cell_map([160], test_global_id_map ) ! On panel 3
-    @assertEqual( [40], test_global_id_map(:,1)  )
-
-    call global_mesh_map%get_cell_map([283], test_global_id_map ) ! On panel 5
-    @assertEqual( [70], test_global_id_map(:,1)  )
-
-    deallocate(test_global_id_map)
-
-
-    ! 384 cell --> 1536 cell
-    global_mesh_ptr => global_mesh_collection % get_global_mesh(MultiGrid_id(2))
-    global_mesh_map => global_mesh_ptr % get_global_mesh_map(MultiGrid_id(3))
-
-    tmp_int = global_mesh_map%get_source_id()
-    @assertEqual( tmp_int, MultiGrid_id(2) )
-
-    tmp_int = global_mesh_map%get_target_id()
-    @assertEqual( tmp_int, MultiGrid_id(3) )
-
-    tmp_int = global_mesh_map%get_nsource_cells()
-    @assertEqual( 384, tmp_int )
-
-    tmp_int = global_mesh_map%get_ntarget_cells_per_source_cell()
-    @assertEqual( 4,  tmp_int )
-
-    ! Check gid map
-    allocate(test_global_id_map(4,1))
-
-    call global_mesh_map%get_cell_map([1], test_global_id_map )    ! On panel 1
-    @assertEqual( [1,2,17,18], test_global_id_map(:,1) )
-
-    call global_mesh_map%get_cell_map([120], test_global_id_map )  ! On panel 2
-    @assertEqual( [463,464,479,480], test_global_id_map(:,1)  )
-
-    call global_mesh_map%get_cell_map([170], test_global_id_map )  ! On panel 3
-    @assertEqual( [675,676,691,692], test_global_id_map(:,1)  )
-
-    call global_mesh_map%get_cell_map([287], test_global_id_map )  ! On panel 5
-    @assertEqual( [1133,1134,1149,1150], test_global_id_map(:,1)  )
-
-    deallocate(test_global_id_map)
-
-  end subroutine test_multigrid
-
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @test( npes=[1] )
-  subroutine test_single_file_multigrid ( this )
-
-    use feign_config_mod,  only: feign_development_config
     use configuration_mod, only: final_configuration
     use ncdf_quad_mod,     only: ncdf_quad_type
 
-    use development_config_mod,  only: implement_consolidated_multigrid, &
-                                       single_mesh_input
-
     implicit none
 
     class(global_mesh_collection_test_type), intent(inout) :: this
 
-    type(ugrid_mesh_data_type)      :: ugrid_mesh_data
-    type(global_mesh_type), pointer :: global_mesh_ptr    => null()
-    type(global_mesh_type), pointer :: target_mesh_ptr    => null()
-    type(global_mesh_type)          :: global_mesh
+    character(str_max_filename), parameter :: filename = 'data/mesh_C32_MG.nc'
+
+    type(ugrid_mesh_data_type) :: ugrid_mesh_data
+    type(global_mesh_type)     :: global_mesh
+
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type), pointer :: target_mesh_ptr => null()
     type(global_mesh_type), pointer :: test_global_mesh_A_ptr => null()
     type(global_mesh_type), pointer :: test_global_mesh_B_ptr => null()
 
@@ -433,8 +213,6 @@ contains
 
     type(global_mesh_map_type), pointer :: global_mesh_map => null()
 
-    logical(l_def) :: test_log = .true.
-
     integer(i_def), allocatable :: mesh_map(:,:)
     integer(i_def), allocatable :: test_global_id_map(:,:)
     integer(i_def) :: multigrid_ids(4)
@@ -445,42 +223,38 @@ contains
     integer (i_def) :: i, j
     integer (i_def) :: test_integer
     integer (i_def) :: kgo_integer
-
-    integer (i_def) :: n_meshes
     integer (i_def) :: npanels = 6
 
     type(ncdf_quad_type) :: file_handler
 
-    ! This unit-test is for new features which should not be accessed until
-    ! implementation. Set namelist testing to true so the new code can be
-    ! tested
-    call feign_development_config(                              &
-             implement_consolidated_multigrid = test_log,       &
-             single_mesh_input='data/mesh_C32_MG.nc',           &
-             spawn_2d_mesh=.false., spawn_shifted_mesh=.false., &
-             spawn_double_level_mesh=.false. )
-
     ! First read all the requested global meshes into memory.
-    ! This is done because the Intergrid map ids are based
+    ! This is done because the intergrid map ids are based
     ! on the global mesh ids. So all the required global mesh
     ! topologies must be read in first.
     do i=1, size(multigrid_mesh_names)
 
-      call ugrid_mesh_data%read_from_file( trim(single_mesh_input), &
-                                      multigrid_mesh_names(i) )
+      call ugrid_mesh_data%read_from_file( trim(filename), &
+                                           multigrid_mesh_names(i) )
       global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
       call ugrid_mesh_data%clear()
-      multiGrid_ids(i) = global_mesh%get_id()
+      multigrid_ids(i) = global_mesh%get_id()
       call global_mesh_collection%add_new_global_mesh( global_mesh )
     end do
 
     do i=1, size(another_chain)
-      call ugrid_mesh_data%read_from_file( trim(single_mesh_input), &
-                                      another_chain(i) )
+      call ugrid_mesh_data%read_from_file( trim(filename), &
+                                           another_chain(i) )
       global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
       call ugrid_mesh_data%clear()
-      another_chain_ids(i) = global_mesh%get_id()
       call global_mesh_collection%add_new_global_mesh( global_mesh )
+    end do
+
+    ! Now get the ids of the `chains` from the collection
+    do i=1, size(multigrid_mesh_names)
+      multiGrid_ids(i) = global_mesh_collection%get_mesh_id(multigrid_mesh_names(i))
+    end do
+    do i=1, size(another_chain)
+      another_chain_ids(i) = global_mesh_collection%get_mesh_id(another_chain(i))
     end do
 
     ! Check that collection returns correct number of meshes read in.
@@ -531,7 +305,7 @@ contains
 
     ! Read in the maps for each global mesh
     !=================================================================
-    call file_handler%file_open(trim(single_mesh_input))
+    call file_handler%file_open(trim(filename))
     do i=1, size(multigrid_mesh_names)
       global_mesh_ptr => global_mesh_collection%get_global_mesh( multigrid_mesh_names(i) )
       call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
@@ -611,7 +385,6 @@ contains
     @assertAssociated( global_mesh_map )
     @assertEqual( global_mesh_ptr%get_id(), global_mesh_map%get_source_id() )
     @assertEqual( target_mesh_ptr%get_id(), global_mesh_map%get_target_id() )
-
 
     ! MultiGrid C16:C32
     mesh_name   = 'C32'
@@ -787,6 +560,7 @@ contains
 
     deallocate(test_global_id_map)
 
-  end subroutine test_single_file_multigrid
+    return
+  end subroutine test_multigrid
 
 end module global_mesh_collection_mod_test

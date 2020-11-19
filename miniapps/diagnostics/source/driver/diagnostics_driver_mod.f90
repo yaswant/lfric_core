@@ -32,6 +32,7 @@ module diagnostics_driver_mod
             LOG_LEVEL_INFO, &
             LOG_LEVEL_DEBUG, &
             LOG_LEVEL_TRACE
+
     use mpi_mod, only : store_comm,    &
                         get_comm_size, &
                         get_comm_rank
@@ -50,7 +51,8 @@ module diagnostics_driver_mod
     ! Coordinate field
     type(field_type), target, dimension(3) :: chi
 
-    integer(i_def) :: mesh_id, twod_mesh_id
+    integer(i_def) :: mesh_id
+    integer(i_def) :: twod_mesh_id
 
     class(clock_type), allocatable :: clock
 
@@ -70,7 +72,8 @@ contains
         use create_fem_mod, only : init_fem
         use create_mesh_mod, only : init_mesh
         use derived_config_mod, only : set_derived_config
-        use global_mesh_collection_mod, only : global_mesh_collection, global_mesh_collection_type
+        use global_mesh_collection_mod, only : global_mesh_collection, &
+                                               global_mesh_collection_type
         use init_diagnostics_mod, only : init_diagnostics
         use io_mod, only : initialise_xios
         use logging_config_mod, only : run_log_level, &
@@ -80,6 +83,7 @@ contains
                 RUN_LOG_LEVEL_DEBUG, &
                 RUN_LOG_LEVEL_TRACE, &
                 RUN_LOG_LEVEL_WARNING
+
         use mod_wait, only : init_wait
         use seed_diagnostics_mod, only : seed_diagnostics
 
@@ -90,11 +94,11 @@ contains
 
         character(len = *), parameter :: xios_ctx = "diagnostics"
 
-        integer(i_def) :: total_ranks, local_rank
+        integer(i_def)     :: total_ranks, local_rank
 
         integer(i_native) :: log_level
 
-        !Store the MPI communicator for later use
+        ! Store the MPI communicator for later use
         call store_comm( model_communicator )
 
         ! Initialise YAXT
@@ -141,11 +145,18 @@ contains
                 source = global_mesh_collection_type())
 
         ! Create the mesh
-        call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id)
+        call init_mesh( local_rank, total_ranks, mesh_id, &
+                        twod_mesh_id=twod_mesh_id )
 
+        ! FEM initialisation
+        call init_fem( mesh_id, chi )
 
-        ! Create FEM specifics (function spaces and chi field)
-        call init_fem(mesh_id, chi)
+        ! Full global meshes no longer required, so reclaim
+        ! the memory from global_mesh_collection
+        write(log_scratch_space, '(A)') &
+                "Purging global mesh collection."
+        call log_event(log_scratch_space, LOG_LEVEL_INFO)
+        if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
         !-------------------------------------------------------------------------
         ! IO init
@@ -185,13 +196,6 @@ contains
         call seed_diagnostics(model_data)
 
         call log_event("finish init", LOG_LEVEL_INFO)
-
-        ! Full global meshes no longer required, so reclaim
-        ! the memory from global_mesh_collection
-        write(log_scratch_space, '(A)') &
-                "Purging global mesh collection."
-        call log_event(log_scratch_space, LOG_LEVEL_INFO)
-        deallocate(global_mesh_collection)
 
     end subroutine initialise
 

@@ -51,7 +51,8 @@ module cell_locator_driver_mod
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
 
-  integer(i_def) :: mesh_id, twod_mesh_id
+  integer(i_def) :: mesh_id
+  integer(i_def) :: twod_mesh_id
 
   type(cell_locator_api_type) :: cell_locator_obj
 
@@ -98,16 +99,18 @@ contains
               source = global_mesh_collection_type() )
 
     ! Create the mesh
-    call init_mesh( local_rank, total_ranks,  mesh_id, twod_mesh_id )
-
-    ! Full global meshes no longer required, so reclaim
-    ! the memory from global_mesh_collection
-    write( log_scratch_space,'(A)' ) "Purging global mesh collection."
-    call log_event( log_scratch_space, LOG_LEVEL_INFO )
-    deallocate( global_mesh_collection )
+    call init_mesh( local_rank, total_ranks, mesh_id, &
+                    twod_mesh_id=twod_mesh_id )
 
     ! Create FEM specifics (function spaces and chi field)
     call init_fem( mesh_id, chi )
+
+    ! Full global meshes no longer required, so reclaim
+    ! the memory from global_mesh_collection
+    write(log_scratch_space,'(A)') &
+        "Purging global mesh collection."
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
     ! Sets up chi. Create runtime_constants object. This creates various things
     ! needed by the timestepping algorithms such as mass matrix operators, mass

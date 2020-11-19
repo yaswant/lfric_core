@@ -55,6 +55,10 @@
   start_dump_directory      = './'
 /
 
+&formulation
+  l_multigrid = .false.
+/
+
 &io
   use_xios_io               = .true.
   write_diag                = .true.
@@ -137,20 +141,10 @@
   planar_domain_max_y =  1.0
 /
 
-&multigrid
-  l_multigrid = .false.
-  multigrid_chain_nitems = 4
-  ugrid      = 'prime', 'mesh_C12.nc', 'mesh_C6.nc', 'mesh_C3.nc'
-/
-
 &section_choice
 radiation='none',
 boundary_layer='none',
 convection='none',
 microphysics='none',
 cloud='none'
-/
-
-&development
-implement_consolidated_multigrid=.false.
 /

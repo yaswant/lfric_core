@@ -101,8 +101,7 @@
                                                     "threads":1,
                                                     "wallclock":"00:05:00"} } },
                       plotstr="slices.py ' + appDiagStemName + ' $NODAL_DATA_DIR density T000000:T000064:T000128:T000192:T000256 -1 -91 0 $PLOT_DIR" )'],
-}
-%}
+} %}
 
 
 %include inc/cosmic.rc

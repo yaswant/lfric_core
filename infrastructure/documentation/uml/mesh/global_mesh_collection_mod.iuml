@@ -15,7 +15,6 @@ class global_mesh_collection_mod::global_mesh_collection_type {
 
   +add_new_global_mesh(<<in>>global_mesh: global_mesh_type)
   +add_unit_test_global_mesh() : mesh_id<<integer>>
-  -map_global_meshes(<<in>>source_global_mesh_id: integer,<<in>>target_global_mesh_id: integer)
 
   +n_meshes(): integer
   +get_mesh_names(): string[ ]<<allocatable>>

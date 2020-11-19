@@ -57,6 +57,7 @@ contains
                                    exner_from_eos=.false.,       &
                                    init_exner_bt=.false.,        &
                                    rotating=.true.,              &
+                                   l_multigrid=.false.,          &
                                    set_hydrostatic_init=.false., &
                                    shallow=.false.,              &
                                    transport_only=.false.,       &

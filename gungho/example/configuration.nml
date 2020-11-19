@@ -3,8 +3,8 @@
 /
 
 &base_mesh
-  filename        = 'mesh_C24.nc'
-  prime_mesh_name = 'dynamics'
+  filename        = 'mesh_C24_MG.nc'
+  prime_mesh_name = 'C24'
   geometry        = 'spherical'
   partitioner     = 'cubedsphere'
   fplane          = .false.
@@ -30,6 +30,7 @@
 /
 
 &formulation
+  l_multigrid           = .true.
   transport_only        = .false.
   rotating              = .true.
   use_moisture          = .false.
@@ -208,14 +209,12 @@
 /
 
 &multigrid
-  l_multigrid = .true.
   multigrid_chain_nitems = 4
-  ugrid      = 'prime', 'mesh_C12.nc', 'mesh_C6.nc', 'mesh_C3.nc'
+  chain_mesh_tags = 'C24','C12','C6','C3'
   smooth_relaxation = 0.8
   n_presmooth = 2
   n_postsmooth = 2
   n_coarsesmooth = 4
-  chain_mesh_tags='','','',''
 /
 
 &domain_size

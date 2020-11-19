@@ -4,20 +4,21 @@
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
 
-!> Test the fuunction space collection object
+!> Test the function space collection object
 !>
 module function_space_collection_mod_test
 
-    use constants_mod,                 only : i_def, r_def
-    use function_space_collection_mod, only : function_space_collection_type, &
-                                              function_space_collection
-    use mesh_collection_mod,           only : mesh_collection_type, &
-                                              mesh_collection
-    use fs_continuity_mod,             only : W0, W2, W3
-    use function_space_mod,            only : function_space_type
-    use yaxt,                          only : xt_initialize, xt_finalize
-    use mpi_mod,                       only : store_comm, clear_comm
-    use pFUnit_Mod
+  use constants_mod,                 only : i_def, r_def
+  use function_space_collection_mod, only : function_space_collection_type, &
+                                            function_space_collection
+  use mesh_collection_mod,           only : mesh_collection_type, &
+                                            mesh_collection
+  use fs_continuity_mod,             only : W0, W2, W3
+  use function_space_mod,            only : function_space_type
+  use pFUnit_Mod
+
+  use yaxt,    only: xt_initialize, xt_finalize
+  use mpi_mod, only: store_comm, clear_comm
 
   implicit none
 
@@ -48,7 +49,7 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use mesh_mod,                  only : PLANE_BI_PERIODIC
+    use mesh_mod, only : PLANE_BI_PERIODIC
 
     implicit none
 
@@ -56,7 +57,8 @@ contains
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
-    !Store the MPI communicator for later use
+
+    ! Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
     ! Create top level mesh collection
@@ -81,7 +83,6 @@ contains
 
     call function_space_collection%clear()
     call mesh_collection%clear()
-    call final_configuration()
 
     ! Finalise YAXT
     call xt_finalize()
@@ -91,7 +92,7 @@ contains
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test( npes=[1] )
+  @test(npes=[1])
   subroutine test_all( this )
 
 
@@ -100,14 +101,8 @@ contains
     class(function_space_collection_test_type), intent(inout) :: this
 
     integer(i_def) :: answer = 3
-    integer(i_def) :: fs_0
-    integer(i_def) :: fs_2
-    integer(i_def) :: fs_3
 
-    type(function_space_type), pointer :: test_fs => null()
-
-    ! create 3 function spaces
-
+    ! Create 3 function spaces
     this%w0_fs => function_space_collection%get_fs( this%mesh_id, &
                                                     element_order, &
                                                     W0 )
@@ -133,7 +128,5 @@ contains
     @assertEqual(answer, function_space_collection%get_fs_collection_size())
 
   end subroutine test_all
-
-
 
 end module function_space_collection_mod_test

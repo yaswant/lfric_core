@@ -66,7 +66,7 @@ module init_transport_mod
     type(field_type), intent(inout)   :: wind_shifted
     type(field_type), intent(inout)   :: density_shifted
 
-    type(function_space_type), pointer       :: function_space => null()
+    type(function_space_type),  pointer :: function_space => null()
     procedure(write_interface), pointer :: tmp_write_ptr => null()
 
     call wind_n%initialise( vector_space = &

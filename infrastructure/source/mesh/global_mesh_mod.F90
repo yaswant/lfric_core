@@ -19,8 +19,6 @@ module global_mesh_mod
   use log_mod,                        only: log_event, log_scratch_space, &
                                             LOG_LEVEL_ERROR, LOG_LEVEL_TRACE
 
-  use development_config_mod, only : implement_consolidated_multigrid
-
   implicit none
 
   private

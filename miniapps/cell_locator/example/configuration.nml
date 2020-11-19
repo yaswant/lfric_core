@@ -20,8 +20,8 @@ method='uniform',
 number_of_layers=1,
 /
 
-&multigrid
-l_multigrid=.false.,
+&formulation
+l_multigrid=.false.
 /
 
 &partitioning

@@ -52,11 +52,7 @@ v0=0.0,
 &logging
   run_log_level='info'
 /
-&multigrid
-l_multigrid=.false.
-multigrid_chain_nitems=1
-ugrid='prime'
-/
+
 &time
 calendar = 'timestep'
 timestep_start = '1'
@@ -105,6 +101,7 @@ test='cosine_hill',
 /
 &formulation
 transport_only=.true.,
+l_multigrid=.false.
 /
 &biperiodic_deppt
 method='euler',
@@ -143,8 +140,4 @@ cloud='none',
 convection='none',
 microphysics='none',
 radiation='none'
-/
-
-&development
-implement_consolidated_multigrid=.false.
 /

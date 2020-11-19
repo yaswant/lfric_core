@@ -95,7 +95,8 @@
     'check_compilers("diagnostics", "default", "full-debug", resolution=("C3",))',
     'canned_test("diagnostics")'],
 'nightly': [
-    'null_task_graph()'] } %}
+    'null_task_graph()']
+} %}
 
 #########################################################################################
 

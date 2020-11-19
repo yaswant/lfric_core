@@ -43,7 +43,7 @@ contains
     character(*), intent(in) :: filename
 
     character(*), parameter :: &
-                  required_configuration(13) = ['finite_element             ', &
+                  required_configuration(12) = ['finite_element             ', &
                                                 'formulation                ', &
                                                 'base_mesh                  ', &
                                                 'initial_wind               ', &
@@ -54,7 +54,6 @@ contains
                                                 'timestepping               ', &
                                                 'extrusion                  ', &
                                                 'transport                  ', &
-                                                'multigrid                  ', &
                                                 'orography                  ']
 
     logical              :: okay

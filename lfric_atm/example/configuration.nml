@@ -69,6 +69,7 @@ rehabilitate=.true.,
 vorticity_in_w1=.false.,
 /
 &formulation
+l_multigrid=.false.,
 dlayer_on=.false.,
 dry_static_adjust=.true.,
 exner_from_eos=.true.,
@@ -158,12 +159,7 @@ smagorinsky=.false.,
 viscosity=.false.,
 viscosity_mu=0.0,
 /
-&multigrid
-l_multigrid=.false.,
-multigrid_chain_nitems=1,
-ugrid='prime',
-chain_mesh_tags=''
-/
+
 &orography
 orog_init_option='none',
 /

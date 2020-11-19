@@ -69,6 +69,7 @@ contains
                               scaling_factor=scaling )
 
     call feign_formulation_config( transport_only        = .false.,         &
+                                   l_multigrid           = .false.,         &
                                    rotating              = .true.,          &
                                    use_moisture          = .false.,         &
                                    use_physics           = .false.,         &

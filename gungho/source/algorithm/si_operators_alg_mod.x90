@@ -25,7 +25,8 @@ module si_operators_alg_mod
   use function_space_chain_mod,  only: multigrid_function_space_chain, &
                                        w2_multigrid_function_space_chain, &
                                        wtheta_multigrid_function_space_chain
-  use multigrid_config_mod,      only: multigrid_chain_nitems, l_multigrid
+  use formulation_config_mod,    only: l_multigrid
+  use multigrid_config_mod,      only: multigrid_chain_nitems
 
   implicit none
   private

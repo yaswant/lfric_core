@@ -17,8 +17,6 @@ module global_mesh_mod_test
                                         global_mesh_collection
   use ugrid_mesh_data_mod,        only: ugrid_mesh_data_type
 
-  use yaxt,    only: xt_initialize, xt_finalize
-  use mpi_mod, only: store_comm, clear_comm
   use pFUnit_Mod
 
   implicit none
@@ -31,7 +29,7 @@ module global_mesh_mod_test
             setUp, tearDown
 
   @testCase
-  type, public, extends( MPITestCase ) :: global_mesh_test_type
+  type, public, extends( TestCase ) :: global_mesh_test_type
     private
   contains
     private
@@ -44,12 +42,8 @@ module global_mesh_mod_test
 
   end type global_mesh_test_type
 
-  character(str_def),          parameter :: mesh_name = 'unit_test'
-  character(str_max_filename), parameter :: &
-      MultiGridFiles(2) =                   &
-                  [ 'data/mesh_C4.nc',      &! 4x4 panel
-                    'data/mesh_C8.nc' ]      ! 8x8 panel
-  integer(i_def), parameter :: npanels = 6
+  character(str_def), parameter :: mesh_name = 'unit_test'
+  integer(i_def),     parameter :: npanels = 6
 
 contains
 
@@ -58,11 +52,6 @@ contains
     implicit none
 
     class( global_mesh_test_type ), intent( inout ) :: this
-
-    ! Initialise YAXT
-    call xt_initialize(this%getMpiCommunicator())
-    !Store the MPI communicator for later use
-    call store_comm(this%getMpiCommunicator())
 
     ! Create top level collections
     global_mesh_collection = global_mesh_collection_type()
@@ -81,16 +70,11 @@ contains
 
     call final_configuration()
 
-    ! Finalise YAXT
-    call xt_finalize()
-    ! Clear the stored MPI communicator
-    call clear_comm()
-
   end subroutine tearDown
 
   ! Test global_mesh module functionality
   !
-  @test( npes=[1] )
+  @test
   subroutine test_biperiodic_global_mesh( this )
 
     implicit none
@@ -105,21 +89,14 @@ contains
     integer(i_def) :: edges(4)
     integer(i_def) :: cells(4)
     integer(i_def) :: ncells
-    integer(i_def) :: ncells_x
-    integer(i_def) :: ncells_y
     integer(i_def) :: max_cells_on_vert
-    integer(i_def) :: cell_owner
     integer(i_def) :: global_mesh_id1
-    integer(i_def) :: global_mesh_id2
     logical(l_def) :: periodic_x
     logical(l_def) :: periodic_y
 
     integer(i_def), allocatable :: edge_on_cells(:,:)
     integer(i_def), allocatable :: vert_on_cells(:,:)
     integer(i_def), allocatable :: cell_next(:,:)
-
-    real(r_def) :: dx
-    real(r_def) :: dy
 
     character(len = str_max_filename) :: filename
 
@@ -213,7 +190,7 @@ contains
   end subroutine test_biperiodic_global_mesh
 
 
-  @test( npes=[1] )
+  @test
   subroutine test_cubedsphere_global_mesh( this )
 
     implicit none
@@ -229,8 +206,6 @@ contains
     integer(i_def) :: edges(4)
     integer(i_def) :: cells(4)
     integer(i_def) :: ncells
-    integer(i_def) :: ncells_x
-    integer(i_def) :: ncells_y
     integer(i_def) :: max_cells_on_vert
     integer(i_def) :: cell_owner
     integer(i_def) :: global_mesh_id1
@@ -239,12 +214,6 @@ contains
     integer(i_def), allocatable :: edge_on_cells(:,:)
     integer(i_def), allocatable :: vert_on_cells(:,:)
     integer(i_def), allocatable :: cell_next(:,:)
-
-    real(r_def) :: dx
-    real(r_def) :: dy
-
-    type(global_mesh_type) :: global_mesh_mg
-    character(str_def)     :: mesh_name_mg = 'C4'
 
     integer(i_def) :: npanels = 6
 
@@ -338,23 +307,17 @@ contains
   end subroutine test_cubedsphere_global_mesh
 
 
-  @test( npes=[1] )
+  @test
   subroutine test_cubedsphere_single_file_intergrid(this)
 
-    use feign_config_mod,  only: feign_development_config
     use configuration_mod, only: final_configuration
     use ncdf_quad_mod,     only: ncdf_quad_type
-
-    use development_config_mod, only: single_mesh_input
 
     implicit none
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
     type(ugrid_mesh_data_type)  :: ugrid_mesh_data
-    type(global_mesh_type)      :: global_mesh_C4
-    type(global_mesh_type)      :: global_mesh_C8
-    type(global_mesh_type)      :: global_mesh_C16
 
     character(len = str_max_filename) :: filename
 
@@ -363,8 +326,7 @@ contains
     integer(i_def) :: edges(4)
     integer(i_def) :: cells(4)
     integer(i_def) :: ncells
-    integer(i_def) :: ncells_x
-    integer(i_def) :: ncells_y
+
     integer(i_def) :: max_cells_on_vert
     integer(i_def) :: cell_owner
     integer(i_def) :: global_mesh_id1
@@ -374,36 +336,13 @@ contains
     integer(i_def), allocatable :: vert_on_cells(:,:)
     integer(i_def), allocatable :: cell_next(:,:)
 
-    character(str_def), allocatable :: target_mesh_names(:)
-    character(str_def) :: test_mesh_name
-    character(str_def) :: test_target_mesh_name_A
-    character(str_def) :: test_target_mesh_name_B
-    real(r_def) :: dx
-    real(r_def) :: dy
-
-    integer(i_def), allocatable     :: mesh_map(:,:)
-    type(global_mesh_type), pointer :: target_mesh => null()
     type(global_mesh_type) :: global_mesh
-    type(ncdf_quad_type)   :: file_handler
     character(str_def)     :: mesh_name = 'C4'
-    type(global_mesh_type) :: test_meshes(4)
 
-    logical(l_def) :: test_log = .true.
-    integer(i_def) :: multigrid_ids(4)
-    integer(i_def) :: i, j, k
-
-    integer(i_def) :: npanels = 6
-
-    call feign_development_config(                              &
-             implement_consolidated_multigrid = test_log,       &
-             single_mesh_input='data/mesh_C32_MG.nc',           &
-             spawn_2d_mesh=.false., spawn_shifted_mesh=.false., &
-             spawn_double_level_mesh=.false. )
-
+    filename='data/mesh_C32_MG.nc'
     !-------------------------------------------------
     ! Test construction of a cubed-sphere mesh is same
     !-------------------------------------------------
-    filename  = single_mesh_input
     mesh_name = 'C4'
     call ugrid_mesh_data%read_from_file(trim(filename), mesh_name)
     global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
@@ -415,7 +354,6 @@ contains
     global_mesh_id2 = global_mesh%get_id()
     @assertTrue(global_mesh_id1 /= global_mesh_id2)
 
-    !
     ! Generate the global_mesh
     cell_id = global_mesh%get_cell_id( 1, 0, 0 )
     @assertEqual( 1, cell_id )
@@ -489,87 +427,48 @@ contains
   end subroutine test_cubedsphere_single_file_intergrid
 
 
-  @test( npes=[1] )
+  @test
   subroutine test_cubedsphere_adding_intergrid_map(this)
 
-    use feign_config_mod,  only: feign_development_config
     use configuration_mod, only: final_configuration
     use ncdf_quad_mod,     only: ncdf_quad_type
-
-    use development_config_mod, only: single_mesh_input
 
     implicit none
 
     class( global_mesh_test_type ), intent( inout ) :: this
 
     type(ugrid_mesh_data_type)  :: ugrid_mesh_data
-    type(global_mesh_type)      :: global_mesh_C4
-    type(global_mesh_type)      :: global_mesh_C8
-    type(global_mesh_type)      :: global_mesh_C16
 
     character(len = str_max_filename) :: filename
-
-    integer(i_def) :: cell_id
-    integer(i_def) :: verts(4)
-    integer(i_def) :: edges(4)
-    integer(i_def) :: cells(4)
-    integer(i_def) :: ncells
-    integer(i_def) :: ncells_x
-    integer(i_def) :: ncells_y
-    integer(i_def) :: max_cells_on_vert
-    integer(i_def) :: cell_owner
-    integer(i_def) :: global_mesh_id1
-    integer(i_def) :: global_mesh_id2
-
-    integer(i_def), allocatable :: edge_on_cells(:,:)
-    integer(i_def), allocatable :: vert_on_cells(:,:)
-    integer(i_def), allocatable :: cell_next(:,:)
 
     character(str_def), allocatable :: target_mesh_names(:)
 
     integer(i_def)     :: kgo_integer
     integer(i_def)     :: test_integer
-    character(str_def) :: test_mesh_name
-    character(str_def) :: test_target_mesh_name_A
-    character(str_def) :: test_target_mesh_name_B
-    real(r_def) :: dx
-    real(r_def) :: dy
-
 
     type(ncdf_quad_type) :: file_handler
-    integer(i_def)       :: i, j, k
+    integer(i_def)       :: i, j
     character(str_def), parameter :: &
         MultiGrid_mesh_names(4) = ['C32','C16','C8 ','C4 ']
 
     character(str_def)   :: mesh_name
     character(str_def)   :: target_name
-    character(str_def)   :: target_mesh_name
 
-    logical(l_def) :: test_log = .true.
     integer(i_def) :: multigrid_ids(4), npanels
 
-    type(global_mesh_type)              :: test_meshes(4)
     type(global_mesh_type),     pointer :: global_mesh_ptr => null()
     type(global_mesh_type),     pointer :: target_mesh_ptr => null()
     type(global_mesh_map_type), pointer :: global_mesh_map => null()
     type(global_mesh_type)              :: global_mesh
     integer(i_def), allocatable         :: mesh_map(:,:)
 
-
-    call feign_development_config(                              &
-             implement_consolidated_multigrid = test_log,       &
-             single_mesh_input='data/mesh_C32_MG.nc',           &
-             spawn_2d_mesh=.false., spawn_shifted_mesh=.false., &
-             spawn_double_level_mesh=.false. )
-
-
     !-------------------------------------------------
     ! Test construction of a cubed-sphere mesh is same
     !-------------------------------------------------
     ! Adding the follow meshed from file to global mesh colleciotn
 
-    filename = single_mesh_input
     npanels  = 6
+    filename='data/mesh_C32_MG.nc'
 
     ! 1.0 First read all the requested global meshes into memory.
     ! This is done because the intergrid map ids are based
@@ -645,21 +544,12 @@ contains
     target_mesh_ptr => global_mesh_collection%get_global_mesh( target_name )
     global_mesh_map => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
 
-    ! Check data here
-
     ! Check map array for C16 -> C32
     target_name='C32'
     target_mesh_ptr => global_mesh_collection%get_global_mesh( target_name )
     global_mesh_map => global_mesh_ptr%get_global_mesh_map( target_mesh_ptr%get_id() )
 
-    ! CHECK DATA HERE ??
-    ! The correct mappings of integrid map data after they are read in
-    ! are tested in global_mesh_collection_mod_test_mod.pf to mirror
-    ! the previous unit-tests
 
   end subroutine test_cubedsphere_adding_intergrid_map
-
-
-
 
 end module global_mesh_mod_test

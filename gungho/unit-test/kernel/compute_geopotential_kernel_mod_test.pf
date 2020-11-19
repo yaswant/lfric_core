@@ -74,6 +74,7 @@ contains
     ! Formulation config is needed to ensure shallow atmosphere formulation is
     ! used
     call feign_formulation_config(transport_only=.false., rotating=.true., &
+                                  l_multigrid=.false.,                     &
                                   use_moisture=.false.,                    &
                                   shallow=.true., use_physics=.false.,     &
                                   use_wavedynamics=.true.,                 &

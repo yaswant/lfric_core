@@ -63,7 +63,6 @@ module mesh_mod_test
   end type mesh_test_type
 
   character(str_def), parameter :: mesh_name = 'unit_test'
-  integer(i_def),     parameter :: npanels    = 6_i_def
   integer(i_def),     parameter :: nlayers    = 5_i_def
   real(r_def),        parameter :: domain_top = 10000.0_r_def
 
@@ -75,11 +74,14 @@ module mesh_mod_test
   real(r_def), parameter :: cp       = 1000.0_r_def
   real(r_def), parameter :: scaling  = 125.0_r_def
 
-  character(str_max_filename), parameter :: &
-      MultiGridFiles(2) =                   &
-                  [ 'data/mesh_C4.nc',      &! 4x4 panel
-                    'data/mesh_C8.nc' ]      ! 8x8 panel
+  character(str_max_filename), parameter :: filename = &
+                                     'data/mesh_C32_MG.nc'
+  character(str_def), parameter :: mesh_names(2) = &
+                                    [ 'C4',  &! 4x4 panel
+                                      'C8']   ! 8x8 panel
 
+  character(str_def), parameter :: source_mesh_name = 'C4'
+  character(str_def), parameter :: target_mesh_name = 'C8'
 
   integer(i_def), parameter :: CoarseToFineMap(4,96) = reshape( &
       [   1,    2,   9,    10,            3,    4,   11,   12,  &
@@ -211,7 +213,6 @@ contains
     class( mesh_test_type ), intent( inout ) :: this
 
     type (mesh_type) :: mesh_1
-    type (domain_size_type) :: domain
 
     integer(i_def) :: test_integer
     mesh_1 = mesh_type( this%global_mesh, &
@@ -724,38 +725,44 @@ contains
 !==============================================================================
   @Test( npes=[1] )
   subroutine test_mesh_map_retrieval( this)
+    use ncdf_quad_mod,     only: ncdf_quad_type
 
     implicit none
 
     class( mesh_test_type ), intent( inout ) :: this
 
-    integer(i_def) :: source_global_mesh_id
-    integer(i_def) :: target_global_mesh_id
+    type(ugrid_mesh_data_type) :: ugrid_mesh_data
+
     integer(i_def) :: source_mesh_id
     integer(i_def) :: target_mesh_id
     integer(i_def) :: mesh_map_id
     integer(i_def) :: test_integer
-    type(ugrid_mesh_data_type) :: ugrid_mesh_data
+
+    ! Global meshes
+    type(global_mesh_type) :: global_mesh
+
     type(global_mesh_type), pointer :: source_global_mesh_ptr => null()
     type(global_mesh_type), pointer :: target_global_mesh_ptr => null()
-    type(global_mesh_type)          :: global_mesh
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
 
+    ! Partitioned meshes
+    type(mesh_type) :: mesh
     type(mesh_type), pointer :: source_mesh_ptr => null()
     type(mesh_type), pointer :: target_mesh_ptr => null()
-    type(mesh_type), target  :: mesh
 
+    integer(i_def), parameter :: npanels = 6
+    type(ncdf_quad_type) :: file_handler
     type(mesh_map_type), pointer :: mesh_map => null()
+    integer(i_def), allocatable  :: cell_map(:,:)
     type(partition_type)         :: partition
     type(uniform_extrusion_type) :: extrusion
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null ()
 
-    integer(i_def), allocatable :: test_1d_array(:)
-    integer(i_def), allocatable :: test_2d_array(:,:)
-    integer(i_def), allocatable :: data(:,:)
-
     integer(i_def), pointer :: test_1d_array_ptr(:)   => null()
     integer(i_def), pointer :: test_2d_array_ptr(:,:) => null()
+    integer(i_def) :: i, j
+    character(str_def), allocatable :: target_mesh_names(:)
 
     ! Clear out the global mesh collection, as it may have the
     ! unit test global mesh which is not what we want.
@@ -763,50 +770,61 @@ contains
     global_mesh_collection = global_mesh_collection_type()
     mesh_collection        = mesh_collection_type()
 
-    ! Add global meshes to the global mesh collection for later generation
-    ! of local meshes, the order in which they are added should create
-    ! a global mesh map between the source and target global meshes.
-    call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(1)), mesh_name)
-    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
-    call ugrid_mesh_data%clear()
-    source_global_mesh_id = global_mesh%get_id()
-    call global_mesh_collection%add_new_global_mesh( global_mesh )
-    call ugrid_mesh_data%read_from_file(trim(MultiGridFiles(2)), mesh_name)
-    global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
-    call ugrid_mesh_data%clear()
-    target_global_mesh_id = global_mesh%get_id()
-    call global_mesh_collection%add_new_global_mesh( global_mesh )
+    ! Read in global meshes
+    do i=1, size(mesh_names)
+      call ugrid_mesh_data%read_from_file(trim(filename), mesh_names(i))
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
+      call ugrid_mesh_data%clear()
+      call global_mesh_collection%add_new_global_mesh( global_mesh )
+    end do
 
-    ! Get pointers to the global objects
-    source_global_mesh_ptr => global_mesh_collection % &
-                              get_global_mesh( source_global_mesh_id )
-    target_global_mesh_ptr => global_mesh_collection % &
-                              get_global_mesh( target_global_mesh_id )
+    ! Read in global mesh maps
+    call file_handler%file_open(trim(filename))
+    do i=1, size(mesh_names)
+      global_mesh_ptr => global_mesh_collection % get_global_mesh (mesh_names(i))
+      call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
+      do j=1, size(target_mesh_names)
+        if (global_mesh_collection%check_for(target_mesh_names(j))) then
+          call file_handler%read_map( mesh_names(i),        &
+                                      target_mesh_names(j), &
+                                      cell_map )
+          target_global_mesh_ptr => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
+          call global_mesh_ptr%add_global_mesh_map(target_global_mesh_ptr, cell_map)
+        end if
+      end do
+    end do
+    call file_handler%file_close()
 
-    ! Generate the partition
+    source_global_mesh_ptr => global_mesh_collection%get_global_mesh(source_mesh_name)
+    target_global_mesh_ptr => global_mesh_collection%get_global_mesh(target_mesh_name)
+
+    ! Set partition method/extrusion
     partitioner_ptr => partitioner_cubedsphere_serial
-
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
     ! Generate the local meshes
     partition = partition_type(source_global_mesh_ptr, partitioner_ptr,1,1,1,0,1)
-    mesh = mesh_type( source_global_mesh_ptr, partition, extrusion )
+    mesh = mesh_type( source_global_mesh_ptr, &
+                      partition,              &
+                      extrusion )
     source_mesh_id = mesh_collection%add_new_mesh( mesh )
     call mesh%clear()
 
     partition = partition_type(target_global_mesh_ptr, partitioner_ptr,1,1,1,0,1)
-    mesh = mesh_type( target_global_mesh_ptr, partition, extrusion )
+    mesh = mesh_type( target_global_mesh_ptr, &
+                      partition,              &
+                      extrusion )
     target_mesh_id = mesh_collection%add_new_mesh( mesh )
     call mesh%clear()
 
     source_mesh_ptr => mesh_collection%get_mesh(source_mesh_id)
     target_mesh_ptr => mesh_collection%get_mesh(target_mesh_id)
 
-
-
+    ! Add maps to the local meshes
     call source_mesh_ptr % add_mesh_map(target_mesh_ptr)
     call target_mesh_ptr % add_mesh_map(source_mesh_ptr)
 
+    ! Conduct the unit tests now
     ! Test coarse to fine
     mesh_map    => source_mesh_ptr%get_mesh_map(target_mesh_ptr)
     mesh_map_id = (10000*source_mesh_id) + target_mesh_id

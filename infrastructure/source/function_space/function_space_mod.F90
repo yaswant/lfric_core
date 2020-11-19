@@ -398,11 +398,11 @@ contains
 
     integer(i_def) :: ndata_sz
 
-    if (present(ndata)) then
-      ndata_sz = ndata
-    else
-      ndata_sz = 1
-    end if
+  if (present(ndata)) then
+    ndata_sz = ndata
+  else
+    ndata_sz = 1
+  end if
 
     instance%mesh => mesh_collection%get_mesh(mesh_id)
     instance%fs = lfric_fs

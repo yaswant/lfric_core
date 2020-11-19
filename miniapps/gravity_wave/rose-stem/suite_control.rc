@@ -32,9 +32,7 @@
 {%- set mesh_build      = "fast-debug" %}
 {%- set MAXRUNAHEAD     = 1 %}
 
-{%- set application_configurations = { 'gravity_wave' : ['multigrid_on',
-                                                         'multigrid_off',
-                                                         'limited_300x4',
+{%- set application_configurations = { 'gravity_wave' : ['limited_300x4',
                                                          'limited_c24',
                                                          'limited_c24_rec',
                                                          'default'] } %}
@@ -67,6 +65,7 @@
     'check_compilers("gravity_wave", "default", "full-debug",
                      resolution=("C24",100.0), publish=True)' ],
 'nightly': [
-    'null_task_graph()' ] } %}
+    'null_task_graph()' ],
+ } %}
 
 #########################################################################################

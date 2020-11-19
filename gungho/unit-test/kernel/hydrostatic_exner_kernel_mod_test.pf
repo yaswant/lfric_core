@@ -90,11 +90,11 @@ contains
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
 
-    call feign_base_mesh_config                &
-             ( filename='foo',                 &
-               prime_mesh_name='unit_test',    &
-               geometry=geometry_planar,       &
-               partitioner=partitioner_planar, &
+    call feign_base_mesh_config                     &
+             ( filename='foo',                      &
+               prime_mesh_name='unit_test',         &
+               geometry=geometry_planar,            &
+               partitioner=partitioner_planar,      &
                fplane=.false., f_lat_deg=0.0_r_def )
 
     call feign_initial_temperature_config( bvf_square=bvf_square,           &
@@ -211,6 +211,7 @@ contains
     real(r_def) :: answer
 
     call feign_formulation_config(transport_only=.false.,                   &
+                                  l_multigrid=.false.,                      &
                                   rotating=.false.,                         &
                                   use_moisture=.false.,                     &
                                   shallow=.true., use_physics=.false.,      &
@@ -267,6 +268,7 @@ contains
     real(r_def) :: answer
 
     call feign_formulation_config(transport_only=.false., rotating=.false.,  &
+                                  l_multigrid=.false.,                       &
                                   use_moisture=.false.,                      &
                                   shallow=.true., use_physics=.false.,       &
                                   use_wavedynamics=.true.,                   &

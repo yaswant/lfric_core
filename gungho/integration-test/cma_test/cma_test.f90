@@ -17,8 +17,9 @@
 
 program cma_test
 
-  use base_mesh_config_mod,           only : geometry, &
-                                             geometry_spherical
+  use base_mesh_config_mod,           only : geometry,           &
+                                             geometry_spherical, &
+                                             prime_mesh_name
   use cma_test_algorithm_mod,         only : cma_test_init,                  &
                                              test_cma_apply_mass_p,          &
                                              test_cma_apply_mass_v,          &
@@ -28,7 +29,7 @@ program cma_test
                                              test_cma_add,                   &
                                              test_cma_apply_inv,             &
                                              test_cma_diag_DhMDhT
-  use constants_mod,                  only : i_def, r_def, str_max_filename, pi
+  use constants_mod,                  only : i_def, r_def, pi
   use derived_config_mod,             only : set_derived_config
   use yaxt,                           only : xt_initialize, xt_finalize
   use mpi_mod,                        only : initialise_comm, store_comm, &
@@ -59,8 +60,10 @@ program cma_test
 
   ! MPI communicator
   integer(kind=i_def) :: comm
-  ! Mesg index
-  integer(kind=i_def) :: mesh_id, twod_mesh_id
+
+  ! Meshes index
+  integer(kind=i_def) :: mesh_id
+
   ! Number of processes and local rank
   integer(kind=i_def) :: total_ranks, local_rank
   ! Filename to read namelist from
@@ -85,14 +88,15 @@ program cma_test
   ! Grid spacing in horizontal and vertical
   real   (kind=r_def) :: dx, dz
   ! Variables for reading configuration from namelist file
-  character(*), parameter :: &
-       required_configuration(7) = (/'finite_element      ', &
-       'base_mesh           ', &
-       'multigrid           ', &
-       'planet              ', &
-       'extrusion           ', &
-       'partitioning        ', &
-       'domain_size         '/)
+  character(*), parameter ::       &
+       required_configuration(7) = &
+      (/'finite_element      ',    &
+        'base_mesh           ',    &
+        'formulation         ',    &
+        'planet              ',    &
+        'extrusion           ',    &
+        'partitioning        ',    &
+        'domain_size         '/)
   logical              :: okay
   logical, allocatable :: success_map(:)
   integer :: i
@@ -229,15 +233,14 @@ program cma_test
   allocate( global_mesh_collection, &
             source = global_mesh_collection_type() )
 
-  ! Create the mesh and function space collection
-  call init_mesh( local_rank, total_ranks, mesh_id, twod_mesh_id )
+  call init_mesh( local_rank, total_ranks, mesh_id )
 
   ! Full global meshes no longer required, so reclaim
   ! the memory from global_mesh_collection
   write(log_scratch_space,'(A)') &
       "Purging global mesh collection."
   call log_event( log_scratch_space, LOG_LEVEL_INFO )
-  deallocate(global_mesh_collection)
+  if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
   ! Work out grid spacing, which should be of order 1
   mesh => mesh_collection%get_mesh( mesh_id )

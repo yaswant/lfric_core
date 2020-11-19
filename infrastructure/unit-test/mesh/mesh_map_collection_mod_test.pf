@@ -39,7 +39,7 @@ module mesh_map_collection_mod_test
   type, extends( MPITestCase ) :: mesh_map_collection_test_type
     private
 
-    type(global_mesh_map_type), pointer :: CoarseTofine_global_mesh_map => null()
+    type(global_mesh_map_type), pointer :: CoarseToFine_global_mesh_map => null()
     type(mesh_type), pointer    :: coarse_mesh => null()
     type(mesh_type), pointer    :: fine_mesh   => null()
 
@@ -56,6 +56,12 @@ module mesh_map_collection_mod_test
   character(str_max_filename), parameter ::                      &
                                coarse_ugrid = 'data/mesh_C4.nc', &! 4x4 panel
                                fine_ugrid   = 'data/mesh_C8.nc'   ! 8x8 panel
+
+  character(str_max_filename), parameter :: filename = &
+                                     'data/mesh_C32_MG.nc'
+  character(str_max_filename), parameter :: mesh_names(2) = &
+                                    [ 'C4',  &! 4x4 panel
+                                      'C8']   ! 8x8 panel
 
   integer(i_def), parameter :: local_rank  = 0_i_def
   integer(i_def), parameter :: total_ranks = 1_i_def
@@ -78,7 +84,8 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use extrusion_mod,             only : uniform_extrusion_type
+    use extrusion_mod, only: uniform_extrusion_type
+    use ncdf_quad_mod, only: ncdf_quad_type
 
     implicit none
 
@@ -87,25 +94,34 @@ contains
     type(ugrid_mesh_data_type)      :: ugrid_mesh_data
     type(global_mesh_type), pointer :: coarse_global_mesh_ptr => null()
     type(global_mesh_type), pointer :: fine_global_mesh_ptr   => null()
-    type(global_mesh_type)          :: coarse_global_mesh
-    type(global_mesh_type)          :: fine_global_mesh
+    type(global_mesh_type), pointer :: global_mesh_ptr => null()
+    type(global_mesh_type), pointer :: target_mesh_ptr => null()
     type(partition_type)            :: coarse_partition
     type(partition_type)            :: fine_partition
     type(uniform_extrusion_type)    :: extrusion
-    type(mesh_type), target         :: mesh
+
+    type(global_mesh_type) :: global_mesh
+    type(mesh_type)        :: local_mesh
 
     integer(i_def)         :: coarse_global_mesh_id
     integer(i_def)         :: fine_global_mesh_id
     integer(i_def)         :: coarse_mesh_id
     integer(i_def)         :: fine_mesh_id
 
+    character(str_def)     :: name
+
+    character(str_def), allocatable :: target_mesh_names(:)
+    integer(i_def),     allocatable :: cell_map(:,:)
+
     integer(i_def)         :: ncells
-    integer(i_def)         :: i
+    integer(i_def)         :: i, j
     integer(i_def)         :: npanels
 
-    type(mesh_map_type), pointer :: mesh_map => null()
+    integer(i_def)         :: global_mesh_id
 
     procedure (partitioner_interface), pointer :: partitioner_ptr => null()
+
+    type(ncdf_quad_type) :: file_handler
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -119,49 +135,75 @@ contains
 
 
     npanels = 6
-    call ugrid_mesh_data%read_from_file(trim(coarse_ugrid), mesh_name)
-    coarse_global_mesh = global_mesh_type( ugrid_mesh_data, npanels)
-    call ugrid_mesh_data%clear()
-    coarse_global_mesh_id = coarse_global_mesh%get_id()
-    call global_mesh_collection%add_new_global_mesh( coarse_global_mesh )
 
-    call ugrid_mesh_data%read_from_file(trim(fine_ugrid), mesh_name)
-    fine_global_mesh = global_mesh_type( ugrid_mesh_data, npanels )
-    call ugrid_mesh_data%clear()
-    fine_global_mesh_id = fine_global_mesh%get_id()
-    call global_mesh_collection % add_new_global_mesh( fine_global_mesh )
+    ! Read in global meshes
+    do i=1, size(mesh_names)
 
-    coarse_global_mesh_ptr => &
-        global_mesh_collection%get_global_mesh( coarse_global_mesh_id )
-    fine_global_mesh_ptr   => &
-        global_mesh_collection%get_global_mesh( fine_global_mesh_id   )
+      call ugrid_mesh_data%read_from_file(trim(filename), mesh_names(i))
+      global_mesh = global_mesh_type( ugrid_mesh_data, npanels)
+      call ugrid_mesh_data%clear()
+      call global_mesh_collection%add_new_global_mesh( global_mesh )
 
-    this%CoarseTofine_global_mesh_map => &
+    end do
+
+    ! Read in global mesh maps
+    call file_handler%file_open(trim(filename))
+    do i=1, size(mesh_names)
+      global_mesh_ptr => global_mesh_collection%get_global_mesh (mesh_names(i) )
+      call global_mesh_ptr%get_target_mesh_names(target_mesh_names)
+      do j=1, size(target_mesh_names)
+        if (global_mesh_collection%check_for(target_mesh_names(j))) then
+          call file_handler%read_map( mesh_names(i),        &
+                                      target_mesh_names(j), &
+                                      cell_map )
+          target_mesh_ptr => global_mesh_collection%get_global_mesh( target_mesh_names(j) )
+          call global_mesh_ptr%add_global_mesh_map(target_mesh_ptr, cell_map)
+        end if
+      end do
+    end do
+    call file_handler%file_close()
+
+
+    name = 'C4'
+    coarse_global_mesh_ptr => global_mesh_collection%get_global_mesh( name )
+    coarse_global_mesh_id  = coarse_global_mesh_ptr%get_id()
+
+    name = 'C8'
+    fine_global_mesh_ptr => global_mesh_collection%get_global_mesh( name )
+    fine_global_mesh_id  =  fine_global_mesh_ptr%get_id()
+
+    this%CoarseToFine_global_mesh_map => &
          coarse_global_mesh_ptr%get_global_mesh_map( fine_global_mesh_id )
 
-    coarse_partition = partition_type( coarse_global_mesh_ptr, partitioner_ptr, &
-                                       xproc, yproc, max_stencil_depth,     &
+    coarse_partition = partition_type( coarse_global_mesh_ptr, &
+                                       partitioner_ptr,        &
+                                       xproc, yproc,           &
+                                       max_stencil_depth,      &
                                        local_rank, total_ranks )
 
     ncells = coarse_partition%get_num_cells_in_layer()
 
-    fine_partition   = partition_type( fine_global_mesh_ptr, partitioner_ptr, &
-                                       xproc, yproc, max_stencil_depth,   &
+    fine_partition   = partition_type( fine_global_mesh_ptr,   &
+                                       partitioner_ptr,        &
+                                       xproc, yproc,           &
+                                       max_stencil_depth,      &
                                        local_rank, total_ranks )
 
     extrusion = uniform_extrusion_type( radius, domain_top, nlayers )
 
-    mesh = mesh_type( coarse_global_mesh_ptr, coarse_partition, extrusion )
-    coarse_mesh_id = mesh_collection%add_new_mesh( mesh )
-    call mesh%clear()
+    local_mesh = mesh_type( coarse_global_mesh_ptr, &
+                            coarse_partition,       &
+                            extrusion )
+    coarse_mesh_id   = mesh_collection%add_new_mesh( local_mesh )
 
-    mesh = mesh_type( fine_global_mesh_ptr, fine_partition, extrusion )
-    fine_mesh_id =  mesh_collection%add_new_mesh( mesh )
-    call mesh%clear()
+
+    local_mesh = mesh_type( fine_global_mesh_ptr, &
+                            fine_partition,       &
+                            extrusion )
+    fine_mesh_id     = mesh_collection%add_new_mesh( local_mesh )
 
     this%coarse_mesh => mesh_collection%get_mesh( coarse_mesh_id )
     this%fine_mesh   => mesh_collection%get_mesh( fine_mesh_id   )
-
 
 
     ncells = coarse_partition%get_num_cells_in_layer()
@@ -182,7 +224,7 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tearDown( this )
 
-    use configuration_mod,        only: final_configuration
+    use configuration_mod, only: final_configuration
 
     implicit none
 
@@ -215,10 +257,7 @@ contains
     type (mesh_map_type),  pointer :: mesh_map2 => null()
     type (partition_type), pointer :: partition => null()
 
-    integer(i_def) :: test_integer, i
-
-    integer(i_def) :: mesh_id
-    integer(i_def) :: global_mesh_id
+    integer(i_def) :: i
     integer(i_def) :: ncells_2d
     integer(i_def) :: ntarget_cells_per_source_cell, nsource_cells
 
@@ -229,7 +268,6 @@ contains
 
     partition => this%coarse_mesh % get_partition()
     ncells_2d = partition%get_num_cells_in_layer()
-
 
     allocate(mesh_lid_gid_map(ncells_2d))
     do i=1, ncells_2d

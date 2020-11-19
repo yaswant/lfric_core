@@ -17,7 +17,7 @@ module init_skeleton_mod
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W3
-  use log_mod,                        only : log_event,         &
+  use log_mod,                        only : log_event,      &
                                              LOG_LEVEL_INFO, &
                                              LOG_LEVEL_ERROR
   use runtime_constants_mod,          only : create_runtime_constants

@@ -52,10 +52,10 @@ module io_dev_init_mod
   !> @param[out] dump_fields  Collection of fields to be written-to/read-from
   !>                          dump files
   subroutine setup_io_dev_fields( mesh_id,      &
-                                   twod_mesh_id, &
-                                   core_fields,  &
-                                   dump_fields,  &
-                                   variable_times_list )
+                                  twod_mesh_id, &
+                                  core_fields,  &
+                                  dump_fields,  &
+                                  variable_times_list )
 
     implicit none
 

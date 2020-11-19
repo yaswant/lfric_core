@@ -83,7 +83,7 @@
   spinup_winds       = .false.
 /
 
-&multigrid
+&formulation
   l_multigrid = .false.
 /
 
@@ -103,6 +103,3 @@
   planar_domain_max_y =  1.0
 /
 
-&development
-implement_consolidated_multigrid=.false.
-/

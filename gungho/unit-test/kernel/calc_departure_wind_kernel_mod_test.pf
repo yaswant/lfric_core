@@ -57,6 +57,7 @@ contains
                                    dry_static_adjust=.false.,    &
                                    exner_from_eos=.false.,       &
                                    init_exner_bt=.false.,        &
+                                   l_multigrid=.false.,          &
                                    rotating=.true.,              &
                                    set_hydrostatic_init=.false., &
                                    shallow=.false.,              &

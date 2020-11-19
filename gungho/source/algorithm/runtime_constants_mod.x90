@@ -26,7 +26,8 @@ module runtime_constants_mod
                                                coordinate_order, &
                                                rehabilitate
   use formulation_config_mod,            only: dlayer_on,  &
-                                               rotating
+                                               rotating,   &
+                                               l_multigrid
   use transport_config_mod,              only: scheme,                 &
                                                scheme_method_of_lines, &
                                                rho_splitting,          &
@@ -34,9 +35,9 @@ module runtime_constants_mod
                                                theta_splitting,        &
                                                theta_splitting_none
   use mixing_config_mod,                 only: smagorinsky
+  use multigrid_config_mod,              only: multigrid_chain_nitems
   use timestepping_config_mod,           only: dt
-  use multigrid_config_mod,              only: multigrid_chain_nitems, l_multigrid
-
+  use multigrid_config_mod,              only: multigrid_chain_nitems
   use function_space_chain_mod,          only: single_layer_function_space_chain, &
                                                multigrid_function_space_chain, &
                                                w2_multigrid_function_space_chain, &

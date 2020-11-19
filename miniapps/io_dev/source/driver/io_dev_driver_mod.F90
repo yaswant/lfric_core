@@ -43,9 +43,11 @@ module io_dev_driver_mod
   type (io_dev_data_type) :: model_data
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
+
   ! Mesh IDs
-  integer(i_def) :: mesh_id      = imdi
-  integer(i_def) :: twod_mesh_id = imdi
+  integer(i_def) :: mesh_id
+  integer(i_def) :: twod_mesh_id
+
   ! Clock object
   class(clock_type), allocatable :: clock
 

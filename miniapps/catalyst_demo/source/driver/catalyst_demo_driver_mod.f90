@@ -94,6 +94,8 @@ module catalyst_demo_driver_mod
   integer(i_def) :: mesh_id
   integer(i_def) :: twod_mesh_id
 
+  integer(i_def), allocatable :: multigrid_mesh_ids(:)
+
   ! Function space chains
   type(function_space_chain_type) :: multigrid_function_space_chain
 
@@ -156,13 +158,16 @@ contains
        source = global_mesh_collection_type() )
 
   ! Create the mesh
-  call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id )
+  call init_mesh( local_rank, total_ranks, mesh_id, &
+                  twod_mesh_id=twod_mesh_id,        &
+                  multigrid_mesh_ids=multigrid_mesh_ids )
 
   !----------------------------------------------------------------------------
   ! FEM init
   !----------------------------------------------------------------------------
   ! Create FEM specifics (function spaces and chi field)
-  call init_fem(mesh_id, chi)
+  call init_fem( mash_id, chi )
+
 
   !----------------------------------------------------------------------------
   ! IO init
@@ -171,11 +176,11 @@ contains
   ! If using XIOS for diagnostic output or checkpointing, then set up XIOS
   ! domain and context
   if ( use_xios_io ) then
-    call initialise_xios( xios_ctx,     &
-                           model_communicator, &
-                          clock,        &
-                          mesh_id,      &
-                          twod_mesh_id, &
+    call initialise_xios( xios_ctx,           &
+                          model_communicator, &
+                          clock,              &
+                          mesh_id,            &
+                          twod_mesh_id,       &
                           chi )
 
     ! Make sure XIOS calendar is set to timestep 1 as it starts there
@@ -202,7 +207,8 @@ contains
   multigrid_function_space_chain = function_space_chain_type()
 
   ! Create function space collection and initialise prognostic fields
-  call init_catalyst_demo( mesh_id, twod_mesh_id, chi, multigrid_function_space_chain, &
+  call init_catalyst_demo( mesh_id, twod_mesh_id, multigrid_mesh_ids, &
+                           chi, multigrid_function_space_chain,       &
                            wind, pressure, buoyancy )
 
   ! Full global meshes no longer required, so reclaim

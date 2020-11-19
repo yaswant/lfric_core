@@ -276,7 +276,7 @@ contains
     integer(i_def) :: test_dim_space_diff
 
     integer :: cell
-    integer(i_def) :: fs_id, ndat
+    integer(i_def) :: ndat
 
     integer(i_def) :: global_cell_dof_id_2d(9)
     integer(i_def) :: known_global_cell_dof_id_2d(9)

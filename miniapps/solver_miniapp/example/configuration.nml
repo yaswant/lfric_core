@@ -27,6 +27,7 @@ rehabilitate=.true.,
 /
 
 &formulation
+  l_multigrid           = .false.
   transport_only        = .false.
   rotating              = .false.
   use_moisture          = .false.
@@ -41,10 +42,6 @@ rehabilitate=.true.,
   init_exner_bt         = .false.
   si_momentum_equation  = .true.
   vector_invariant      = .true.
-/
-
-&multigrid
-l_multigrid=.false.,
 /
 
 &io
@@ -106,6 +103,3 @@ planar_domain_min_y=-1.0,
   mix_factor = 0.0
 /
 
-&development
-implement_consolidated_multigrid=.false.
-/

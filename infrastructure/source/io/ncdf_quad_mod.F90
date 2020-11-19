@@ -33,8 +33,8 @@ private
 ! Module parameters
 !-------------------------------------------------------------------------------
 
-integer(i_def), parameter :: TWO  = 2                  !< Two
-integer(i_def), parameter :: FOUR = 4                  !< Four
+integer(i_def), parameter :: TWO  = 2   !< Two
+integer(i_def), parameter :: FOUR = 4   !< Four
 
 ! Ranks for each variable.
 integer(i_def), parameter :: MESH_RANK            = 0

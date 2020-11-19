@@ -45,7 +45,7 @@ contains
                                                          'initial_temperature   ', &
                                                          'initial_wind          ', &
                                                          'timestepping          ', &
-                                                         'multigrid             ', &
+                                                         'formulation           ', &
                                                          'gravity_wave_constants']
 
     logical              :: okay

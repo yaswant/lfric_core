@@ -83,7 +83,8 @@
     'check_compilers("skeleton", "default", "full-debug", resolution=("C24",))',
     'canned_test("skeleton")' ],
 'nightly': [
-    'null_task_graph()' ] } %}
+    'null_task_graph()' ]
+ } %}
 
 #########################################################################################
 

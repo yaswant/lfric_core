@@ -83,13 +83,14 @@ contains
 
     class(extrusion_type), allocatable :: unit_under_test
 
-    call feign_base_mesh_config(             &
-             filename='/foo.nc',             &
-             prime_mesh_name='unit_test',    &
-             geometry=geometry_planar,       &
-             partitioner=partitioner_planar, &
-             fplane=.false.,                 &
+    call feign_base_mesh_config(                &
+             filename='/foo.nc',                &
+             prime_mesh_name='unit_test',       &
+             geometry=geometry_planar,          &
+             partitioner=partitioner_planar,    &
+             fplane=.false.,                    &
              f_lat_deg=0.0_r_def )
+
     call feign_extrusion_config( domain_top=13.5_r_def, &
                                  method=method_uniform, &
                                  number_of_layers=7_i_def, &

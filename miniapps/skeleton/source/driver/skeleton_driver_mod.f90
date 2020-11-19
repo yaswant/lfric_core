@@ -9,10 +9,12 @@
 !>
 module skeleton_driver_mod
 
+  use base_mesh_config_mod,       only : prime_mesh_name
   use checksum_alg_mod,           only : checksum_alg
   use clock_mod,                  only : clock_type
   use configuration_mod,          only : final_configuration
-  use constants_mod,              only : i_def, i_native, PRECISION_REAL
+  use constants_mod,              only : i_def, i_native, &
+                                         PRECISION_REAL
   use convert_to_upper_mod,       only : convert_to_upper
   use create_mesh_mod,            only : init_mesh
   use create_fem_mod,             only : init_fem
@@ -61,7 +63,8 @@ module skeleton_driver_mod
   ! Coordinate field
   type(field_type), target, dimension(3) :: chi
 
-  integer(i_def) :: mesh_id, twod_mesh_id
+  integer(i_def) :: mesh_id
+  integer(i_def) :: twod_mesh_id
 
 contains
 
@@ -83,7 +86,7 @@ contains
     character(:),      intent(in), allocatable :: filename
     integer(i_native), intent(in)              :: model_communicator
 
-    integer(i_def) :: total_ranks, local_rank
+    integer(i_def)     :: total_ranks, local_rank
 
     integer(i_native) :: log_level
 
@@ -139,17 +142,18 @@ contains
               source = global_mesh_collection_type() )
 
     ! Create the mesh
-    call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id)
+    call init_mesh( local_rank, total_ranks, mesh_id, &
+                    twod_mesh_id = twod_mesh_id )
+
+    ! Create FEM specifics (function spaces and chi field)
+    call init_fem( mesh_id, chi )
 
     ! Full global meshes no longer required, so reclaim
     ! the memory from global_mesh_collection
     write(log_scratch_space,'(A)') &
         "Purging global mesh collection."
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
-    deallocate(global_mesh_collection)
-
-    ! Create FEM specifics (function spaces and chi field)
-    call init_fem(mesh_id, chi)
+    if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
     !-------------------------------------------------------------------------
     ! IO init
@@ -159,11 +163,11 @@ contains
     ! XIOS domain and context
 
     if ( use_xios_io ) then
-      call initialise_xios( xios_ctx,     &
+      call initialise_xios( xios_ctx,           &
                             model_communicator, &
-                            clock,        &
-                            mesh_id,      &
-                            twod_mesh_id, &
+                            clock,              &
+                            mesh_id,            &
+                            twod_mesh_id,       &
                             chi )
 
       ! Make sure XIOS calendar is set to timestep 1 as it starts there

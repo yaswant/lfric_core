@@ -8,6 +8,7 @@
 module gungho_model_mod
 
   use assign_orography_field_mod, only : assign_orography_field
+  use base_mesh_config_mod,       only : prime_mesh_name
   use checksum_alg_mod,           only : checksum_alg
   use clock_mod,                  only : clock_type
   use create_fem_mod,             only : init_fem, final_fem
@@ -164,6 +165,9 @@ module gungho_model_mod
 
     type(linked_list_type) :: files_list
 
+    integer(i_def), allocatable :: multigrid_mesh_ids(:)
+    integer(i_def), allocatable :: multigrid_2d_mesh_ids(:)
+
     !-------------------------------------------------------------------------
     ! Initialise aspects of the infrastructure
     !-------------------------------------------------------------------------
@@ -234,16 +238,25 @@ module gungho_model_mod
               source = global_mesh_collection_type() )
 
     ! Create the mesh
-    call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id, &
-                   shifted_mesh_id, double_level_mesh_id)
+    call init_mesh( local_rank, total_ranks, mesh_id,             &
+                    twod_mesh_id          = twod_mesh_id,         &
+                    shifted_mesh_id       = shifted_mesh_id,      &
+                    double_level_mesh_id  = double_level_mesh_id, &
+                    multigrid_mesh_ids    = multigrid_mesh_ids,   &
+                    multigrid_2D_mesh_ids = multigrid_2D_mesh_ids )
 
-    ! Create FEM specifics (function spaces and chi field)
-    call init_fem(mesh_id, chi, shifted_mesh_id, shifted_chi, &
-                  double_level_mesh_id, double_level_chi)
+    call init_fem( mesh_id, chi,                                 &
+                   shifted_mesh_id       = shifted_mesh_id,      &
+                   shifted_chi           = shifted_chi,          &
+                   double_level_mesh_id  = double_level_mesh_id, &
+                   double_level_chi      = double_level_chi,     &
+                   multigrid_mesh_ids    = multigrid_mesh_ids,   &
+                   multigrid_2D_mesh_ids = multigrid_2D_mesh_ids )
+
 
     ! Full global meshes no longer required, so reclaim
     ! the memory from global_mesh_collection
-    deallocate(global_mesh_collection)
+    if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
     !-------------------------------------------------------------------------
     ! Initialise aspects of output

@@ -49,25 +49,16 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
-    use feign_config_mod,  only: feign_development_config
-
     implicit none
 
     class(mesh_collection_test_type), intent(inout) :: this
 
     integer(i_def) :: global_test_mesh_id
-    logical(l_def) :: test_log = .true.
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
     !Store the MPI communicator for later use
     call store_comm(this%getMpiCommunicator())
-
-    call feign_development_config(                              &
-             implement_consolidated_multigrid = test_log,       &
-             single_mesh_input='data/mesh_C32_MG.nc',           &
-             spawn_2d_mesh=.false., spawn_shifted_mesh=.false., &
-             spawn_double_level_mesh=.false. )
 
     ! Create top level collections
     global_mesh_collection = global_mesh_collection_type()

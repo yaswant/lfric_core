@@ -25,8 +25,8 @@ number_of_layers=1,
 /
 
 &files
-  diag_stem_name            = 'diagSkeleton'
-  checkpoint_stem_name      = 'restartSkeleton'
+  diag_stem_name       = 'diagSkeleton'
+  checkpoint_stem_name = 'restartSkeleton'
 /
 
 &finite_element
@@ -39,14 +39,11 @@ vorticity_in_w1=.false.,
 
 &formulation
 use_physics=.false.
+l_multigrid=.false.
 /
 
 &mixing
 smagorinsky=.false.
-/
-
-&multigrid
-l_multigrid=.false.,
 /
 
 &io
@@ -108,8 +105,4 @@ cloud='none',
 convection='none',
 microphysics='none',
 radiation='none'
-/
-
-&development
-implement_consolidated_multigrid=.false.
 /

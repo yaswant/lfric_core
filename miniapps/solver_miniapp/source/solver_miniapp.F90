@@ -52,11 +52,11 @@ program solver_miniapp
 
   character(:), allocatable :: filename
 
-  integer(i_def)     :: total_ranks, local_rank
-  integer(i_def)     :: log_level
-  integer(i_def)     :: comm = -999
+  integer(i_def) :: total_ranks, local_rank
+  integer(i_def) :: log_level
+  integer(i_def) :: comm = -999
 
-  integer(i_def)     :: mesh_id, twod_mesh_id
+  integer(i_def) :: mesh_id
 
   ! prognostic fields
   type( field_type ), target, dimension(3) :: chi
@@ -118,15 +118,17 @@ program solver_miniapp
   ! Create the mesh and function space collection
   allocate( global_mesh_collection, &
             source = global_mesh_collection_type() )
-  call init_mesh(local_rank, total_ranks, mesh_id, twod_mesh_id)
- ! Full global meshes no longer required, so reclaim
+
+  call init_mesh( local_rank, total_ranks, mesh_id )
+
+  call init_fem( mesh_id, chi )
+
+  ! Full global meshes no longer required, so reclaim
   ! the memory from global_mesh_collection
   write(log_scratch_space,'(A)') &
       "Purging global mesh collection."
   call log_event( log_scratch_space, LOG_LEVEL_INFO )
-  deallocate(global_mesh_collection)
-
-  call init_fem(mesh_id,chi)
+  if (allocated(global_mesh_collection)) deallocate(global_mesh_collection)
 
   ! Create and initialise prognostic fields
   call init_solver_miniapp(mesh_id, chi, fv_1)
