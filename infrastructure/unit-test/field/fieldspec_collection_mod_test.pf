@@ -10,7 +10,8 @@ module fieldspec_collection_mod_test
 
   use constants_mod,              only: i_def
   use fieldspec_mod,              only: fieldspec_type
-  use fieldspec_collection_mod,   only: fieldspec_collection_type
+  use fieldspec_collection_mod,   only: fieldspec_collection_type, &
+                                        fieldspec_collection_iterator_type
   use fs_continuity_mod,          only: W3
   use io_driver_enum_mod,         only: WRITE_FIELD_FACE
   use pFUnit_Mod
@@ -18,7 +19,7 @@ module fieldspec_collection_mod_test
   implicit none
 
   private
-  public :: test_assignment
+  public :: test_assignment, test_iterator
 
   @TestCase
   type, extends(TestCase), public :: fieldspec_collection_test_type
@@ -27,6 +28,7 @@ module fieldspec_collection_mod_test
     procedure setUp
     procedure tearDown
     procedure test_assignment
+    procedure test_iterator
   end type fieldspec_collection_test_type
 
 contains
@@ -80,5 +82,49 @@ contains
     @assertEqual("bar", returned_fieldspec%get_unique_id())
 
   end subroutine test_assignment
+
+  !> Test fieldspec collection iterator
+  !>
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @test
+  subroutine test_iterator( self )
+
+    implicit none
+
+    class(fieldspec_collection_test_type), intent(inout) :: self
+    type(fieldspec_type),                  pointer       :: fieldspec => null()
+    type(fieldspec_collection_type)                      :: f_collection
+    type(fieldspec_collection_iterator_type)             :: iterator
+    integer(i_def)                                       :: i
+
+    f_collection = fieldspec_collection_type()
+
+    ! Add two fieldspecs to the collection
+    call f_collection%generate_and_add_fieldspec("fieldspec1", "field_group_name", &
+                                       1_i_def, W3, 0_i_def, &
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE)
+    call f_collection%generate_and_add_fieldspec("fieldspec2", "field_group_name", &
+                                       1_i_def, W3, 0_i_def, &
+                                       0_i_def, 0_i_def, WRITE_FIELD_FACE)
+
+    iterator = f_collection%get_iterator()
+
+    ! Iterate through the fieldspecs in the collection
+    do i=1,10
+      if (.not. iterator%has_next()) exit
+      fieldspec => iterator%next()
+      if (i == 1) then
+        ! The 1st fieldspec should have the unique_id "fieldspec1"
+        @assertEqual("fieldspec1", fieldspec%get_unique_id())
+      else if (i ==2) then
+        ! The 2nd fieldspec should have the unique_id "fieldspec2"
+        @assertEqual("fieldspec2", fieldspec%get_unique_id())
+      end if
+    end do
+
+    ! The loop should have been exited after 2 fieldspecs, so i=3
+    @assertEqual(3, i)
+
+  end subroutine test_iterator
 
 end module fieldspec_collection_mod_test

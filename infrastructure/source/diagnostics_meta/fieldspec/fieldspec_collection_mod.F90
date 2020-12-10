@@ -12,7 +12,7 @@
 
 module fieldspec_collection_mod
 
-  use constants_mod,             only: i_def
+  use constants_mod,             only: i_def, l_def
   use fieldspec_mod,             only: fieldspec_type
   use linked_list_mod,           only: linked_list_type, linked_list_item_type
   use log_mod,                   only: log_event, log_scratch_space, &
@@ -22,6 +22,8 @@ module fieldspec_collection_mod
 
   private
 
+  !===========================================================================
+  !> @brief Holds a collection of fieldspecs in a linked list
   type, public :: fieldspec_collection_type
 
     private
@@ -34,6 +36,7 @@ module fieldspec_collection_mod
     procedure :: generate_and_add_fieldspec
     procedure :: add_fieldspec
     procedure :: get_fieldspec
+    procedure :: get_iterator
     procedure :: get_length
     procedure :: clear
     final     :: fieldspec_collection_destructor
@@ -48,6 +51,26 @@ module fieldspec_collection_mod
   !>
   type(fieldspec_collection_type), public, allocatable, target :: &
       fieldspec_collection
+
+  !===========================================================================
+  !> @brief Iterates through a fieldspec collection
+  type, public :: fieldspec_collection_iterator_type
+
+    private
+
+    !> A pointer to the fieldspec within the collection that will be
+    !> the next to be returned
+    type(linked_list_item_type), pointer :: current
+
+  contains
+    procedure, public :: next
+    procedure, public :: has_next
+  end type fieldspec_collection_iterator_type
+
+  interface fieldspec_collection_iterator_type
+    module procedure fieldspec_collection_iterator_constructor
+  end interface
+  !===========================================================================
 
 contains
 
@@ -233,6 +256,20 @@ contains
   end function get_fieldspec
 
   !===========================================================================
+  !> @brief Returns an iterator on the fieldspec collection
+  !> @return An iterator on the fieldspec collection
+  function get_iterator(self) result(iterator)
+
+    implicit none
+
+    class(fieldspec_collection_type), intent(in) :: self
+    type(fieldspec_collection_iterator_type) :: iterator
+
+    iterator=fieldspec_collection_iterator_type(self)
+
+  end function get_iterator
+
+  !===========================================================================
   !> @brief Returns the number of fieldspec objects stored in this collection
   !> @return The number of fieldspec objects stored in this collection
   !>
@@ -264,5 +301,62 @@ contains
 
     return
   end subroutine clear
+
+  !============================================================================
+  !> @brief Constructor for a fieldspec collection iterator
+  !> @param [in] collection The collection to iterate over
+  function fieldspec_collection_iterator_constructor(collection) result(self)
+
+    implicit none
+
+    type(fieldspec_collection_type) :: collection
+    type(fieldspec_collection_iterator_type) :: self
+
+    ! Start the iterator at the beginning of the fieldspec list.
+    self%current => collection%fieldspec_list%get_head()
+    if (.not.associated(self%current)) then
+      write(log_scratch_space, '(A)') &
+         'Cannot create an iterator on an empty fieldspec collection'
+      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    end if
+
+  end function fieldspec_collection_iterator_constructor
+
+  !============================================================================
+  !> @brief Returns the next fieldspec from the collection
+  !> @return fieldspec The next fieldspec from the collection
+  function next(self) result (fieldspec)
+
+    implicit none
+
+    class(fieldspec_collection_iterator_type), intent(inout), target :: self
+    class(fieldspec_type), pointer :: fieldspec
+
+    ! 'cast' to the fieldspec_type
+    select type(listfieldspec => self%current%payload)
+      type is (fieldspec_type)
+        fieldspec => listfieldspec
+    end select
+
+    ! Move the current fieldspec pointer onto the next fieldspec in the collection
+    self%current => self%current%next
+
+  end function next
+
+  !============================================================================
+  !> Checks if there are any further fieldspecs in the collection being
+  !> iterated over
+  !> @return next Logical showing if there is another fieldspec in the collection
+  function has_next(self) result(next)
+
+    implicit none
+
+    class(fieldspec_collection_iterator_type), intent(in) :: self
+    logical(l_def) :: next
+
+    next = .true.
+    if (.not.associated(self%current)) next = .false.
+
+  end function has_next
 
 end module fieldspec_collection_mod
