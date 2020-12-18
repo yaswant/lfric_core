@@ -189,7 +189,7 @@ subroutine poly1d_vert_flux_code( nlayers,              &
   ! For averaging the wind = +/-1 so the resulting average is non-zero
   ! Make sure we always compute the boundary values
   order = min(vertical_order, 2)
-
+  boundary_offset = 0
 
   ! The boundary values only have a cell on one side of them so the
   ! reconstruction above may not have performed. Therefore we ensure
@@ -197,7 +197,7 @@ subroutine poly1d_vert_flux_code( nlayers,              &
 
   k = 0
   id = 1
-  boundary_offset = 1
+  if ( order > 0 ) boundary_offset = 1
   df = id + vert_offset
   polynomial_density = 0.0_r_def
   do p = 1,order+1
@@ -209,7 +209,7 @@ subroutine poly1d_vert_flux_code( nlayers,              &
 
   k = nlayers-1
   id = 2
-  boundary_offset =  -1
+  if ( order > 0 ) boundary_offset =  -1
   df = id + vert_offset
   polynomial_density = 0.0_r_def
   do p = 1,order+1
