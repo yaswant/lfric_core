@@ -13,9 +13,9 @@ USE constants_mod,                 ONLY : i_def
 USE field_mod,                     ONLY : field_type
 USE field_parent_mod,              ONLY:  read_interface, write_interface,     &
                                           field_parent_proxy_type
-USE read_methods_mod,              ONLY : read_field_single_face,              &
+use lfric_xios_read_mod,           ONLY : read_field_single_face,              &
                                           read_field_face
-USE write_methods_mod,             ONLY : write_field_single_face,             &
+use lfric_xios_write_mod,          ONLY : write_field_single_face,             &
                                           write_field_face
 USE finite_element_config_mod,     ONLY : element_order
 USE function_space_collection_mod, ONLY : function_space_collection

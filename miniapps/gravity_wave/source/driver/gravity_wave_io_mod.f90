@@ -13,7 +13,7 @@ module gravity_wave_io_mod
   use constants_mod,           only : i_def, i_native
   use field_mod,               only : field_type
   use io_config_mod,           only : use_xios_io
-  use io_mod,                  only : initialise_xios
+  use lfric_xios_io_mod,       only : initialise_xios
   use xios,                    only : xios_context_finalize, &
                                       xios_update_calendar
 

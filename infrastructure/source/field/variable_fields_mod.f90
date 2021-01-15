@@ -12,7 +12,7 @@ module variable_fields_mod
   use log_mod,                       only : log_event, &
                                             log_scratch_space, &
                                             LOG_LEVEL_INFO
-  use time_axis_mod,                 only : time_axis_type
+  use lfric_xios_time_axis_mod,      only : time_axis_type
   use linked_list_mod,               only : linked_list_type, &
                                             linked_list_item_type
   implicit none

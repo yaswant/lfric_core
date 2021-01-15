@@ -15,7 +15,9 @@
 # Operate only on this list of sub-projects. May be overridden from the
 # terminal.
 #
-OPERATE_ON ?= infrastructure mesh_tools gungho lfric_atm \
+OPERATE_ON ?= infrastructure                             \
+              components/lfric-xios                      \
+              mesh_tools gungho lfric_atm                \
               lfricinputs                                \
               miniapps/skeleton                          \
               miniapps/diagnostics                       \

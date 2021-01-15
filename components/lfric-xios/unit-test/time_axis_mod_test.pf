@@ -10,7 +10,7 @@ module time_axis_mod_test
   use pFUnit_Mod
 
   use constants_mod,                  only : i_def, r_def, str_def
-  use time_axis_mod,                  only : time_axis_type
+  use lfric_xios_time_axis_mod,       only : time_axis_type
 
   implicit none
 

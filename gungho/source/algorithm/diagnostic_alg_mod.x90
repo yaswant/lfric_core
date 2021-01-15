@@ -547,7 +547,7 @@ contains
                                               vorticity_in_w1
     use function_space_collection_mod,  only: function_space_collection
     use field_parent_mod,               only: write_interface
-    use write_methods_mod,              only: write_field_face
+    use lfric_xios_write_mod,           only: write_field_face
     implicit none
 
     type(field_type), intent(out) :: vorticity

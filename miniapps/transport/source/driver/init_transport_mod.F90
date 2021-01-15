@@ -20,7 +20,7 @@ module init_transport_mod
   use function_space_collection_mod,  only: function_space_collection
   use io_config_mod,                  only: write_diag, &
                                             use_xios_io
-  use write_methods_mod,              only: write_field_face
+  use lfric_xios_write_mod,           only: write_field_face
   use log_mod,                        only: log_event,                &
                                             LOG_LEVEL_INFO
   use transport_init_fields_alg_mod,  only: transport_init_fields_alg

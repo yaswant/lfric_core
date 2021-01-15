@@ -17,7 +17,7 @@ module io_dev_model_mod
   use global_mesh_collection_mod, only : global_mesh_collection, &
                                          global_mesh_collection_type
   use init_clock_mod,             only : initialise_clock
-  use io_mod,                     only : initialise_xios
+  use lfric_xios_io_mod,          only : initialise_xios
   use linked_list_mod,            only : linked_list_type
   use local_mesh_collection_mod,  only : local_mesh_collection, &
                                          local_mesh_collection_type
@@ -32,7 +32,6 @@ module io_dev_model_mod
                                          LOG_LEVEL_INFO,     &
                                          LOG_LEVEL_DEBUG,    &
                                          LOG_LEVEL_TRACE
-
   use mpi_mod,                    only : store_comm,    &
                                          get_comm_size, &
                                          get_comm_rank

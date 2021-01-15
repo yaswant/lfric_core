@@ -85,6 +85,11 @@ build: ALWAYS
                   SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
 	          SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source
+	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
+	          SOURCE_DIR=$(ROOT_DIR)/components/lfric-xios/source
+	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
+	          SOURCE_DIR=$(ROOT_DIR)/components/lfric-xios/source \
+	          OPTIMISATION_PATH=$(OPTIMISATION_PATH)
 	$(call MESSAGE,========================================)
 	$(call MESSAGE,Extracting Gungho dynamical core)
 	$(call MESSAGE,========================================)
@@ -125,7 +130,8 @@ build: ALWAYS
 # Unit tests
 #
 .PHONY: unit-tests
-unit-tests: export ADDITIONAL_EXTRACTION = $(ROOT_DIR)/infrastructure/source
+unit-tests: export ADDITIONAL_EXTRACTION = "$(ROOT_DIR)/infrastructure/source \
+                                            $(ROOT_DIR)/components/lfric-xios/source"
 unit-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit
 unit-tests: export FFLAG_GROUPS += DEBUG NO_OPTIMISATION INIT UNIT_WARNINGS

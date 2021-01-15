@@ -20,7 +20,7 @@ SUBROUTINE read_from_dump(dep_graph)
 !
 
 USE gen_io_check_mod,       ONLY: gen_io_check
-USE read_methods_mod,       ONLY: read_field_face, read_field_single_face
+use lfric_xios_read_mod,    ONLY: read_field_face, read_field_single_face
 USE field_mod,              ONLY: field_proxy_type
 USE field_parent_mod,       ONLY: read_interface
 USE log_mod,                ONLY: log_event, log_scratch_space, LOG_LEVEL_ERROR

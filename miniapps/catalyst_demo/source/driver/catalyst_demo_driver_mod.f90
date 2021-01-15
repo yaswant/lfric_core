@@ -24,8 +24,8 @@ module catalyst_demo_driver_mod
                                             gravity_wave_alg_final
   use init_catalyst_demo_mod,         only: init_catalyst_demo
   use init_clock_mod,                 only: initialise_clock
-  use io_mod,                         only: initialise_xios,   &
-                                            ts_fname
+  use lfric_xios_io_mod,              only: initialise_xios
+  use io_mod,                         only: ts_fname
   use diagnostics_io_mod,             only: write_scalar_diagnostic, &
                                             write_vector_diagnostic
   use local_mesh_collection_mod,      only: local_mesh_collection, &

@@ -32,12 +32,12 @@ module init_catalyst_demo_mod
                                              use_xios_io,      &
                                              checkpoint_write, &
                                              checkpoint_read
-  use write_methods_mod,              only : write_field_face, &
-                                             write_field_node, &
-                                             checkpoint_write_xios, &
+  use io_mod,                         only : checkpoint_read_netcdf, &
                                              checkpoint_write_netcdf
-  use read_methods_mod,               only : checkpoint_read_netcdf, &
-                                             checkpoint_read_xios
+  use lfric_xios_read_mod,            only : checkpoint_read_xios
+  use lfric_xios_write_mod,           only : write_field_face, &
+                                             write_field_node, &
+                                             checkpoint_write_xios
 
   use function_space_mod,             only : function_space_type
   use function_space_collection_mod,  only : function_space_collection

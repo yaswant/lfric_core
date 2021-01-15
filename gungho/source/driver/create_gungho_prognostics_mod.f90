@@ -29,11 +29,11 @@ module create_gungho_prognostics_mod
                                              mr_names
   use moist_dyn_mod,                  only : num_moist_factors
   use pure_abstract_field_mod,        only : pure_abstract_field_type
-  use write_methods_mod,              only : write_field_node, &
+  use lfric_xios_read_mod,            only : checkpoint_read_xios
+  use lfric_xios_write_mod,           only : write_field_node, &
                                              write_field_face, &
-                                             checkpoint_write_netcdf, &
                                              checkpoint_write_xios
-  use read_methods_mod,               only : checkpoint_read_xios, &
+  use io_mod,                         only : checkpoint_write_netcdf, &
                                              checkpoint_read_netcdf
   use io_config_mod,                  only : use_xios_io,     &
                                              write_diag,      &

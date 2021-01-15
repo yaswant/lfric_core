@@ -1,14 +1,15 @@
 !-------------------------------------------------------------------------------
-!(c) Crown copyright 2020 Met Office. All rights reserved.
-!The file LICENCE, distributed with this code, contains details of the terms
-!under which the code may be used.
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
 !-------------------------------------------------------------------------------
 
-!>  @brief Module for field reading routines
-!>  @details Holds all routines for reading LFRic fields. All routines are set
-!>           up to read data with dimension ordering according to the
-!>           recommendations in the NetCDF CF standard.
-module read_methods_mod
+!>  @brief    Module for field reading routines
+!>  @details  Holds all routines for reading LFRic fields. All routines are set
+!>            up to read data with dimension ordering according to the
+!>            recommendations in the NetCDF CF standard.
+!>
+module lfric_xios_read_mod
 
   use constants_mod,                 only: i_def, dp_xios, str_def, r_def, &
                                            r_solver
@@ -28,13 +29,17 @@ module read_methods_mod
                                            log_scratch_space, &
                                            LOG_LEVEL_INFO,    &
                                            LOG_LEVEL_ERROR
-  use xios
+  use xios,                          only: xios_field,           &
+                                           xios_recv_field,      &
+                                           xios_get_handle,      &
+                                           xios_get_attr,        &
+                                           xios_get_domain_attr, &
+                                           xios_get_axis_attr
 
   implicit none
 
   private
-  public :: checkpoint_read_netcdf,  &
-            checkpoint_read_xios,    &
+  public :: checkpoint_read_xios,    &
             read_field_node,         &
             read_field_edge,         &
             read_field_face,         &
@@ -46,49 +51,14 @@ module read_methods_mod
 
 contains
 
-!> @brief   I/O handler for reading a netcdf checkpoint
-!> @details Legacy method for reading checkpoints
-!           Note this routine accepts a field name but
-!           doesn't use it - this is to keep the interface
-!           the same for all methods
-!>@param[in] field_name Name of the field to read
-!>@param[in] file_name Name of the file to read from
-!>@param[in,out] field_proxy the proxy of the field to read data into
-subroutine checkpoint_read_netcdf(field_name, file_name, field_proxy)
-  use field_io_ncdf_mod,    only : field_io_ncdf_type
-
-  implicit none
-
-  character(len=*),              intent(in)    :: field_name
-  character(len=*),              intent(in)    :: file_name
-  class(field_parent_proxy_type), intent(inout) :: field_proxy
-
-  type(field_io_ncdf_type), allocatable :: ncdf_file
-
-  allocate(ncdf_file)
-
-  call ncdf_file%file_open( file_name )
-
-  select type(field_proxy)
-
-    type is (field_proxy_type)
-    call ncdf_file%read_field_data( field_proxy%data(:) )
-
-  end select
-
-  call ncdf_file%file_close()
-
-  deallocate(ncdf_file)
-
-end subroutine checkpoint_read_netcdf
-
-!> @brief   I/O handler for reading an XIOS netcdf checkpoint
-!> @details Note this routine accepts a filename but doesn't
-!           use it - this is to keep the interface the same
-!           for all methods
-!>@param[in] xios_field_name XIOS unique id for the field
-!>@param[in] file_name Name of the file to read
-!>@param[in,out] field_proxy the proxy of the field to read into
+!>  @brief    I/O handler for reading an XIOS netcdf checkpoint
+!>  @details  Note this routine accepts a filename but doesn't use it - this is
+!>           to keep the interface the same for all methods
+!>
+!>  @param[in]      xios_field_name  XIOS identifier for the field
+!>  @param[in]      file_name        Name of the file to read
+!>  @param[in,out]  field_proxy      A field proxy to read data into
+!>
 subroutine checkpoint_read_xios(xios_field_name, file_name, field_proxy)
 
   implicit none
@@ -107,14 +77,18 @@ subroutine checkpoint_read_xios(xios_field_name, file_name, field_proxy)
     type is (field_proxy_type)
     call xios_recv_field(xios_field_name, field_proxy%data(1:undf))
 
+    class default
+    call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
 end subroutine checkpoint_read_xios
 
-!> @brief   Read a field in UGRID format on the node domain via XIOS
-!>@param[in]    xios_field_name XIOS identifier for the field
-!>@param[inout] field_proxy     A field proxy containing the data to output
-!-------------------------------------------------------------------------------
+!>  @brief  Read node UGRID data on to a W0 field via XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to read data into
+!>
 subroutine read_field_node(xios_field_name, field_proxy)
 
   implicit none
@@ -153,16 +127,20 @@ subroutine read_field_node(xios_field_name, field_proxy)
                   int(recv_field( i*(domain_size)+1 : (i+1)*domain_size ), i_def)
     end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
   deallocate(recv_field)
 
 end subroutine read_field_node
 
-!> @brief   Read a field in UGRID format on the edge domain via XIOS
-!>@param[in]    xios_field_name XIOS identifier for the field
-!>@param[inout] field_proxy     A field proxy containing the data to output
-!-------------------------------------------------------------------------------
+!>  @brief  Read half-level edge UGRID data on to a W2H field via XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to read data into
+!>
 subroutine read_field_edge(xios_field_name, field_proxy)
 
   implicit none
@@ -208,15 +186,20 @@ subroutine read_field_edge(xios_field_name, field_proxy)
                real(recv_field( i*(domain_size)+1 : (i+1)*domain_size ), r_solver)
     end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
   deallocate(recv_field)
 
 end subroutine read_field_edge
 
-!> @brief   Read a field in UGRID format on the face domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy to read data into
+!>  @brief  Read full/half-level face UGRID data on to a W3/WTheta field via XIOS
+!>
+!>  @param[in]  xios_field_name  XIOS identifier for the field
+!>  @param[in]  field_proxy      A field proxy to read data into
+!>
 subroutine read_field_face(xios_field_name, field_proxy)
 
   implicit none
@@ -272,6 +255,8 @@ subroutine read_field_face(xios_field_name, field_proxy)
              real( recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size), r_solver)
     end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
 
   end select
 
@@ -279,9 +264,11 @@ subroutine read_field_face(xios_field_name, field_proxy)
 
 end subroutine read_field_face
 
-!> @brief   Read a single level field in UGRID format on the face domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy to read data into
+!>  @brief  Read face domain UGRID data on to a single-level W3 field via XIOS
+!>
+!>  @param[in]  xios_field_name  XIOS identifier for the field
+!>  @param[in]  field_proxy      A field proxy to read data into
+!>
 subroutine read_field_single_face(xios_field_name, field_proxy)
 
   implicit none
@@ -339,161 +326,22 @@ subroutine read_field_single_face(xios_field_name, field_proxy)
               real(recv_field(i*(domain_size)+1:(i*(domain_size)) + domain_size), r_solver)
     end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
   deallocate(recv_field)
 
 end subroutine read_field_single_face
 
-!> @brief   Read into a collection of fields
-!> @details Iterate over a field collection and read each field
-!>          into a collection, if it is enabled for read
-!>@param[in,out] state -  the collection of fields to populate
-!>@param[in,optional] prefix A prefix to be added to the field name to create the XIOS field ID
-!>@param[in,optional] suffix A suffix to be added to the field name to create the XIOS field ID
-subroutine read_state(state, prefix, suffix)
-
-  implicit none
-
-  type( field_collection_type ), intent(inout) :: state
-  character( len=* ), optional,  intent(in)    :: prefix
-  character( len=* ), optional,  intent(in)    :: suffix
-
-  type( field_collection_iterator_type) :: iter
-  character( str_def )                  :: xios_field_id
-
-  class( field_parent_type ), pointer :: fld => null()
-
-  iter = state%get_iterator()
-
-  do
-    if ( .not.iter%has_next() ) exit
-    fld => iter%next()
-    select type(fld)
-      type is (field_type)
-        if ( fld%can_read() ) then
-          call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
-                          LOG_LEVEL_INFO )
-
-          ! Construct the XIOS field ID from the LFRic field name and optional arguments
-          xios_field_id = trim(adjustl(fld%get_name()))
-          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
-          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
-
-          call fld%read_field(xios_field_id)
-        else
-          call log_event('Read method for  '//trim(adjustl(fld%get_name()))// &
-                         ' not set up', LOG_LEVEL_INFO )
-        end if
-
-      type is (integer_field_type)
-        if ( fld%can_read() ) then
-          call log_event( &
-            'Reading '//trim(adjustl(fld%get_name())), &
-            LOG_LEVEL_INFO)
-
-          ! Construct the XIOS field ID from the LFRic field name and optional arguments
-          xios_field_id = trim(adjustl(fld%get_name()))
-          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
-          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
-
-          call fld%read_field(xios_field_id)
-        else
-          call log_event( 'Read method for  '// trim(adjustl(fld%get_name())) // &
-                          ' not set up', LOG_LEVEL_INFO )
-        end if
-
-      type is (r_solver_field_type)
-        if ( fld%can_read() ) then
-          call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
-            LOG_LEVEL_INFO)
-
-          ! Construct the XIOS field ID from the LFRic field name and optional
-          ! arguments
-          xios_field_id = trim(adjustl(fld%get_name()))
-          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
-          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
-
-          call fld%read_field(xios_field_id)
-        else
-          call log_event( 'Read method for  '// trim(adjustl(fld%get_name())) // &
-                          ' not set up', LOG_LEVEL_INFO )
-        end if
-
-    end select
-  end do
-
-  nullify(fld)
-
-end subroutine read_state
-
-!> @brief   Read from a checkpoint into a collection of fields
-!> @details Iterate over a field collection and read each field
-!>          into a collection, if it is enabled for checkpointing
-!>@param[in] state -  the collection of fields to populate
-!>@param[in] timestep the current timestep
-subroutine read_checkpoint(state, timestep)
-
-  implicit none
-
-  type( field_collection_type ), intent(inout) :: state
-  integer(i_def),                intent(in)    :: timestep
-
-  type( field_collection_iterator_type) :: iter
-
-  class( field_parent_type ), pointer :: fld => null()
-
-  iter = state%get_iterator()
-  do
-    if ( .not.iter%has_next() ) exit
-    fld => iter%next()
-    select type(fld)
-      type is (field_type)
-        if ( fld%can_checkpoint() ) then
-          call log_event( 'Reading checkpoint file to restart '// &
-                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
-          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
-                                    trim(ts_fname(checkpoint_stem_name, "",    &
-                                    trim(adjustl(fld%get_name())),timestep,"")) )
-        else
-          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
-                          ' not set up', LOG_LEVEL_INFO )
-        end if
-      type is (integer_field_type)
-        if ( fld%can_checkpoint() ) then
-          call log_event( 'Reading checkpoint file to restart '// &
-                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
-          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
-                                    trim(ts_fname(checkpoint_stem_name, "",    &
-                                    trim(adjustl(fld%get_name())),timestep,"")) )
-        else
-          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
-                          ' not set up', LOG_LEVEL_INFO )
-        end if
-
-      type is (r_solver_field_type)
-        if ( fld%can_checkpoint() ) then
-          call log_event( 'Reading checkpoint file to restart '// &
-                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
-          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
-                                    trim(ts_fname(checkpoint_stem_name, "",    &
-                                    trim(adjustl(fld%get_name())),timestep,"")))
-        else
-          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
-                          ' not set up', LOG_LEVEL_INFO )
-        end if
-
-    end select
-  end do
-
-  nullify(fld)
-
-end subroutine read_checkpoint
-
-!> @brief   Read a time-varying field in UGRID format using XIOS
-!>@param[in]    xios_field_name XIOS identifier for the field
-!>@param[inout] field_proxy A field proxy to be read into
-!>@param[in]    time_index The indices of the time 'columns' to be read in
+!>  @brief  Read a time-varying field in UGRID format using XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to be read into
+!>  @param[in]     time_index       The indices of the time 'columns' to be
+!>                                  read in
+!>
 subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
 
   implicit none
@@ -598,9 +446,11 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
 
 end subroutine read_field_time_var
 
-!> @brief Read time data using XIOS
-!>@param[in]  time_id   The XIOS ID for the time data
-!>@param[out] time_data The array of time data
+!>  @brief  Read time data using XIOS
+!>
+!>  @param[in]   time_id    The XIOS ID for the time data
+!>  @param[out]  time_data  The array of time data
+!>
 subroutine read_time_data(time_id, time_data)
 
   implicit none
@@ -641,4 +491,155 @@ subroutine read_time_data(time_id, time_data)
 
 end subroutine read_time_data
 
-end module read_methods_mod
+!>  @brief    Read into a collection of fields
+!>  @details  Iterate over a field collection and read each field
+!>            into a collection, if it is enabled for read
+!>
+!>  @param[in,out]       state   The collection of fields to populate
+!>  @param[in,optional]  prefix  A prefix to be added to the field name to
+!>                               create the XIOS field ID
+!>  @param[in,optional]  suffix  A suffix to be added to the field name to
+!>                               create the XIOS field ID
+!>
+subroutine read_state(state, prefix, suffix)
+
+  implicit none
+
+  type( field_collection_type ), intent(inout) :: state
+  character( len=* ), optional,  intent(in)    :: prefix
+  character( len=* ), optional,  intent(in)    :: suffix
+
+  type( field_collection_iterator_type) :: iter
+  character( str_def )                  :: xios_field_id
+
+  class( field_parent_type ), pointer :: fld => null()
+
+  iter = state%get_iterator()
+
+  do
+    if ( .not.iter%has_next() ) exit
+    fld => iter%next()
+    select type(fld)
+      type is (field_type)
+        if ( fld%can_read() ) then
+          call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
+                          LOG_LEVEL_INFO )
+
+          ! Construct the XIOS field ID from the LFRic field name and optional arguments
+          xios_field_id = trim(adjustl(fld%get_name()))
+          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
+          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
+
+          call fld%read_field(xios_field_id)
+        else
+          call log_event('Read method for  '//trim(adjustl(fld%get_name()))// &
+                         ' not set up', LOG_LEVEL_INFO )
+        end if
+
+      type is (integer_field_type)
+        if ( fld%can_read() ) then
+          call log_event( &
+            'Reading '//trim(adjustl(fld%get_name())), &
+            LOG_LEVEL_INFO)
+
+          ! Construct the XIOS field ID from the LFRic field name and optional arguments
+          xios_field_id = trim(adjustl(fld%get_name()))
+          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
+          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
+
+          call fld%read_field(xios_field_id)
+        else
+          call log_event( 'Read method for  '// trim(adjustl(fld%get_name())) // &
+                          ' not set up', LOG_LEVEL_INFO )
+        end if
+
+      type is (r_solver_field_type)
+        if ( fld%can_read() ) then
+          call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
+            LOG_LEVEL_INFO)
+
+          ! Construct the XIOS field ID from the LFRic field name and optional
+          ! arguments
+          xios_field_id = trim(adjustl(fld%get_name()))
+          if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
+          if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
+
+          call fld%read_field(xios_field_id)
+        else
+          call log_event( 'Read method for  '// trim(adjustl(fld%get_name())) // &
+                          ' not set up', LOG_LEVEL_INFO )
+        end if
+
+    end select
+  end do
+
+  nullify(fld)
+
+end subroutine read_state
+
+!>  @brief    Read from a checkpoint into a collection of fields
+!>  @details  Iterate over a field collection and read each field
+!>            into a collection, if it is enabled for checkpointing
+!>
+!>  @param[in]  state     The collection of fields to populate
+!>  @param[in]  timestep  The current timestep
+!>
+subroutine read_checkpoint(state, timestep)
+
+  implicit none
+
+  type( field_collection_type ), intent(inout) :: state
+  integer(i_def),                intent(in)    :: timestep
+
+  type( field_collection_iterator_type) :: iter
+
+  class( field_parent_type ), pointer :: fld => null()
+
+  iter = state%get_iterator()
+  do
+    if ( .not.iter%has_next() ) exit
+    fld => iter%next()
+    select type(fld)
+      type is (field_type)
+        if ( fld%can_checkpoint() ) then
+          call log_event( 'Reading checkpoint file to restart '// &
+                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
+          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
+                                    trim(ts_fname(checkpoint_stem_name, "",    &
+                                    trim(adjustl(fld%get_name())),timestep,"")) )
+        else
+          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
+                          ' not set up', LOG_LEVEL_INFO )
+        end if
+      type is (integer_field_type)
+        if ( fld%can_checkpoint() ) then
+          call log_event( 'Reading checkpoint file to restart '// &
+                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
+          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
+                                    trim(ts_fname(checkpoint_stem_name, "",    &
+                                    trim(adjustl(fld%get_name())),timestep,"")) )
+        else
+          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
+                          ' not set up', LOG_LEVEL_INFO )
+        end if
+
+      type is (r_solver_field_type)
+        if ( fld%can_checkpoint() ) then
+          call log_event( 'Reading checkpoint file to restart '// &
+                           trim(adjustl(fld%get_name())), LOG_LEVEL_INFO)
+          call fld%read_checkpoint( "restart_"//trim(adjustl(fld%get_name())), &
+                                    trim(ts_fname(checkpoint_stem_name, "",    &
+                                    trim(adjustl(fld%get_name())),timestep,"")))
+        else
+          call log_event( 'Checkpointing for  '// trim(adjustl(fld%get_name())) // &
+                          ' not set up', LOG_LEVEL_INFO )
+        end if
+
+    end select
+  end do
+
+  nullify(fld)
+
+end subroutine read_checkpoint
+
+end module lfric_xios_read_mod

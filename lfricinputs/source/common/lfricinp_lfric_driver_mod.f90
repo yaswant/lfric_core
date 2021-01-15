@@ -14,7 +14,7 @@ USE log_mod,                    ONLY: log_event, log_scratch_space,            &
                                       finalise_logging
 
 ! LFRic Modules
-USE io_mod,                     ONLY: initialise_xios
+USE lfric_xios_io_mod,          ONLY: initialise_xios
 USE create_mesh_mod,            ONLY: init_mesh
 USE create_fem_mod,             ONLY: init_fem
 USE derived_config_mod,         ONLY: set_derived_config
@@ -44,7 +44,7 @@ IMPLICIT NONE
 PRIVATE
 PUBLIC :: lfricinp_initialise_lfric, lfricinp_finalise_lfric, lfric_fields
 
-CHARACTER(len=fnamelen) :: xios_id 
+CHARACTER(len=fnamelen) :: xios_id
 ! xios_ctx names needs to match iodef.xml file
 CHARACTER(len=*), PARAMETER :: xios_ctx  = "gungho_atm"
 CHARACTER(len=fnamelen) :: program_name

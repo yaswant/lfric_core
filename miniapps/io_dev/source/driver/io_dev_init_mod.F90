@@ -21,19 +21,19 @@ module io_dev_init_mod
   use log_mod,                        only : log_event, &
                                              LOG_LEVEL_INFO
   use pure_abstract_field_mod,        only : pure_abstract_field_type
-  use time_axis_mod,                  only : time_axis_type, update_interface
+  use lfric_xios_time_axis_mod,       only : time_axis_type, update_interface
   ! Configuration
   use finite_element_config_mod,      only : element_order
   use initialization_config_mod,      only : init_option,                     &
                                              init_option_fd_start_dump
   ! I/O methods
-  use read_methods_mod,               only : read_field_node,                 &
+  use lfric_xios_read_mod,            only : read_field_node,                 &
                                              read_field_edge,                 &
                                              read_field_face,                 &
                                              read_field_single_face,          &
                                              read_field_time_var,             &
                                              read_state
-  use write_methods_mod,              only : write_field_node,                &
+  use lfric_xios_write_mod,           only : write_field_node,                &
                                              write_field_edge,                &
                                              write_field_face,                &
                                              write_field_single_face

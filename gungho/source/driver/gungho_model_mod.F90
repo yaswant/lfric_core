@@ -34,7 +34,7 @@ module gungho_model_mod
   use init_altitude_mod,          only : init_altitude
   use init_clock_mod,             only : initialise_clock
   use init_altitude_mod,          only : init_altitude
-  use io_mod,                     only : initialise_xios
+  use lfric_xios_io_mod,          only : initialise_xios
   use io_config_mod,              only : subroutine_timers,       &
                                          subroutine_counters,     &
                                          use_xios_io,             &
@@ -84,7 +84,7 @@ module gungho_model_mod
                                          method_rk
   use transport_config_mod,       only : scheme, &
                                          scheme_method_of_lines
-  use write_methods_mod,          only : write_state, &
+  use lfric_xios_write_mod,       only : write_state, &
                                          write_field_single_face
   use xios,                       only : xios_context_finalize, &
                                          xios_update_calendar

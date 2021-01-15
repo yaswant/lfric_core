@@ -26,9 +26,9 @@ module diagnostics_calc_mod
                                            nodal_output_on_w3
   use files_config_mod,              only: diag_stem_name
   use project_output_mod,            only: project_output
-  use io_mod,                        only: ts_fname
-  use write_methods_mod,             only: nodal_write_field,           &
-                                           write_field_face,       &
+  use io_mod,                        only: ts_fname, &
+                                           nodal_write_field
+  use lfric_xios_write_mod,          only: write_field_face, &
                                            write_field_edge
   use diagnostics_io_mod,            only: write_scalar_diagnostic,     &
                                            write_vector_diagnostic

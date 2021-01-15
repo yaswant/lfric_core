@@ -193,9 +193,9 @@ SUBROUTINE dump_write(global_field_index)
 ! parameter set, to the target dump.
 !
 
-USE write_methods_mod, ONLY: write_field_face, write_field_single_face
-USE field_parent_mod,  ONLY: write_interface
-USE field_mod,         ONLY: field_proxy_type
+USE lfric_xios_write_mod, ONLY: write_field_face, write_field_single_face
+USE field_parent_mod,     ONLY: write_interface
+USE field_mod,            ONLY: field_proxy_type
 
 IMPLICIT NONE
 

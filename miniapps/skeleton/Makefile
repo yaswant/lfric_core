@@ -125,6 +125,17 @@ build: ALWAYS
 	          SOURCE_DIR=$(LFRIC_INFRASTRUCTURE)/source \
 	          OPTIMISATION_PATH=$(OPTIMISATION_PATH)
 	$(call MESSAGE,========================================)
+	$(call MESSAGE,Extracting LFRic-XIOS model component)
+	$(call MESSAGE,========================================)
+	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
+	          SOURCE_DIR=$(ROOT_DIR)/components/lfric-xios/source
+	$(call MESSAGE,========================================)
+	$(call MESSAGE,Psycloning LFRic-XIOS model component)
+	$(call MESSAGE,========================================)
+	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/psyclone.mk \
+	          SOURCE_DIR=$(ROOT_DIR)/components/lfric-xios/source \
+	          OPTIMISATION_PATH=$(OPTIMISATION_PATH)
+	$(call MESSAGE,========================================)
 	$(call MESSAGE,Extracting Gungho dynamical core)
 	$(call MESSAGE,========================================)
 	$Q$(MAKE) $(QUIET_ARG) -f $(LFRIC_BUILD)/extract.mk \
@@ -167,6 +178,7 @@ build: ALWAYS
 # 
 .PHONY: unit-tests
 unit-tests: export ADDITIONAL_EXTRACTION = "$(ROOT_DIR)/infrastructure/source \
+                                            $(ROOT_DIR)/components/lfric-xios/source \
                                             $(ROOT_DIR)/gungho/source"
 unit-tests: export BIN_DIR ?= $(PROJECT_DIR)/test
 unit-tests: export EXTERNAL_STATIC_LIBRARIES += pfunit

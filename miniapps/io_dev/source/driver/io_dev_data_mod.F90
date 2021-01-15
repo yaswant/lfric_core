@@ -31,8 +31,8 @@ module io_dev_data_mod
                                                ancil_option,              &
                                                ancil_option_basic_gal
   ! I/O methods
-  use read_methods_mod,                 only : read_state
-  use write_methods_mod,                only : write_state
+  use lfric_xios_read_mod,              only : read_state
+  use lfric_xios_write_mod,             only : write_state
   ! IO_Dev modules
   use io_dev_init_mod,                  only : setup_io_dev_fields
   use io_dev_init_fields_alg_mod,       only : io_dev_init_fields_alg

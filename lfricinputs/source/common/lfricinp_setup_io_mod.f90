@@ -7,7 +7,7 @@ MODULE lfricinp_setup_io_mod
 
 USE clock_mod,                     ONLY: clock_type
 USE constants_mod,                 ONLY: i_def, str_max_filename
-USE file_mod,                      ONLY: xios_file_type
+USE lfric_xios_file_mod,           ONLY: xios_file_type
 USE linked_list_mod,               ONLY: linked_list_type,                     &
                                          linked_list_item_type
 

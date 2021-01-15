@@ -11,7 +11,7 @@ module io_dev_init_files_mod
   ! Infrastructure
   use clock_mod,                     only: clock_type
   use constants_mod,                 only: i_def, str_def, str_max_filename
-  use file_mod,                      only: xios_file_type
+  use lfric_xios_file_mod,           only: xios_file_type
   use linked_list_mod,               only: linked_list_type, &
                                            linked_list_item_type
 

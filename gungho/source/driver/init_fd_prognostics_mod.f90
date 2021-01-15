@@ -12,7 +12,7 @@ module init_fd_prognostics_mod
                                              log_scratch_space, &
                                              LOG_LEVEL_INFO,    &
                                              LOG_LEVEL_TRACE
-  use read_methods_mod,                only: read_state
+  use lfric_xios_read_mod,             only: read_state
 
   ! Derived Types
   use field_mod,                       only: field_type

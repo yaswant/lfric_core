@@ -1,0 +1,889 @@
+!-------------------------------------------------------------
+! (C) Crown copyright 2020 Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt
+! which you should have received as part of this distribution.
+!-------------------------------------------------------------
+
+!>  @brief    Module for IO subroutines for the lfric-XIOS interface
+!>
+module lfric_xios_io_mod
+
+  use base_mesh_config_mod,          only: geometry, &
+                                           geometry_spherical
+  use clock_mod,                     only: clock_type
+  use constants_mod,                 only: i_def, i_native, i_halo_index, &
+                                           r_def, dp_xios,                &
+                                           str_def, radians_to_degrees
+  use coord_transform_mod,           only: xyz2llr
+  use field_mod,                     only: field_type, field_proxy_type
+  use finite_element_config_mod,     only: element_order
+  use lfric_xios_file_mod,           only: xios_file_type
+  use function_space_mod,            only: function_space_type, BASIS
+  use function_space_collection_mod, only: function_space_collection
+  use fs_continuity_mod,             only: W0, W1, W2, W3, Wtheta, W2H, &
+                                           name_from_functionspace
+  use linked_list_mod,               only: linked_list_type, &
+                                           linked_list_item_type
+  use log_mod,                       only: log_event, LOG_LEVEL_INFO
+  use mesh_mod,                      only: mesh_type
+  use mpi_mod,                       only: get_comm_size, get_comm_rank, all_gather
+  use psykal_lite_mod,               only: invoke_nodal_coordinates_kernel
+  use psykal_builtin_light_mod,      only: invoke_pointwise_convert_xyz2llr
+  use xios
+
+  implicit none
+  private
+  public :: initialise_xios
+
+! Each column of a higher-order discontinuous field can be used to
+! represent multi-dimensional quantities like tiles, plant functional
+! types and sea ice categories. Set parameters for the orders required:
+! This will likely change once #1552 is on trunk
+integer(i_def), public, parameter :: tile_order = 2 ! Enough space for 27 tiles
+integer(i_def), public, parameter :: pft_order  = 1 ! Enough space for 8 plant functional types
+integer(i_def), public, parameter :: sice_order = 0 ! Single NWP sea-ice category for now
+integer(i_def), public, parameter :: soil_order = 1 ! Enough space for 8 soil levels
+integer(i_def), public, parameter :: snow_order = 2 ! Enough space for 9 tiles and 3 snow layers, i.e. 27
+
+contains
+
+
+!>  @brief    Performs XIOS context, dimension and file initialisation
+!>
+!>  @param[in]           xios_ctx      XIOS context identifier
+!>  @param[in]           mpi_comm      The MPI comm object
+!>  @param[in]           clock         Model time
+!>  @param[in]           mesh_id       Mesh id
+!>  @param[in]           twod_mesh_id  2D Mesh id
+!>  @param[in]           chi           Coordinate field
+!>  @param[in,optional]  files_list    List of XIOS files to be initialised
+!>
+subroutine initialise_xios( xios_ctx, mpi_comm, clock, mesh_id, twod_mesh_id, &
+                            chi, files_list )
+
+  implicit none
+
+  ! Arguments
+  character(len=*),                 intent(in) :: xios_ctx
+  integer(i_def),                   intent(in) :: mpi_comm
+  type(clock_type),                 intent(in) :: clock
+  integer(i_def),                   intent(in) :: mesh_id
+  integer(i_def),                   intent(in) :: twod_mesh_id
+  type(field_type),                 intent(in) :: chi(:)
+  type(linked_list_type), optional, intent(in) :: files_list
+
+  ! Local variables
+  type(xios_context)  :: xios_ctx_hdl
+  type(xios_date)     :: xios_start_date
+  type(xios_duration) :: xios_timestep, xios_since_timestep_zero
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Setup context !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  call log_event("Initialising XIOS model context", LOG_LEVEL_INFO)
+
+  call xios_context_initialize(xios_ctx, mpi_comm)
+  call xios_get_handle(xios_ctx, xios_ctx_hdl)
+  call xios_set_current_context(xios_ctx_hdl)
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Setup XIOS domains !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  call init_xios_dimensions(mesh_id, twod_mesh_id, chi)
+
+  !!!!!!!!!!!!! Setup files context information !!!!!!!!!!!!!!!!!!
+
+  if ( present(files_list) ) then
+    call setup_xios_files(files_list, clock)
+  end if
+
+  !!!!!!!!!!!!!!!!!!!! Setup calendar and finalise context !!!!!!!!!!!!!!!!!!!!
+
+  ! Set the current date by adding the run length so far to the run start date
+  ! obtained from the iodef file.
+  call xios_get_start_date(xios_start_date)
+  xios_since_timestep_zero%second = &
+                           clock%seconds_from_steps(clock%get_first_step() - 1)
+  xios_start_date = xios_start_date + xios_since_timestep_zero
+  call xios_set_start_date(xios_start_date)
+
+  ! Set the XIOS time-step from the model clock
+  xios_timestep%second = clock%get_seconds_per_step()
+  call xios_set_timestep(xios_timestep)
+
+  call xios_close_context_definition()
+
+  return
+
+end subroutine initialise_xios
+
+!>  @brief    Performs XIOS domain and axis initialisation
+!>  @details  Calculates the coordinates and bounds for the different kinds of
+!>            XIOS dimensionality (domains, axes, etc) and initialised the
+!>            corresponding XIOS objects
+!>
+!>  @param[in]  mesh_id       Mesh id
+!>  @param[in]  twod_mesh_id  2D Mesh id
+!>  @param[in]  chi           Coordinate field
+!>
+subroutine init_xios_dimensions(mesh_id, twod_mesh_id, chi)
+
+  implicit none
+
+  ! Arguments
+  integer(i_def),   intent(in) :: mesh_id
+  integer(i_def),   intent(in) :: twod_mesh_id
+  type(field_type), intent(in) :: chi(:)
+
+  ! Local variables
+  integer(i_def) :: i
+
+  ! Node domain (W0)
+  integer(i_def)             :: coord_dim_full
+  integer(i_def)             :: coord_dim_owned
+  real(r_def),allocatable    :: nodes_lon_full(:)
+  real(r_def),allocatable    :: nodes_lat_full(:)
+  real(dp_xios),allocatable  :: nodes_lon(:)
+  real(dp_xios),allocatable  :: nodes_lat(:)
+  real(dp_xios),allocatable  :: bnd_nodes_lon(:,:)
+  real(dp_xios),allocatable  :: bnd_nodes_lat(:,:)
+
+  ! Face domain (W3)
+  real(dp_xios),allocatable  :: bnd_faces_lon(:,:)
+  real(dp_xios),allocatable  :: bnd_faces_lat(:,:)
+
+  ! Edge domain on half levels (W2H)
+  real(dp_xios),allocatable  :: bnd_edges_lon(:,:)
+  real(dp_xios),allocatable  :: bnd_edges_lat(:,:)
+
+  ! Levels variables
+  integer(i_def)             :: nfull_levels
+
+  ! Checkpoint domain parameters
+  character(len=str_def)       :: domain_name, domain_fs_name
+  integer(i_native), parameter :: domain_function_spaces(5) &
+                                   = (/W0, W1, W2, W3, Wtheta/)
+  integer(i_native) :: fs_index
+
+
+  ! Variables needed to compute output domain coordinates in lat-long
+
+  ! Transformed coords for nodal output
+  type( field_type ) :: coord_output(3)
+  ! Field proxies (to calculate domain coordinate info)
+  type(field_proxy_type), target  :: proxy_coord_output(3)
+
+  ! Variables for local and global mesh information
+  type(mesh_type), pointer :: mesh => null()
+  integer(i_def)           :: num_face_local
+  integer(i_def)           :: nodes_per_edge
+  integer(i_def)           :: nodes_per_face
+  integer(i_def)           :: num_edge_local
+
+  type(function_space_type), pointer :: output_field_fs   => null()
+  type(function_space_type), pointer :: w2h_fs   => null()
+
+  ! Variables for the gather to determine global domain sizes
+  ! from the local partitioned ones
+  integer(i_def), allocatable   :: local_undf(:)
+  integer(i_def) :: use_i_index(2) = (/ W3, Wtheta /)
+
+  ! Factor to convert coords from radians to degrees if needed
+  ! set as 1.0 for planar mesh
+  real(r_def)                :: r2d
+
+  if ( geometry == geometry_spherical ) then
+   r2d = radians_to_degrees
+  else
+   r2d = 1.0_r_def
+  endif
+
+  ! Set up array to hold number of dofs for local domains
+  allocate(local_undf(1))
+
+  ! Set up fields to hold the output coordinates
+  output_field_fs => function_space_collection%get_fs( mesh_id, element_order, W0 )
+  do i = 1,3
+    call coord_output(i)%initialise( vector_space = output_field_fs )
+    proxy_coord_output(i) = coord_output(i)%get_proxy()
+  end do
+
+  ! Get mesh information
+  mesh => coord_output(1)%get_mesh()
+  num_face_local = mesh%get_last_edge_cell()
+  nodes_per_face = mesh%get_nverts_per_cell_2d()
+  nodes_per_edge = mesh%get_nverts_per_edge()
+
+  ! Calculate the local size of a W2H fs in order to determine
+  ! how many edge dofs for the current partition
+  w2h_fs => function_space_collection%get_fs( mesh_id, element_order, W2H )
+  num_edge_local = w2h_fs%get_last_dof_owned()/size(w2h_fs%get_levels())
+
+  ! Get the local value for last owned dof
+  local_undf(1)  = proxy_coord_output(1)%vspace%get_last_dof_owned()
+
+  ! Get the unique fractional levels to set up vertical output domain
+  nfull_levels = size( proxy_coord_output(1)%vspace%get_levels() )
+
+  ! Get sizes of full nodal coordinate field as well as local partition size
+  coord_dim_full = size(proxy_coord_output(1)%data) / nfull_levels
+  coord_dim_owned = local_undf(1) / nfull_levels
+
+  ! Allocate coordinate arrays
+  allocate(nodes_lon_full(coord_dim_full))
+  allocate(nodes_lat_full(coord_dim_full))
+
+  allocate(nodes_lon( coord_dim_owned ))
+  allocate(nodes_lat( coord_dim_owned ))
+
+  allocate(bnd_nodes_lon(1,size(nodes_lon)))
+  allocate(bnd_nodes_lat(1,size(nodes_lat)))
+
+  allocate(bnd_faces_lon(nodes_per_face,num_face_local))
+  allocate(bnd_faces_lat(nodes_per_face,num_face_local))
+
+  allocate(bnd_edges_lon(nodes_per_edge,num_edge_local))
+  allocate(bnd_edges_lat(nodes_per_edge,num_edge_local))
+
+  ! Calculate the node coords arrays and also the face and edge bounds
+  call calc_xios_domain_coords(mesh, coord_output, chi,  &
+                               nfull_levels, num_face_local,   &
+                               nodes_lon_full, nodes_lat_full, &
+                               bnd_faces_lon, bnd_faces_lat,   &
+                               bnd_edges_lon, bnd_edges_lat)
+
+  ! Construct node bounds arrays
+  bnd_nodes_lon=(reshape(nodes_lon, (/1, size(nodes_lon)/) ) )
+  bnd_nodes_lat=(reshape(nodes_lat, (/1, size(nodes_lat)/) ) )
+
+  ! Initialise XIOS UGRID domains
+  call init_xios_ugrid_domain( "node", mesh_id, W0,  chi, bnd_nodes_lon, bnd_nodes_lat )
+  call init_xios_ugrid_domain( "face", mesh_id, W3,  chi, bnd_faces_lon, bnd_faces_lat )
+  call init_xios_ugrid_domain( "edge", mesh_id, W2H, chi, bnd_edges_lon, bnd_edges_lat )
+
+  ! Initialise XIOS axes
+  call init_xios_axis( "vert_axis_full_levels", mesh_id, W0 )
+  call init_xios_axis( "vert_axis_half_levels", mesh_id, W3 )
+
+  ! Create all the regular checkpoint domains based on current function spaces
+  ! Loop over function spaces we need to create domains for:
+  do fs_index = lbound(domain_function_spaces, 1), &
+                ubound(domain_function_spaces, 1)
+
+    domain_fs_name = name_from_functionspace(domain_function_spaces(fs_index))
+    domain_name = "checkpoint_" // trim(domain_fs_name)
+
+    ! Enable use of the XIOS i_index for relevant function spaces
+    if (any( use_i_index == domain_function_spaces(fs_index) )) then
+      call checkpoint_domain_init(domain_function_spaces(fs_index), &
+                                  trim(domain_name), mesh_id, chi, .true.)
+    else
+      call checkpoint_domain_init(domain_function_spaces(fs_index), &
+                                  trim(domain_name), mesh_id, chi, .false.)
+    end if
+
+  end do
+
+  ! Set up 2D checkpoint domain - only W3 at the moment
+  call checkpoint_domain_init(W3, "checkpoint_W3_2D",  twod_mesh_id, chi, .true.)
+
+  ! Set up physics prognostics checkpoint domains which make use of higher-order fields
+  call checkpoint_domain_init(W3, "checkpoint_pft",  twod_mesh_id, chi, .true., pft_order)
+  call checkpoint_domain_init(W3, "checkpoint_tile",  twod_mesh_id, chi, .true., tile_order)
+  call checkpoint_domain_init(W3, "checkpoint_sice",  twod_mesh_id, chi, .true., sice_order)
+  call checkpoint_domain_init(W3, "checkpoint_soil",  twod_mesh_id, chi, .true., soil_order)
+  call checkpoint_domain_init(W3, "checkpoint_snow",  twod_mesh_id, chi, .true., snow_order)
+
+  ! Clean up things that are not needed after dimension setup
+  if ( allocated(bnd_nodes_lon) ) deallocate(bnd_nodes_lon)
+  if ( allocated(bnd_nodes_lat) ) deallocate(bnd_nodes_lat)
+  if ( allocated(bnd_edges_lon) ) deallocate(bnd_edges_lon)
+  if ( allocated(bnd_edges_lat) ) deallocate(bnd_edges_lat)
+  if ( allocated(bnd_faces_lon) ) deallocate(bnd_faces_lon)
+  if ( allocated(bnd_faces_lat) ) deallocate(bnd_faces_lat)
+
+  return
+
+end subroutine init_xios_dimensions
+
+!> @brief  Sets up XIOS file context information from list of file objects
+!>
+!> @param[in]  files_list  List of file objects
+!> @param[in]  clock       Clock object
+!>
+subroutine setup_xios_files(files_list, clock)
+
+  implicit none
+
+  type(linked_list_type), intent(in) :: files_list
+  type(clock_type),       intent(in) :: clock
+
+  type(xios_file)       :: file_hdl
+  type(xios_duration)   :: file_freq
+  type(xios_fieldgroup) :: field_group_hdl
+  character(str_def)    :: field_group_id
+  character(str_def)    :: file_mode
+
+  type(linked_list_item_type), pointer :: loop  => null()
+  type(xios_file_type),        pointer :: file  => null()
+
+  ! Start at the head of the time_axis linked list
+  loop => files_list%get_head()
+  do
+    ! If list is empty or we're at the end of list, return a null pointer
+    if ( .not. associated(loop) ) then
+      nullify(file)
+      exit
+    end if
+
+    ! tmp_ptr is a dummy pointer used to 'cast' to the xios_file_type so that
+    ! we can get at the information in the payload
+    select type( tmp_ptr => loop%payload )
+      type is (xios_file_type)
+        file => tmp_ptr
+
+        ! Get file handle from XIOS and set attributes
+        call xios_get_handle( file%get_xios_id(), file_hdl )
+        call xios_set_attr( file_hdl, name=file%get_path() )
+
+        ! Set XIOS duration object second value equal to file output frequency
+        if ( .not. file%get_output_freq() == -999 ) then
+          file_freq%second = file%get_output_freq() * clock%get_seconds_per_step()
+          call xios_set_attr( file_hdl, output_freq=file_freq )
+        end if
+
+        call xios_set_attr( file_hdl, enabled=.true. )
+
+        ! If there is an associated field group, enable it
+        field_group_id = file%get_field_group()
+
+        if ( .not. field_group_id == "unset" ) then
+          call xios_get_handle( field_group_id, field_group_hdl )
+          call xios_set_attr( field_group_hdl, enabled=.true. )
+        end if
+
+        ! If file is not in "read" mode switch time-counter to exclusive
+        call xios_get_attr( file_hdl, mode=file_mode )
+        if ( .not. file_mode == "read" ) then
+          call xios_set_attr( file_hdl, time_counter="exclusive", &
+                                        time_counter_name="time" )
+        end if
+
+    end select
+    loop => loop%next
+  end do
+
+  nullify(loop)
+  nullify(file)
+
+end subroutine setup_xios_files
+
+!> @brief   Compute the node domain coords for this partition
+!> @details Samples the chi field at nodal points, calculates cartesian coordinates.
+!>          For spherical geometry, converts to lat-lon in degrees for specified layer
+!>
+!> @param[in]     mesh            The id of the partitioned mesh
+!> @param[in]     nodal_coords          Input field
+!> @param[in]     chi                   Input coordinate field
+!> @param[in]     nlayers               The number of layers data is output on
+!> @param[in]     ncells                The number of cells on the partition
+!> @param[out]    lon_coords            Array of longitude coordinates for the nodes
+!> @param[out]    lat_coords            Array of latitude coordinates for the nodes
+!> @param[inout]  face_bnds_lon_coords  Array of longitude coords making up the faces
+!> @param[inout]  face_bnds_lat_coords  Array of latitude coords making up the faces
+!> @param[inout]  edge_bnds_lon_coords  Array of coords making up the edges
+!> @param[inout]  edge_bnds_lat_coords  Array of coords making up the edges
+!>
+subroutine calc_xios_domain_coords(mesh, nodal_coords, chi, &
+                                   nlayers, ncells,               &
+                                   lon_coords, lat_coords,        &
+                                   face_bnds_lon_coords,          &
+                                   face_bnds_lat_coords,          &
+                                   edge_bnds_lon_coords,          &
+                                   edge_bnds_lat_coords)
+
+  implicit none
+
+  type(mesh_type), pointer, intent(in) :: mesh
+  type(field_type),   intent(in)       :: nodal_coords(3)
+  type(field_type),   intent(in)       :: chi(:)
+  integer(i_def),     intent(in)       :: nlayers
+  integer(i_def),     intent(in)       :: ncells
+  real(kind=r_def),   intent(out)      :: lon_coords(:), lat_coords(:)
+  real(kind=dp_xios), intent(inout)    :: face_bnds_lon_coords(:,:)
+  real(kind=dp_xios), intent(inout)    :: face_bnds_lat_coords(:,:)
+  real(kind=dp_xios), intent(inout)    :: edge_bnds_lon_coords(:,:)
+  real(kind=dp_xios), intent(inout)    :: edge_bnds_lat_coords(:,:)
+
+  type(field_proxy_type) :: x_p(3), chi_p(3)
+
+  integer(i_def)            :: cell, edge_count
+  integer(i_def)            :: ndf_chi, ndf_x
+  integer(i_def)            :: dim_chi
+  integer, pointer          :: map_chi(:)   => null()
+  integer, pointer          :: map_x(:)     => null()
+  real(kind=r_def), pointer :: nodes_x(:,:) => null()
+  real(kind=r_def)          :: xyz(3)
+  real(kind=r_def)          :: llr(3)
+
+  real(kind=r_def), allocatable  :: basis_chi(:,:,:)
+  integer(i_def)                 :: df_x, df_chi, i
+  integer(i_def)                 :: edge1, edge2
+
+  ! Factor to convert coords from radians to degrees if needed
+  ! set as 1.0 for planar mesh
+  real(r_def) :: r2d
+
+  edge_count = 0
+
+  do i = 1,3
+    x_p(i)   = nodal_coords(i)%get_proxy()
+    chi_p(i) = chi(i)%get_proxy()
+  end do
+
+  ndf_x  = x_p(1)%vspace%get_ndf( )
+  nodes_x => x_p(1)%vspace%get_nodes()
+  ndf_chi  = chi_p(1)%vspace%get_ndf( )
+
+  dim_chi = chi_p(1)%vspace%get_dim_space( )
+
+  allocate(basis_chi(dim_chi, ndf_chi, ndf_x))
+
+  do df_x = 1, ndf_x
+    do df_chi = 1, ndf_chi
+      basis_chi(:,df_chi,df_x) = chi_p(1)%vspace%call_function(BASIS,df_chi,nodes_x(:,df_x))
+    end do
+  end do
+
+  if (chi_p(1)%is_dirty(depth=1)) then
+    call chi_p(1)%halo_exchange(depth=1)
+  end if
+
+  if (chi_p(2)%is_dirty(depth=1)) then
+    call chi_p(2)%halo_exchange(depth=1)
+  end if
+
+  if (chi_p(3)%is_dirty(depth=1)) then
+    call chi_p(3)%halo_exchange(depth=1)
+  end if
+
+  ! Loop over cells
+  do cell = 1, ncells
+
+    map_x   => x_p(1)%vspace%get_cell_dofmap( cell )
+    map_chi => chi_p(1)%vspace%get_cell_dofmap( cell )
+
+    ! Loop over bottom half of the cell dofmap for the given layer
+    do df_x = 1,(ndf_x/2)
+      xyz(:) = 0.0_r_def
+      do df_chi = 1, (ndf_chi/2)
+        xyz(1) = xyz(1) + chi_p(1)%data(map_chi(df_chi))*basis_chi(1,df_chi,df_x)
+        xyz(2) = xyz(2) + chi_p(2)%data(map_chi(df_chi))*basis_chi(1,df_chi,df_x)
+        xyz(3) = xyz(3) + chi_p(3)%data(map_chi(df_chi))*basis_chi(1,df_chi,df_x)
+      end do
+
+      ! Convert to lat-lon in degrees if required
+      if ( geometry == geometry_spherical ) then
+        r2d = radians_to_degrees
+        call xyz2llr(xyz(1), xyz(2), xyz(3), llr(1), llr(2), llr(3))
+
+        lon_coords( ((map_x(df_x)-1)/nlayers)+1) = llr(1)*r2d
+        lat_coords( ((map_x(df_x)-1)/nlayers)+1) = llr(2)*r2d
+
+        face_bnds_lon_coords(df_x,cell) = llr(1)*r2d
+        face_bnds_lat_coords(df_x,cell) = llr(2)*r2d
+      else
+        r2d = 1.0_r_def
+
+        lon_coords( ((map_x(df_x)-1)/nlayers)+1) = xyz(1)*r2d
+        lat_coords( ((map_x(df_x)-1)/nlayers)+1) = xyz(2)*r2d
+
+        face_bnds_lon_coords(df_x,cell) = xyz(1)*r2d
+        face_bnds_lat_coords(df_x,cell) = xyz(2)*r2d
+      endif
+    end do ! Loop over bottom layer dofs
+
+    ! For this cell compute the edge-bounds coordinates from the face-bounds coordinates
+    do df_x = 1,(ndf_x/2)
+
+      ! Retrieve the lat / lon coords of the points bounding the edge
+      if (df_x == ndf_x/2) then
+        edge1 = df_x
+        edge2 = 1
+      else
+        edge1 = df_x
+        edge2 = df_x + 1
+      endif
+
+      ! Is the edge owned by this cell?
+      if (mesh%get_edge_cell_owner(df_x, cell) == cell) then
+        edge_count = edge_count + 1
+
+        edge_bnds_lon_coords(1,edge_count) = face_bnds_lon_coords(edge1,cell)
+        edge_bnds_lon_coords(2,edge_count) = face_bnds_lon_coords(edge2,cell)
+        edge_bnds_lat_coords(1,edge_count) = face_bnds_lat_coords(edge1,cell)
+        edge_bnds_lat_coords(2,edge_count) = face_bnds_lat_coords(edge2,cell)
+      end if ! Edge is owned by this cell
+
+    end do ! loop over edges
+
+  end do ! loop over cells
+
+  call x_p(1)%set_dirty()
+  call x_p(2)%set_dirty()
+  call x_p(3)%set_dirty()
+
+  deallocate(basis_chi)
+
+  nullify( map_chi, map_x, nodes_x )
+
+end subroutine calc_xios_domain_coords
+
+!> @brief    Performs XIOS checkpoint domain initialisation
+!>
+!> @param[in]  fs_id        Function space id
+!> @param[in]  domain_name  XIOS domain name
+!> @param[in]  mesh_id      Mesh id
+!> @param[in]  chi          Coordinate field
+!> @param[in]  use_index    Flag to specify use of domain index
+!>                          to preserve order over decomposition
+!> @param[in]  k_order      Function space order (optional,
+!>                          default = 0)
+!>
+subroutine checkpoint_domain_init(fs_id, domain_name, mesh_id, chi, &
+                                       use_index, k_order)
+
+  implicit none
+
+  ! Arguments
+  integer(i_def),           intent(in) :: fs_id
+  character(len=*),         intent(in) :: domain_name
+  integer(i_def),           intent(in) :: mesh_id
+  type(field_type),         intent(in) :: chi(3)
+  logical,                  intent(in) :: use_index
+  integer(i_def), optional, intent(in) :: k_order
+
+  ! Local variables
+  integer(i_def)    :: i
+  integer(i_def)    :: k_ord
+
+  ! Checkpoint domain
+  integer(i_def)                     :: ibegin_checkpoint
+  real(dp_xios), allocatable         :: checkpoint_lon(:)
+  real(dp_xios), allocatable         :: checkpoint_lat(:)
+  real(dp_xios), allocatable         :: bnd_checkpoint_lon(:,:)
+  real(dp_xios), allocatable         :: bnd_checkpoint_lat(:,:)
+  integer(i_halo_index), allocatable :: domain_index(:)
+
+
+  ! Variables needed to compute output domain coordinates in lat-long
+  type( field_type ) :: coord_output(3)
+  type(field_proxy_type), target  :: proxy_coord_output(3)
+  type(function_space_type), pointer :: output_field_fs   => null()
+
+  ! Variables for the gather to determine global domain sizes
+  ! from the local partitioned ones
+  integer(i_def)                :: global_undf_checkpoint
+  integer(i_def), allocatable   :: local_undf(:)
+  integer(i_def), allocatable   :: all_undfs_checkpoint_domain(:)
+
+  ! Factor to convert coords from radians to degrees if needed
+  ! set as 1.0 for planar mesh
+  real(r_def) :: r2d
+
+  if ( geometry == geometry_spherical ) then
+   r2d = radians_to_degrees
+  else
+   r2d = 1.0_r_def
+  endif
+
+  ! Set k order value to 0 if unassigned
+  if (present(k_order))then
+    k_ord=k_order
+  else
+    k_ord=0
+  end if
+
+  ! Set up arrays to hold number of dofs for local and global domains
+  allocate(local_undf(1))
+  allocate(all_undfs_checkpoint_domain(get_comm_size()))
+
+  all_undfs_checkpoint_domain = 0
+
+  ! Create appropriate function space in order to be able to get the
+  ! physical coordinates
+  output_field_fs => function_space_collection%get_fs( mesh_id, &
+                                                       k_ord, &
+                                                       fs_id)
+
+  ! Calculate the nodal coords for a field on the function space
+
+  ! Set up fields to hold the output coordinates
+  do i = 1,3
+    call coord_output(i)%initialise( vector_space = output_field_fs )
+  end do
+
+  ! Convert field to physical nodal output & sample chi on nodal points
+  call invoke_nodal_coordinates_kernel(coord_output, chi)
+
+  ! If spherical geometry convert the coordinate field to (longitude, latitude, radius)
+  if ( geometry == geometry_spherical ) then
+    call invoke_pointwise_convert_xyz2llr(coord_output)
+  end if
+
+  ! Get proxies for coordinates so we can access them
+  do i = 1,3
+    proxy_coord_output(i) = coord_output(i)%get_proxy()
+  end do
+
+  ! Get the local value for undf
+  local_undf(1)  = proxy_coord_output(1)%vspace%get_last_dof_owned()
+
+  !!!!!!!!!!!!  Global domain calculation !!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  call all_gather ( local_undf, all_undfs_checkpoint_domain, 1 )
+
+  ! Now get the global sum of undf across all ranks to set the global domain sizes
+  ! for checkpoint domain
+  global_undf_checkpoint = sum(all_undfs_checkpoint_domain)
+
+  ! Calculate ibegin for each rank as we have the array of undfs in order
+  ! we can just sum to get it.
+  if (get_comm_rank() == 0) then
+    ibegin_checkpoint = 0
+  else
+    ibegin_checkpoint = sum(all_undfs_checkpoint_domain(1:get_comm_rank()))
+  end if
+
+  ! Allocate coordinate arrays to be the size required for checkpoint domain.
+  ! Essentially up to last owned dof of the current partition.
+  allocate( checkpoint_lon( size( proxy_coord_output(1)%data(1: local_undf(1)))) )
+  allocate( checkpoint_lat( size( proxy_coord_output(2)%data(1: local_undf(1)))) )
+
+  ! Populate the arrays with data
+  checkpoint_lon =  proxy_coord_output(1)%data(1: local_undf(1)) * r2d
+  checkpoint_lat =  proxy_coord_output(2)%data(1: local_undf(1)) * r2d
+
+  allocate(bnd_checkpoint_lon(1,size(checkpoint_lon)))
+  allocate(bnd_checkpoint_lat(1,size(checkpoint_lat)))
+
+  ! Construct bounds arrays
+  bnd_checkpoint_lon=(reshape(checkpoint_lon, (/1, size(checkpoint_lon)/) ) )
+  bnd_checkpoint_lat=(reshape(checkpoint_lat, (/1, size(checkpoint_lat)/) ) )
+
+  ! Give coordinate information to the XIOS domain
+  call xios_set_domain_attr(trim(domain_name), ni_glo=global_undf_checkpoint,    &
+                            ibegin=ibegin_checkpoint, ni=local_undf(1),          &
+                            type='unstructured')
+  call xios_set_domain_attr(trim(domain_name), lonvalue_1d=checkpoint_lon,       &
+                            latvalue_1d=checkpoint_lat)
+  call xios_set_domain_attr(trim(domain_name), bounds_lon_1d=bnd_checkpoint_lon, &
+                            bounds_lat_1d=bnd_checkpoint_lat)
+
+  ! If we have requested to use domain index then get it and use it
+  if (use_index) then
+
+    ! Allocate domain_index - it is of size ndof_glob
+    allocate(domain_index(output_field_fs%get_ndof_glob()))
+
+    ! Populate domain_index for this rank
+    call output_field_fs%get_global_dof_id(domain_index)
+
+    ! temporary fix for higher-order domain decomposition
+    if (k_ord > 0) then
+      domain_index = domain_index/2
+    end if
+
+    ! Pass local portion of domain_index (up to undf)
+    call xios_set_domain_attr(domain_name, i_index=int(domain_index(1:local_undf(1))))
+
+  end if
+
+  if ( allocated(checkpoint_lon) )     deallocate(checkpoint_lon)
+  if ( allocated(checkpoint_lat) )     deallocate(checkpoint_lat)
+  if ( allocated(domain_index) )    deallocate(domain_index)
+  if ( allocated(bnd_checkpoint_lon) ) deallocate(bnd_checkpoint_lon)
+  if ( allocated(bnd_checkpoint_lat) ) deallocate(bnd_checkpoint_lat)
+  if ( allocated(local_undf) )      deallocate(local_undf)
+  if ( allocated(all_undfs_checkpoint_domain) ) deallocate(all_undfs_checkpoint_domain)
+
+  nullify( output_field_fs )
+  return
+end subroutine checkpoint_domain_init
+
+!> @brief   Initialises unstructured XIOS domain from function space
+!> @details Calculates coordinates from function space and local mesh, obtains
+!>          local portion of the domain index and passes information to XIOS
+!>          domain object
+!>
+!> @param[in]  domain_id   The name of the XIOS domain
+!> @param[in]  mesh_id     The id of the partitioned mesh
+!> @param[in]  fs_id       The id of the function space corresponding to the domain
+!> @param[in]  chi         Input coordinate field
+!> @param[in]  lon_bounds  Array of longitude coords making up the domain bounds
+!> @param[in]  lat_bounds  Array of latitude coords making up the domain bounds
+!>
+subroutine init_xios_ugrid_domain( domain_id, mesh_id, fs_id, chi, lon_bounds, lat_bounds )
+
+  implicit none
+
+  character(len=*),            intent(in) :: domain_id
+  integer(i_def),              intent(in) :: mesh_id
+  integer(i_native),           intent(in) :: fs_id
+  type(field_type),            intent(in) :: chi(:)
+
+  type(function_space_type), pointer :: domain_fs   => null()
+
+  type( field_type )              :: coord_output(3)
+  type(field_proxy_type), target  :: proxy_coord_output(3)
+
+  ! Variables for the gather to determine global domain sizes
+  ! from the local partitioned ones
+  integer(i_def)              :: global_undf, n_levels, i, ibegin, local_domain_size
+  integer(i_def), allocatable :: local_undf(:), all_undfs(:)
+  real(dp_xios),  allocatable :: dp_levels(:)
+  real(dp_xios),  allocatable :: lat_data(:)
+  real(dp_xios),  allocatable :: lon_data(:)
+  real(dp_xios),  allocatable :: lat_bounds(:,:)
+  real(dp_xios),  allocatable :: lon_bounds(:,:)
+  integer(i_def), allocatable :: domain_index(:)
+
+  ! Factor to convert coords from radians to degrees if needed
+  ! set as 1.0 for planar mesh
+  real(r_def)                :: r2d
+
+  if ( geometry == geometry_spherical ) then
+    r2d = radians_to_degrees
+  else
+    r2d = 1.0_r_def
+  endif
+
+  ! Set up arrays for AllGather
+  allocate(local_undf(1))
+  allocate(all_undfs(get_comm_size()))
+
+  all_undfs = 0
+
+  ! Here we use information from the input function space to calculate the
+  ! physical coordinates for the horizontal domain
+  domain_fs => function_space_collection%get_fs( mesh_id, element_order, fs_id )
+
+  ! Get the function space levels information
+  dp_levels = real( domain_fs%get_levels(), kind=dp_xios )
+  n_levels = size(dp_levels)
+
+  ! Set up fields to hold the output coordinates
+  do i = 1,3
+    call coord_output(i)%initialise( vector_space = domain_fs )
+  end do
+
+  !=========================================================================
+  ! These calls need to be replaced with a working infrastructure alternative:
+  ! Convert field to physical nodal output & sample chi on nodal points
+  call invoke_nodal_coordinates_kernel(coord_output, chi)
+
+  ! If spherical geometry convert the coordinate field to (longitude, latitude, radius)
+  if ( geometry == geometry_spherical ) then
+    call invoke_pointwise_convert_xyz2llr(coord_output)
+  end if
+  !=========================================================================
+
+  ! Get proxies for coordinates so we can access them
+  do i = 1,3
+    proxy_coord_output(i) = coord_output(i)%get_proxy()
+  end do
+
+  ! Get the local value for undf
+  local_undf(1)  = domain_fs%get_last_dof_owned()
+  local_domain_size = local_undf(1)/n_levels
+
+  allocate( lat_data(local_domain_size) )
+  allocate( lon_data(local_domain_size) )
+
+  lat_data = proxy_coord_output(2)%data(1: local_undf(1):n_levels) * r2d
+  lon_data = proxy_coord_output(1)%data(1: local_undf(1):n_levels) * r2d
+
+  !!!!!!!!!!!!  Global domain calculation !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  call all_gather ( local_undf, all_undfs, 1 )
+
+  ! Adjust size of data taking into account how many levels we have (same for each
+  ! partition as we only partition horizontally)
+  all_undfs = all_undfs/n_levels
+
+  ! Now get the global sum of undf across all ranks to set the global domain sizes
+  ! for xios node domain
+  global_undf = sum(all_undfs)
+
+  ! Calculate ibegin for each rank (as we have the array of undfs in order
+  ! we can just sum to get it)
+  if (get_comm_rank() == 0) then
+    ibegin = 0
+  else
+    ibegin = sum(all_undfs(1:get_comm_rank()))
+  end if
+
+  ! Populate domain_index for this rank for relevant function space
+  allocate( domain_index(local_domain_size) )
+  if (fs_id == W0) then
+    call domain_fs%get_global_vert_dof_id_2d(domain_index)
+  else if (fs_id == W2H) then
+    call domain_fs%get_global_edge_dof_id_2d(domain_index)
+  else if (fs_id == W3) then
+    call domain_fs%get_global_cell_dof_id_2d(domain_index)
+  end if
+
+  ! Pass domain attibutes to XIOS
+  call xios_set_domain_attr( trim(domain_id), ni_glo=global_undf, &
+                             ibegin=ibegin, &
+                             ni=local_domain_size, &
+                             type='unstructured' )
+  call xios_set_domain_attr( trim(domain_id), lonvalue_1d=lon_data, &
+                             latvalue_1d=lat_data )
+  call xios_set_domain_attr( trim(domain_id), bounds_lon_1d=lon_bounds, &
+                             bounds_lat_1d=lat_bounds )
+
+  ! Pass local portion of domain_index to XIOS
+  call xios_set_domain_attr( domain_id, i_index=int( domain_index( 1 : local_domain_size ) ) )
+
+  ! Tidy up time
+  deallocate( local_undf, all_undfs )
+  deallocate( dp_levels )
+  deallocate( lat_data )
+  deallocate( lon_data )
+  deallocate( domain_index )
+  nullify(domain_fs)
+
+end subroutine init_xios_ugrid_domain
+
+!> @brief   Initialises XIOS axis from function space and mesh
+!> @details Calculates vertical levels and coordinates from function space and
+!>          local mesh and passes information to XIOS axis object
+!>
+!> @param[in]  axis_id  The name of the XIOS axis
+!> @param[in]  mesh_id  The id of the partitioned mesh
+!> @param[in]  fs_id    The id of the function space corresponding to the domain
+!>
+subroutine init_xios_axis( axis_id, mesh_id, fs_id )
+
+  implicit none
+
+  character(len=*),            intent(in) :: axis_id
+  integer(i_def),              intent(in) :: mesh_id
+  integer(i_native),           intent(in) :: fs_id
+
+  type(function_space_type), pointer :: domain_fs   => null()
+  real(dp_xios), allocatable         :: dp_levels(:)
+  integer(i_def)                     :: n_levels
+
+  domain_fs => function_space_collection%get_fs( mesh_id, element_order, fs_id )
+
+  ! Get the function space levels information
+  dp_levels = real( domain_fs%get_levels(), kind=dp_xios )
+  n_levels = size(dp_levels)
+
+  call xios_set_axis_attr( trim(axis_id),  &
+                           n_glo=n_levels, &
+                           value=dp_levels )
+
+end subroutine init_xios_axis
+
+end module lfric_xios_io_mod

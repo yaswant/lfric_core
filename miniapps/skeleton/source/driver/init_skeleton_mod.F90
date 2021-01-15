@@ -23,7 +23,7 @@ module init_skeleton_mod
   use runtime_constants_mod,          only : create_runtime_constants
   use io_config_mod,                  only : write_diag, &
                                              use_xios_io
-  use write_methods_mod,              only : write_field_face
+  use lfric_xios_write_mod,           only : write_field_face
   implicit none
 
 

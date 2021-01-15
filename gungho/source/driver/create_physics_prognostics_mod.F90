@@ -18,7 +18,7 @@ module create_physics_prognostics_mod
   use field_collection_mod,           only : field_collection_type
   use fs_continuity_mod,              only : W2, W3, Wtheta
   use function_space_mod,             only : function_space_type
-  use io_mod,                         only : tile_order, pft_order, &
+  use lfric_xios_io_mod,              only : tile_order, pft_order, &
                                              sice_order, soil_order, snow_order
   use log_mod,                        only : log_event,         &
                                              LOG_LEVEL_INFO,         &
@@ -814,14 +814,15 @@ contains
                                name, vector_space, &
                                checkpoint_restart_flag, twod, advection_flag)
 
-    use io_config_mod,      only : use_xios_io, &
-                                   write_diag
-    use write_methods_mod,  only : write_field_face,        &
-                                   write_field_single_face, &
-                                   checkpoint_write_xios,        &
-                                   checkpoint_write_netcdf
-    use read_methods_mod,   only : checkpoint_read_netcdf,       &
-                                   checkpoint_read_xios
+    use io_config_mod,           only : use_xios_io, &
+                                        write_diag
+    use lfric_xios_read_mod,     only : checkpoint_read_xios
+    use lfric_xios_write_mod,    only : write_field_node, &
+                                        write_field_face, &
+                                        write_field_single_face, &
+                                        checkpoint_write_xios
+    use io_mod,                  only : checkpoint_write_netcdf, &
+                                        checkpoint_read_netcdf
 
     implicit none
 

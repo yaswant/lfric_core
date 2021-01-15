@@ -79,7 +79,7 @@ contains
         use global_mesh_collection_mod, only : global_mesh_collection, &
                                                global_mesh_collection_type
         use init_diagnostics_mod, only : init_diagnostics
-        use io_mod, only : initialise_xios
+        use lfric_xios_io_mod, only : initialise_xios
         use logging_config_mod, only : run_log_level, &
                 key_from_run_log_level, &
                 RUN_LOG_LEVEL_ERROR, &

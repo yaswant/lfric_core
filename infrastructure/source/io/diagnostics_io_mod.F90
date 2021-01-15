@@ -20,9 +20,9 @@ module diagnostics_io_mod
   use io_config_mod,                 only: use_xios_io
   use files_config_mod,              only: diag_stem_name
   use project_output_mod,            only: project_output
-  use io_mod,                        only: ts_fname
-  use write_methods_mod,             only: nodal_write_field, &
-                                           write_field_face, &
+  use io_mod,                        only: ts_fname, &
+                                           nodal_write_field
+  use lfric_xios_write_mod,          only: write_field_face, &
                                            write_field_edge
   use mesh_mod,                      only: mesh_type
   use mesh_collection_mod,           only: mesh_collection

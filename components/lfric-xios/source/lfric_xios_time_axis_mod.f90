@@ -9,7 +9,7 @@
 !> @details Fields need to be updated at different times and frequencies. The
 !>          time axis object can be linked to a field to provide information
 !>          of how the field should be updated with time.
-module time_axis_mod
+module lfric_xios_time_axis_mod
 
   use constants_mod,        only: i_def, str_def, r_def, l_def, dp_xios
   use field_mod,            only: field_type, field_proxy_type
@@ -343,4 +343,4 @@ contains
 
   end subroutine populate_model_fields
 
-end module time_axis_mod
+end module lfric_xios_time_axis_mod

@@ -47,8 +47,8 @@ module gravity_wave_driver_mod
                                             LOG_LEVEL_INFO,     &
                                             LOG_LEVEL_TRACE,    &
                                             LOG_LEVEL_ERROR
-  use read_methods_mod,               only: read_checkpoint
-  use write_methods_mod,              only: write_checkpoint
+  use lfric_xios_read_mod,            only: read_checkpoint
+  use lfric_xios_write_mod,           only: write_checkpoint
   use io_config_mod,                  only: write_diag,           &
                                             checkpoint_read,      &
                                             checkpoint_write,     &

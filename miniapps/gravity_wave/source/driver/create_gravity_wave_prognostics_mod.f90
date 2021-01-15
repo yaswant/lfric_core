@@ -25,12 +25,13 @@ module create_gravity_wave_prognostics_mod
                                              use_xios_io, &
                                              checkpoint_write, &
                                              checkpoint_read
-  use write_methods_mod,              only : write_field_node, &
-                                             write_field_face, &
-                                             checkpoint_write_xios, &
+  use io_mod,                         only : checkpoint_read_netcdf, &
                                              checkpoint_write_netcdf
-  use read_methods_mod,               only : checkpoint_read_netcdf, &
-                                             checkpoint_read_xios
+  use lfric_xios_read_mod,            only : checkpoint_read_xios
+  use lfric_xios_write_mod,           only : write_field_node, &
+                                             write_field_face, &
+                                             checkpoint_write_xios
+
   use gravity_wave_constants_config_mod,&
                                       only : b_space, &
                                              b_space_w0, &

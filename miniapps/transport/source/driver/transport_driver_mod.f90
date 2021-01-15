@@ -25,7 +25,7 @@ module transport_driver_mod
   use init_transport_mod,             only: init_transport
   use transport_mod,                  only: transport_load_configuration, &
                                             program_name
-  use io_mod,                         only: initialise_xios
+  use lfric_xios_io_mod,              only: initialise_xios
   use diagnostics_io_mod,             only: write_scalar_diagnostic, &
                                             write_vector_diagnostic
   use diagnostics_calc_mod,           only: write_density_diagnostic

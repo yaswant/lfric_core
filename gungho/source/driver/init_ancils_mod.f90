@@ -19,11 +19,11 @@ module init_ancils_mod
                                              ancil_option_basic_gal,  &
                                              ancil_option_prototype_gal
   use linked_list_mod,                only : linked_list_type
-  use read_methods_mod,               only : read_field_face, &
+  use lfric_xios_read_mod,            only : read_field_face, &
                                              read_field_single_face, &
                                              read_field_time_var, &
                                              read_time_data
-  use write_methods_mod,              only : write_field_face, &
+  use lfric_xios_write_mod,           only : write_field_face, &
                                              write_field_single_face
   use field_collection_mod,           only : field_collection_type, &
                                              field_collection_real_iterator_type
@@ -31,7 +31,7 @@ module init_ancils_mod
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W3, WTheta
   use pure_abstract_field_mod,        only : pure_abstract_field_type
-  use time_axis_mod,                  only : time_axis_type, update_interface
+  use lfric_xios_time_axis_mod,       only : time_axis_type, update_interface
   use jules_control_init_mod,         only: n_land_tile
   use jules_surface_types_mod,        only: npft
 

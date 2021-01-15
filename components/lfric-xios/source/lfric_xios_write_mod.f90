@@ -1,12 +1,13 @@
 !-------------------------------------------------------------------------------
-!(c) Crown copyright 2020 Met Office. All rights reserved.
-!The file LICENCE, distributed with this code, contains details of the terms
-!under which the code may be used.
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
 !-------------------------------------------------------------------------------
 
-!>  @brief Module for field writing routines
-!>  @details Holds all routines for writing LFRic fields
-module write_methods_mod
+!>  @brief    Module for field writing routines
+!>  @details  Holds all routines for writing LFRic fields
+!>
+module lfric_xios_write_mod
 
   use clock_mod,            only: clock_type
   use constants_mod,        only: i_def, dp_xios, str_def, &
@@ -23,15 +24,17 @@ module write_methods_mod
   use r_solver_field_mod,   only: r_solver_field_type, r_solver_field_proxy_type
   use log_mod,              only: log_event,         &
                                   log_scratch_space, &
-                                  LOG_LEVEL_INFO,LOG_LEVEL_ERROR
-  use xios
+                                  LOG_LEVEL_INFO,    &
+                                  LOG_LEVEL_WARNING, &
+                                  LOG_LEVEL_ERROR
+  use xios,                 only: xios_send_field, &
+                                  xios_get_domain_attr, &
+                                  xios_get_axis_attr
 
   implicit none
 
   private
-  public :: nodal_write_field,        &
-            checkpoint_write_netcdf,  &
-            checkpoint_write_xios,    &
+  public :: checkpoint_write_xios,    &
             write_field_node,         &
             write_field_single_face,  &
             write_field_face,         &
@@ -41,105 +44,14 @@ module write_methods_mod
 
 contains
 
-!> @brief   Output a field in nodal format to text file
-!>@param[in] nodal_coordinates field holding coordinate information
-!>@param[in] level field holding level information
-!>@param[in] nodal_output field holding diagnostic data
-!>@param[in] fspace_dimension dimension of the field's function space
-!>@param[in] output_unit file unit to write to
-!>@param[in] fname file name to write to
-!-------------------------------------------------------------------------------
-subroutine nodal_write_field(nodal_coordinates, level, nodal_output, &
-                             fspace_dimension, output_unit, fname)
-
-  implicit none
-
-  type(field_type),            intent(in) :: nodal_coordinates(3)
-  type(field_type),            intent(in) :: level
-  type(field_type),            intent(in) :: nodal_output(3)
-  integer(i_def),              intent(in) :: fspace_dimension
-  integer(i_def),              intent(in) :: output_unit
-  character(str_max_filename), intent(in) :: fname
-
-  type(field_proxy_type) :: x_p(3), l_p, n_p(3)
-  integer(i_def) :: df, undf, i
-
-  do i = 1, 3
-    x_p(i) = nodal_coordinates(i)%get_proxy()
-    n_p(i) = nodal_output(i)%get_proxy()
-  end do
-
-  l_p = level%get_proxy()
-  undf = n_p(1)%vspace%get_last_dof_owned()
-
-  open(output_unit, file = trim(fname), status = "replace")
-  write(output_unit,'(A)') 'x = ['
-
-  if ( fspace_dimension  == 1 ) then
-    do df = 1, undf
-      write(output_unit,'(5e25.15e3)') x_p(1)%data(df), x_p(2)%data(df), &
-                                       x_p(3)%data(df), l_p%data(df),    &
-                                       n_p(1)%data(df)
-    end do
-  else
-    do df = 1, undf
-      write(output_unit,'(7e25.15e3)') x_p(1)%data(df), x_p(2)%data(df), &
-                                       x_p(3)%data(df), l_p%data(df),    &
-                                       n_p(1)%data(df), n_p(2)%data(df), &
-                                       n_p(3)%data(df)
-    end do
-  end if
-
-  write(output_unit,'(A)') '];'
-  close(output_unit)
-
-end subroutine nodal_write_field
-
-
-!> @brief   I/O handler for writing a netcdf checkpoint
-!> @details Legacy method for writing checkpoints
-!           Note this routine accepts a field name but
-!           doesn't use it - this is to keep the interface
-!           the same for all methods
-!>@param[in] field_name Name of the field to write
-!>@param[in] file_name Name of the file to write to
-!>@param[in,out] field_proxy the proxy of the field to write
-subroutine checkpoint_write_netcdf(field_name, file_name, field_proxy)
-  use field_io_ncdf_mod,    only : field_io_ncdf_type
-
-  implicit none
-
-  character(len=*),               intent(in) :: field_name
-  character(len=*),               intent(in) :: file_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  type(field_io_ncdf_type), allocatable :: ncdf_file
-
-  allocate(ncdf_file)
-
-  call ncdf_file%file_new( file_name )
-
-  select type(field_proxy)
-
-    type is (field_proxy_type)
-    call ncdf_file%write_field_data ( field_proxy%data(:) )
-
-  end select
-
-  call ncdf_file%file_close()
-
-  deallocate(ncdf_file)
-
-end subroutine checkpoint_write_netcdf
-
-
-!> @brief   I/O handler for writing an XIOS netcdf checkpoint
-!> @details Note this routine accepts a filename but doesn't
-!           use it - this is to keep the interface the same
-!           for all methods
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] file_name Name of the file to write
-!>@param[in,out] field_proxy the proxy of the field to write
+!>  @brief    I/O handler for writing an XIOS netcdf checkpoint
+!>  @details  Note this routine accepts a filename but doesn't use it - this is
+!>            to keep the interface the same for all methods
+!>
+!>  @param[in]      xios_field_name  XIOS identifier for the field
+!>  @param[in]      file_name        Name of the file to write into
+!>  @param[in,out]  field_proxy      A field proxy to be written
+!>
 subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
 
   implicit none
@@ -163,12 +75,15 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
     type is (integer_field_proxy_type)
     if ( any( abs(field_proxy%data) > xios_max_int) ) then
       call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_ERROR )
+                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
     end if
     send_field = real( field_proxy%data(1:undf), dp_xios )
 
     type is (r_solver_field_proxy_type)
     send_field = field_proxy%data(1:undf)
+
+    class default
+    call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
 
   end select
 
@@ -176,10 +91,11 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
 
 end subroutine checkpoint_write_xios
 
-!> @brief   Output a field in UGRID format on the node domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy containing the data to output
-!-------------------------------------------------------------------------------
+!>  @brief  Output W0 field data to the node UGRID via XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to be written
+!>
 subroutine write_field_node(xios_field_name, field_proxy)
 
   implicit none
@@ -220,7 +136,7 @@ subroutine write_field_node(xios_field_name, field_proxy)
     type is (integer_field_proxy_type)
     if ( any( abs(field_proxy%data) > xios_max_int) ) then
       call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_ERROR )
+                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
     end if
     do i = 0, axis_size-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
@@ -233,6 +149,9 @@ subroutine write_field_node(xios_field_name, field_proxy)
                  field_proxy%data(i+1:undf:axis_size)
     end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
   ! Reshape into 2D horizontal + vertical levels for output
@@ -243,159 +162,11 @@ subroutine write_field_node(xios_field_name, field_proxy)
 
 end subroutine write_field_node
 
-
-!> @brief   Output a single level field in UGRID format on the face domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy containing the data to output
-!-------------------------------------------------------------------------------
-subroutine write_field_single_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  integer(i_def) :: i, undf, ndata
-  integer(i_def) :: domain_size
-  real(dp_xios), allocatable :: send_field(:)
-
-  undf = field_proxy%vspace%get_last_dof_owned()
-  ndata = field_proxy%vspace%get_ndata()
-
-  ! Get the expected horizontal size
-  ! all 2D fields are nominally in W3, hence half levels
-  call xios_get_domain_attr('face', ni=domain_size)
-
-  ! Size the array to be what is expected
-  allocate(send_field(domain_size*ndata))
-
-  ! If the fields do not have the same size, then exit with error
-  if ( size(send_field) /= undf ) then
-    call log_event( "Global size of model field /= size of field from file", &
-                    LOG_LEVEL_ERROR )
-  end if
-
-  ! Different field kinds are selected to access data - data is re-ordered into
-  ! slabs according to ndata
-  select type(field_proxy)
-
-    type is (field_proxy_type)
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (integer_field_proxy_type)
-    if ( any( abs(field_proxy%data) > xios_max_int) ) then
-      call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_ERROR )
-    end if
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-    type is (r_solver_field_proxy_type)
-    do i = 0, ndata-1
-      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
-    end do
-
-  end select
-
-  call xios_send_field(xios_field_name, send_field)
-
-  deallocate(send_field)
-
-end subroutine write_field_single_face
-
-!> @brief   Output a field in UGRID format on the face domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy containing the data to output
-!-------------------------------------------------------------------------------
-subroutine write_field_face(xios_field_name, field_proxy)
-
-  implicit none
-
-  character(len=*),               intent(in) :: xios_field_name
-  class(field_parent_proxy_type), intent(in) :: field_proxy
-
-  integer(i_def) :: i, undf
-  integer(i_def) :: fs_id
-  integer(i_def) :: domain_size, axis_size
-  real(dp_xios), allocatable :: send_field(:)
-
-  ! Field must be cast to kind to get function space ID
-  select type(field_proxy)
-    type is (field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (integer_field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-    type is (r_solver_field_proxy_type)
-    fs_id = field_proxy%vspace%which()
-
-  end select
-
-  ! Size the arrays to be what is expected
-  undf = field_proxy%vspace%get_last_dof_owned()
-
-  ! Get the expected horizontal and vertical axis size
-  if ( fs_id == W3 ) then
-    call xios_get_domain_attr('face', ni=domain_size)
-    call xios_get_axis_attr("vert_axis_half_levels", n_glo=axis_size)
-  else
-    call xios_get_domain_attr('face', ni=domain_size)
-    call xios_get_axis_attr("vert_axis_full_levels", n_glo=axis_size)
-  end if
-
-  allocate(send_field(domain_size*axis_size))
-
-  ! We need to reshape the raw field data to get the correct data layout for UGRID
-  ! At the moment field array data is 1D with levels ordered sequentially
-  ! This is only true for current scalar fields on lowest order fs and may change
-
-  ! Different field kinds are selected to access data, which is arranged into blocks
-  ! based on model level
-  select type(field_proxy)
-
-    type is (field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-    type is (integer_field_proxy_type)
-      if ( any( abs(field_proxy%data) > xios_max_int) ) then
-        call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                        '" contains values too large for 16-bit precision', LOG_LEVEL_ERROR )
-      end if
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   real( field_proxy%data(i+1:undf:axis_size), dp_xios )
-      end do
-
-    type is (r_solver_field_proxy_type)
-      do i = 0, axis_size-1
-        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
-                   field_proxy%data(i+1:undf:axis_size)
-      end do
-
-  end select
-
-  ! Reshape into 2D horizontal + vertical levels for output
-  call xios_send_field(xios_field_name, &
-                       reshape (send_field, (/domain_size, axis_size/) ))
-
-  deallocate(send_field)
-
-end subroutine write_field_face
-
-!> @brief   Output a field in UGRID format on the edge domain via XIOS
-!>@param[in] xios_field_name XIOS identifier for the field
-!>@param[in] field_proxy a field proxy containing the data to output
-!-------------------------------------------------------------------------------
+!>  @brief  Write W2H field data to the half-level edge UGRID via XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to be written
+!>
 subroutine write_field_edge(xios_field_name, field_proxy)
 
   implicit none
@@ -436,7 +207,7 @@ subroutine write_field_edge(xios_field_name, field_proxy)
     type is (integer_field_proxy_type)
     if ( any( abs(field_proxy%data) > xios_max_int) ) then
       call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
-                      '" contains values too large for 16-bit precision', LOG_LEVEL_ERROR )
+                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
     end if
     do i = 0, axis_size-1
       send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
@@ -449,6 +220,9 @@ subroutine write_field_edge(xios_field_name, field_proxy)
                    field_proxy%data(i+1:undf:axis_size)
       end do
 
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
   end select
 
   ! Reshape into 2D horizontal + vertical levels for output
@@ -459,12 +233,176 @@ subroutine write_field_edge(xios_field_name, field_proxy)
 
 end subroutine write_field_edge
 
-!> @brief   Write a collection of fields
-!> @details Iterate over a field collection and write each field
-!>          if it is enabled for write
-!>@param[in] state - a collection of fields
-!>@param[in,optional] prefix A prefix to be added to the field name to create the XIOS field ID
-!>@param[in,optional] suffix A suffix to be added to the field name to create the XIOS field ID
+!>  @brief  Write single-level W3 field data to the face UGRID domain via XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to be written
+!>
+subroutine write_field_single_face(xios_field_name, field_proxy)
+
+  implicit none
+
+  character(len=*),               intent(in) :: xios_field_name
+  class(field_parent_proxy_type), intent(in) :: field_proxy
+
+  integer(i_def) :: i, undf, ndata
+  integer(i_def) :: domain_size
+  real(dp_xios), allocatable :: send_field(:)
+
+  undf = field_proxy%vspace%get_last_dof_owned()
+  ndata = field_proxy%vspace%get_ndata()
+
+  ! Get the expected horizontal size
+  ! all 2D fields are nominally in W3, hence half levels
+  call xios_get_domain_attr('face', ni=domain_size)
+
+  ! Size the array to be what is expected
+  allocate(send_field(domain_size*ndata))
+
+  ! If the fields do not have the same size, then exit with error
+  if ( size(send_field) /= undf ) then
+    call log_event( "Global size of model field /= size of field from file", &
+                    LOG_LEVEL_ERROR )
+  end if
+
+  ! Different field kinds are selected to access data - data is re-ordered into
+  ! slabs according to ndata
+  select type(field_proxy)
+
+    type is (field_proxy_type)
+    do i = 0, ndata-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
+    end do
+
+    type is (integer_field_proxy_type)
+    if ( any( abs(field_proxy%data) > xios_max_int) ) then
+      call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
+                      '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
+    end if
+    do i = 0, ndata-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
+    end do
+
+    type is (r_solver_field_proxy_type)
+    do i = 0, ndata-1
+      send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                              field_proxy%data(i+1:(ndata*domain_size)+i:ndata)
+    end do
+
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
+  end select
+
+  call xios_send_field(xios_field_name, send_field)
+
+  deallocate(send_field)
+
+end subroutine write_field_single_face
+
+!>  @brief  Write W3/WTheta field data to the full/half-level face UGRIDs via
+!>          XIOS
+!>
+!>  @param[in]     xios_field_name  XIOS identifier for the field
+!>  @param[inout]  field_proxy      A field proxy to be written
+!>
+subroutine write_field_face(xios_field_name, field_proxy)
+
+  implicit none
+
+  character(len=*),               intent(in) :: xios_field_name
+  class(field_parent_proxy_type), intent(in) :: field_proxy
+
+  integer(i_def) :: i, undf
+  integer(i_def) :: fs_id
+  integer(i_def) :: domain_size, axis_size
+  real(dp_xios), allocatable :: send_field(:)
+
+  ! Field must be cast to kind to get function space ID
+  select type(field_proxy)
+    type is (field_proxy_type)
+    fs_id = field_proxy%vspace%which()
+
+    type is (integer_field_proxy_type)
+    fs_id = field_proxy%vspace%which()
+
+    type is (r_solver_field_proxy_type)
+    fs_id = field_proxy%vspace%which()
+
+    class default
+    call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
+  end select
+
+  ! Size the arrays to be what is expected
+  undf = field_proxy%vspace%get_last_dof_owned()
+
+  ! Get the expected horizontal and vertical axis size
+  if ( fs_id == W3 ) then
+    call xios_get_domain_attr('face', ni=domain_size)
+    call xios_get_axis_attr("vert_axis_half_levels", n_glo=axis_size)
+  else
+    call xios_get_domain_attr('face', ni=domain_size)
+    call xios_get_axis_attr("vert_axis_full_levels", n_glo=axis_size)
+  end if
+
+  allocate(send_field(domain_size*axis_size))
+
+  ! We need to reshape the raw field data to get the correct data layout for UGRID
+  ! At the moment field array data is 1D with levels ordered sequentially
+  ! This is only true for current scalar fields on lowest order fs and may change
+
+  ! Different field kinds are selected to access data, which is arranged into blocks
+  ! based on model level
+  select type(field_proxy)
+
+    type is (field_proxy_type)
+      do i = 0, axis_size-1
+        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                   field_proxy%data(i+1:undf:axis_size)
+      end do
+
+    type is (integer_field_proxy_type)
+      if ( any( abs(field_proxy%data) > xios_max_int) ) then
+        call log_event( 'Data for integer field "'// trim(adjustl(xios_field_name)) // &
+                        '" contains values too large for 16-bit precision', LOG_LEVEL_WARNING )
+      end if
+      do i = 0, axis_size-1
+        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                   real( field_proxy%data(i+1:undf:axis_size), dp_xios )
+      end do
+
+    type is (r_solver_field_proxy_type)
+      do i = 0, axis_size-1
+        send_field(i*(domain_size)+1:(i*(domain_size)) + domain_size) = &
+                   field_proxy%data(i+1:undf:axis_size)
+      end do
+
+    class default
+      call log_event( "Invalid type for input field proxy", LOG_LEVEL_ERROR )
+
+  end select
+
+  ! Reshape into 2D horizontal + vertical levels for output
+  call xios_send_field(xios_field_name, &
+                       reshape (send_field, (/domain_size, axis_size/) ))
+
+  deallocate(send_field)
+
+end subroutine write_field_face
+
+!>  @brief    Write a collection of fields
+!>  @details  Iterate over a field collection and write each field if it is
+!>            enabled for writing
+!>
+!>  @param[in]           state   A collection of fields
+!>  @param[in,optional]  prefix  A prefix to be added to the field name to
+!>                               create the XIOS field ID
+!>  @param[in,optional]  suffix  A suffix to be added to the field name to
+!>                               create the XIOS field ID
+!>
 subroutine write_state(state, prefix, suffix)
 
   implicit none
@@ -547,11 +485,12 @@ subroutine write_state(state, prefix, suffix)
 
 end subroutine write_state
 
-!> @brief   Write a checkpoint from a collection of fields
-!> @details Iterate over a field collection and checkpoint each field
-!>          if it is enabled for checkpointing
-!>@param[in] state Fields to checkpoint.
-!>@param[in] clock Model time
+!>  @brief    Write a checkpoint from a collection of fields
+!>  @details  Iterate over a field collection and checkpoint each field
+!>            if it is enabled for checkpointing
+!>
+!>  @param[in]  state  Fields to checkpoint.
+!>  @param[in]  clock  Model time
 !>
 subroutine write_checkpoint( state, clock )
 
@@ -629,4 +568,4 @@ subroutine write_checkpoint( state, clock )
 
 end subroutine write_checkpoint
 
-end module write_methods_mod
+end module lfric_xios_write_mod

@@ -102,14 +102,14 @@ module create_lbcs_mod
   subroutine add_lbc_field( lbc_fields, depository, prognostic_fields, &
                             name, vector_space, checkpoint_restart_flag )
 
-    use io_config_mod,      only : use_xios_io,             &
-                                   write_diag
-    use write_methods_mod,  only : write_field_face,        &
-                                   write_field_node,        &
-                                   checkpoint_write_xios,   &
-                                   checkpoint_write_netcdf
-    use read_methods_mod,   only : checkpoint_read_netcdf,  &
-                                   checkpoint_read_xios
+    use io_config_mod,        only : use_xios_io,             &
+                                     write_diag
+    use lfric_xios_read_mod,  only : checkpoint_read_xios
+    use lfric_xios_write_mod, only : write_field_node, &
+                                     write_field_face, &
+                                     checkpoint_write_xios
+    use io_mod,               only : checkpoint_write_netcdf, &
+                                     checkpoint_read_netcdf
 
     implicit none
 

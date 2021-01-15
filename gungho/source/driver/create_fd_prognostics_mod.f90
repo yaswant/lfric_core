@@ -13,8 +13,8 @@ module create_fd_prognostics_mod
   use field_mod,                      only : field_type
   use field_parent_mod,               only : read_interface, &
                                              write_interface
-  use read_methods_mod,               only : read_field_face
-  use write_methods_mod,              only : write_field_face
+  use lfric_xios_read_mod,            only : read_field_face
+  use lfric_xios_write_mod,           only : write_field_face
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use field_collection_mod,           only : field_collection_type

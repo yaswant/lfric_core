@@ -36,9 +36,9 @@ module gungho_model_data_mod
   use io_config_mod,                    only : checkpoint_read,  &
                                                checkpoint_write, &
                                                write_dump
-  use read_methods_mod,                 only : read_checkpoint,  &
+  use lfric_xios_read_mod,              only : read_checkpoint,  &
                                                read_state
-  use write_methods_mod,                only : write_checkpoint, &
+  use lfric_xios_write_mod,             only : write_checkpoint, &
                                                write_state
   use boundaries_config_mod,            only : limited_area
   use create_lbcs_mod,                  only : create_lbc_fields
