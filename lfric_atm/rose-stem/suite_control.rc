@@ -226,7 +226,7 @@
                          },
                      plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
                      )',
-    'check_compilers("lfric_atm", "scm_dry_bl", "fast-debug",
+    'check_compilers("lfric_atm", "scm_bl_pc2_mphys_rad", "fast-debug",
                      resolution=("BiP4x4-10000x10000",600.0))',
     'canned_test("lfric_atm")'
   ],

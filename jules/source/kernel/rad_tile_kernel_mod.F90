@@ -467,42 +467,57 @@ subroutine rad_tile_code(nlayers,                                &
     df_rtile = n_surf_tile*(i_band-1)
     do i_tile = 1, n_land_tile
       df_rtile = df_rtile + 1
-      tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
-        = sw_weight_blue(i_band) &
-        * real(alb_tile(1, i_tile, 1), r_def)  & ! visible direct albedo
-        + (1.0_r_def - sw_weight_blue(i_band)) &
-        * real(alb_tile(1, i_tile, 3), r_def)    ! near-ir direct albedo
-      tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
-        = sw_weight_blue(i_band) &
-        * real(alb_tile(1, i_tile, 2), r_def)  & ! visible diffuse albedo
-        + (1.0_r_def - sw_weight_blue(i_band)) &
-        * real(alb_tile(1, i_tile, 4), r_def)    ! near-ir diffuse albedo
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
+          = sw_weight_blue(i_band) &
+          * real(alb_tile(1, i_tile, 1), r_def)  & ! visible direct albedo
+          + (1.0_r_def - sw_weight_blue(i_band)) &
+          * real(alb_tile(1, i_tile, 3), r_def)    ! near-ir direct albedo
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
+          = sw_weight_blue(i_band) &
+          * real(alb_tile(1, i_tile, 2), r_def)  & ! visible diffuse albedo
+          + (1.0_r_def - sw_weight_blue(i_band)) &
+          * real(alb_tile(1, i_tile, 4), r_def)    ! near-ir diffuse albedo
+      else
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+      end if
     end do
 
     ! Sea tile albedos
     df_rtile = first_sea_tile-1 + n_surf_tile*(i_band-1)
-    do i_tile = 1, n_sea_tile
+    do i_tile = first_sea_tile, first_sea_tile + n_sea_tile - 1
       df_rtile = df_rtile + 1
-      tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
-        = real(open_sea_albedo(1, 1, 1, i_band), r_def)
-      tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
-        = real(open_sea_albedo(1, 1, 2, i_band), r_def)
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
+          = real(open_sea_albedo(1, 1, 1, i_band), r_def)
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
+          = real(open_sea_albedo(1, 1, 2, i_band), r_def)
+      else
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+      end if
     end do
 
     ! Sea-ice tile albedos
     df_rtile = first_sea_ice_tile-1 + n_surf_tile*(i_band-1)
-    do i_tile = 1, n_sea_ice_tile
+    do i_tile = first_sea_ice_tile, first_sea_ice_tile + n_sea_ice_tile - 1
       df_rtile = df_rtile + 1
-      tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
-        = sw_weight_blue(i_band) &
-        * real(sea_ice_albedo(1, 1, 1), r_def) &
-        + (1.0_r_def - sw_weight_blue(i_band)) &
-        * real(sea_ice_albedo(1, 1, 3), r_def)
-      tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
-        = sw_weight_blue(i_band) &
-        * real(sea_ice_albedo(1, 1, 2), r_def) &
-        + (1.0_r_def - sw_weight_blue(i_band)) &
-        * real(sea_ice_albedo(1, 1, 4), r_def)
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
+          = sw_weight_blue(i_band) &
+          * real(sea_ice_albedo(1, 1, 1), r_def) &
+          + (1.0_r_def - sw_weight_blue(i_band)) &
+          * real(sea_ice_albedo(1, 1, 3), r_def)
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
+          = sw_weight_blue(i_band) &
+          * real(sea_ice_albedo(1, 1, 2), r_def) &
+          + (1.0_r_def - sw_weight_blue(i_band)) &
+          * real(sea_ice_albedo(1, 1, 4), r_def)
+      else
+        tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
+      end if
     end do
   end do
 
@@ -515,29 +530,41 @@ subroutine rad_tile_code(nlayers,                                &
     df_rtile = n_surf_tile*(i_band-1)
     do i_tile = 1, n_land_tile
       df_rtile = df_rtile + 1
-      if (i_tile <= npft) then
-        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
-          = 1.0_r_def - real(emis_pft(i_tile), r_def)
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        if (i_tile <= npft) then
+          tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
+            = 1.0_r_def - real(emis_pft(i_tile), r_def)
+        else
+          tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
+            = 1.0_r_def - real(emis_nvg(i_tile-npft), r_def)
+        end if
       else
-        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
-          = 1.0_r_def - real(emis_nvg(i_tile-npft), r_def)
+        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) = 0.0_r_def
       end if
     end do
 
     ! Sea tile albedos
     df_rtile = first_sea_tile-1 + n_surf_tile*(i_band-1)
-    do i_tile = 1, n_sea_tile
+    do i_tile = first_sea_tile, first_sea_tile + n_sea_tile - 1
       df_rtile = df_rtile + 1
-      tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
-        = 1.0_r_def - real(emis_sea, r_def)
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
+          = 1.0_r_def - real(emis_sea, r_def)
+      else
+        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) = 0.0_r_def
+      end if
     end do
 
     ! Sea-ice tile albedos
     df_rtile = first_sea_ice_tile-1 + n_surf_tile*(i_band-1)
-    do i_tile = 1, n_sea_ice_tile
+    do i_tile = first_sea_ice_tile, first_sea_ice_tile + n_sea_ice_tile - 1
       df_rtile = df_rtile + 1
-      tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
-        = 1.0_r_def - real(emis_sice, r_def)
+      if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
+        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) &
+          = 1.0_r_def - real(emis_sice, r_def)
+      else
+        tile_lw_albedo(map_lw_tile(1)+df_rtile-1) = 0.0_r_def
+      end if
     end do
   end do
 
