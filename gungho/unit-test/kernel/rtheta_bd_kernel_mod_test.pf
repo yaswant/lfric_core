@@ -27,8 +27,6 @@ module rtheta_bd_kernel_mod_test
     procedure test_all
   end type rtheta_bd_test_type
 
-  integer(i_def) :: element_order = 0
-
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

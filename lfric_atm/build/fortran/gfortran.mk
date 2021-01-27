@@ -13,4 +13,4 @@ export FFLAGS_UM_PHYSICS = -fdefault-real-8
 # unused variables.
 # We reset the FFLAGS_WARNINGS variable here in order to prevent
 # -Werror induced build failures.
-FFLAGS_WARNINGS          = -Wall -Werror=character-truncation
+FFLAGS_WARNINGS          = -Wall -Werror=character-truncation -Werror=unused-value

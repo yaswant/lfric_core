@@ -71,16 +71,14 @@ module rk_transport_rho_mod
   private
 
   ! 'State' items that need to be created once but used every step
-  type( field_type )              :: rho_n, r_u, r_rho, rho_inc, mass_flux
+  type( field_type )              :: rho_n, r_rho, rho_inc, mass_flux
   type( field_type ), allocatable :: rr_prediction(:)
 
   ! Needed for nonuniform FV operators
   type( field_type ), allocatable :: flux_coeffs(:,:), vert_flux_coeffs(:,:)
 
   integer(i_def) :: flux_stencil_extent,      &
-                    advective_stencil_extent, &
-                    flux2d_stencil_size,      &
-                    advective2d_stencil_size
+                    flux2d_stencil_size
   integer(i_def) :: nfaces_h, nfaces_v
 
   public :: rk_transport_rho_init
