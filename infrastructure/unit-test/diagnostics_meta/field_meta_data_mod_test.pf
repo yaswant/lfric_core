@@ -105,6 +105,9 @@ contains
       packing = 0, &
       vertical_dimension = model_height_dimension(TOP_ATMOSPHERIC_LEVEL, &
                                                   BOTTOM_ATMOSPHERIC_LEVEL), &
+      non_spatial_dimension = [non_spatial_dimension_type(&
+              name="test_axis_non_spatial_dimension", &
+              axis_definition=[real(r_def) ::1,2,3,4,5,6,7,8,9])], &
 
       standard_name = "eastward_wind", &
       misc_meta_data = [misc_meta_data_type("test_name_1","test_value_1"), &
@@ -124,6 +127,16 @@ contains
       recommended_interpolation = TEST_TRILINEAR, &
       packing = 0, &
       vertical_dimension = fixed_height_dimension(level_definition = REAL([1.5], r_def)), &
+      non_spatial_dimension = [non_spatial_dimension_type(name="Tiles", &
+              label_definition=[character(str_short) ::'Broadleaf Tree', &
+                                                       'Needle Leaf Tree', &
+                                                       'C3 Grass', &
+                                                       'C4 Grass', &
+                                                       'Shrub', &
+                                                       'Urban', &
+                                                       'Water', &
+                                                       'Soil', &
+                                                       'Ice'])], &
       standard_name = "air_temperature")
 
 !    !> Testing objects

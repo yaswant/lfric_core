@@ -16,10 +16,10 @@ module diagnostics_mod
   use vertical_dimension_types_mod, only: range_vertical_dimension_meta_data_type, &
                                           list_vertical_dimension_meta_data_type, &
                                           abstract_vertical_meta_data_type
+  use non_spatial_dimension_mod,    only: non_spatial_dimension_type
   use misc_meta_data_mod,           only: misc_meta_data_type
 
   implicit none
-
   private
 
   type, public :: field_meta_data_type
@@ -62,6 +62,9 @@ module diagnostics_mod
     !> vertical_dimension_type to define its vertical dimension meta data.
     class(abstract_vertical_meta_data_type), allocatable :: vertical_dimension
 
+    !> Non spatial dimension
+    type(non_spatial_dimension_type), allocatable :: non_spatial_dimension(:)
+
     !> Standard name for the field, optional
     character(str_def)  ::  standard_name
 
@@ -99,27 +102,29 @@ contains
   !> @param [in,optional] standard_name The standard name of the field if it exists
   !> @param [in,optional] long_name The long name of the field
   !> @param [in,optional] positive The direction for positive numbers
-  !> @param [in,optional] vertical_dimension The vertical of the field
+  !> @param [in,optional] vertical_dimension The vertical dimension of the field
+  !> @param [in,optional] non_spatial_dimension The non-spatial dimension(s) of the field
   !> @param [in,optional] misc_meta_data Holds a key/value pair of strings
   !> used for any miscellaneous data that a field might need
   !> @return self the meta_data object
   !>
-  function meta_data_constructor(unique_id,                     &
-                                 units,                         &
-                                 function_space,                &
-                                 order,                         &
-                                 io_driver,                     &
-                                 trigger,                       &
-                                 description,                   &
-                                 data_type,                     &
-                                 time_step,                     &
-                                 recommended_interpolation,     &
-                                 packing,                       &
-                                 standard_name,                 &
-                                 long_name,                     &
-                                 positive,                      &
-                                 vertical_dimension,            &
-                                 misc_meta_data)                &
+  function meta_data_constructor(unique_id,                 &
+                                 units,                     &
+                                 function_space,            &
+                                 order,                     &
+                                 io_driver,                 &
+                                 trigger,                   &
+                                 description,               &
+                                 data_type,                 &
+                                 time_step,                 &
+                                 recommended_interpolation, &
+                                 packing,                   &
+                                 standard_name,             &
+                                 long_name,                 &
+                                 positive,                  &
+                                 vertical_dimension,        &
+                                 non_spatial_dimension,     &
+                                 misc_meta_data)            &
                                  result(self)
 
     implicit none
@@ -138,9 +143,11 @@ contains
     character(*), optional,              intent(in) :: standard_name
     character(*), optional,              intent(in) :: long_name
     integer(i_native), optional,         intent(in) :: positive
-    type(misc_meta_data_type), optional, intent(in) :: misc_meta_data(:)
     class(abstract_vertical_meta_data_type), optional, &
                                          intent(in) :: vertical_dimension
+    type(non_spatial_dimension_type),        optional, &
+                                         intent(in) :: non_spatial_dimension(:)
+    type(misc_meta_data_type), optional, intent(in) :: misc_meta_data(:)
 
     type(field_meta_data_type)   :: self
 
@@ -179,6 +186,10 @@ contains
       !> allocate the derived type instead of using the assignment operator (=)
       !> Fortran 2008 would support self%vertical_dimension = vertical_dimension
       allocate(self%vertical_dimension, source=vertical_dimension)
+    end if
+
+    if(present(non_spatial_dimension)) then
+      allocate(self%non_spatial_dimension, source=non_spatial_dimension)
     end if
 
     if(present(misc_meta_data)) then
