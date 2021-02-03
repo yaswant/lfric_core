@@ -438,7 +438,7 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices)
   end do
 
   ! Pass reshaped data array to field object via proxy
-  field_proxy%data = field_data
+  field_proxy%data( 1 : undf ) = field_data( 1 : undf )
 
   ! Set halos dirty here as for parallel read we only read in data for owned
   ! dofs and the halos will not be set
