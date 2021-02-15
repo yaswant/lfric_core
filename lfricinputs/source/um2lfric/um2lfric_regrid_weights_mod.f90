@@ -84,30 +84,30 @@ TYPE(lfricinp_regrid_weights_type), POINTER :: weights
 ! Local variables
 INTEGER(KIND=int64) :: horiz_grid_code = 0
 
-! Check that the STASHmaster record exists. 
+! Check that the STASHmaster record exists.
 IF (ASSOCIATED(stashmaster(stashcode) % record)) THEN
   ! Get grid type code from STASHmaster entry
   horiz_grid_code = stashmaster(stashcode) % record % grid
 ELSE
-  WRITE(log_scratch_space, '(A,I0)')                             & 
-       "Unassociated STASHmaster record for stashcode ", stashcode 
+  WRITE(log_scratch_space, '(A,I0)')                             &
+       "Unassociated STASHmaster record for stashcode ", stashcode
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 
 IF (horiz_grid_code == u_points) THEN
 
-  weights => grid_u_to_mesh_face_centre 
+  weights => grid_u_to_mesh_face_centre
 
 ELSE IF (horiz_grid_code == v_points) THEN
 
-  weights => grid_v_to_mesh_face_centre 
+  weights => grid_v_to_mesh_face_centre
 
 ELSE IF (horiz_grid_code == p_points .OR.   &
          horiz_grid_code == ozone_points .OR. &
          horiz_grid_code == land_compressed .OR. &
          horiz_grid_code == p_points_values_over_sea) THEN
 
-   weights => grid_p_to_mesh_face_centre 
+   weights => grid_p_to_mesh_face_centre
 ELSE
   WRITE(log_scratch_space, '(2(A,I0))') "Unsupported horizontal grid type code: ", &
        horiz_grid_code, " encountered during regrid of stashcode", stashcode

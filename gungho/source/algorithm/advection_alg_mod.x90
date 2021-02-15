@@ -56,7 +56,17 @@ module advection_alg_mod
   use calc_dep_pts_alg_mod,           only: calc_dep_pts
   use transport_config_mod,           only: scheme,                         &
                                             scheme_cosmic_3D,               &
-                                            scheme_method_of_lines
+                                            scheme_method_of_lines,         &
+                                            rho_splitting,                  &
+                                            rho_splitting_none,             &
+                                            rho_splitting_vh,               &
+                                            rho_splitting_hv,               &
+                                            rho_splitting_strang,           &
+                                            theta_splitting,                &
+                                            theta_splitting_none,           &
+                                            theta_splitting_vh,             &
+                                            theta_splitting_hv,             &
+                                            theta_splitting_strang
   use formulation_config_mod,         only: moisture_conservation,          &
                                             si_momentum_equation,           &
                                             transport_only,                 &
@@ -71,6 +81,11 @@ module advection_alg_mod
   use flux_shifted_alg_mod,           only: flux_shifted_alg_init,          &
                                             flux_shifted_alg_final,         &
                                             flux_shifted_alg
+  use split_mol_cosmic_alg_mod,       only: split_transport_rho_step
+  use rk_transport_rho_mod,           only: rk_transport_rho_init
+  use rk_transport_theta_mod,         only: rk_transport_theta_init
+  use split_transport_theta_mod,      only: split_transport_theta_step
+  use split_slice_mol_alg_mod,        only: split_slice_mol_transport
 
   implicit none
 
@@ -86,7 +101,12 @@ module advection_alg_mod
   public  :: conservative_mr_adv_alg
   public  :: advection_generic_field_alg
   public  :: advect_momentum_alg
-  private :: advect_field
+  public  :: advect_field
+  integer(i_def)         :: advection_counter = 0_i_def
+  integer(i_def)         :: switch_splitting = 0
+  integer(i_def)         :: rho_splitting_var
+  integer(i_def)         :: theta_splitting_var
+
 contains
 
   !===========================================================================!
@@ -111,6 +131,9 @@ contains
 
     ! Set up the mass flux spatial computation
     call flux_alg_init(mesh_id)
+    if ( rho_splitting /= rho_splitting_none ) then
+      call rk_transport_rho_init( mesh_id )
+    end if
     if ( moisture_conservation ) then
       shifted_mesh_id => get_shifted_mesh_id()
       call flux_shifted_alg_init(shifted_mesh_id)
@@ -118,6 +141,9 @@ contains
 
     ! Set up the advective update spatial computation
     call advective_update_alg_init(mesh_id)
+    if ( theta_splitting /= theta_splitting_none   ) then
+      call rk_transport_theta_init( mesh_id )
+    end if
 
   end subroutine advection_alg_init
 
@@ -196,6 +222,8 @@ contains
 
     logical          :: do_moisture_diagnostics
     integer(i_def)   :: i_mr
+
+    advection_counter = advection_counter + 1_i_def
 
     if (use_wavedynamics) then
       do_moisture_diagnostics = write_conservation_diag .and. &
@@ -320,6 +348,13 @@ contains
   ! Advect density field
   call log_event( "Advecting density...", LOG_LEVEL_INFO)
   if ( scheme == scheme_method_of_lines ) then
+
+    if ( rho_splitting /= rho_splitting_none  ) then
+     call advect_field(advection(igh_d), state(igh_d), advecting_wind, &
+                      scheme, wind_n, wind_np1, advect_density=.true., &
+                      timestep=dt, si_advective_terms=.false.,         &
+                      shifted=.false., density_predictor=.true.)
+    else
     ! Reconstruct the advection increment from the mass flux
     call advect_field(mass_flux, state(igh_d), advecting_wind,         &
                       scheme, wind_n, wind_np1, advect_density=.true., &
@@ -332,6 +367,7 @@ contains
                  inc_a_times_X(-1.0_r_def, r_rho),                 &
                  dg_matrix_vector_kernel_type(advection(igh_d),    &
                                               r_rho, mm_w3_inv) )
+    end if
   else
     ! Cosmic computes the advection increment instead of the mass flux
     call advect_field(advection(igh_d), state(igh_d), advecting_wind,  &
@@ -806,6 +842,7 @@ contains
     use psykal_builtin_light_mod, only: invoke_sign
     use advective_wind_update_kernel_mod, &
       only: advective_wind_update_kernel_type
+    use timestepping_config_mod, only: outer_iterations
 
     implicit none
 
@@ -841,11 +878,118 @@ contains
     type(field_type)          :: wind_divergence
     type(field_type), pointer :: detj_at_w2 => null()
     type(field_type), pointer :: cell_orientation => null()
+    type(field_type)          :: field_old, field_unity
+    real(r_def)               :: inv_dt
+    integer(i_def)            :: time_step_number
 
     ! Function space of the field to be advected
     function_space = field%which_function_space()
 
-    select case(adv_scheme)
+     call flux%initialise( advecting_wind%get_function_space() )
+     call rhs%initialise( field%get_function_space() )
+     call field_inc%initialise( field%get_function_space() )
+     call field_new%initialise( field%get_function_space() )
+     call field%copy_field(field_new)
+
+     if ( shifted ) then
+        div       => get_div_shifted()
+        mm_w3_inv => get_mass_matrix(w3inv_shift_id)
+      else
+        div       => get_div()
+        mm_w3_inv => get_mass_matrix(w3inv_id)
+     end if
+
+     if ( time_method == method_semi_implicit          &
+          .and. advect_density                         &
+          .and. .not. si_momentum_equation             &
+          .and. (rho_splitting == rho_splitting_none)  &
+          .and. density_predictor                      ) then
+       ! Advect predictor for the density: rho*divergence_factor with
+       ! divergence_factor = [1-beta*dt*div(u)]
+      ! This helps improve long timestep stability
+          minus_beta_dt = -beta*timestep
+          call divergence_factor%initialise( field%get_function_space() )
+          call invoke( name = "compute_density_predictor",                     &
+                       dg_matrix_vector_kernel_type(divergence_factor, wind_n, &
+                                                    div),                      &
+                       dg_matrix_vector_kernel_type(rhs, divergence_factor,    &
+                                                    mm_w3_inv),                &
+                       setval_c(divergence_factor, 1.0_r_def),                 &
+                       inc_X_plus_bY(divergence_factor, minus_beta_dt, rhs),   &
+                       inc_X_times_Y(field_new, divergence_factor) )
+     end if
+
+     rho_splitting_var   = rho_splitting
+     theta_splitting_var = theta_splitting
+
+     if ( (  rho_splitting /= rho_splitting_none  ) .OR.  &
+         (theta_splitting /= theta_splitting_none)       ) then
+       time_step_number = int(real(advection_counter/outer_iterations,r_def),i_def) + 1_i_def
+
+       if (switch_splitting == 1 ) then
+        if ( mod(time_step_number,2_i_def) == 0 ) then
+          rho_splitting_var = rho_splitting_vh
+          theta_splitting_var = theta_splitting_vh
+        else
+          rho_splitting_var = rho_splitting_hv
+          theta_splitting_var = theta_splitting_hv
+        end if
+       end if
+
+       if (switch_splitting == 2 ) then
+        if ( mod(advection_counter,2_i_def) == 0 ) then
+          rho_splitting_var = rho_splitting_vh
+          theta_splitting_var = theta_splitting_vh
+        else
+          rho_splitting_var = rho_splitting_hv
+          theta_splitting_var = theta_splitting_hv
+        end if
+       end if
+     end if
+
+     inv_dt = 1.0_r_def/timestep
+
+    if ( (rho_splitting /= rho_splitting_none) .AND. (function_space==W3) ) then
+       !
+       ! Use "split_slice_mol_transport" if the field is a conservative rho-type field
+       !
+
+      call field_old%initialise( field%get_function_space() )
+      call field_new%copy_field(field_old)
+      call invoke( setval_c(advection_inc, 0.0_r_def) )
+
+      call split_slice_mol_transport( advecting_wind, field_new, rho_splitting_var )
+
+      if ( .not. advect_density ) then
+        call field_unity%initialise( field%get_function_space() )
+        call invoke( setval_c(field_unity, 1.0_r_def) )
+        call split_slice_mol_transport( advecting_wind, field_unity, rho_splitting_var )
+        call invoke( inc_X_divideby_Y(field_new, field_unity) )
+      end if
+
+      call invoke( X_minus_Y(advection_inc, field_new, field_old), &
+                   inc_a_times_X(inv_dt,advection_inc)             )
+
+    else if( (theta_splitting /= theta_splitting_none) .AND. (function_space==Wtheta) ) then
+       !
+       ! Use "split_transport_theta_step" if the field is a advective theta-type field
+       !
+
+      call field_old%initialise( field%get_function_space() )
+      call field_new%copy_field(field_old)
+      call invoke( setval_c(advection_inc, 0.0_r_def) )
+
+      call split_transport_theta_step( advecting_wind, field_new, theta_splitting_var)
+
+      call invoke( X_minus_Y(advection_inc, field_new, field_old), &
+                   inc_a_times_X(inv_dt,advection_inc)             )
+
+    else
+
+       !
+       ! Use the original MOL or Cosmic methods
+       !
+     select case(adv_scheme)
 
       case(scheme_method_of_lines)
 
@@ -862,41 +1006,7 @@ contains
           allocate( ak_adv( nstage, nstage ) )
           ak_adv = ak
         end if
-
-       ! Use Method of lines scheme to advect field
-        call flux%initialise( advecting_wind%get_function_space() )
-        call rhs%initialise( field%get_function_space() )
-        call field_inc%initialise( field%get_function_space() )
-        call field%copy_field(field_new)
-
-        if ( shifted ) then
-          div       => get_div_shifted()
-          mm_w3_inv => get_mass_matrix(w3inv_shift_id)
-        else
-          div       => get_div()
-          mm_w3_inv => get_mass_matrix(w3inv_id)
-        end if
-
         allocate( rk_rhs(nstage) )
-
-        if ( time_method == method_semi_implicit &
-             .and. advect_density                &
-             .and. .not. si_momentum_equation    &
-             .and. density_predictor             ) then
-          ! Advect predictor for the density: rho*divergence_factor with
-          ! divergence_factor = [1-beta*dt*div(u)]
-          ! This helps improve long timestep stability
-          minus_beta_dt = -beta*timestep
-          call divergence_factor%initialise( field%get_function_space() )
-          call invoke( name = "compute_density_predictor",                     &
-                       dg_matrix_vector_kernel_type(divergence_factor, wind_n, &
-                                                    div),                      &
-                       dg_matrix_vector_kernel_type(rhs, divergence_factor,    &
-                                                    mm_w3_inv),                &
-                       setval_c(divergence_factor, 1.0_r_def),                 &
-                       inc_X_plus_bY(divergence_factor, minus_beta_dt, rhs),   &
-                       inc_X_times_Y(field_new, divergence_factor) )
-        end if
 
         if ( function_space == W3 .and. .not. advect_density ) then
           ! Compute unit wind to make flux alg return recontructed
@@ -1011,7 +1121,8 @@ contains
         call log_event("Invalid transport scheme", &
                        LOG_LEVEL_ERROR)
 
-    end select
+      end select
+    end if  !if splitting
 
   end subroutine advect_field
 

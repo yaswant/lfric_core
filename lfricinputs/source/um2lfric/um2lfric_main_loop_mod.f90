@@ -89,7 +89,7 @@ DO i_field = 1, um2lfric_config%num_fields
   weights => get_weights(stashcode)
   lfric_field => lfric_fields%get_field(get_field_name(stashcode))
   lfric_mesh => lfric_field % get_mesh()
-  
+
   num_levels = SIZE(um_input_fields)
   ALLOCATE(regridded_field(lfric_mesh%get_ncells_2d(), num_levels))
   DO level = 1, num_levels
@@ -106,7 +106,7 @@ DO i_field = 1, um2lfric_config%num_fields
                                                  src=um_input_fields(level)%rdata, &
                                                  dst=regridded_field(:, level))
   END DO ! loop over levels
-  
+
   ! Tidy up input field memory
   IF (ALLOCATED(um_input_fields)) DEALLOCATE(um_input_fields)
 

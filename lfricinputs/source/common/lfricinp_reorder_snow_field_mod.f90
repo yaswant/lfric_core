@@ -20,7 +20,7 @@ PUBLIC :: lfricinp_reorder_snow_field
 CONTAINS
 
 SUBROUTINE lfricinp_reorder_snow_field(field, um_grid)
-! Take a snow layer field and converts from UM to 
+! Take a snow layer field and converts from UM to
 ! LFRic ordering
 USE lfricinp_grid_type_mod, ONLY: lfricinp_grid_type
 

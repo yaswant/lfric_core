@@ -31,14 +31,18 @@ contains
 
   subroutine setUp( this )
     use feign_config_mod,     only : feign_base_mesh_config, &
-                                     feign_planet_config, &
+                                     feign_planet_config,    &
                                      feign_transport_config
     use base_mesh_config_mod, only : geometry_planar, &
                                      partitioner_planar
-    use transport_config_mod, only : scheme_method_of_lines, &
-                                     operators_fv, &
-                                     rho_splitting_none, &
-                                     theta_splitting_none
+    use transport_config_mod, only : scheme_method_of_lines,     &
+                                     operators_fv,               &
+                                     rho_splitting_none,         &
+                                     theta_splitting_none,       &
+                                     rho_vertical_scheme_slice,  &
+                                     theta_vertical_scheme_sl,   &
+                                     slice_order_cubic,          &
+                                     vertical_sl_order_cubic
     implicit none
 
     class(poly1d_vert_adv_coeffs_test_type), intent(inout) :: this
@@ -65,7 +69,12 @@ contains
                                  cfl_mol_1d_stab = 1.0_r_def, &
                                  cfl_mol_2d_stab = 1.0_r_def, &
                                  cfl_mol_3d_stab = 1.0_r_def, &
-                                 upwind_direction_from_w_at_wtheta = .true. )
+                                 rho_vertical_scheme = rho_vertical_scheme_slice,  &
+                                 theta_vertical_scheme = theta_vertical_scheme_sl, &
+                                 slice_order = slice_order_cubic,                  &
+                                 vertical_sl_order = vertical_sl_order_cubic,      &
+                                 upwind_direction_from_w_at_wtheta = .true.        &
+                                 )
   end subroutine setUp
 
   @Test( npes=[1] )

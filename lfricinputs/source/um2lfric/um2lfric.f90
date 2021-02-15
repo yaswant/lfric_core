@@ -62,14 +62,14 @@ CALL lfricinp_create_ancil_fields(ancil_fields, mesh_id, twod_mesh_id)
 CALL um2lfric_partition_weights()
 
 ! Now initialise masked points that requires post regridding addjustments
-CALL um2lfric_init_masked_field_adjustments() 
+CALL um2lfric_init_masked_field_adjustments()
 
-! Loop over all the stashcodes and regrid from UM field to 
+! Loop over all the stashcodes and regrid from UM field to
 ! lfric field
 CALL um2lfric_main_loop()
 
 ! Unloads data from memory and closes UM input file
-CALL lfricinp_finalise_um()    
+CALL lfricinp_finalise_um()
 
 ! Finalizes XIOS file contents
 CALL xios_context_finalize()

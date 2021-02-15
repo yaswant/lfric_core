@@ -24,7 +24,7 @@ USE lfricinp_um_parameters_mod, ONLY:                                           
     ih_cloud_levels, ih_tracer_levels, ih_boundary_levels, ih_N_types,          &
     ih_height_gen, ih_1_c_rho_level, ih_land_points, ih_ozone_levels,           &
     ih_soilQ_levels, ih_convect_levels, ldc_eta_theta, ldc_eta_rho,             &
-    ldc_Zsea_theta, ldc_C_theta, ldc_Zsea_rho, ldc_C_rho     
+    ldc_Zsea_theta, ldc_C_theta, ldc_Zsea_rho, ldc_C_rho
 
 USE lfricinp_grid_type_mod, ONLY: lfricinp_grid_type
 
@@ -46,7 +46,7 @@ CONTAINS
 
 SUBROUTINE lfric2um_initialise_um()
 ! Description:
-!  Create UM file object using shumlib Populates metadata using 
+!  Create UM file object using shumlib Populates metadata using
 !  information from UM grid object
 USE lfricinp_um_grid_mod, ONLY: um_grid
 USE lfricinp_lfric_driver_mod, ONLY: mesh_id
@@ -59,8 +59,8 @@ IMPLICIT NONE
 TYPE(mesh_type), POINTER :: lfric_mesh
 CHARACTER(LEN=*), PARAMETER :: routinename='lfric2um_initialise_um'
 INTEGER(KIND=int64) :: num_lookup
-! Create UM file 
-! Future work todo, calculate lookups based on requested fields, for 
+! Create UM file
+! Future work todo, calculate lookups based on requested fields, for
 ! now use default 4096
 num_lookup = 4096
 CALL shumlib(routinename//'::open_file', &
@@ -78,7 +78,7 @@ CALL lfric2um_set_real_constants(um_output_file, um_grid, lfric_mesh)
 CALL lfric2um_set_level_dep_constants(um_output_file, lfric_mesh)
 
 ! Write output header
-CALL shumlib(routinename//'::write_header', & 
+CALL shumlib(routinename//'::write_header', &
          um_output_file%write_header())
 
 END SUBROUTINE lfric2um_initialise_um
@@ -164,17 +164,17 @@ int_constants(ih_rows) = um_grid%num_p_points_y
 int_constants(ih_model_levels) = lfric_mesh%get_nlayers()
 int_constants(ih_wet_levels) = int_constants(ih_model_levels)
 ! hardcode for now, no info on soil in lfric dump
-int_constants(ih_soilT_levels) = 4 
+int_constants(ih_soilT_levels) = 4
 int_constants(ih_soilQ_levels) = int_constants(ih_soilT_levels)
 int_constants(ih_cloud_levels) = lfric_mesh%get_nlayers()
 int_constants(ih_tracer_levels) = lfric_mesh%get_nlayers()
 ! hardcode for now, doesn't exist as a concept in lfric yet
-int_constants(ih_boundary_levels) = 29 
+int_constants(ih_boundary_levels) = 29
 int_constants(ih_height_gen) = 2 ! Smooth height generation method
 ! hardcode for now - doesn't exist in lfric yet
-int_constants(ih_1_c_rho_level) = 30 
+int_constants(ih_1_c_rho_level) = 30
 !  hardcode for now - aquaplanet
-int_constants(ih_land_points) = 0 
+int_constants(ih_land_points) = 0
 int_constants(ih_ozone_levels) = int_constants(ih_model_levels)
 int_constants(ih_convect_levels) = 0
 
@@ -275,7 +275,7 @@ DO k = 1, num_levels
     level_dep_constants(k, ldc_C_rho) = 0.0
   END IF
 END DO
-        
+
 CALL shumlib(routinename//'::set_level_dependent_constants', &
      um_output_file%set_level_dependent_constants(level_dep_constants))
 

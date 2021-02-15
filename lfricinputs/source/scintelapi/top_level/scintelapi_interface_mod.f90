@@ -243,7 +243,7 @@ CALL field_list(l) % initialise(vector_space =                                 &
                                 function_space_collection%get_fs(              &
                                                                 m_id,          &
                                                                 element_order, &
-                                                                Fspace         &      
+                                                                Fspace         &
                                                                 ),             &
                                 name = field_id)
 

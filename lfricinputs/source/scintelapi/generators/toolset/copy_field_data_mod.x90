@@ -47,7 +47,7 @@ INTEGER :: fspace
 fspace = dep_graph % output_field(1) % field_ptr % which_function_space()
 CALL gen_io_check(                                                             &
                   dep_graph=dep_graph,                                         &
-                  input_field_no=1,                                            &  
+                  input_field_no=1,                                            &
                   input_field_fs=[fspace],                                     &
                   output_field_no=1,                                           &
                   output_field_fs=[fspace],                                    &

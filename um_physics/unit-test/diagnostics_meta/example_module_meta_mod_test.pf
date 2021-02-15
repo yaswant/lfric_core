@@ -115,7 +115,7 @@ contains
     !> Create misc meta data objects
     type(misc_meta_data_type) :: meta_data_test_1
     type(misc_meta_data_type) :: meta_data_test_2
-    
+
     character(str_def) :: target, actual
 
 

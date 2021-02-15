@@ -6,7 +6,7 @@
 MODULE lfricinp_grid_namelist_mod
 ! Description:
 ! Namelist used to define a global regular grid
-  
+
 ! lfric modules
 USE constants_mod,    ONLY: imdi, rmdi
 
@@ -14,10 +14,10 @@ USE constants_mod,    ONLY: imdi, rmdi
 USE, INTRINSIC :: iso_fortran_env, ONLY : int64, real64
 
 IMPLICIT NONE
-  
+
 ! Grid namelist - names matching namelist created by weight generation script
 REAL(KIND=real64) :: lambda_origin_targ = rmdi ! Note this is P grid origin
-REAL(KIND=real64) :: phi_origin_targ = rmdi    ! Note this is P grid origin 
+REAL(KIND=real64) :: phi_origin_targ = rmdi    ! Note this is P grid origin
 REAL(KIND=real64) :: phi_pole =  rmdi          ! Latitude of north pole
 REAL(KIND=real64) :: lambda_pole = rmdi        ! Longitude of north polexs
 REAL(KIND=real64) :: delta_lambda_targ = rmdi  ! Grid spacing x direction

@@ -66,19 +66,19 @@ DO l = 1, no_dependency_graphs
 
   IF (ALLOCATED(dependency_graph_list(l)%input_field)) THEN
     DO j = 1, SIZE(dependency_graph_list(l)%output_field)
-  
+
       jj = get_field_index(                                                    &
            dependency_graph_list(l)%output_field(j)%field_ptr%get_name()       &
                         )
       DO i = 1, SIZE(dependency_graph_list(l)%input_field)
- 
+
         ii = get_field_index(                                                  &
              dependency_graph_list(l)%input_field(i)%field_ptr%get_name()      &
                         )
         field_dependency_matrix(ii,jj) = 1
 
       END DO
-    
+
     END DO
   END IF
 
@@ -121,13 +121,13 @@ DO i = 1, no_dependency_graphs ! Loop over all dependency graphs.
       input_field_name(l) =                                                    &
            TRIM(dependency_graph_list(k)%input_field(l)%field_ptr%get_name())
     END DO
-  
+
   ENDIF
 
   ! Get output field name list for later use
   output_field_no = SIZE(dependency_graph_list(k)%output_field)
   ALLOCATE(output_field_name(output_field_no))
-  DO l = 1, output_field_no  
+  DO l = 1, output_field_no
     output_field_name(l) =                                                     &
           TRIM(dependency_graph_list(k)%output_field(l)%field_ptr%get_name())
   END DO
@@ -155,13 +155,13 @@ DO i = 1, no_dependency_graphs ! Loop over all dependency graphs.
                                  TRIM(dependency_graph_list(k)%gen%identifier)
   CALL log_event(log_scratch_space, LOG_LEVEL_INFO)
 
-  ! Write the newly generated fields to dump if needed. Since a field has 
+  ! Write the newly generated fields to dump if needed. Since a field has
   ! now been generated, its dependencies on other fields in the field dependency
   ! can now be removed, and finally also flag up that its been generated.
   DO l = 1, output_field_no
 
     global_field_index =  get_field_index(output_field_name(l))
-    IF (TRIM(field_io_id_list(global_field_index)) /= empty_string) THEN   
+    IF (TRIM(field_io_id_list(global_field_index)) /= empty_string) THEN
       CALL dump_write(global_field_index)
     END IF
 
@@ -203,7 +203,7 @@ IMPLICIT NONE
 ! Argument(s)
 !
 ! Index of field in global field list to be written to dump
-INTEGER :: global_field_index 
+INTEGER :: global_field_index
 
 !
 ! Local variables
@@ -237,7 +237,7 @@ IF (no_layers == 1) THEN ! This is a 2D field
 
   CALL field_list(global_field_index) % set_write_behaviour(tmp_write_ptr_2d)
 
-ELSE                     ! This is a 3D field 
+ELSE                     ! This is a 3D field
 
   CALL field_list(global_field_index) % set_write_behaviour(tmp_write_ptr_3d)
 

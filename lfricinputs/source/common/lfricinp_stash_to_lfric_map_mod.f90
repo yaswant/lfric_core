@@ -23,10 +23,10 @@ INTEGER(KIND=int64), SAVE :: field_counter = 0
 ! The get_index array is dimensioned to the maximum number of stashcodes
 ! possible in the UM. The array index will correspond to the
 ! stashcode. First two digits are the section code, remaining 3 digits
-! are the items code. E.g. Section code 0, item code 3 will be at 
+! are the items code. E.g. Section code 0, item code 3 will be at
 ! get_index(3), section code 2, item code 21 would be get_index(2021)
 ! The contents of the array will an index to the character array of lfric
-! field names. This intermediate step is used to avoid having a hugely 
+! field names. This intermediate step is used to avoid having a hugely
 ! oversized character array
 INTEGER(KIND=int64) :: get_index(99999) = int(imdi, int64)
 
@@ -93,7 +93,7 @@ CALL map_field_name(stashcode_snowdep_grd_tile, 'tile_snow_depth')       ! stash
 CALL map_field_name(stashcode_snowpack_bk_dens, 'tile_snowpack_density') ! stash 377
 CALL map_field_name(stashcode_nsnow_layrs_tiles, 'tile_n_snow_layers')   ! stash 380
 CALL map_field_name(stashcode_snow_laythk_tiles, &                       ! stash 381
-     'tile_snow_layer_thickness')                    
+     'tile_snow_layer_thickness')
 CALL map_field_name(stashcode_snow_liq_tile, 'tile_snow_layer_liq_mass') ! stash 383
 CALL map_field_name(stashcode_snow_ice_tile, 'tile_snow_layer_ice_mass') ! stash 382
 CALL map_field_name(stashcode_snow_T_tile, 'tile_snow_layer_temp')       ! stash 384
@@ -134,8 +134,8 @@ IMPLICIT NONE
 INTEGER(KIND=int64), INTENT(IN) :: stashcode
 CHARACTER(LEN=str_def) :: name ! Result
 IF (get_index(stashcode) == imdi) THEN
-  WRITE(log_scratch_space, '(A,I0,A)') "Stashcode ", stashcode, & 
-       " has not been mapped to lfric field name" 
+  WRITE(log_scratch_space, '(A,I0,A)') "Stashcode ", stashcode, &
+       " has not been mapped to lfric field name"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 ELSE
   name = TRIM(field_name(get_index(stashcode)))

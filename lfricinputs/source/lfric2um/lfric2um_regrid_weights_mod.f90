@@ -31,7 +31,7 @@ SUBROUTINE lfric2um_regrid_weightsfile_ctl()
 !  Control routine to handle weights file reading and some processing
 !  of weights to convert to 2D array indices
 USE lfric2um_namelists_mod, ONLY: lfric2um_config
-USE lfricinp_um_grid_mod, ONLY: um_grid 
+USE lfricinp_um_grid_mod, ONLY: um_grid
 IMPLICIT NONE
 
 ! P points
@@ -85,12 +85,12 @@ INTEGER(KIND=int64) :: horiz_grid_code = 0
 horiz_grid_code = get_stashmaster_item(stashcode, grid)
 
 SELECT CASE(horiz_grid_code)
-CASE( u_points ) 
-  weights => mesh_face_centre_to_grid_u 
+CASE( u_points )
+  weights => mesh_face_centre_to_grid_u
 CASE( v_points )
-  weights => mesh_face_centre_to_grid_v 
-CASE( p_points, ozone_points ) 
-   weights => mesh_face_centre_to_grid_p 
+  weights => mesh_face_centre_to_grid_v
+CASE( p_points, ozone_points )
+   weights => mesh_face_centre_to_grid_p
 CASE DEFAULT
   WRITE(log_scratch_space, '(2(A,I0))') "Unsupported horizontal grid type code: ", &
        horiz_grid_code, " encountered during regrid of stashcode", stashcode

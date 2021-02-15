@@ -17,12 +17,12 @@ CONTAINS
 ! it to be short due to its use as a wrapper to netcdf function calls
 SUBROUTINE check_stat_ncdf(stat)
 ! Description:
-!  Wrapper routine to check return status of any calls to 
+!  Wrapper routine to check return status of any calls to
 !  netcdf library and call an abort if necessary
 
 ! External libraries
 USE netcdf, ONLY: NF90_NOERR, NF90_STRERROR
-! LFRic modules 
+! LFRic modules
 USE log_mod, ONLY: LOG_LEVEL_INFO, LOG_LEVEL_ERROR, log_event
 
 IMPLICIT NONE

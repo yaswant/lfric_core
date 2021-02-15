@@ -48,7 +48,7 @@ INTEGER(KIND=int64) ::                                                         &
   um_file_type, dump_stagger, dump_grid_type, dump_num_levels
 REAL(KIND=real64)   :: dump_model_top
 
-! Indices of required values in integer constants 
+! Indices of required values in integer constants
 INTEGER(KIND=int64), PARAMETER :: ih_num_levels = 8
 INTEGER(KIND=int64), PARAMETER :: rh_height_model_top = 16
 
@@ -68,7 +68,7 @@ CALL shumlib(routinename//'::get_fixed_length_header_by_index',                &
 IF (um_file_type /= inst_dump) THEN
   WRITE(log_scratch_space, "(2(A,I0))" )                                       &
        "Input file is not a UM dump, dataset type "                            &
-        // "found was: ", um_file_type, " but a dump should have: ", inst_dump 
+        // "found was: ", um_file_type, " but a dump should have: ", inst_dump
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 

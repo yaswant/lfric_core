@@ -32,7 +32,7 @@ USE lfricinp_masks_mod,                ONLY: lfricinp_init_masks,              &
 USE um2lfric_regrid_weights_mod,           ONLY: get_weights
 USE um2lfric_masked_field_adjustments_mod, ONLY: land_field_adjustments,       &
                                                  maritime_field_adjustments
- 
+
 IMPLICIT NONE
 
 ! Local variables
@@ -49,9 +49,9 @@ CALL lfricinp_init_masks(stashcode_land_mask)
 !
 IF (ALLOCATED(um_land_mask) .AND. ALLOCATED(lfric_land_mask)) THEN
 
-  ! Find indices of land points on LFRic mesh that will require adjustment to 
+  ! Find indices of land points on LFRic mesh that will require adjustment to
   ! UM NN land point values
-  CALL land_field_adjustments%find_adjusted_points_src_2d_dst_1d(              &     
+  CALL land_field_adjustments%find_adjusted_points_src_2d_dst_1d(              &
                                       src_mask=um_land_mask,                   &
                                       dst_mask=lfric_land_mask,                &
                                       weights=get_weights(stashcode_land_mask))
@@ -83,9 +83,9 @@ END IF
 !
 IF (ALLOCATED(um_maritime_mask) .AND. ALLOCATED(lfric_maritime_mask)) THEN
 
-  ! Find indices of maritime points on LFRic mesh that will require adjustment to 
+  ! Find indices of maritime points on LFRic mesh that will require adjustment to
   ! UM NN maritime point values
-  CALL maritime_field_adjustments%find_adjusted_points_src_2d_dst_1d(          &     
+  CALL maritime_field_adjustments%find_adjusted_points_src_2d_dst_1d(          &
                                       src_mask=um_maritime_mask,               &
                                       dst_mask=lfric_maritime_mask,            &
                                       weights=get_weights(stashcode_land_mask))

@@ -61,7 +61,7 @@ ALLOCATE( remap_matrix_local_tmp( weights%num_wgts, weights%num_links) )
 local_links = 0
 DO i_link = 1, weights%num_links
   ! The call to get_lid_from_gid will return -1 if the global id is not
-  ! known to this partition. Also the partition will also contain halo cells. 
+  ! known to this partition. Also the partition will also contain halo cells.
   ! However, we only want to select cells wholy owned by this partition. So reject
   ! any addresses that are -1 or greater than ncells_2D
   IF ( local_mesh % get_lid_from_gid(weights%dst_address(i_link)) /= -1 .AND.  &
@@ -80,7 +80,7 @@ DO i_link = 1, weights%num_links
   END IF
 END DO
 
-! Deallocate and reallocate the arrays in the main weights type using 
+! Deallocate and reallocate the arrays in the main weights type using
 ! the local sizes as calculated by the local_links counter in the above loop
 IF (ALLOCATED(weights%src_address_2D)) DEALLOCATE(weights%src_address_2D)
 ALLOCATE(weights%src_address_2D(local_links, 2))
@@ -112,7 +112,7 @@ USE um2lfric_regrid_weights_mod, ONLY: get_weights
 USE lfricinp_lfric_driver_mod, ONLY: lfric_fields
 USE lfricinp_stash_to_lfric_map_mod, ONLY: get_field_name
 
-IMPLICIT NONE 
+IMPLICIT NONE
 
 ! Description: Control routine to call weights partitioning for each grid type
 ! Will need additional logic once we have a dynamic list of fields

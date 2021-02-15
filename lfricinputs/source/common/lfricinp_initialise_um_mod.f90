@@ -45,7 +45,7 @@ CONTAINS
 SUBROUTINE lfricinp_initialise_um(fname)
 
   IMPLICIT NONE
-  
+
   CHARACTER(LEN=fnamelen), INTENT(IN) :: fname
   CHARACTER(LEN=*), PARAMETER :: routinename='lfricinp_initialise_um'
 
@@ -68,7 +68,7 @@ FUNCTION find_field_by_stashcode(stashcode_in)
   USE lfricinp_um_parameters_mod, ONLY: um_imdi, msglen
 
   IMPLICIT NONE
-  
+
   INTEGER, INTENT(IN) :: stashcode_in
   INTEGER(KIND=um_integer64) :: stashcode
   CHARACTER(LEN=16)          :: timestring

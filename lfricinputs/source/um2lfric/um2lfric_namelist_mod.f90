@@ -31,7 +31,7 @@ TYPE :: config
   CHARACTER(LEN=512) :: message = 'No namelist read'
   INTEGER :: unit_number
 CONTAINS
-  
+
   PROCEDURE :: load_namelist
 
 END TYPE config
@@ -102,7 +102,7 @@ SUBROUTINE load_namelist(self, fname)
   OPEN(UNIT=self%unit_number, FILE=fname, IOSTAT=self%status,                 &
                               IOMSG=self%message)
   IF (self%status /= 0) CALL log_event(self%message, LOG_LEVEL_ERROR)
-  
+
   READ(self%unit_number, NML=configure_um2lfric, IOSTAT=self%status,          &
                          IOMSG=self%message)
   IF (self%status /= 0) CALL log_event(self%message, LOG_LEVEL_ERROR)

@@ -18,19 +18,19 @@ IMPLICIT NONE
 ! Define STASHmaster array. The size of which must match the size
 ! of the array in Shumlib. The array index will correspond to the
 ! stashcode. First two digits are the section code, remaining 3 digits
-! are the items code. E.g. Section code 0, item code 3 will be at 
+! are the items code. E.g. Section code 0, item code 3 will be at
 ! stashmaster(3), section code 2, item code 21 would be stashmaster(2021)
 TYPE(shum_STASHmaster), PUBLIC :: stashmaster(99999)
 
 ! Parameters for horizontal grid code
 ! Atmospheric theta / p points
-INTEGER(KIND=int64), PUBLIC, PARAMETER :: p_points = 1 
+INTEGER(KIND=int64), PUBLIC, PARAMETER :: p_points = 1
 ! Atmospheric theta / p points - values over sea only
 INTEGER(KIND=int64), PUBLIC, PARAMETER :: p_points_values_over_sea = 3
 ! Atmospheric u points on the 'c' grid
-INTEGER(KIND=int64), PUBLIC, PARAMETER :: u_points = 18 
+INTEGER(KIND=int64), PUBLIC, PARAMETER :: u_points = 18
 ! Atmospheric v points on the 'c' grid
-INTEGER(KIND=int64), PUBLIC, PARAMETER :: v_points = 19 
+INTEGER(KIND=int64), PUBLIC, PARAMETER :: v_points = 19
 ! Land compressed point
 INTEGER(KIND=int64), PUBLIC, PARAMETER :: land_compressed = 21
 ! Ozone points
@@ -515,7 +515,7 @@ CONTAINS
 SUBROUTINE lfricinp_read_stashmaster(stashmaster_path)
 ! Description:
 !  Read in STASHmaster using shumlib and check return code
-!  of shumlib function. 
+!  of shumlib function.
 
 IMPLICIT NONE
 ! Arguments
@@ -546,10 +546,10 @@ INTEGER(KIND=int64) :: item
 
 item = imdi
 
-! Check that the STASHmaster record exists. 
+! Check that the STASHmaster record exists.
 IF (.NOT. ASSOCIATED(stashmaster(stashcode) % record)) THEN
   WRITE(log_scratch_space, '(A,I0)') &
-       "Unassociated STASHmaster record for stashcode ", stashcode 
+       "Unassociated STASHmaster record for stashcode ", stashcode
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 
@@ -580,7 +580,7 @@ CASE(cfll)
   item = stashmaster(stashcode) % record % cfll
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-       "STASHmaster item id ", item_id, " not supported" 
+       "STASHmaster item id ", item_id, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 

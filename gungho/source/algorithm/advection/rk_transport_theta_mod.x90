@@ -14,7 +14,7 @@ module rk_transport_theta_mod
   use log_mod,                           only: log_event,         &
                                                LOG_LEVEL_INFO,    &
                                                LOG_LEVEL_ERROR
-  use fs_continuity_mod,                 only: W1
+  use fs_continuity_mod,                 only: W1, W2, Wtheta
   ! Configuration options
   use finite_element_config_mod,         only: element_order
   use timestepping_config_mod,           only: dt
@@ -35,7 +35,6 @@ module rk_transport_theta_mod
                                                operators_fem,                  &
                                                oned_reconstruction,            &
                                                consistent_metric,              &
-                                               theta_splitting,                &
                                                theta_splitting_vh,             &
                                                theta_splitting_hv,             &
                                                theta_splitting_strang,         &
@@ -67,121 +66,36 @@ module rk_transport_theta_mod
   ! Log
   use io_config_mod,                     only: subroutine_timers
   use timer_mod,                         only: timer
-  use split_vector_field_kernel_mod,     only: split_vector_field_kernel_type
-  use vert_sl_theta_alg_mod,             only: vert_sl_theta
+  use advective_update_alg_mod,          only: adv_coeffs, vert_adv_coeffs, &
+                                               advective_av,                &
+                                               advective_av_chi3,           &
+                                               chi3_at_wt,                  &
+                                               nfaces_re_h, nfaces_re_v,    &
+                                               advective_stencil_extent,    &
+                                               advective2d_stencil_size
 
   implicit none
 
   private
 
   ! 'State' items that need to be created once but used every step
-  type( field_type )              :: theta_n, r_theta, theta_inc
+  type( field_type )              :: theta, theta_n, r_theta, theta_inc
   type( field_type ), allocatable :: rt_prediction(:)
   type( field_type )              :: mt_lumped
   type( field_type )              :: theta0
   type( field_type )              :: ones
   type( field_type )              :: theta_av
-  type( field_type )              :: advective_av_chi3, theta_metrics, chi3_at_wt
+  type( field_type )              :: theta_metrics
 
   ! Needed for nonuniform FV operators
-  type( field_type ), allocatable :: adv_coeffs(:,:),  vert_adv_coeffs(:,:)
 
-  integer(i_def) :: flux_stencil_extent,      &
-                    advective_stencil_extent, &
-                    flux2d_stencil_size,      &
-                    advective2d_stencil_size
   integer(i_def) :: nfaces_h, nfaces_v
 
-  public :: split_transport_theta_step
   public :: rk_transport_theta_step
   public :: rk_transport_theta_init
   public :: rk_transport_theta_final
 
 contains
-
-  !===========================================================================
-  !> @brief This routine splits the wind into vertical and horizontal parts
-  !>        then does a vertical semi-Lagrangian advection and a multi-step
-  !>        Runge-Kutta-Method-Of-Line (RKMOL) in the horizontal.
-  !> @param[in]     wind The 3D wind field
-  !> @param[in,out] theta A theta/tracer type field
-  !===========================================================================
-
-  subroutine split_transport_theta_step( wind, theta)
-
-    implicit none
-
-    type( field_type ), intent( in    ) :: wind
-    type( field_type ), intent( inout ) :: theta
-
-    type(field_type) :: wind_horiz, wind_horiz2
-    type(field_type) :: wind_vert
-    type(function_space_type), pointer :: w2_fs => null()
-    type(field_type), pointer          :: detj_at_w2 => null()
-
-    integer(i_def)         :: mol_substeps
-    integer(i_def)         :: sub_step_count
-    real(r_def)            :: dt_substep, half_dt, full_dt
-    real(r_def)            :: cfl_min, cfl_max
-    type( field_type )     :: theta_in
-
-    if ( subroutine_timers ) call timer('split_transport_theta_step')
-
-    w2_fs =>  wind%get_function_space()
-    call wind_horiz%initialise( vector_space = w2_fs )
-    call wind_horiz2%initialise( vector_space = w2_fs )
-    call wind_vert%initialise( vector_space = w2_fs )
-
-    call theta_in%initialise( vector_space = theta%get_function_space())
-    call theta%copy_field(theta_in)
-    detj_at_w2 => get_detj_at_w2()
-
-    if (theta_splitting /= theta_splitting_strang .and. &
-        theta_splitting /= theta_splitting_vh     .and. &
-        theta_splitting /= theta_splitting_hv           ) then
-     call log_event( "split_transport_theta_step: Invalid theta splitting option", LOG_LEVEL_ERROR )
-    end if
-
-    call invoke(split_vector_field_kernel_type(wind_horiz, wind_vert, wind) )
-    half_dt  = 0.5_r_def*dt
-    full_dt  = real(dt, r_def)
-
-    ! Do half-step SL vertical transport if Strang splitting
-    ! Do full dt-SL-step if split vertical(dt)+horizontal(dt)
-
-    if ( theta_splitting == theta_splitting_strang ) then
-       call vert_sl_theta(wind_vert,theta,half_dt)
-    elseif ( theta_splitting == theta_splitting_vh ) then
-       call vert_sl_theta(wind_vert,theta,full_dt)
-    end if
-
-    call invoke( name = "Split the horizontal vertical winds",    &
-                 X_divideby_Y(wind_horiz2,wind_horiz,detj_at_w2), &
-                 inc_a_times_X(full_dt, wind_horiz2)              )
-    call wind_horiz2%field_minmax(cfl_min, cfl_max)
-    cfl_max = max(abs(cfl_max),abs(cfl_min))
-
-    mol_substeps = int(cfl_max/(cfl_mol_2d_stab+tiny_eps),i_def) + 1_i_def
-    dt_substep = full_dt/real(mol_substeps,r_def)
-
-    do sub_step_count = 1, mol_substeps
-       call rk_transport_theta_step(wind_horiz,theta,dt_substep)
-    end do
-
-    ! Do half-step SL vertical transport if splitting_strang
-    ! Do full dt-SL-step if splitting_hv
-
-    if ( theta_splitting == theta_splitting_strang ) then
-       call vert_sl_theta(wind_vert,theta,half_dt)
-    elseif ( theta_splitting == theta_splitting_hv ) then
-       call vert_sl_theta(wind_vert,theta,full_dt)
-    end if
-
-    nullify( w2_fs, detj_at_w2 )
-
-    if ( subroutine_timers ) call timer('split_transport_theta_step')
-
-  end subroutine split_transport_theta_step
 
   !===========================================================================
   !> @brief A Runge-Kutta time-discretisation of the advection equation.
@@ -233,33 +147,32 @@ contains
           ! Use polynomial reconstruction
           call invoke( setval_c(theta_av, 0.0_r_def) )
           if ( oned_reconstruction ) then
-            call invoke_poly1d_adv_recon( theta_av, u, theta, adv_coeffs, &
+            call invoke_poly1d_adv_recon( theta_av, u, theta, adv_coeffs,               &
                                           fv_advective_order, advective_stencil_extent, &
-                                          nfaces_h )
+                                          nfaces_h                                      )
             ! Horizontal advection of metric terms
             if ( consistent_metric ) then
               call invoke( setval_c(advective_av_chi3, 0.0_r_def) )
-              call invoke_poly1d_adv_recon( advective_av_chi3, u, &
-                                            chi3_at_wt, adv_coeffs, &
+              call invoke_poly1d_adv_recon( advective_av_chi3, u,                         &
+                                            chi3_at_wt, adv_coeffs,                       &
                                             fv_advective_order, advective_stencil_extent, &
-                                            nfaces_h )
+                                            nfaces_h                                      )
             end if
           else
             ! Use 2d flux code
-            call invoke_poly2d_adv_recon( theta_av, u, theta, adv_coeffs, &
+            call invoke_poly2d_adv_recon( theta_av, u, theta, adv_coeffs,               &
                                           fv_advective_order, advective2d_stencil_size, &
-                                          nfaces_h )
+                                          nfaces_h                                      )
             ! Horizontal advection of metric terms
             if ( consistent_metric ) then
               call invoke( setval_c(advective_av_chi3, 0.0_r_def) )
-              call invoke_poly2d_adv_recon( advective_av_chi3, u, &
-                                            chi3_at_wt, adv_coeffs, &
+              call invoke_poly2d_adv_recon( advective_av_chi3, u,                         &
+                                            chi3_at_wt, adv_coeffs,                       &
                                             fv_advective_order, advective2d_stencil_size, &
-                                            nfaces_h )
+                                            nfaces_h                                      )
             end if
           end if
-          call invoke( poly_advective_kernel_type( rt_prediction(stage), &
-                                                   u, theta_av) )
+          call invoke( poly_advective_kernel_type( rt_prediction(stage), u, theta_av) )
 
           ! Compute vertical components of advective update
           call u%copy_field(consistent_wind)
@@ -268,14 +181,13 @@ contains
             ! Modify advecting wind
                        consistent_wind_kernel_type(consistent_wind, u, theta_metrics, chi_xyz) )
           end if
-          call invoke_poly1d_vert_adv( rt_prediction(stage), consistent_wind, theta, &
-                                       vert_adv_coeffs, &
-                                       fv_advective_order, nfaces_v)
+          call invoke_poly1d_vert_adv( rt_prediction(stage), consistent_wind, theta,  &
+                                       vert_adv_coeffs, fv_advective_order, nfaces_v  )
         case(operators_fem)
           ! Use FEM projection
           ! Initialise fields
-          call invoke( name = "FEM advection of theta",           &
-                       setval_c(rt_prediction(stage), 0.0_r_def), &
+          call invoke( name = "FEM advection of theta",                       &
+                       setval_c(rt_prediction(stage), 0.0_r_def),             &
           ! Theta advection
                        rtheta_kernel_type( rt_prediction(stage), theta, u, qr) )
         case default
@@ -291,7 +203,7 @@ contains
       ! Theta
       select case(operators)
         case(operators_fv) ! theta in Wtheta
-          call invoke( inc_X_divideby_Y(r_theta, mt_lumped), &
+          call invoke( inc_X_divideby_Y(r_theta, mt_lumped),    &
                        X_minus_bY(theta, theta_n, dts, r_theta) )
         case(operators_fem)
           call mass_matrix_solver_alg( theta_inc, r_theta)
@@ -309,11 +221,9 @@ contains
   !===========================================================================
   !> @brief Init routine for RK transport timestepping algorithm.
   !> @param[in] Mesh_id Mesh id of mesh on which the model runs
-  !> @param[in] u 3D wind field
-  !> @param[in] theta A theta/tracer w-type field
   !===========================================================================
 
-  subroutine rk_transport_theta_init( mesh_id, u, theta)
+  subroutine rk_transport_theta_init( mesh_id )
     use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
     use sample_field_kernel_mod,           only: sample_field_kernel_type
     use quadrature_edge_mod,               only: quadrature_edge_type
@@ -328,8 +238,6 @@ contains
 
     ! Mesh id
     integer(i_def),  intent(in)        :: mesh_id
-    ! Prognostic fields
-    type( field_type ), intent( in )   :: u, theta
 
     type(function_space_type), pointer :: u_fs     => null()
     type(function_space_type), pointer :: theta_fs => null()
@@ -341,7 +249,6 @@ contains
     type( field_type ), pointer :: chi_xyz(:) => null()
     type( field_type ), pointer :: md_wt => null()
     type( field_type )          :: wt_multiplicity
-    integer(i_def)              :: direction, polynomial
 
     type( quadrature_xyoz_type )           :: qr
     type( quadrature_edge_type )           :: qre
@@ -358,9 +265,11 @@ contains
 
     !=== Section 1: Create field objects =====================================!
     ! Local fields
-    u_fs     => u%get_function_space()
-    theta_fs => theta%get_function_space()
+    u_fs    => function_space_collection%get_fs( mesh_id, element_order, W2      )
+    theta_fs => function_space_collection%get_fs( mesh_id, element_order, Wtheta )
 
+    call theta%initialise( vector_space = theta_fs )
+    call theta0%initialise( vector_space = theta_fs )
     call theta_n%initialise( vector_space = theta_fs )
     call r_theta%initialise( vector_space = theta_fs )
     call theta_inc%initialise( vector_space = theta_fs )
@@ -369,19 +278,14 @@ contains
       call rt_prediction(stage)%initialise( vector_space = theta_fs )
     end do
 
+    nfaces_h = nfaces_re_h
+    nfaces_v = nfaces_re_v
+
     if ( operators == operators_fv ) then
       if ( element_order == 0 ) then
         ! Get topology information from the reference element
-        mesh              => theta%get_mesh()
+        mesh              => theta_n%get_mesh()
         reference_element => mesh%get_reference_element()
-        ! Number of horizontal neighbours
-        nfaces_h = reference_element%get_number_horizontal_faces()
-        ! Number of vertical neighbours is (and always will be) 2
-        nfaces_v = reference_element%get_number_vertical_faces()
-
-        ! Compute stencil extents
-        flux_stencil_extent      = int(real(fv_flux_order+1,r_def)/2.0,i_def)
-        advective_stencil_extent = int(real(fv_advective_order+1,r_def)/2.0,i_def)
       else
         call log_event( "Gungho: subgrid mappings needed for FV MoL with high order elements", LOG_LEVEL_ERROR )
       end if
@@ -393,37 +297,6 @@ contains
                    setval_c(mt_lumped, 0.0_r_def), &
                    matrix_vector_kernel_type(mt_lumped, ones, mm_wt) )
 
-      ! Compute stencil for nonuniform polynomial fit
-      ! Initialise PSy layer arrays (this will not be needed when
-      ! multi-dimensional field arrays are supported)
-      if ( oned_reconstruction ) then
-        call psykal_lite_mol_adv_init(theta,                &
-                                      fv_advective_order,   &
-                                      fv_advective_order+1, &
-                                      nfaces_h, nfaces_v)
-      else
-        flux2d_stencil_size = 1_i_def
-        do polynomial = 1, fv_flux_order
-          if ( mod(polynomial,2_i_def) == 0 ) then
-            flux2d_stencil_size = flux2d_stencil_size + nfaces_h
-          else
-            flux2d_stencil_size = flux2d_stencil_size + nfaces_h*polynomial
-          end if
-        end do
-        advective2d_stencil_size = 1_i_def
-        do polynomial = 1, fv_advective_order
-          if ( mod(polynomial,2_i_def) == 0 ) then
-            advective2d_stencil_size = advective2d_stencil_size + nfaces_h
-          else
-            advective2d_stencil_size = advective2d_stencil_size + nfaces_h*polynomial
-          end if
-        end do
-        call psykal_lite_mol_adv_init(theta,                    &
-                                      fv_advective_order,       &
-                                      advective2d_stencil_size, &
-                                      nfaces_h, nfaces_v)
-      end if
-
       chi_xyz => get_coordinates_xyz()
       nqp_xy = fv_advective_order+3_i_def
       nqp_z = 2
@@ -432,44 +305,24 @@ contains
       else
         face_quad_order = fv_flux_order+1_i_def
       end if
-      qr = quadrature_xyoz_type(nqp_xy, nqp_xy, nqp_z, &
-                                gauss_lobatto_quadrature)
-      qre = quadrature_edge_type(face_quad_order, .true., .false., &
-                                 reference_element, gaussian_quadrature)
+      qr = quadrature_xyoz_type(nqp_xy, nqp_xy, nqp_z, gauss_lobatto_quadrature)
+      qre = quadrature_edge_type(face_quad_order, .true., .false.,      &
+                                 reference_element, gaussian_quadrature )
       md_wt => get_mass_matrix_diagonal(wt_id)
-      call theta_av%initialise( vector_space =                        &
+      call theta_av%initialise( vector_space =                         &
           function_space_collection%get_fs(mesh_id, element_order, W1) )
       if ( oned_reconstruction ) then
-        allocate( adv_coeffs(fv_advective_order+1, nfaces_h) )
-        do direction = 1,nfaces_h
-          do polynomial = 1,fv_advective_order+1
-            call adv_coeffs(polynomial,direction)%initialise( vector_space = theta_fs )
-          end do
-        end do
         call invoke_poly1d_advective_coeffs( adv_coeffs, md_wt, chi_xyz, qr, qre, &
                                              fv_advective_order,                  &
-                                             advective_stencil_extent, nfaces_h )
+                                             advective_stencil_extent, nfaces_h   )
       else
-        allocate( adv_coeffs(advective2d_stencil_size, nfaces_h) )
-        do direction = 1,nfaces_h
-          do polynomial = 1,advective2d_stencil_size
-            call adv_coeffs(polynomial,direction)%initialise( vector_space = theta_fs )
-          end do
-        end do
         call invoke_poly2d_advective_coeffs( adv_coeffs, md_wt, chi_xyz, qr, &
                                              qre, fv_advective_order,        &
                                              advective2d_stencil_size,       &
-                                             nfaces_h )
+                                             nfaces_h                        )
       end if
       call log_event( "Gungho: computing vertical advective coeffs", LOG_LEVEL_INFO )
-      ! Vertical advective coeffs
-      allocate( vert_adv_coeffs(fv_advective_order+2, nfaces_v) )
-      do direction = 1,nfaces_v
-        do polynomial = 1,fv_advective_order+2
-          call vert_adv_coeffs(polynomial,direction)%initialise( vector_space = theta_fs )
-        end do
-      end do
-      call invoke_poly1d_vert_adv_coeffs( vert_adv_coeffs, chi_xyz, &
+      call invoke_poly1d_vert_adv_coeffs( vert_adv_coeffs, chi_xyz,    &
                                           fv_advective_order, nfaces_v )
 
       if ( consistent_metric ) then
@@ -477,8 +330,8 @@ contains
         call theta_metrics%initialise(vector_space = theta_fs )
         call chi3_at_wt%initialise(vector_space = theta_fs )
         call wt_multiplicity%initialise(vector_space = theta_fs )
-        call invoke( setval_c(wt_multiplicity, 0.0_r_def),       &
-                     multiplicity_kernel_type(wt_multiplicity),  &
+        call invoke( setval_c(wt_multiplicity, 0.0_r_def),                              &
+                     multiplicity_kernel_type(wt_multiplicity),                         &
                      sample_field_kernel_type( chi3_at_wt, wt_multiplicity, chi_xyz(3)) )
       end if
 

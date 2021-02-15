@@ -15,7 +15,7 @@ USE constants_mod,    ONLY: imdi, rmdi
 
 IMPLICIT NONE
 
-PRIVATE 
+PRIVATE
 
 ! Type to contain information relating to the structured grid
 TYPE, PUBLIC :: lfricinp_grid_type
@@ -83,7 +83,7 @@ IMPLICIT NONE
 
 ! Arguments
 TYPE(shum_file_type), INTENT(INOUT) :: um_input_file
-! 
+!
 TYPE(lfricinp_grid_type) :: self
 
 ! Local variables
@@ -104,7 +104,7 @@ INTEGER(KIND=int64) :: um_file_fixed_length_header(      &
                             f_shum_fixed_length_header_len)
 ! Integer constants
 INTEGER(KIND=int64), ALLOCATABLE  :: um_file_integer_constants(:)
-! Real constants 
+! Real constants
 REAL(KIND=real64), ALLOCATABLE :: um_file_real_constants(:)
 
 CHARACTER(LEN=*), PARAMETER :: routinename = &
@@ -170,18 +170,18 @@ INTEGER(KIND=int64), PARAMETER :: arakawa_C_nd = 3
 ! Calculate the number of Arakawa cells that make up the grid.
 IF (grid_staggering == arakawa_C_endgame) THEN
   !      EG 2x2 grid example
-  !    
+  !
   !      .___V___.___V___.
   !      |       |       |    P points are on stagger location CENTER
-  !      U___P___U___P___|   
+  !      U___P___U___P___|
   !      |       |       |    U points are on stagger location EDGE1
-  !      .___V___.___V___.   
+  !      .___V___.___V___.
   !      |       |       |    V points are on stagger location EDGE2
   !      U___P___U___P___|
   !      |       |       |    o - Grid origin
   !      o___V___.___V___.
   !
-  ! If the stagger adjusted Arakawa C with v at poles is used then the 
+  ! If the stagger adjusted Arakawa C with v at poles is used then the
   ! number of P points is equal to to number of cells
   self%num_arakawa_cells_x = num_p_points_x
   self%num_arakawa_cells_y = num_p_points_y
@@ -194,7 +194,7 @@ IF (grid_staggering == arakawa_C_endgame) THEN
   ! Set number of v points - same as p points in x, one extra in y
   self%num_v_points_x = self%num_p_points_x
   self%num_v_points_y = self%num_p_points_y + 1
-  ! Set grid spacing 
+  ! Set grid spacing
   self%spacing_x = grid_spacing_x
   self%spacing_y = grid_spacing_y
   ! Set base grid origin
@@ -208,7 +208,7 @@ IF (grid_staggering == arakawa_C_endgame) THEN
   self%v_origin_x = grid_origin_x + (0.5 * self%spacing_x)
   self%v_origin_y = grid_origin_y
 ELSE IF(grid_staggering == arakawa_C_nd) THEN
-! If a standard Arakawa C grid is used then the x direction the number of P 
+! If a standard Arakawa C grid is used then the x direction the number of P
 ! points is equal to the number of cells but the y direction the number of
 ! P points is one greater than the number of cells.
   CALL log_event("New Dynamics Arakawa C grid not supported", LOG_LEVEL_ERROR)

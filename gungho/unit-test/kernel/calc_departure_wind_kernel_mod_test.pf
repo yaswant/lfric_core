@@ -150,7 +150,7 @@ contains
                                   dim_space, dim_space_diff, &
                                   nqp_h, nqp_v,              &
                                   nlayers )
-    call get_w3_m3x3_q3x3x3_size( ndf_pid, undf_pid, ncells,   &
+    call get_w3_m3x3_q3x3x3_size( ndf_pid, undf_pid, ncells, &
                                   dim_space, dim_space_diff, &
                                   nqp_h, nqp_v, 1 )
 

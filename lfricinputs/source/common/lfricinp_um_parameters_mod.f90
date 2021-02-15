@@ -46,9 +46,9 @@ INTEGER(KIND=int64), PARAMETER, PUBLIC :: rh_model_top       =16
 
 ! Meaningful parameter names for integer constants header
 ! No. of points E-W
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_row_length      = 6  
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_row_length      = 6
 ! No. of points N-S
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_rows            = 7  
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_rows            = 7
 ! No. of model levels (0=surface)
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_model_levels    = 8
 ! No. of model levels with moisture
@@ -56,21 +56,21 @@ INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_wet_levels      = 9
 ! No. of deep soil temperature levels
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_soilT_levels    = 10
 ! No. of cloud levels
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_cloud_levels    = 11 
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_cloud_levels    = 11
 ! No. of tracer levels
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_tracer_levels   = 12 
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_tracer_levels   = 12
 ! No. of boundary layer levels
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_boundary_levels = 13
 ! No. of field types
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_N_types         = 15 
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_N_types         = 15
 ! Height generation method
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_height_gen      = 17
 ! First rho level at which height is constant
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_1_c_rho_level   = 24
 ! No. of land points
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_land_points     = 25 
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_land_points     = 25
 ! No. of ozone levels
-INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_ozone_levels    = 26 
+INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_ozone_levels    = 26
 ! No. of deep soil moisture levels
 INTEGER(KIND=int64), PARAMETER, PUBLIC :: ih_soilQ_levels    = 28
 ! Number of convective cloud levels

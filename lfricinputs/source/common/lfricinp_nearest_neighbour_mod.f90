@@ -47,23 +47,23 @@ INTEGER(KIND=int64) :: ix_start, iy_start, ix_end, iy_end
 INTEGER(KIND=int64) :: ix_start_o, iy_start_o, ix_end_o, iy_end_o
 INTEGER(KIND=int64) :: search_point_num, num_on_mask_points
 INTEGER(KIND=int64), ALLOCATABLE :: search_points(:,:)
-       
+
 ! Allocate array that will contain UM grid (mask) indices that needs to be checked
-! during each iteration of the spiral search. 
-num_on_mask_points = SIZE((um_mask .eqv. .TRUE.))  
+! during each iteration of the spiral search.
+num_on_mask_points = SIZE((um_mask .eqv. .TRUE.))
 ALLOCATE(search_points(num_on_mask_points,2))
 
-! Make and initial guess to the angular search radius from the reference point  
+! Make and initial guess to the angular search radius from the reference point
 circle_ang_rad_o = SQRT((um_grid%spacing_x)**2 + (um_grid%spacing_y)**2)
-circle_ang_rad_o = circle_ang_rad_o * degrees_to_radians 
+circle_ang_rad_o = circle_ang_rad_o * degrees_to_radians
 circle_ang_rad   = circle_ang_rad_o
 
 ! Set initial value of minimum angular distance of a on mask point from the
 ! reference point. This variable will be used in a comparison test and updated
-! appropriately during the search 
+! appropriately during the search
 phi_min = 2.0 * PI
 
-! Initial limits of the "previous" search circle UM grid bounding box 
+! Initial limits of the "previous" search circle UM grid bounding box
 ix_start_o = 0
 iy_start_o = 0
 ix_end_o   = 0
@@ -78,14 +78,14 @@ DO
   ! circle crosses the prime meridian.
   CALL get_lat_lon_index_limits(um_mask_grid_type, lat_ref, lon_ref,           &
                                 circle_ang_rad, iy_start, iy_end,              &
-                                ix_start, ix_end) 
+                                ix_start, ix_end)
 
   ! Find any NEW on mask points that needs checking inside the current search
-  ! circle bounding box, whilst ignoring previously searched bounding box points 
+  ! circle bounding box, whilst ignoring previously searched bounding box points
   !
-  ! Re-initialise points to be searched for in this iteration  
+  ! Re-initialise points to be searched for in this iteration
   search_point_num = 0
-  search_points = 0 
+  search_points = 0
   !
   ! Loops over all points in the bounding box
   DO iy = iy_start, iy_end
@@ -104,7 +104,7 @@ DO
         END IF
       END IF
     END DO
-  END DO  
+  END DO
 
   ! Loop over all points that needs their distances checked during this
   ! iteration
@@ -132,7 +132,7 @@ DO
   ! points are found within the search radius. This can also happen when an on
   ! mask point is found on the bounding box, but it lies outside the search
   ! circle itself, e.g. if the on mask point lies on a corner of the bounding
-  ! box. 
+  ! box.
   !
   ! If current nearest neighbour distance estimate is LESS than the current
   ! search circle radius, that means the NN on mask point has successfully been
@@ -153,15 +153,15 @@ DO
     ! Store current UM grid bounding box boundaries for use in next iteration
     ix_start_o = ix_start
     iy_start_o = iy_start
-    ix_end_o   = ix_end  
-    iy_end_o   = iy_end  
+    ix_end_o   = ix_end
+    iy_end_o   = iy_end
   ELSE
     ! If this section is reached it means the on mask nearest neighbour has been
     ! found, so terminate the search by exiting the search/iteration loop
     EXIT
   END IF
- 
-END DO  
+
+END DO
 
 DEALLOCATE(search_points)
 
@@ -170,9 +170,9 @@ END SUBROUTINE find_nn_on_um_grid
 
 FUNCTION wrap_lon_indices(grid_type, idx) RESULT(idx_w)
 !
-! Wrap out of bounds (e.g. negative) longitude indices back on to 
+! Wrap out of bounds (e.g. negative) longitude indices back on to
 ! the proper UM grid index range
-! 
+!
 USE lfricinp_um_grid_mod, ONLY: um_grid
 
 IMPLICIT NONE
@@ -200,7 +200,7 @@ ELSE IF (idx < 1) THEN
 ELSE
   idx_w = idx
 END IF
- 
+
 END FUNCTION wrap_lon_indices
 
 
@@ -208,9 +208,9 @@ SUBROUTINE get_lat_lon_index_limits(grid_type, lat, lon, circle_ang_rad,       &
                                     iy_start, iy_end, ix_start, ix_end)
 
 !
-! Given a circle with angular radius CIRCLE_AND_RAD centered on 
-! the point with coordinates LAT & LON find the limits of the smallest 
-! UM grid bounding box that contains the circle.  
+! Given a circle with angular radius CIRCLE_AND_RAD centered on
+! the point with coordinates LAT & LON find the limits of the smallest
+! UM grid bounding box that contains the circle.
 !
 USE constants_mod,        ONLY: radians_to_degrees
 USE lfricinp_um_grid_mod, ONLY: um_grid
@@ -248,21 +248,21 @@ IF (grid_type == 'p' ) THEN
   ny  = um_grid%num_p_points_y
   origin_x = um_grid%p_origin_x
   origin_y = um_grid%p_origin_y
- 
+
 ELSE IF (grid_type == 'u') THEN
 
   nx  = um_grid%num_u_points_x
   ny  = um_grid%num_u_points_y
   origin_x = um_grid%u_origin_x
   origin_y = um_grid%u_origin_y
- 
+
 ELSE IF (grid_type == 'v') THEN
 
   nx  = um_grid%num_v_points_x
   ny  = um_grid%num_v_points_y
   origin_x = um_grid%v_origin_x
   origin_y = um_grid%v_origin_y
- 
+
 ELSE
 
   WRITE(log_scratch_space,'(A)') 'UM grid code ' // grid_type // ' was not '// &
@@ -272,8 +272,8 @@ ELSE
 END IF
 
 ! Note the maximum change in longitude away from the centre of the search circle,
-! here denoted by phi_x has not been strictly verified. This needs to be independently 
-! confirmed in future. For now it appears to work. The corresponding variable for 
+! here denoted by phi_x has not been strictly verified. This needs to be independently
+! confirmed in future. For now it appears to work. The corresponding variable for
 ! latitude, phi_y, is self-evident however as latitudes are strictly measured along
 ! a meridian which is a great circle.
 phi_x = (ASIN(circle_ang_rad) / COS(lat)) * radians_to_degrees
@@ -286,7 +286,7 @@ phi_y = circle_ang_rad * radians_to_degrees
 ! meridian. This is not "corrected", to preserve the implied ORDERING when looping
 ! over the indices. The calling routine will have to "wrap" the out of range indices
 ! back on to the proper UM grid index range, e.g. when they are used inside the body
-! of said loop for instance 
+! of said loop for instance
 IF ( ((lat_deg+phi_y) > 90.0) .OR. ((lat_deg-phi_y) < -90.0) ) THEN
   ix_start = 1
   ix_end   = nx
@@ -298,12 +298,12 @@ ENDIF
 ! Find latitude index limits of the UM grid bounding box that contains the
 ! search circle. Note the latitude indices are limited between maximum and
 ! minimum values on the grid, unlike the case for the longitude indices above
-! which are allowed the be out of range. 
+! which are allowed the be out of range.
 iy_start = CEILING(((lat_deg - phi_y) - origin_y) / um_grid%spacing_y) + 1
 IF(iy_start < 1) iy_start = 1
 iy_end   = CEILING(((lat_deg + phi_y) - origin_y) / um_grid%spacing_y)
-IF(iy_end > ny)  iy_end  = ny 
+IF(iy_end > ny)  iy_end  = ny
 
-END SUBROUTINE get_lat_lon_index_limits 
+END SUBROUTINE get_lat_lon_index_limits
 
 END MODULE lfricinp_nearest_neighbour_mod

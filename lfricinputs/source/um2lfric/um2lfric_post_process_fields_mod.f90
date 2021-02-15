@@ -18,7 +18,7 @@ CONTAINS
 
 SUBROUTINE um2lfric_post_process_fields(field, stashcode)
 ! Description: Applies transformations to fields. Should be applied
-! post regridding but before the fields are transferred into the 
+! post regridding but before the fields are transferred into the
 ! LFRic field types.
 
 ! lfric modules

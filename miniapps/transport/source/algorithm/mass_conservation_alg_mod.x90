@@ -32,14 +32,17 @@ module mass_conservation_alg_mod
 
 contains
 
-  !> @param[in] tstep   Current timestep
-  !> @param[in] density Density field
-  subroutine mass_conservation( tstep, density )
+  !>@brief Subroutine to compute the total masse at two time-levels
+  !>       n and n+1, as well as the relative error between the 2 masses.
+  !> @param[in] tstep       Current timestep (n+1)
+  !> @param[in] density_n   Density field at step n
+  !> @param[in] density_np1 Density field at step n+1
+  subroutine mass_conservation( tstep, density_n, density_np1 )
 
     implicit none
 
     integer(i_def), intent(in)   :: tstep
-    type(field_type), intent(in) :: density
+    type(field_type), intent(in) :: density_n, density_np1
 
     type(quadrature_xyoz_type)          :: qr
     type(quadrature_rule_gaussian_type) :: quadrature_rule
@@ -47,8 +50,8 @@ contains
     type(field_type), pointer           :: panel_id => null()
     type(function_space_type), pointer  :: w3_fs => null()
 
-    type(field_type)      :: mass
-    real(kind=r_def)      :: total_mass
+    type(field_type)      :: mass_n, mass_np1
+    real(kind=r_def)      :: total_mass_n, total_mass_np1, err_mass
     integer(kind=i_def)   :: mesh
 
     if ( subroutine_timers ) call timer( 'mass_conservation' )
@@ -60,16 +63,27 @@ contains
     qr = quadrature_xyoz_type( element_order+3, quadrature_rule )
 
     ! Create mass field
-    mesh = density%get_mesh_id()
+    mesh = density_n%get_mesh_id()
     w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
-    call mass%initialise( vector_space = w3_fs )
+
+    call mass_n%initialise( vector_space = w3_fs )
+    call mass_np1%initialise( vector_space = w3_fs )
 
     ! Compute and write out conserved quantities
-    call invoke( compute_total_mass_kernel_type( mass, density,           &
+    call invoke( compute_total_mass_kernel_type( mass_n, density_n,       &
                                                  chi_sph, panel_id, qr ), &
-                 sum_X( total_mass, mass ) )
+                 sum_X( total_mass_n, mass_n ),                           &
+                 compute_total_mass_kernel_type( mass_np1, density_np1,   &
+                                                 chi_sph, panel_id, qr ), &
+                 sum_X( total_mass_np1, mass_np1 )                        )
+
+    err_mass = ( total_mass_np1 - total_mass_n )/ total_mass_n
+
     write( log_scratch_space, '(A,I4,1E32.24)')  &
-                                        'Conservation  = ', tstep, total_mass
+                                        'Total mass  = ', tstep, total_mass_np1
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A,1E16.6)')  &
+                                        ' Error in total mass  = ', err_mass
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
     nullify( chi_sph, panel_id, w3_fs )

@@ -16,7 +16,7 @@ USE lfric2um_namelists_mod, ONLY: lfric2um_nl_fname, lfric_nl_fname, &
 USE lfricinp_lfric_driver_mod, ONLY: lfricinp_initialise_lfric, mesh_id, &
      twod_mesh_id, lfric_fields
 USE lfric2um_initialise_um_mod, ONLY: lfric2um_initialise_um, um_output_file
-USE lfric2um_initialise_lfric2um_mod, ONLY: lfric2um_initialise_lfric2um    
+USE lfric2um_initialise_lfric2um_mod, ONLY: lfric2um_initialise_lfric2um
 USE lfric2um_main_loop_mod, ONLY: lfric2um_main_loop
 USE lfricinp_um_grid_mod, ONLY: um_grid
 
@@ -28,7 +28,7 @@ CALL lfricinp_read_command_line_args(lfric2um_nl_fname, lfric_nl_fname)
 ! Initialise LFRic Infrastructure
 CALL lfricinp_initialise_lfric("lfric2um", lfric_nl_fname, required_lfric_namelists)
 
-! Initialise lfric2um 
+! Initialise lfric2um
 CALL lfric2um_initialise_lfric2um()
 
 ! Initialise UM Infrastructure

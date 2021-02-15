@@ -118,7 +118,7 @@ IF (PRESENT(output_field_no)) THEN
 END IF
 !
 ! Done checking number of input and output fields
-! 
+!
 
 !
 ! Compare actual field function spaces with the user supplied lists
@@ -190,9 +190,9 @@ IF (PRESENT(parameter_no)) THEN
   actual_number_of_parameters = 0
   l_scanning_parameter = .false.
 
-  DO i = 1, LEN(TRIM(parlist))             ! Loop over each character 
+  DO i = 1, LEN(TRIM(parlist))             ! Loop over each character
 
-    IF(parlist(i:i) /= ' ') THEN           ! Non-blank character detected ...           
+    IF(parlist(i:i) /= ' ') THEN           ! Non-blank character detected ...
 
       IF (.NOT. l_scanning_parameter) THEN ! ... not currently scanning a
                                            ! parameter, so must a new parameter
@@ -211,7 +211,7 @@ IF (PRESENT(parameter_no)) THEN
   END DO
 
   IF (actual_number_of_parameters /= parameter_no) THEN
-  
+
     WRITE(log_scratch_space,'(A)') 'GEN_IO_CHECK: The expected ' //            &
                                    'and actual number of parameters do ' //    &
                                    'not match!'

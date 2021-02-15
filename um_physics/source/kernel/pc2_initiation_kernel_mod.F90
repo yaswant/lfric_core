@@ -41,7 +41,7 @@ type, public, extends(kernel_type) :: pc2_initiation_kernel_type
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! exner_n_wth
        arg_type(GH_FIELD,   GH_READ,    ANY_DISCONTINUOUS_SPACE_1), & ! zlcl_mixed
        arg_type(GH_FIELD,   GH_READ,    ANY_DISCONTINUOUS_SPACE_1), & ! r_cumulus
-       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! height_wth  
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! height_wth
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dtheta_inc
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dqv_inc_wth
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dqcl_inc_wth

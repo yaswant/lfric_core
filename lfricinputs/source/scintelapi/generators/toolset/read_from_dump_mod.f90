@@ -60,7 +60,7 @@ INTEGER :: ioerr
 !
 CALL gen_io_check(                                                             &
                   dep_graph=dep_graph,                                         &
-                  input_field_no=0,                                            &  
+                  input_field_no=0,                                            &
                   output_field_no=1,                                           &
                   parameter_no=1                                               &
                  )

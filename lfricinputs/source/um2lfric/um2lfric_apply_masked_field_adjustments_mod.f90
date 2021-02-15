@@ -42,7 +42,7 @@ SELECT CASE (get_stashmaster_item(stashcode, grid))
                                                                       dst)
 
 END SELECT
-    
+
 END SUBROUTINE um2lfric_apply_masked_field_adjustments
 
 END MODULE um2lfric_apply_masked_field_adjustments_mod

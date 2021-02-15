@@ -48,12 +48,13 @@ module flux_alg_mod
 
   private
 
-  integer(i_def)                  :: flux_stencil_extent, &
-                                     flux2d_stencil_size
+  ! These are made puclic to be used in other transport modules
+  integer(i_def), public                 :: flux_stencil_extent, &
+                                            flux2d_stencil_size
   ! Interpolation coefficients needed for nonuniform fv operators
-  type( field_type ), allocatable :: flux_coeffs(:,:), &
-                                     vert_flux_coeffs(:,:)
-  integer(i_def)                  :: nfaces_re_h, nfaces_re_v
+  type( field_type ), public, allocatable :: flux_coeffs(:,:), &
+                                             vert_flux_coeffs(:,:)
+  integer(i_def), public                  :: nfaces_re_h, nfaces_re_v
 
   public  :: flux_alg
   public  :: flux_alg_init

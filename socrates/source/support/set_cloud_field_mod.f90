@@ -173,7 +173,7 @@ case (cloud_representation_combined, &
     ! Squeeze large scale cloud into area not filled by convective cloud
     cloud_frac(k) = area_fraction(k) * (1.0_r_def - cca(k))
     ! Convective cloud amount unaltered
-    conv_frac(k) = cca(k) 
+    conv_frac(k) = cca(k)
     ! Set liquid fraction of convective cloud using layer temperature
     liq_conv_frac(k) = 1.0_r_def - ( (t_layer(k) - starticeTKelvin) / &
                                      (alliceTdegC-(starticeTKelvin-zerodegc)) )

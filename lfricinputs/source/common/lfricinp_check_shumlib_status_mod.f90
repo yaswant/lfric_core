@@ -24,7 +24,7 @@ SUBROUTINE shumlib(routinename, status,                                        &
 ! Here my_shumlib_func is called first, the arguments var1 and
 ! var2 are passed to the routine. They remain in scope in the calling
 ! routine and are available to be set if their intent allows.
-! my_shumlib_func then returns a status object that is passed into this 
+! my_shumlib_func then returns a status object that is passed into this
 ! routine for checking.
 
 ! Intrinsic modules
@@ -36,7 +36,7 @@ USE log_mod, ONLY: log_event, LOG_LEVEL_ERROR, LOG_LEVEL_INFO
 ! Shumlib modules
 USE f_shum_ff_status_mod, ONLY: shum_ff_status_type, OPERATOR(==),            &
                                 OPERATOR(<), SHUMLIB_SUCCESS
-                                
+
 IMPLICIT NONE
 
 ! Arguments
@@ -46,9 +46,9 @@ LOGICAL(KIND=C_BOOL), OPTIONAL  :: print_on_success, ignore_warning
 INTEGER, OPTIONAL               :: errorstatus
 ! Internal variables
 
-! Message - set to be the maximum SHUMlib message length (1024) plus a 
+! Message - set to be the maximum SHUMlib message length (1024) plus a
 ! reasonable size for a routine name (128)
-CHARACTER(LEN=1152) :: message   
+CHARACTER(LEN=1152) :: message
 ! Set message
 WRITE(message, '(A,A,A,A)') '[', TRIM(routinename), '] ',TRIM(status%message)
 
@@ -77,7 +77,7 @@ ELSE IF (status == SHUMLIB_SUCCESS) THEN
     END IF
   END IF
 ELSE
-  IF (PRESENT(errorstatus)) errorstatus = 1  
+  IF (PRESENT(errorstatus)) errorstatus = 1
   ! This is a definite failure, abort whatever else is provided
   CALL log_event(message, LOG_LEVEL_ERROR)
 END IF

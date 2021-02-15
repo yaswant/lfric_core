@@ -11,12 +11,15 @@
 
 module vertical_sl_theta_kernel_mod
 
-use argument_mod,      only : arg_type,                           &
-                              GH_FIELD, GH_READWRITE, GH_READ,    &
-                              CELLS, GH_REAL
-use fs_continuity_mod, only : W2, Wtheta
-use constants_mod,     only : r_def, i_def
-use kernel_mod,        only : kernel_type
+use argument_mod,          only : arg_type,                           &
+                                  GH_FIELD, GH_READWRITE, GH_READ,    &
+                                  CELLS, GH_REAL
+use fs_continuity_mod,     only : W2, Wtheta
+use constants_mod,         only : r_def, i_def
+use kernel_mod,            only : kernel_type
+use transport_config_mod,  only : vertical_sl_order,           &
+                                  vertical_sl_order_cubic,     &
+                                  vertical_sl_order_quintic
 
 implicit none
 
@@ -89,12 +92,14 @@ subroutine vertical_sl_theta_code( nlayers,                             &
   real(kind=r_def), dimension(undf_wtheta), intent(inout) :: theta
   real(kind=r_def), intent(in)                            :: dts
 
-  integer(kind=i_def) :: ncelledges, k, k1, k2, k3, k4
-  real(kind=r_def)    :: zd,s,c1,c2,c3,c4
-  real(kind=r_def)    :: z_surf, z_top
+  integer(kind=i_def) :: ncelledges
+  real(kind=r_def)    :: zd, z_surf, z_top
   real(kind=r_def),allocatable :: u_local(:)
   real(kind=r_def),allocatable :: theta_local(:)
   real(kind=r_def),allocatable :: theta_d_local(:)
+  integer(kind=i_def) :: k,k0,k1,k2,k3,k4,k5
+  real(kind=r_def)    :: c0,c1,c2,c3,c4,c5
+  real(kind=r_def)    :: sm3,sm2,sm1,ss,sp1,sp2
 
   ncelledges = nlayers + 1_i_def
   allocate(u_local(1:ncelledges))
@@ -110,34 +115,89 @@ subroutine vertical_sl_theta_code( nlayers,                             &
        theta_local(k+1) = theta(map_wtheta(1)+k)
   end do
 
-  do k=1,ncelledges
-    zd = real(k,r_def) - dts*u_local(k)
-    zd = min(z_top,max(z_surf,zd))
-    k2 = floor(zd)
-    s  = zd - real(k2, r_def)
-    k1 = max(1_i_def, k2 - 1_i_def)
-    k3 = min(ncelledges, k2 + 1_i_def)
-    k4 = min(ncelledges, k2 + 2_i_def)
+  if ( vertical_sl_order == vertical_sl_order_cubic ) then
 
-    c1 = -(1.0_r_def/6.0_r_def)*s*(s-1.0_r_def)*(s-2.0_r_def)
-    c2 =  (1.0_r_def/2.0_r_def)*(s+1.0_r_def)*(s-1.0_r_def)*(s-2.0_r_def)
-    c3 = -(1.0_r_def/2.0_r_def)*s*(s+1.0_r_def)*(s-2.0_r_def)
-    c4 =  (1.0_r_def/6.0_r_def)*s*(s+1.0_r_def)*(s-1.0_r_def)
+    do k=1,ncelledges
+      zd = real(k,r_def) - dts*u_local(k)
+      zd = min(z_top,max(z_surf,zd))
+      k2 = floor(zd)
+      ss = zd - real(k2, r_def)
+      k1 = max(1_i_def, k2 - 1_i_def)
+      k3 = min(ncelledges, k2 + 1_i_def)
+      k4 = min(ncelledges, k2 + 2_i_def)
 
-    ! Do linear intepolation if you are next to the boundary.
-    ! This if could be removed but this is equivalent to imposing
-    ! zero-gradient assumption near the top and bottom boundaries
+      sm1 = ss - 1.0_r_def
+      sm2 = ss - 2.0_r_def
+      sp1 = ss + 1.0_r_def
 
-    if( k1 == k2 .or. k3 == k4) then
-       c1 = 0.0_r_def
-       c4 = 0.0_r_def
-       c2 = 1.0_r_def - s
-       c3 = s
-    end if
+      c1 = -(1.0_r_def/6.0_r_def) * ss  * sm1 * sm2
+      c2 =  (1.0_r_def/2.0_r_def) * sp1 * sm1 * sm2
+      c3 = -(1.0_r_def/2.0_r_def) * ss  * sp1 * sm2
+      c4 =  (1.0_r_def/6.0_r_def) * ss  * sp1 * sm1
 
-    theta_d_local(k) = c1*theta_local(k1) + c2*theta_local(k2) + &
-                       c3*theta_local(k3) + c4*theta_local(k4)
-  end do
+      ! Do linear intepolation if you are next to the boundary.
+      ! This if could be removed but this is equivalent to imposing
+      ! zero-gradient assumption near the top and bottom boundaries
+
+      if( k1 == k2 .or. k3 == k4) then
+         c1 = 0.0_r_def
+         c4 = 0.0_r_def
+         c2 = 1.0_r_def - ss
+         c3 = ss
+      end if
+
+      theta_d_local(k) = c1*theta_local(k1) + c2*theta_local(k2) + &
+                         c3*theta_local(k3) + c4*theta_local(k4)
+    end do
+
+  else if ( vertical_sl_order == vertical_sl_order_quintic) then
+
+    do k=1,ncelledges
+      zd = real(k,r_def) - dts*u_local(k)
+      zd = min(z_top,max(z_surf,zd))
+      k2 = floor(zd)
+      ss = zd - real(k2, r_def)
+      k1 = max(1_i_def, k2 - 1_i_def)
+      k0 = max(1_i_def, k2 - 2_i_def)
+      k3 = min(ncelledges, k2 + 1_i_def)
+      k4 = min(ncelledges, k2 + 2_i_def)
+      k5 = min(ncelledges, k2 + 3_i_def)
+
+      sm1 = ss - 1.0_r_def
+      sm2 = ss - 2.0_r_def
+      sm3 = ss - 3.0_r_def
+      sp1 = ss + 1.0_r_def
+      sp2 = ss + 2.0_r_def
+
+      c0 = -(1.0_r_def/120.0_r_def) * sp1 * ss  * sm1 * sm2 * sm3
+      c1 =  (1.0_r_def/24.0_r_def ) * sp2 * ss  * sm1 * sm2 * sm3
+      c2 = -(1.0_r_def/12.0_r_def ) * sp2 * sp1 * sm1 * sm2 * sm3
+      c3 =  (1.0_r_def/12.0_r_def ) * sp2 * sp1 * ss  * sm2 * sm3
+      c4 = -(1.0_r_def/24.0_r_def ) * sp2 * sp1 * ss  * sm1 * sm3
+      c5 =  (1.0_r_def/120.0_r_def) * sp2 * sp1 * ss  * sm1 * sm2
+
+      if( k5 == k4 .or. k1 == k0) then
+         c0 = 0.0_r_def
+         c5 = 0.0_r_def
+         c1 = -(1.0_r_def/6.0_r_def) * ss  * sm1 * sm2
+         c2 =  (1.0_r_def/2.0_r_def) * sp1 * sm1 * sm2
+         c3 = -(1.0_r_def/2.0_r_def) * ss  * sp1 * sm2
+         c4 =  (1.0_r_def/6.0_r_def) * ss  * sp1 * sm1
+      end if
+      if( k1 == k2 .or. k3 == k4) then
+         c0 = 0.0_r_def
+         c1 = 0.0_r_def
+         c4 = 0.0_r_def
+         c5 = 0.0_r_def
+         c2 = 1.0_r_def - ss
+         c3 = ss
+      end if
+
+      theta_d_local(k) = c0*theta_local(k0) + c1*theta_local(k1) + c2*theta_local(k2) + &
+                         c3*theta_local(k3) + c4*theta_local(k4) + c5*theta_local(k5)
+    end do
+
+  end if
 
   do k=0,nlayers
     theta(map_wtheta(1)+k) = theta_d_local(k+1)

@@ -1,0 +1,123 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> @brief To solve the advection equation of a theta-type tracer using a
+!>        split-approach with a semi-Lagrangian in the vertical and a
+!>        multi-step RK method in the horizontal.
+!>
+module split_transport_theta_mod
+
+  use constants_mod,                     only: r_def, i_def, tiny_eps
+  use log_mod,                           only: log_event, LOG_LEVEL_ERROR
+  use timestepping_config_mod,           only: dt
+  use runtime_constants_mod,             only: get_detj_at_w2
+  use transport_config_mod,              only: theta_splitting_vh,             &
+                                               theta_splitting_hv,             &
+                                               theta_splitting_strang,         &
+                                               cfl_mol_2d_stab
+  use field_mod,                         only: field_type
+  use function_space_mod,                only: function_space_type
+  use io_config_mod,                     only: subroutine_timers
+  use timer_mod,                         only: timer
+  use split_vector_field_kernel_mod,     only: split_vector_field_kernel_type
+  use vert_sl_theta_alg_mod,             only: vert_sl_theta
+  use rk_transport_theta_mod,            only: rk_transport_theta_step
+
+  implicit none
+
+  private
+
+  public :: split_transport_theta_step
+
+  contains
+
+  !===========================================================================
+  !> @brief This routine to split the wind into vertical and horizontal parts
+  !>        then do a vertical semi-Lagrangian advection and a multi-step
+  !>        Runge-Kutta-Method-Of-Line (RKMOL) in the horizontal.
+  !> @param[in]     wind         The 3D wind field
+  !> @param[in,out] theta        A theta/tracer type field
+  !> @param[in] theta_splitting  The splitting approach
+  !===========================================================================
+
+  subroutine split_transport_theta_step( wind, theta, theta_splitting)
+
+    implicit none
+
+    type( field_type ), intent( in    ) :: wind
+    type( field_type ), intent( inout ) :: theta
+    integer(i_def),     intent( in )    :: theta_splitting
+
+    type(field_type) :: wind_horiz, wind_horiz2
+    type(field_type) :: wind_vert
+    type(function_space_type), pointer :: w2_fs => null()
+    type(field_type), pointer          :: detj_at_w2 => null()
+
+    integer(i_def)         :: mol_substeps
+    integer(i_def)         :: sub_step_count
+    real(r_def)            :: dt_substep, half_dt, full_dt
+    real(r_def)            :: cfl_min, cfl_max
+    type( field_type )     :: theta_in
+
+    if ( subroutine_timers ) call timer('split_transport_theta_step')
+
+    w2_fs =>  wind%get_function_space()
+    call wind_horiz%initialise( vector_space = w2_fs )
+    call wind_horiz2%initialise( vector_space = w2_fs )
+    call wind_vert%initialise( vector_space = w2_fs )
+
+    call theta_in%initialise( vector_space = theta%get_function_space())
+    call theta%copy_field(theta_in)
+    detj_at_w2 => get_detj_at_w2()
+
+    if ( theta_splitting /= theta_splitting_strang .and. &
+         theta_splitting /= theta_splitting_vh     .and. &
+         theta_splitting /= theta_splitting_hv           ) then
+     call log_event( "split_transport_theta_step: Invalid theta splitting option", LOG_LEVEL_ERROR )
+    end if
+
+    call invoke(split_vector_field_kernel_type(wind_horiz, wind_vert, wind) )
+    half_dt  = 0.5_r_def*dt
+    full_dt  = real(dt, r_def)
+
+    ! Do half-step SL vertical transport if Strang splitting
+    ! Do full dt-SL-step if split vertical(dt)+horizontal(dt)
+
+    if ( theta_splitting == theta_splitting_strang ) then
+       call vert_sl_theta(wind_vert,theta,half_dt)
+     else if ( theta_splitting == theta_splitting_vh ) then
+       call vert_sl_theta(wind_vert,theta,full_dt)
+    end if
+
+    call invoke( name = "Split_the_horizontal_vertical_winds",    &
+                 X_divideby_Y(wind_horiz2,wind_horiz,detj_at_w2), &
+                 inc_a_times_X(full_dt, wind_horiz2)              )
+    call wind_horiz2%field_minmax(cfl_min, cfl_max)
+    cfl_max = max(abs(cfl_max),abs(cfl_min))
+
+    mol_substeps = int(cfl_max/(cfl_mol_2d_stab+tiny_eps),i_def) + 1_i_def
+    dt_substep = full_dt/real(mol_substeps,r_def)
+
+    do sub_step_count = 1, mol_substeps
+      call rk_transport_theta_step(wind_horiz,theta,dt_substep)
+    end do
+
+    ! Do half-step SL vertical transport if splitting_strang
+    ! Do full dt-SL-step if splitting_hv
+
+    if ( theta_splitting == theta_splitting_strang ) then
+       call vert_sl_theta(wind_vert,theta,half_dt)
+     else if ( theta_splitting == theta_splitting_hv ) then
+       call vert_sl_theta(wind_vert,theta,full_dt)
+    end if
+
+    nullify( w2_fs, detj_at_w2 )
+
+    if ( subroutine_timers ) call timer('split_transport_theta_step')
+
+  end subroutine split_transport_theta_step
+
+end module split_transport_theta_mod

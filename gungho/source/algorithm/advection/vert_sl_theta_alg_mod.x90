@@ -7,17 +7,25 @@
 !> @brief An algorithm for performing 1D-vertical-semi-Lagrangian scheme.
 !> @details The algorithm calculates the departure of theta-points
 !>          using only the vertical wind, then computes the theta at
-!>          the departure points using a cubic interpolation.
+!>          the departure points using a cubic or quintic interpolation.
 !-----------------------------------------------------------------------------
 module vert_sl_theta_alg_mod
 
-  use constants_mod,                     only: r_def
-  use io_config_mod,                     only: subroutine_timers
-  use timer_mod,                         only: timer
-  use field_mod,                         only: field_type
-  use calc_departure_wind_kernel_mod,    only: calc_departure_wind_kernel_type
-  use vertical_sl_theta_kernel_mod,      only: vertical_sl_theta_kernel_type
-  use runtime_constants_mod,             only: get_coordinates, get_panel_id
+  use constants_mod,                      only: r_def
+  use io_config_mod,                      only: subroutine_timers
+  use timer_mod,                          only: timer
+  use field_mod,                          only: field_type
+  use calc_computational_wind_kernel_mod, only: calc_computational_wind_kernel_type
+  use vertical_sl_theta_kernel_mod,       only: vertical_sl_theta_kernel_type
+  use runtime_constants_mod,              only: get_coordinates, get_panel_id
+  use rk_transport_theta_mod,             only: rk_transport_theta_step
+  use transport_config_mod,               only: theta_vertical_scheme,        &
+                                                theta_vertical_scheme_mol,    &
+                                                theta_vertical_scheme_sl,     &
+                                                vertical_sl_order,            &
+                                                vertical_sl_order_cubic,      &
+                                                vertical_sl_order_quintic
+  use log_mod,                            only: log_event, LOG_LEVEL_ERROR
 
   implicit none
 
@@ -46,21 +54,35 @@ contains
     type( field_type ), pointer :: chi_sph(:) => null()
     type( field_type ), pointer :: panel_id => null()
 
-    chi_sph  => get_coordinates()
-    panel_id => get_panel_id()
-    call departure_wind%initialise( vector_space = wind_adv%get_function_space())
 
     if ( subroutine_timers ) call timer( 'vert_sl_theta' )
 
-    ! set up the wind and compute SL advection (vertical only) of theta
+    if ( theta_vertical_scheme == theta_vertical_scheme_mol ) then
 
-    call invoke( name = "calculate_dept_and_interpolate",                        &
-                 setval_c( departure_wind, 0.0_r_def ),                          &
-                 calc_departure_wind_kernel_type(departure_wind, wind_adv,       &
-                                                 chi_sph, panel_id),             &
-                 vertical_sl_theta_kernel_type( departure_wind, theta, dts)      )
+      call rk_transport_theta_step( wind_adv, theta, dts)
 
-    nullify( chi_sph, panel_id )
+    else if ( theta_vertical_scheme == theta_vertical_scheme_sl ) then
+
+      if ( vertical_sl_order /= vertical_sl_order_cubic   .and. &
+           vertical_sl_order /= vertical_sl_order_quintic       ) then
+        call log_event( "vertical_sl_theta: Invalid vertical_sl_order", LOG_LEVEL_ERROR )
+      end if
+
+      chi_sph  => get_coordinates()
+      panel_id => get_panel_id()
+      call departure_wind%initialise( vector_space = wind_adv%get_function_space())
+
+      ! set up the wind and compute SL advection (vertical only) of theta
+
+      call invoke( name = "calculate_dept_and_interpolate",                       &
+                  setval_c( departure_wind, 0.0_r_def ),                          &
+                  calc_computational_wind_kernel_type( departure_wind, wind_adv,  &
+                                                       chi_sph, panel_id),        &
+                  vertical_sl_theta_kernel_type( departure_wind, theta, dts)      )
+      nullify( chi_sph, panel_id )
+    else
+      call log_event( "vert_sl_theta: Invalid vertical scheme", LOG_LEVEL_ERROR )
+    end if
 
     if ( subroutine_timers ) call timer( 'vert_sl_theta' )
 

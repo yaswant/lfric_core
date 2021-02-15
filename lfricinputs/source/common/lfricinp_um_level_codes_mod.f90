@@ -33,7 +33,7 @@ CONTAINS
 
 FUNCTION lfricinp_get_num_levels(um_file, stashcode) RESULT(num_levels)
 ! Description:
-!  Returns the number of levels expected in a field as defined by 
+!  Returns the number of levels expected in a field as defined by
 !  first and last level codes in the stashmaster
 
 IMPLICIT NONE
@@ -78,7 +78,7 @@ SELECT CASE(first_level_code)
     first_level_num = 0
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-     "First level code ", first_level_code, " not supported" 
+     "First level code ", first_level_code, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 
@@ -88,7 +88,7 @@ END FUNCTION lfricinp_get_first_level_num
 
 FUNCTION lfricinp_get_last_level_num(um_file, stashcode) RESULT(last_level_num)
 ! Description:
-!  Takes um_file and stashcode as input and interogates the stashmaster 
+!  Takes um_file and stashcode as input and interogates the stashmaster
 !  last level code to determine the last/top level number for the field
 
 ! lfricinp modules
@@ -124,7 +124,7 @@ SELECT CASE(last_level_code)
     last_level_num = model_levels
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-     "Last level code ", last_level_code, " not supported" 
+     "Last level code ", last_level_code, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 
@@ -135,7 +135,7 @@ END FUNCTION lfricinp_get_last_level_num
 FUNCTION lfricinp_get_num_pseudo_levels(um_grid, stashcode) &
      RESULT(num_pseudo_levels)
 ! Description:
-!  Returns the number of pseudo levels expected in a field as defined by 
+!  Returns the number of pseudo levels expected in a field as defined by
 !  first and last pseudo level codes in the stashmaster
 
 IMPLICIT NONE
@@ -156,7 +156,7 @@ FUNCTION lfricinp_get_first_pseudo_level_num(stashcode) &
      RESULT(first_pseudo_level_num)
 ! Description:
 !  Takes stashcode as input and interogates the stashmaster first
-!  pseudo_level code to determine the first/bottom pseudo_level 
+!  pseudo_level code to determine the first/bottom pseudo_level
 !  number for the field
 
 ! lfricinp modules
@@ -176,7 +176,7 @@ SELECT CASE(first_pseudo_level_code)
     first_pseudo_level_num = 1
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-     "First pseudo_level code ", first_pseudo_level_code, " not supported" 
+     "First pseudo_level code ", first_pseudo_level_code, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 
@@ -187,8 +187,8 @@ END FUNCTION lfricinp_get_first_pseudo_level_num
 FUNCTION lfricinp_get_last_pseudo_level_num(um_grid, stashcode) &
      RESULT(last_pseudo_level_num)
 ! Description:
-!  Takes um_grid and stashcode as input and interogates the stashmaster 
-!  last pseudo_level code to determine the last/top pseudo_level number 
+!  Takes um_grid and stashcode as input and interogates the stashmaster
+!  last pseudo_level code to determine the last/top pseudo_level number
 !  for the field
 
 ! lfricinp modules
@@ -214,7 +214,7 @@ CASE (11)
   last_pseudo_level_num = um_grid%num_snow_layers * um_grid%num_surface_types
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-       "Last pseudo_level code ", last_pseudo_level_code, " not supported" 
+       "Last pseudo_level code ", last_pseudo_level_code, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 

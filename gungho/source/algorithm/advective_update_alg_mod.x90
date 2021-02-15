@@ -51,15 +51,16 @@ module advective_update_alg_mod
 
   private
 
-  integer(i_def)                     :: advective_stencil_extent, &
-                                        advective2d_stencil_size
-
   ! Interpolation coefficients needed for nonuniform fv operators
-  type( field_type ), allocatable :: adv_coeffs(:,:),  &
-                                     vert_adv_coeffs(:,:)
-  type( field_type )              :: advective_av
-  type( field_type )              :: advective_av_chi3, wt_metrics, chi3_at_wt
-  integer(i_def)                  :: nfaces_re_h, nfaces_re_v
+  ! These are made puplic to be used by other transport modules
+  integer(i_def), public                  :: advective_stencil_extent, &
+                                             advective2d_stencil_size
+  type( field_type ), public, allocatable :: adv_coeffs(:,:),  &
+                                             vert_adv_coeffs(:,:)
+  type( field_type ), public              :: advective_av
+  type( field_type ), public              :: advective_av_chi3, &
+                                             wt_metrics, chi3_at_wt
+  integer(i_def), public                  :: nfaces_re_h, nfaces_re_v
 
 
   public :: advective_update_alg_init

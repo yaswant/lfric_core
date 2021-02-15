@@ -3,7 +3,7 @@
 ! For further details please refer to the file LICENCE
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
-MODULE um2lfric_populate_lfric_field_mod 
+MODULE um2lfric_populate_lfric_field_mod
 
 ! Intrinsic modules
 USE, INTRINSIC :: iso_fortran_env, ONLY : real64, int32, int64
@@ -12,7 +12,7 @@ USE, INTRINSIC :: iso_fortran_env, ONLY : real64, int32, int64
 USE field_mod, ONLY: lfric_field_type => field_type,      &
                      lfric_proxy_type => field_proxy_type
 
-IMPLICIT NONE 
+IMPLICIT NONE
 
 PRIVATE
 
@@ -37,7 +37,7 @@ USE extrusion_config_mod, ONLY: number_of_layers
 !  onto the next horizontal point.
 !
 !  In the current UM2LFRic code we use a serial implementation of the LFRic
-!  infrastructure. This means that there are no complications from the 
+!  infrastructure. This means that there are no complications from the
 !  MPI partitioning or from field stencils.
 !
 !  Simple example of a 2 layer mesh, with 4 points on each layer and both
@@ -49,10 +49,10 @@ USE extrusion_config_mod, ONLY: number_of_layers
 !                Layer 1                                  Layer 2
 !
 !
-!     x  regridded_1      x  regridded_3       x  regridded_1       x  regridded_3     
+!     x  regridded_1      x  regridded_3       x  regridded_1       x  regridded_3
 !        LFRIC_1             LFRIC_5              LFRIC_2              LFRIC_6
 !
-!     x  regridded_2      x  regridded_4       x  regridded_2       x  regridded_4  
+!     x  regridded_2      x  regridded_4       x  regridded_2       x  regridded_4
 !        LFRIC_3             LFRIC_7              LFRIC_4              LFRIC_8
 
 ! 2D array field containing the regridded data. First dimension corresponds
@@ -78,7 +78,7 @@ lfric_field_proxy = lfric_field%get_proxy()
 
 num_levels = SIZE(regridded_field, 2)
 
-! Get the size of a single level and multiply by total number of levels to get 
+! Get the size of a single level and multiply by total number of levels to get
 ! total field size
 regridded_total_field_size = SIZE(regridded_field, 2) * SIZE(regridded_field, 1)
 lfric_total_field_size = SIZE(lfric_field_proxy % data)
@@ -94,7 +94,7 @@ DO level = 1, num_levels
   len_regridded_field = SIZE(regridded_field, 1)
   ! Split up the data here and insert it into the LFRic field in the
   ! correct place. Loop over all points in the 2D regridded field that
-  ! represents a single level. The first lfric array index will match the 
+  ! represents a single level. The first lfric array index will match the
   ! current level number
   lfric_index = level
   DO regridded_index = 1, len_regridded_field

@@ -3,7 +3,7 @@
 ! For further details please refer to the file LICENCE
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
-MODULE lfricinp_add_um_field_to_file_mod 
+MODULE lfricinp_add_um_field_to_file_mod
 
 ! Intrinsic modules
 USE, INTRINSIC :: iso_fortran_env, ONLY: real64, int64
@@ -61,8 +61,8 @@ CONTAINS
 SUBROUTINE lfricinp_add_um_field_to_file(um_file, stashcode, level_index, &
                                          um_grid)
 ! Description:
-!  Adds a field object of given stashcode and level index to the um file 
-!  object. Uses metadata from um_file headers as well as the um_grid 
+!  Adds a field object of given stashcode and level index to the um file
+!  object. Uses metadata from um_file headers as well as the um_grid
 !  object in order to populate the field metadata. Allocates space for
 !  field data.
 IMPLICIT NONE
@@ -125,7 +125,7 @@ lookup_int(lbhem) = 0 ! Hardcode to global
 ! Determine grid type
 grid_type_code = get_stashmaster_item(stashcode, grid)
 
-! Set horiz grid 
+! Set horiz grid
 SELECT CASE(grid_type_code)
 CASE(p_points, ozone_points)
   lookup_int(lbrow) = um_grid%num_p_points_y
@@ -147,7 +147,7 @@ CASE(v_points)
   lookup_real_tmp(bzx) = um_grid%v_origin_x - um_grid%spacing_x
 CASE DEFAULT
   WRITE(log_scratch_space, '(A,I0,A)') &
-       "Grid type code ", grid_type_code, " not supported" 
+       "Grid type code ", grid_type_code, " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END SELECT
 lookup_real_tmp(bplat) = real_constants(rh_polelat)
@@ -156,7 +156,7 @@ lookup_real_tmp(bdx) = real_constants(rh_deltaEW)
 lookup_real_tmp(bdy) = real_constants(rh_deltaNS)
 
 
-lookup_int(lbpack) = 2 ! Currently only support 32 bit packing 
+lookup_int(lbpack) = 2 ! Currently only support 32 bit packing
 lookup_int(lbrel) = 3 ! UM version 8.1 onwards
 lookup_int(lbfc) = get_stashmaster_item(stashcode, ppfc) ! field code
 lookup_int(lbcfc) = 0  ! Always set to 0 for UM files
@@ -179,7 +179,7 @@ level_code = get_stashmaster_item(stashcode, levelt)
 IF (level_code == single_level) THEN
   ! Single levels get special code from stashmaster
   lookup_int(lblev) = get_stashmaster_item(stashcode, cfll)
-ELSE 
+ELSE
   IF (level_number == 0) THEN
     ! Levels on surface set to 9999
     lookup_int(lblev) = 9999
@@ -203,7 +203,7 @@ lookup_int(lbuser1) = get_stashmaster_item(stashcode, datat)
 ! Stashcode
 lookup_int(lbuser4) = stashcode
 ! Internal model number: atmosphere
-lookup_int(lbuser7) = 1 
+lookup_int(lbuser7) = 1
 
 ! Datum value, always 1
 lookup_real_tmp(bdatum) = 0.0
@@ -214,7 +214,7 @@ lookup_real_tmp(brsvd4) = 0.0
 
 ! Check vertical coordinate type
 IF (lookup_int(lbvc) >= 126 .AND. lookup_int(lbvc) <= 139 &
-     .OR. lookup_int(lbvc) == 5) THEN 
+     .OR. lookup_int(lbvc) == 5) THEN
   ! Special codes inc single level, set to 0.0
   lookup_real_tmp(blev)=0.0
   lookup_real_tmp(bhlev)=0.0
@@ -245,7 +245,7 @@ ELSE IF (lookup_int(lbvc) == 65) THEN ! Standard hybrid height levels
     END IF                             ! top level
 
     lookup_real_tmp(blev) = level_dep_c(level_number+1, ldc_zsea_theta)
-    lookup_real_tmp(bhlev)= level_dep_c(level_number+1, ldc_c_theta) 
+    lookup_real_tmp(bhlev)= level_dep_c(level_number+1, ldc_c_theta)
 
     IF (level_number == 0) THEN        ! Zeroth level
       lookup_real_tmp(brlev) = 0.0     ! zsea at/below surface
@@ -269,14 +269,14 @@ ELSE IF (lookup_int(lbvc) == 65) THEN ! Standard hybrid height levels
       lookup_real_tmp(bhulev)=    level_dep_c(level_number+1, ldc_c_theta)
       lookup_real_tmp(blev)  = level_dep_c(level_number, ldc_zsea_rho)
       lookup_real_tmp(bhlev) =    level_dep_c(level_number, ldc_c_rho)
-    END IF                            
+    END IF
 
     lookup_real_tmp(brlev) = level_dep_c(level_number, ldc_zsea_theta)
     lookup_real_tmp(bhrlev)=    level_dep_c(level_number, ldc_c_theta)
   END IF
 ELSE
    WRITE(log_scratch_space, '(A,I0,A)') &
-       "Vertical coord type ", lookup_int(lbvc), " not supported" 
+       "Vertical coord type ", lookup_int(lbvc), " not supported"
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 END IF
 
@@ -289,7 +289,7 @@ lookup_real_tmp(bmks) = 1.0_real64
 ! Set lookup
 CALL shumlib(routinename//'::set_lookup',       &
              temp_field%set_lookup(lookup_int, &
-             ! Lookup real is dimensioned using full lookup size so that 
+             ! Lookup real is dimensioned using full lookup size so that
              ! index parameters match those use in shumlib
              lookup_real_tmp(len_int_lookup+1 :)) )
 

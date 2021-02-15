@@ -32,11 +32,11 @@ SUBROUTINE lfricinp_gather_lfric_field(lfric_field, global_field_array, comm, &
 IMPLICIT NONE
 !
 ! Description:
-!  Takes an partitioned lfric field and extracts data from a single level, 
+!  Takes an partitioned lfric field and extracts data from a single level,
 !  as specified in argument list, then gathers that data onto rank 0
 !  and puts into correct location using the global id (gid) map
 !
-! Arguments 
+! Arguments
 TYPE(field_type), INTENT(INOUT) :: lfric_field
 REAL(KIND=real64), INTENT(OUT)  :: global_field_array(:)
 INTEGER(KIND=i_def), INTENT(IN) :: comm
@@ -55,7 +55,7 @@ INTEGER(KIND=int32), ALLOCATABLE :: displacements(:)
 INTEGER(KIND=int32) :: nlayers, global_ncells_2d, local_rank, total_ranks
 INTEGER(KIND=int32) :: local_size_2d, global_size_2d
 INTEGER(KIND=int32), PARAMETER   :: rank_0 = 0
-INTEGER(KIND=int32) :: err, i, index_3d 
+INTEGER(KIND=int32) :: err, i, index_3d
 !, unit_num
 
 REAL(KIND=real64), ALLOCATABLE :: local_data(:)
@@ -79,7 +79,7 @@ total_ranks = get_comm_size()
 local_size_2d = twod_mesh%get_last_edge_cell()
 ALLOCATE(local_data(local_size_2d))
 
-! Copy from 1D array that contains full local 3D field in column order into 
+! Copy from 1D array that contains full local 3D field in column order into
 ! 1D array that contains only a 2D slice of the field
 index_3d = level
 DO i = 1, local_size_2d

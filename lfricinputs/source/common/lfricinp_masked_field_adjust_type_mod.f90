@@ -39,7 +39,7 @@ TYPE :: lfricinp_masked_field_adjust_type
   ! Map that links the which single source point has been selected to replace
   ! the adjusted destination data point
   INTEGER(KIND=int32), ALLOCATABLE :: adjusted_dst_to_src_map_2D(:,:)
- 
+
   ! Flag to check whether the adjustment type has been initialised
   LOGICAL :: initialised = .FALSE.
 
@@ -60,7 +60,7 @@ CONTAINS
 
 SUBROUTINE find_adjusted_points_src_2d_dst_1d(self, src_mask, dst_mask, weights)
 !
-! This routine finds all masked field destination points that will require 
+! This routine finds all masked field destination points that will require
 ! post regridding adjustment
 !
 ! Argument(s)
@@ -114,8 +114,8 @@ DO w = 1, weights%num_wgts
             dst_point_contrb_record(dst_index) = src_mask_contrb_only
           ELSE
             dst_point_contrb_record(dst_index) = off_src_mask_contrb
-          END IF 
-        
+          END IF
+
         CASE (src_mask_contrb_only)
           IF ( .NOT. l_on_src_mask) THEN
             dst_point_contrb_record(dst_index) = off_src_mask_contrb
@@ -178,7 +178,7 @@ IF (self%initialised) THEN
                                      src(self%adjusted_dst_to_src_map_2D(i,1), &
                                          self%adjusted_dst_to_src_map_2D(i,2))
   END DO
-  
+
   DO i = 1, SIZE(dst)
     IF (.NOT. self%dst_mask_1D(i)) THEN
       dst(i) = um_rmdi

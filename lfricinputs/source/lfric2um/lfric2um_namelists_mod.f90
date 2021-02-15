@@ -32,7 +32,7 @@ TYPE :: config
   CHARACTER(LEN=512) :: message = 'No namelist read'
   INTEGER :: unit_number
 CONTAINS
-  
+
   PROCEDURE :: load_namelists
 
 END TYPE config
@@ -72,7 +72,7 @@ USE log_mod,          ONLY: log_event, LOG_LEVEL_ERROR, LOG_LEVEL_INFO
 USE constants_mod,    ONLY: imdi, rmdi
 
 ! lfricinputs modules
-USE lfricinp_grid_namelist_mod, ONLY: grid, lambda_origin_targ, & 
+USE lfricinp_grid_namelist_mod, ONLY: grid, lambda_origin_targ, &
      phi_origin_targ, phi_pole, lambda_pole, delta_lambda_targ, &
      delta_phi_targ, points_lambda_targ, points_phi_targ,       &
      igrid_targ, rotated

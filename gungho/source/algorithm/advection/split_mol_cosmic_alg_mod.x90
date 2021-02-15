@@ -29,8 +29,7 @@ module split_mol_cosmic_alg_mod
   use rk_transport_rho_mod,              only: rk_transport_rho_step
   use split_vector_field_kernel_mod,     only: split_vector_field_kernel_type
   use calc_vertical_departure_alg_mod,   only: calc_vertical_departure
-  use transport_config_mod,              only: rho_splitting,                  &
-                                               rho_splitting_vh,               &
+  use transport_config_mod,              only: rho_splitting_vh,               &
                                                rho_splitting_hv,               &
                                                rho_splitting_strang,           &
                                                cfl_mol_2d_stab
@@ -49,16 +48,18 @@ contains
 !=========================================================================================
 !> @brief Algorithm to compute the vertical displacement then
 !>        call the split-transport-routine.
-!> @param[in]     wind    The 3D advecting wind
-!> @param[in,out] rho     Density field
+!> @param[in]     wind      The 3D advecting wind
+!> @param[in,out] rho       Density field
+!> @param[in] rho_splitting The (rho) splitting option
 !=========================================================================================
 
-subroutine split_transport_rho_step( wind, rho )
+subroutine split_transport_rho_step( wind, rho, rho_splitting )
 
   implicit none
 
   type(field_type), intent(inout)    :: rho
   type(field_type), intent(in)       :: wind
+  integer(i_def),   intent(in)       :: rho_splitting
 
   type(field_type)          :: dep_z
   type(field_type), pointer :: detj_w2 => null()
@@ -73,7 +74,8 @@ subroutine split_transport_rho_step( wind, rho )
   call calc_vertical_departure(wind, dep_z)
 
   call split_mol_cosmic_transport_step( rho, wind, dep_z,     &
-                                        detj_w2, cell_orient  )
+                                        detj_w2, cell_orient, &
+                                        rho_splitting         )
 
   if ( subroutine_timers ) call timer('split_transport_rho_step')
 
@@ -90,13 +92,15 @@ end subroutine split_transport_rho_step
 !> @param[in,out] dep_pts_z         Departure points in z direction
 !> @param[in]     detj_at_w2        Det(J) at W2 dofs
 !> @param[in]     cell_orientation  Orientation of halo cells
+!> @param[in]     rho_splitting     The (rho) splitting option
 !=========================================================================================
 
-subroutine split_mol_cosmic_transport_step(  rho,             &
-                                             wind,            &
-                                             dep_pts_z,       &
-                                             detj_at_w2,      &
-                                             cell_orientation )
+subroutine split_mol_cosmic_transport_step(  rho,              &
+                                             wind,             &
+                                             dep_pts_z,        &
+                                             detj_at_w2,       &
+                                             cell_orientation, &
+                                             rho_splitting     )
   implicit none
 
   type(field_type), intent(inout)    :: rho
@@ -104,6 +108,7 @@ subroutine split_mol_cosmic_transport_step(  rho,             &
   type(field_type), intent(inout)    :: dep_pts_z
   type(field_type), intent(in)       :: detj_at_w2
   type(field_type), intent(in)       :: cell_orientation
+  integer(i_def),   intent(in)       :: rho_splitting
 
   type(field_type) :: rho_xy
   type(field_type) :: increment_xy
@@ -135,7 +140,7 @@ subroutine split_mol_cosmic_transport_step(  rho,             &
 
     ! Split wind to wind_horiz=(u,v,0) and wind_vert=(0,0,w)
 
-    call invoke( name = "Split wind into horizontal and vertical",            &
+    call invoke( name = "split_wind_into_horizontal_and_vertical",            &
                  split_vector_field_kernel_type(wind_horiz, wind_vert, wind), &
                  X_divideby_Y(wind_horiz2,wind_horiz,detj_at_w2),             &
                  inc_a_times_X(dt, wind_horiz2)                               )
@@ -145,9 +150,9 @@ subroutine split_mol_cosmic_transport_step(  rho,             &
 
     call invoke( setval_X(rho_xy, rho) )
 
-    if (rho_splitting /= rho_splitting_strang .and. &
-        rho_splitting /= rho_splitting_vh     .and. &
-        rho_splitting /= rho_splitting_hv           ) then
+    if ( rho_splitting /= rho_splitting_strang .and. &
+         rho_splitting /= rho_splitting_vh     .and. &
+         rho_splitting /= rho_splitting_hv           ) then
      call log_event( "split_mol_cosmic_alg_mod: Invalid rho splitting option", LOG_LEVEL_ERROR )
     end if
 

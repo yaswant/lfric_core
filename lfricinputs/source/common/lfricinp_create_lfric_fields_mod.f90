@@ -69,7 +69,7 @@ INTEGER(KIND=int64) :: stashcode, level_code, i
 INTEGER(KIND=i_def) :: ndata
 
 CALL log_event( 'Creating lfric fields...', LOG_LEVEL_INFO )
-    
+
 IF (element_order > 0) THEN
   CALL log_event( 'Finite diff fields: requires lowest order elements', &
          LOG_LEVEL_ERROR )
@@ -81,22 +81,22 @@ field_collection  =  field_collection_type(name="lfric_fields")
 DO i=1, SIZE(stash_list)
   stashcode = stash_list(i)
   level_code = get_stashmaster_item(stashcode, levelt)
-  
+
 
   ! TODO - It would be good to move this case statement into its own routine
-  ! it could be used elsewhere to add fields to the collection without the 
+  ! it could be used elsewhere to add fields to the collection without the
   ! do loop over stash list
   SELECT CASE (level_code)
 
   CASE(rho_levels) ! Stashcodes that map to W3/rho
-    CALL field % initialise( vector_space =                                 & 
+    CALL field % initialise( vector_space =                                 &
          function_space_collection%get_fs(mesh_id, element_order, W3),      &
          name=TRIM(get_field_name(stashcode)))
     tmp_read_ptr => read_field_face
     tmp_write_ptr => write_field_face
 
   CASE(theta_levels) ! Stashcodes that maps to Wtheta
-    CALL field % initialise( vector_space =                                 & 
+    CALL field % initialise( vector_space =                                 &
          function_space_collection%get_fs(mesh_id, element_order, Wtheta),  &
          name=TRIM(get_field_name(stashcode)))
     tmp_read_ptr => read_field_face
@@ -131,10 +131,10 @@ DO i=1, SIZE(stash_list)
 
   CASE DEFAULT
     WRITE(log_scratch_space, '(A,I0,A)')                                    &
-       "Level code ", level_code, " not supported" 
+       "Level code ", level_code, " not supported"
     CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
   END SELECT
-  
+
   CALL field%set_read_behaviour(tmp_read_ptr)
   CALL field%set_write_behaviour(tmp_write_ptr)
   CALL log_event("Adding " // TRIM(get_field_name(stashcode)) // &

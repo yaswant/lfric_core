@@ -3,7 +3,7 @@
 ! For further details please refer to the file LICENCE
 ! which you should have received as part of this distribution.
 ! *****************************COPYRIGHT*******************************
-MODULE lfricinp_read_command_line_args_mod 
+MODULE lfricinp_read_command_line_args_mod
 
 ! Intrinsic modules
 USE, INTRINSIC :: iso_fortran_env, ONLY: int32
@@ -35,7 +35,7 @@ CALL GET_COMMAND_ARGUMENT(1, lfricinputs_fname, arglen, icode_32)
 SELECT CASE(icode_32)
 CASE (0)
   CONTINUE
-CASE (1) 
+CASE (1)
   log_scratch_space = 'No lfricinputs namelist filename provided on command line'
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
 CASE (-1)
@@ -49,14 +49,14 @@ CASE (-1)
 CASE DEFAULT
   log_scratch_space = 'Unknown error reading namelist file from command line.'
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
-END SELECT    
+END SELECT
 
 ! Read LFRic infrastructure namelist filename from command line
 CALL GET_COMMAND_ARGUMENT(2, lfric_fname, arglen, icode_32)
 SELECT CASE(icode_32)
 CASE (0)
   CONTINUE
-CASE (1) 
+CASE (1)
   log_scratch_space = &
        'No LFRic infrastructure namelist filename provided on command line'
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
@@ -71,7 +71,7 @@ CASE (-1)
 CASE DEFAULT
   log_scratch_space = 'Unknown error reading namelist file from command line.'
   CALL log_event(log_scratch_space, LOG_LEVEL_ERROR)
-END SELECT    
+END SELECT
 RETURN
 END SUBROUTINE lfricinp_read_command_line_args
 

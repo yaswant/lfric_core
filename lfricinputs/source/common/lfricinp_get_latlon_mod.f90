@@ -23,7 +23,7 @@ SUBROUTINE get_um_grid_coords(grid_type, idx, idy, lon, lat)
 ! This routine returns the latitude and longitude of a UM grid point with
 ! indices IDX and IDY. Note this routine is not compatible with variable
 ! resolution LAMs!
-! 
+!
 USE constants_mod,        ONLY: degrees_to_radians
 USE lfricinp_um_grid_mod, ONLY: um_grid
 
@@ -59,7 +59,7 @@ ELSE
 
 END IF
 
-! Readjust longitude range from [0,360] to [-180,180] 
+! Readjust longitude range from [0,360] to [-180,180]
 IF (lon > 180.0) lon = lon - 360.0
 
 ! Convert longitude and latitude to radians
@@ -108,7 +108,7 @@ CALL global_mesh%get_vert_on_cell(mesh%get_cell_gid(cell_lid), verts)
 !
 lon = 0.0
 lat = 0.0
-DO i = 1, SIZE(verts) 
+DO i = 1, SIZE(verts)
     CALL global_mesh%get_vert_coords(verts(i), vert_coords)
     lat = lat + vert_coords(2)
     lon = lon + vert_coords(1)

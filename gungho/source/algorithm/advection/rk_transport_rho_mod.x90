@@ -65,6 +65,10 @@ module rk_transport_rho_mod
   use io_config_mod,                     only: subroutine_timers
   use timer_mod,                         only: timer
   use matrix_vector_kernel_mod,          only: matrix_vector_kernel_type
+  use flux_alg_mod, only: flux_coeffs, vert_flux_coeffs, &
+                          flux_stencil_extent,           &
+                          flux2d_stencil_size,           &
+                          nfaces_re_h, nfaces_re_v
 
   implicit none
 
@@ -75,10 +79,7 @@ module rk_transport_rho_mod
   type( field_type ), allocatable :: rr_prediction(:)
 
   ! Needed for nonuniform FV operators
-  type( field_type ), allocatable :: flux_coeffs(:,:), vert_flux_coeffs(:,:)
 
-  integer(i_def) :: flux_stencil_extent,      &
-                    flux2d_stencil_size
   integer(i_def) :: nfaces_h, nfaces_v
 
   public :: rk_transport_rho_init
@@ -101,9 +102,7 @@ contains
     implicit none
 
     integer(i_def),  intent(in) :: mesh_id
-
-    integer(i_def)              :: flux_stencil_size,  &
-                                   direction, polynomial
+    integer(i_def)              :: flux_stencil_size
     type( field_type ), pointer :: chi_xyz(:) => null()
     type( field_type ), pointer :: md_w3 => null()
 
@@ -115,54 +114,26 @@ contains
     type( field_type )                     :: w3_field
     class(reference_element_type), pointer :: reference_element => null()
     type(mesh_type),               pointer :: mesh => null()
-    integer(i_def)                         :: face_quad_order, stage
+    integer(i_def)                         :: face_quad_order
     integer(i_def)                         :: nqp_xy, nqp_z, nqp_xyz
 
-    w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
-    allocate( rr_prediction(num_rk_stage) )
-    do stage = 1,num_rk_stage
-      call rr_prediction(stage)%initialise( vector_space = w3_fs )
-    end do
+    nfaces_h = nfaces_re_h
+    nfaces_v = nfaces_re_v
 
     if ( operators == operators_fv ) then
       if ( element_order == 0 ) then
-        ! Compute stencil extents
-        flux_stencil_extent = int(real(fv_flux_order+1,r_def)/2.0,i_def)
-        !======================================================================!
-        ! Compute stencil for nonuniform polynomial fit
-        ! Initialise PSy layer arrays (this will not be needed when
-        ! multi-dimensional field arrays are supported)
-        ! This needs some temporary fields for computing undf in the PSy layer
-
+        w3_fs => function_space_collection%get_fs( mesh_id, element_order, W3 )
         call w3_field%initialise( vector_space = w3_fs )
 
         ! Get topology information from the reference element
         mesh              => w3_field%get_mesh()
         reference_element => mesh%get_reference_element()
-        ! Number of horizontal neighbours
-        nfaces_h = reference_element%get_number_horizontal_faces()
-        ! Number of vertical neighbours
-        nfaces_v = reference_element%get_number_vertical_faces()
 
         if ( oned_reconstruction ) then
           flux_stencil_size = fv_flux_order + 1_i_def
         else
-          ! Compute the maximum number of cells in the flux stencil
-          ! This occurs on a uniform mesh
-          ! (this computation is only correct for quadrilateral meshes)
-          flux2d_stencil_size = 1
-          do polynomial = 1, fv_flux_order
-            if ( mod(polynomial, 2) == 0 ) then
-              flux2d_stencil_size = flux2d_stencil_size + nfaces_h
-            else
-              flux2d_stencil_size = flux2d_stencil_size + nfaces_h*polynomial
-            end if
-          end do
           flux_stencil_size = flux2d_stencil_size
         end if
-        call psykal_lite_mol_flux_init(w3_field, fv_flux_order,   &
-                                       flux_stencil_size,         &
-                                       nfaces_h, nfaces_v         )
 
         chi_xyz => get_coordinates_xyz()
         nqp_xyz = fv_flux_order+1
@@ -180,12 +151,6 @@ contains
 
         call log_event( "Gungho: computing horizontal flux coeffs", LOG_LEVEL_INFO )
         md_w3 => get_mass_matrix_diagonal(w3_id)
-        allocate( flux_coeffs(flux_stencil_size, nfaces_h) )
-        do direction = 1, nfaces_h
-          do polynomial = 1,flux_stencil_size
-             call flux_coeffs(polynomial,direction)%initialise( vector_space = w3_fs )
-          end do
-        end do
         if ( oned_reconstruction ) then
           call invoke_poly1d_flux_coeffs( flux_coeffs, md_w3, chi_xyz, &
                                           qr, qrf, fv_flux_order,      &
@@ -196,15 +161,7 @@ contains
                                           flux2d_stencil_size, nfaces_h )
         end if
         call log_event( "Gungho: computing vertical flux coeffs", LOG_LEVEL_INFO )
-        ! Vertical flux coeffs
-        allocate( vert_flux_coeffs(fv_flux_order+1, nfaces_v) )
-        do direction = 1, nfaces_v
-          do polynomial = 1,fv_flux_order+1
-            call vert_flux_coeffs(polynomial,direction)%initialise( vector_space = w3_fs )
-          end do
-        end do
-        ! Quadrature rule on vertical faces with 1 point in both horizontal and
-        ! vertical directions
+
         nqp_xyz = 1
         qrf = quadrature_face_type(nqp_xyz, .false., .true.,                  &
                                    reference_element, gaussian_quadrature)
@@ -249,6 +206,7 @@ contains
 
     if ( subroutine_timers ) call timer('rk_transport_rho_alg')
 
+    allocate( rr_prediction(num_rk_stage) )
     qr => get_qr()
     u_fs   => u%get_function_space()
     rho_fs => rho%get_function_space()
@@ -260,6 +218,10 @@ contains
     call r_rho%initialise( vector_space = rho_fs )
     call rho_inc%initialise( vector_space = rho_fs )
     call mass_flux%initialise( vector_space = u_fs )
+
+    do stage = 1,num_rk_stage
+      call rr_prediction(stage)%initialise( vector_space = rho_fs )
+    end do
 
     call invoke( setval_X(rho_n, rho) )
 
@@ -295,7 +257,7 @@ contains
       end do
 
       ! Invert mass matrices and add increments
-      ! Rho
+
       call invoke( name = "Invert mass matrices and add increments",     &
                    setval_c(rho_inc, 0.0_r_def),                         &
                    matrix_vector_kernel_type(rho_inc, r_rho, mm_w3_inv), &
@@ -304,7 +266,7 @@ contains
     end do
 
     nullify( mm_w3_inv, mt_lumped_inv, u_fs, rho_fs, qr )
-
+    deallocate(rr_prediction)
     if ( subroutine_timers ) call timer('rk_transport_rho_alg')
 
   end subroutine rk_transport_rho_step

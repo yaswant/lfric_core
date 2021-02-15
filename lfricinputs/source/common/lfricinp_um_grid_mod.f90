@@ -29,7 +29,7 @@ CONTAINS
 
 SUBROUTINE lfricinp_set_grid_from_file(um_input_file, num_snow_layers, &
                                         num_surface_types)
-! Description: 
+! Description:
 !  Extracts grid information from UM input file to populate grid_info object
 
 ! Shumlib modules
@@ -37,7 +37,7 @@ USE f_shum_file_mod,   ONLY: shum_file_type
 
 IMPLICIT NONE
 
-! Arguments 
+! Arguments
 TYPE(shum_file_type), INTENT(INOUT) :: um_input_file
 INTEGER(KIND=int64), INTENT(IN) :: num_snow_layers
 INTEGER(KIND=int64), INTENT(IN) :: num_surface_types

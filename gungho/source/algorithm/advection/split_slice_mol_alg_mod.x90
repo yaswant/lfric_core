@@ -1,0 +1,252 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2020 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+!> @brief Algorithm for a split vertical SLICE-remapping + multi-steps MOL horizontal.
+!> @details The algorithm performs a vertical conservative remapping followed by
+!>          multi-steps horizontal MOL scheme for a density field.
+!-------------------------------------------------------------------------------
+
+module split_slice_mol_alg_mod
+
+  use constants_mod,                      only: i_def, r_def, tiny_eps
+  use field_mod,                          only: field_type
+  use function_space_mod,                 only: function_space_type
+  use function_space_collection_mod,      only: function_space_collection
+  use finite_element_config_mod,          only: element_order
+  use fs_continuity_mod,                  only: W2, W3
+  use runtime_constants_mod,              only: get_coordinates,               &
+                                                get_cell_orientation,          &
+                                                get_panel_id,                  &
+                                                get_detj_at_w2
+  use flux_direction_mod,                 only: z_direction
+  use vert_conservative_cosmic_alg_mod,   only: vert_conservative_cosmic_alg
+  use cosmic_divergence_alg_mod,          only: cosmic_divergence_alg
+  use io_config_mod,                      only: subroutine_timers
+  use timer_mod,                          only: timer
+  use timestepping_config_mod,            only: dt
+  use rk_transport_rho_mod,               only: rk_transport_rho_step
+  use split_vector_field_kernel_mod,      only: split_vector_field_kernel_type
+  use calc_vertical_departure_alg_mod,    only: calc_vertical_departure
+  use transport_config_mod,               only: rho_splitting_vh,               &
+                                                rho_splitting_hv,               &
+                                                rho_splitting_strang,           &
+                                                cfl_mol_2d_stab,                &
+                                                rho_vertical_scheme,            &
+                                                rho_vertical_scheme_mol,        &
+                                                rho_vertical_scheme_sl,         &
+                                                rho_vertical_scheme_slice,      &
+                                                slice_order,                    &
+                                                vertical_sl_order,              &
+                                                vertical_sl_order_cubic,        &
+                                                vertical_sl_order_quintic
+  use log_mod,                            only: log_event, LOG_LEVEL_ERROR
+  use vertical_mass_remapping_kernel_mod, only: vertical_mass_remapping_kernel_type
+  use dg_matrix_vector_kernel_mod,        only: dg_matrix_vector_kernel_type
+  use vertical_sl_rho_kernel_mod,         only: vertical_sl_rho_kernel_type
+  use calc_computational_wind_kernel_mod, only: calc_computational_wind_kernel_type
+
+
+  implicit none
+
+  private
+  integer(i_def) :: mol_substeps
+
+  public :: split_slice_mol_transport
+  public :: vertical_slice_transport
+
+contains
+
+  !=========================================================================================
+  !> @brief Algorithm for sub-step horizontal MOL with a choice of vertical transport schemes.
+  !> @details The algorithm performs a vertical transport with some choices of vertical schemes
+  !>          and a horizontal sub-stepped MOL method for a density field.
+  !> @param[in]     wind              The advecting wind
+  !> @param[in,out] rho               Density field
+  !> @param[in]     rho_splitting     The splitting option
+  !=========================================================================================
+
+  subroutine split_slice_mol_transport(  wind, rho, rho_splitting )
+
+    implicit none
+
+    type(field_type), intent(inout)    :: rho
+    type(field_type), intent(in)       :: wind
+    integer(i_def),   intent(in)       :: rho_splitting
+
+    type(field_type) :: rho_temp
+    type(field_type) :: wind_horiz
+    type(field_type) :: wind_horiz2
+    type(field_type) :: wind_vert
+    integer(i_def)   :: sub_step_count
+    real(r_def)      :: dt_substep, half_dt
+    real(r_def)      :: cfl_min, cfl_max
+
+    type(function_space_type), pointer :: wind_fs => null()
+    type(function_space_type), pointer :: rho_fs  => null()
+    type(field_type),          pointer :: detj_w2 => null()
+
+    wind_fs  => wind%get_function_space()
+    rho_fs  => rho%get_function_space()
+    detj_w2 => get_detj_at_w2()
+
+    call rho_temp%initialise( vector_space = rho_fs )
+    call wind_horiz%initialise( vector_space = wind_fs )
+    call wind_horiz2%initialise( vector_space = wind_fs )
+    call wind_vert%initialise( vector_space = wind_fs )
+
+    if ( subroutine_timers ) call timer('split_slice_mol_transport')
+
+    ! Split wind to wind_horiz=(u,v,0) and wind_vert=(0,0,w)
+
+    call invoke( name = "Split_wind_into_horizontal_and_vertical",            &
+                 split_vector_field_kernel_type(wind_horiz, wind_vert, wind), &
+                 X_divideby_Y(wind_horiz2,wind_horiz,detj_w2),                &
+                 inc_a_times_X(dt, wind_horiz2)                               )
+
+    call wind_horiz2%field_minmax(cfl_min, cfl_max)
+    cfl_max = max(abs(cfl_max),abs(cfl_min))
+
+    call invoke( setval_X(rho_temp, rho) )
+
+    if ( rho_splitting /= rho_splitting_strang .and. &
+         rho_splitting /= rho_splitting_vh     .and. &
+         rho_splitting /= rho_splitting_hv           ) then
+     call log_event( "split_slice_mol_alg_mod: Invalid rho splitting option", LOG_LEVEL_ERROR )
+    end if
+
+    half_dt = 0.5_r_def*dt
+
+   !
+   ! Perform a full or half vertical transport
+   !
+
+   if (rho_splitting == rho_splitting_strang) then
+       call vertical_slice_transport( wind_vert, rho_temp, half_dt,    &
+                                      rho_vertical_scheme, slice_order )
+
+     else if (rho_splitting == rho_splitting_vh) then
+       call vertical_slice_transport( wind_vert, rho_temp, dt,         &
+                                      rho_vertical_scheme, slice_order )
+   end if
+
+   !
+   ! Perform a full step horizontal transport using small sub-steps (if required)
+   !
+
+   mol_substeps = int(cfl_max/(cfl_mol_2d_stab+tiny_eps)) + 1_i_def
+   dt_substep = dt/real(mol_substeps, r_def)
+
+   do sub_step_count = 1, mol_substeps
+     call rk_transport_rho_step( wind_horiz, rho_temp, dt_substep)
+   end do
+
+   !
+   ! Perform a full or half vertical transport
+   !
+
+   if ( rho_splitting == rho_splitting_strang ) then
+       call vertical_slice_transport( wind_vert, rho_temp, half_dt,    &
+                                      rho_vertical_scheme, slice_order )
+    else if ( rho_splitting == rho_splitting_hv ) then
+       call vertical_slice_transport( wind_vert, rho_temp, dt,         &
+                                      rho_vertical_scheme, slice_order )
+   end if
+
+   ! Overwrite rho with the new rho
+   call invoke( setval_X(rho, rho_temp) )
+
+   if ( subroutine_timers ) call timer('split_slice_mol_transport')
+
+   nullify( wind_fs, rho_fs, detj_w2 )
+
+  end subroutine split_slice_mol_transport
+
+  !=========================================================================================
+  !> @brief Algorithm to do sub-step MOL horizontally and a vertical transport scheme.
+  !> @details The algorithm performs a vertical using a specified scheme then multi-steps
+  !>          horizontal transport using the MOL method for a density field.
+  !> @param[in,out] rho          Density field
+  !> @param[in]     wind         The advecting wind field
+  !> @param[in]     dts          A local time step size
+  !> @param[in]     vert_scheme  The scheme to be used for the vertical
+  !> @param[in]     order        The order of the scheme used for the vertical
+  !=========================================================================================
+
+  subroutine vertical_slice_transport( vert_wind, rho, dts, vert_scheme, order)
+    use runtime_constants_mod,               only: get_mass_matrix,  &
+                                                   w3_id,            &
+                                                   w3inv_id
+    use operator_mod,                        only: operator_type
+
+    implicit none
+
+   type( field_type ),  intent( in    ) :: vert_wind
+   type( field_type ),  intent( inout ) :: rho
+   real( kind = r_def), intent( in    ) :: dts
+   integer(kind=i_def), intent( in    ) :: vert_scheme
+   integer(kind=i_def), intent( in    ) :: order
+
+   type( field_type )                 :: mass
+   type( field_type )                 :: wind_comp
+   type( field_type ),        pointer :: chi_sph(:) => null()
+   type( field_type ),        pointer :: panel_id => null()
+   type(operator_type),       pointer :: mm_w3_inv => null()
+   type(operator_type),       pointer :: mm_w3 => null()
+   type(function_space_type), pointer :: wind_fs  => null()
+   type(function_space_type), pointer :: rho_fs   => null()
+   integer(kind=i_def)                :: inc_div, conserv
+
+   chi_sph  => get_coordinates()
+   panel_id => get_panel_id()
+   wind_fs  => vert_wind%get_function_space()
+   rho_fs   => rho%get_function_space()
+   call wind_comp%initialise( vector_space = wind_fs )
+
+   call invoke( setval_c(wind_comp, 0.0_r_def),                 &
+                calc_computational_wind_kernel_type( wind_comp, &
+                vert_wind,  chi_sph, panel_id )                 )
+
+   if ( vert_scheme == rho_vertical_scheme_mol ) then
+
+      call rk_transport_rho_step( vert_wind, rho, dts)
+
+    else if ( vert_scheme == rho_vertical_scheme_sl ) then
+
+      if ( vertical_sl_order /= vertical_sl_order_cubic   .and. &
+           vertical_sl_order /= vertical_sl_order_quintic       ) then
+        call log_event( "vertical_sl_rho: Invalid vertical_sl_order", LOG_LEVEL_ERROR )
+      end if
+
+      inc_div = 1_i_def
+      conserv = 0_i_def
+      call invoke( vertical_sl_rho_kernel_type(vert_wind, wind_comp,  &
+                                         rho, dts, inc_div, conserv ) )
+
+    else if ( vert_scheme == rho_vertical_scheme_slice ) then
+
+      call mass%initialise( vector_space = rho_fs )
+      mm_w3 => get_mass_matrix(w3_id)
+      mm_w3_inv => get_mass_matrix(w3inv_id)
+
+      call invoke( dg_matrix_vector_kernel_type(mass, rho, mm_w3),                   &
+                   vertical_mass_remapping_kernel_type(wind_comp, mass, dts, order), &
+                   dg_matrix_vector_kernel_type(rho, mass, mm_w3_inv )               )
+
+      nullify( mm_w3, mm_w3_inv )
+
+    else
+
+      call log_event( "vertical_slice_transport: Invalid vert_scheme ", LOG_LEVEL_ERROR )
+
+   end if
+
+   nullify( chi_sph, panel_id )
+   nullify( wind_fs, rho_fs )
+
+  end subroutine vertical_slice_transport
+
+end module split_slice_mol_alg_mod

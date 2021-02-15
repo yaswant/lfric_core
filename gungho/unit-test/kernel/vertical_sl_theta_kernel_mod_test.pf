@@ -11,6 +11,8 @@ module vertical_sl_theta_kernel_mod_test
 
   use constants_mod, only : i_def, r_def
   use pFUnit_Mod
+  use yaxt,          only : xt_initialize, xt_finalize
+  use mpi_mod,       only : store_comm, clear_comm
 
   implicit none
 
@@ -19,7 +21,7 @@ module vertical_sl_theta_kernel_mod_test
   public :: test_all
 
   @TestCase
-  type, public, extends(TestCase) :: vertical_sl_theta_test_type
+  type, public, extends(MPITestCase) :: vertical_sl_theta_test_type
     private
   contains
     procedure setUp
@@ -31,23 +33,65 @@ contains
  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine setUp( this )
 
+  use feign_config_mod,      only : feign_transport_config
+  use transport_config_mod,  only : scheme_method_of_lines,      &
+                                    operators_fv,                &
+                                    rho_splitting_none,          &
+                                    theta_splitting_none,        &
+                                    rho_vertical_scheme_slice,   &
+                                    theta_vertical_scheme_sl,    &
+                                    slice_order_cubic,           &
+                                    vertical_sl_order_cubic
+
     implicit none
 
     class(vertical_sl_theta_test_type), intent(inout) :: this
+
+    ! Initialise YAXT
+    call xt_initialize(this%getMpiCommunicator())
+    ! Store the MPI communicator for later use
+    call store_comm(this%getMpiCommunicator())
+    call feign_transport_config( scheme = scheme_method_of_lines,             &
+                                 operators = operators_fv,                    &
+                                 fv_flux_order = 2,                           &
+                                 fv_advective_order = 2,                      &
+                                 consistent_metric  = .false.,                &
+                                 enforce_monotonicity = .false.,              &
+                                 oned_reconstruction = .false.,               &
+                                 rho_splitting = rho_splitting_none,          &
+                                 theta_splitting = theta_splitting_none,      &
+                                 cfl_mol_1d_stab = 1.0_r_def,                 &
+                                 cfl_mol_2d_stab = 1.0_r_def,                 &
+                                 cfl_mol_3d_stab = 1.0_r_def,                 &
+                                 rho_vertical_scheme = rho_vertical_scheme_slice,  &
+                                 theta_vertical_scheme = theta_vertical_scheme_sl, &
+                                 slice_order = slice_order_cubic,                  &
+                                 vertical_sl_order = vertical_sl_order_cubic,      &
+                                 upwind_direction_from_w_at_wtheta = .true.        &
+                                 )
 
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   subroutine tearDown( this )
 
+    use configuration_mod,  only: final_configuration
+
     implicit none
 
     class(vertical_sl_theta_test_type), intent(inout) :: this
 
+    call final_configuration()
+
+    ! Finalise YAXT
+    call xt_finalize()
+    ! Clear the stored MPI communicator
+    call clear_comm()
+
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test
+  @Test( npes=[1] )
   subroutine test_all( this )
 
     use vertical_sl_theta_kernel_mod, only: vertical_sl_theta_code

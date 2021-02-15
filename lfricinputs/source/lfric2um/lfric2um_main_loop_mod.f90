@@ -64,7 +64,7 @@ DO i_stash = 1, lfric2um_config%num_fields
   ! Get pointer to lfric field + read
   lfric_field => lfric_fields%get_field(get_field_name(stashcode))
   CALL lfric_field%read_field("read_"//lfric_field%get_name())
-  
+
   ! Allocate space for global data, only need full field on rank 0
   IF (ALLOCATED(global_field_array)) DEALLOCATE(global_field_array)
   IF (local_rank == 0) THEN
@@ -87,15 +87,15 @@ DO i_stash = 1, lfric2um_config%num_fields
       ! Get the index of the last field added, which is just num_fields
       i_field = um_output_file%num_fields
       CALL weights%validate_dst(SIZE(um_output_file%fields(i_field)%rdata))
-      ! Perform the regridding from lfric to um 
+      ! Perform the regridding from lfric to um
       CALL weights%regrid_src_1d_dst_2d(global_field_array(:), &
            um_output_file%fields(i_field)%rdata(:,:))
-      
+
       ! Write to file
       CALL shumlib(routinename//'::write_field',  &
            um_output_file%write_field(i_field))
       ! Unload data from field
-      CALL shumlib(routinename//'::unload_field', & 
+      CALL shumlib(routinename//'::unload_field', &
            um_output_file%unload_field(i_field))
     END IF
   END DO ! end loop over levels
@@ -105,10 +105,10 @@ END DO  ! end loop over field stashcodes
 
 IF (local_rank == 0) THEN ! Only write UM file with rank 0
   ! Write output header
-  CALL shumlib(routinename//'::write_header', & 
+  CALL shumlib(routinename//'::write_header', &
            um_output_file%write_header())
   ! Close file
-  CALL shumlib(routinename//'::close_file', & 
+  CALL shumlib(routinename//'::close_file', &
            um_output_file%close_file())
 END IF
 

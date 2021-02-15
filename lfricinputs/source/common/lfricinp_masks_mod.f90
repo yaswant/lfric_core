@@ -31,12 +31,12 @@ USE lfricinp_ancils_mod,               ONLY: ancil_fields, l_land_area_fraction
 !
 ! shumlib modules
 USE f_shum_field_mod, ONLY: shum_field_type
- 
+
 IMPLICIT NONE
 
 ! LFRic mesh and local partition
 TYPE(mesh_type), POINTER :: mesh
-TYPE(partition_type), POINTER :: partition 
+TYPE(partition_type), POINTER :: partition
 
 ! Ancil fields
 TYPE(lfric_field_type), POINTER :: ancil_field
@@ -112,7 +112,7 @@ ELSE
   NULLIFY(mesh, partition)
 
   ! Set up UM mask dimensions
-  dim_2dx = SIZE(um_input_fields(1)%rdata,DIM=1) 
+  dim_2dx = SIZE(um_input_fields(1)%rdata,DIM=1)
   dim_2dy = SIZE(um_input_fields(1)%rdata,DIM=2)
   !
   ! Set up UM logical land mask

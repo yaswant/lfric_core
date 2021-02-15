@@ -57,7 +57,7 @@ CONTAINS
 SUBROUTINE regrid_src_2d_dst_1d(self, src, dst)
 
 ! Apply weights to perform copy between source and destination
-! Uses real arrays, could be overloaded for different types, 
+! Uses real arrays, could be overloaded for different types,
 ! precision and shapes
 REAL(KIND=real64), INTENT(IN) :: src(:,:)
 REAL(KIND=real64), INTENT(IN OUT) :: dst(:)
@@ -84,7 +84,7 @@ END SUBROUTINE regrid_src_2d_dst_1d
 SUBROUTINE regrid_src_1d_dst_2d(self, src, dst)
 
 ! Apply weights to perform copy between source and destination
-! Uses real arrays, could be overloaded for different types, 
+! Uses real arrays, could be overloaded for different types,
 ! precision and shapes
 REAL(KIND=real64), INTENT(IN) :: src(:)
 REAL(KIND=real64), INTENT(IN OUT) :: dst(:,:)
@@ -166,7 +166,7 @@ IF (ALLOCATED(self%remap_matrix)) DEALLOCATE(self%remap_matrix)
 ALLOCATE(self%remap_matrix( self%num_wgts, self%num_links))
 
 WRITE(log_scratch_space, '(2(A,I0),A)' ) "Allocated remap_matrix(num_wgts = ", &
-     self%num_wgts, " , num_links = ", self%num_links, " )" 
+     self%num_wgts, " , num_links = ", self%num_links, " )"
 CALL log_event(log_scratch_space, LOG_LEVEL_INFO)
 
 ! Read remap matrix from file
