@@ -497,9 +497,9 @@ subroutine rad_tile_code(nlayers,                                &
     do i_tile = first_sea_tile, first_sea_tile + n_sea_tile - 1
       df_rtile = df_rtile + 1
       if (tile_fraction(map_tile(i_tile)) > 0.0_r_def) then
-        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
-          = real(open_sea_albedo(1, 1, 1, i_band), r_def)
         tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) &
+          = real(open_sea_albedo(1, 1, 1, i_band), r_def)
+        tile_sw_diffuse_albedo(map_sw_tile(1)+df_rtile-1) &
           = real(open_sea_albedo(1, 1, 2, i_band), r_def)
       else
         tile_sw_direct_albedo(map_sw_tile(1)+df_rtile-1) = 0.0_r_def
