@@ -218,13 +218,14 @@ subroutine allocate_arrays(self, generator_strategy)
   type(ugrid_2d_type),         intent(inout) :: self
   class(ugrid_generator_type), intent(in)    :: generator_strategy
 
-  call generator_strategy%get_dimensions(                &
-         num_nodes          = self%num_nodes,            &
-         num_edges          = self%num_edges,            &
-         num_faces          = self%num_faces,            &
-         num_nodes_per_face = self%num_nodes_per_face,   &
-         num_edges_per_face = self%num_edges_per_face,   &
-         num_nodes_per_edge = self%num_nodes_per_edge)
+  call generator_strategy%get_dimensions(                      &
+         num_nodes              = self%num_nodes,              &
+         num_edges              = self%num_edges,              &
+         num_faces              = self%num_faces,              &
+         num_nodes_per_face     = self%num_nodes_per_face,     &
+         num_edges_per_face     = self%num_edges_per_face,     &
+         num_nodes_per_edge     = self%num_nodes_per_edge,     &
+         max_num_faces_per_node = self%max_num_faces_per_node )
 
 
 

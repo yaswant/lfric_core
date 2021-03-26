@@ -144,6 +144,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .true.
@@ -189,7 +190,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -199,6 +201,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -294,6 +297,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .true.
@@ -367,8 +371,8 @@ contains
     call mesh_gen%get_dimensions( nodes, edges, faces, &
                                   nodes_per_face,      &
                                   edges_per_face,      &
-                                  nodes_per_edge )
-
+                                  nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, edge_cells_x*edge_cells_y,   "Incorrect number of vertices for mesh dimensions")
@@ -378,6 +382,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -466,6 +471,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .false.
@@ -508,7 +514,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, (edge_cells_x)*(edge_cells_y+1),  "Incorrect number of vertices for mesh dimensions")
@@ -518,6 +525,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -597,6 +605,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .true.
@@ -638,8 +647,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
-
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, (edge_cells_x+1)*edge_cells_y,           "Incorrect number of vertices for mesh dimensions")
@@ -649,6 +658,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -730,6 +740,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -771,8 +782,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
-
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, (edge_cells_x+1)*(edge_cells_y+1),           "Incorrect number of vertices for mesh dimensions")
@@ -782,6 +793,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -864,6 +876,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .false.
@@ -909,7 +922,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -919,6 +933,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1004,6 +1019,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .false.
@@ -1049,7 +1065,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 6, "Incorrect number of vertices for mesh dimensions")
@@ -1059,6 +1076,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1152,6 +1170,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .false.
@@ -1197,7 +1216,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 6,  "Incorrect number of vertices for mesh dimensions")
@@ -1207,6 +1227,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1304,6 +1325,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .true.
     logical(l_def) :: periodic_y = .false.
@@ -1349,7 +1371,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 9,  "Incorrect number of vertices for mesh dimensions")
@@ -1359,6 +1382,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1458,6 +1482,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .true.
@@ -1503,7 +1528,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -1513,6 +1539,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1598,6 +1625,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .true.
@@ -1645,7 +1673,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 6, "Incorrect number of vertices for mesh dimensions")
@@ -1655,6 +1684,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1750,6 +1780,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .true.
@@ -1795,7 +1826,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes,  6, "Incorrect number of vertices for mesh dimensions")
@@ -1805,6 +1837,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -1903,6 +1936,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .true.
@@ -1953,7 +1987,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes,  9, "Incorrect number of vertices for mesh dimensions")
@@ -1963,6 +1998,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2077,6 +2113,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2122,7 +2159,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -2132,6 +2170,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2216,6 +2255,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2261,7 +2301,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 6, "Incorrect number of vertices for mesh dimensions")
@@ -2271,6 +2312,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2363,6 +2405,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2411,7 +2454,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes,  8, "Incorrect number of vertices for mesh dimensions")
@@ -2421,6 +2465,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2519,6 +2564,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2564,7 +2610,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 6, "Incorrect number of vertices for mesh dimensions")
@@ -2574,6 +2621,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2666,6 +2714,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2714,7 +2763,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes,  8, "Incorrect number of vertices for mesh dimensions")
@@ -2724,6 +2774,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2821,6 +2872,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -2874,7 +2926,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -2884,6 +2937,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -2967,6 +3021,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -3024,7 +3079,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -3034,6 +3090,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -3127,6 +3184,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -3184,7 +3242,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -3194,6 +3253,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )
@@ -3287,6 +3347,7 @@ contains
     integer(i_def) :: nodes, edges, faces
     integer(i_def) :: nodes_per_face, edges_per_face
     integer(i_def) :: nodes_per_edge
+    integer(i_def) :: max_faces_per_node
 
     logical(l_def) :: periodic_x = .false.
     logical(l_def) :: periodic_y = .false.
@@ -3344,7 +3405,8 @@ contains
 
     ! Retrieve calculated dimensions
     call mesh_gen%get_dimensions( nodes, edges, faces, nodes_per_face, &
-                                  edges_per_face, nodes_per_edge )
+                                  edges_per_face, nodes_per_edge,      &
+                                  max_faces_per_node )
 
     ! Mesh has correct dimensions for arguments
     @assertEqual(nodes, 4, "Incorrect number of vertices for mesh dimensions")
@@ -3354,6 +3416,7 @@ contains
     ! Mesh has correct element dimensions
     @assertEqual(edges_per_face, 4, "Number of edges per face does not correspond to quad mesh")
     @assertEqual(nodes_per_edge, 2, "Number of vertices per edge does not correspond to quad mesh")
+    @assertEqual(max_faces_per_node, 4, "Max number of faces around a node does not correspond to quad mesh")
 
     allocate( this%nodes_on_face(4, faces) )
     allocate( this%edges_on_face(4, faces) )

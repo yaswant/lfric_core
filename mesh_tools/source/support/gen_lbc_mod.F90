@@ -220,6 +220,7 @@ module gen_lbc_mod
     integer(i_def) :: nodes_per_edge
     integer(i_def) :: edges_per_face
 
+    integer(i_def) :: max_num_faces_per_node
 
     ! Used to generate LBC
     type(gen_planar_type)     :: lam_strategy
@@ -323,7 +324,9 @@ function gen_lbc_constructor( lam_strategy, rim_depth ) result( self )
                                 num_faces = lam_n_faces,                  &
                                 num_nodes_per_face = self%nodes_per_face, &
                                 num_edges_per_face = self%edges_per_face, &
-                                num_nodes_per_edge = self%nodes_per_edge )
+                                num_nodes_per_edge = self%nodes_per_edge, &
+                                max_num_faces_per_node =                  &
+                                             self%max_num_faces_per_node )
 
   call lam_strategy%get_metadata                                    &
                         ( mesh_name    = self%target_mesh_names(1), &
@@ -461,17 +464,19 @@ end subroutine base_lbc_panel_final
 !> @brief Populates the arguments with the dimensions defining
 !>        the planar mesh.
 !>
-!> @param[out]  num_nodes           The number of nodes on the mesh.
-!> @param[out]  num_edges           The number of edges on the mesh.
-!> @param[out]  num_faces           The number of faces on the mesh.
-!> @param[out]  num_nodes_per_face  The number of nodes around each face.
-!> @param[out]  num_edges_per_face  The number of edges around each face.
-!> @param[out]  num_nodes_per_face  The number of nodes around each edge.
+!> @param[out]  num_nodes              The number of nodes on the mesh.
+!> @param[out]  num_edges              The number of edges on the mesh.
+!> @param[out]  num_faces              The number of faces on the mesh.
+!> @param[out]  num_nodes_per_face     The number of nodes around each face.
+!> @param[out]  num_edges_per_face     The number of edges around each face.
+!> @param[out]  num_nodes_per_face     The number of nodes around each edge.
+!> @param[out]  max_num_faces_per_node The maximum number of faces surrounding
+!>                                     each node.
 !-----------------------------------------------------------------------------
-subroutine get_dimensions( self,                                   &
-                           num_nodes, num_edges, num_faces,        &
-                           num_nodes_per_face, num_edges_per_face, &
-                           num_nodes_per_edge )
+subroutine get_dimensions( self,                                       &
+                           num_nodes, num_edges, num_faces,            &
+                           num_nodes_per_face, num_edges_per_face,     &
+                           num_nodes_per_edge, max_num_faces_per_node )
   implicit none
 
   class(gen_lbc_type), intent(in) :: self
@@ -482,6 +487,7 @@ subroutine get_dimensions( self,                                   &
   integer(i_def), intent(out) :: num_nodes_per_face
   integer(i_def), intent(out) :: num_edges_per_face
   integer(i_def), intent(out) :: num_nodes_per_edge
+  integer(i_def), intent(out) :: max_num_faces_per_node
 
   num_nodes = self%n_nodes
   num_edges = self%n_edges
@@ -490,6 +496,8 @@ subroutine get_dimensions( self,                                   &
   num_nodes_per_face = self%nodes_per_face
   num_edges_per_face = self%edges_per_face
   num_nodes_per_edge = self%nodes_per_edge
+
+  max_num_faces_per_node = self%max_num_faces_per_node
 
   return
 end subroutine get_dimensions
@@ -619,7 +627,9 @@ subroutine generate(self)
                              num_faces = lam_n_faces,                  &
                              num_nodes_per_face = self%nodes_per_face, &
                              num_edges_per_face = self%edges_per_face, &
-                             num_nodes_per_edge = self%nodes_per_edge )
+                             num_nodes_per_edge = self%nodes_per_edge, &
+                             max_num_faces_per_node =                  &
+                                          self%max_num_faces_per_node )
 
   ! 1.2 LAM coordinates
   allocate( lam_node_coords( 2, lam_n_nodes) )

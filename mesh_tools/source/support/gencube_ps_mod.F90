@@ -78,6 +78,8 @@ module gencube_ps_mod
     integer(i_def)      :: npanels
     integer(i_def)      :: nmaps
 
+    integer(i_def)      :: max_num_faces_per_node
+
     real(r_def)         :: stretch_factor = 1.0_r_def
     real(r_def)         :: lat_north      = rmdi
     real(r_def)         :: lon_north      = rmdi
@@ -187,6 +189,9 @@ contains
   self%nsmooth    = nsmooth
   self%npanels    = NPANELS
   self%nmaps      = 0
+
+  ! There are a maximum of 4 faces around a node in this type of mesh
+  self%max_num_faces_per_node = 4
 
   ! Construct string to report construction arguments
   ! This string should be updated if new arguments are
@@ -1199,17 +1204,19 @@ end subroutine stretch_mesh
 !> @brief Populates the arguments with the dimensions defining
 !>        the mesh.
 !>
-!> @param[in]   self                The gencube_ps_type instance reference.
-!> @param[out]  num_nodes           The number of nodes on the mesh.
-!> @param[out]  num_edges           The number of edges on the mesh.
-!> @param[out]  num_faces           The number of faces on the mesh.
-!> @param[out]  num_nodes_per_face  The number of nodes around each face.
-!> @param[out]  num_edges_per_face  The number of edges around each face.
-!> @param[out]  num_nodes_per_edge  The number of nodes around each edge.
+!> @param[in]   self                   The gencube_ps_type instance reference.
+!> @param[out]  num_nodes              The number of nodes on the mesh.
+!> @param[out]  num_edges              The number of edges on the mesh.
+!> @param[out]  num_faces              The number of faces on the mesh.
+!> @param[out]  num_nodes_per_face     The number of nodes around each face.
+!> @param[out]  num_edges_per_face     The number of edges around each face.
+!> @param[out]  num_nodes_per_edge     The number of nodes around each edge.
+!> @param[out]  max_num_faces_per_node The maximum number of faces surrounding
+!>                                     each node.
 !-------------------------------------------------------------------------------
-subroutine get_dimensions(self, num_nodes, num_edges, num_faces,        &
-                                num_nodes_per_face, num_edges_per_face, &
-                                num_nodes_per_edge)
+subroutine get_dimensions(self, num_nodes, num_edges, num_faces,           &
+                                num_nodes_per_face, num_edges_per_face,    &
+                                num_nodes_per_edge, max_num_faces_per_node )
 
   implicit none
 
@@ -1221,6 +1228,7 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,        &
   integer(i_def), intent(out) :: num_nodes_per_face
   integer(i_def), intent(out) :: num_edges_per_face
   integer(i_def), intent(out) :: num_nodes_per_edge
+  integer(i_def), intent(out) :: max_num_faces_per_node
 
   integer(i_def) :: edge_cells, cpp, ncells
 
@@ -1235,6 +1243,8 @@ subroutine get_dimensions(self, num_nodes, num_edges, num_faces,        &
   num_nodes_per_face = 4
   num_edges_per_face = 4
   num_nodes_per_edge = 2
+
+  max_num_faces_per_node = self%max_num_faces_per_node
 
   return
 end subroutine get_dimensions

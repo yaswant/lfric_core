@@ -117,6 +117,8 @@ module gen_planar_mod
     integer(i_def) :: edges_per_face
     integer(i_def) :: nodes_per_edge
 
+    integer(i_def) :: max_num_faces_per_node
+
   contains
 
     procedure :: generate
@@ -268,6 +270,8 @@ function gen_planar_constructor( reference_element,          &
   self%nodes_per_face = reference_element%get_number_2d_vertices()
   self%edges_per_face = reference_element%get_number_2d_edges()
   self%nodes_per_edge = reference_element%get_number_verts_per_edge()
+  ! There are a maximum of 4 faces around a node in this type of mesh
+  self%max_num_faces_per_node = 4
 
   min_cells_x = 1
   min_cells_y = 1
@@ -1612,17 +1616,19 @@ end subroutine calc_cell_centres
 !> @brief Populates the arguments with the dimensions defining
 !>        the planar mesh.
 !>
-!> @param[out]  num_nodes           The number of nodes on the mesh.
-!> @param[out]  num_edges           The number of edges on the mesh.
-!> @param[out]  num_faces           The number of faces on the mesh.
-!> @param[out]  num_nodes_per_face  The number of nodes around each face.
-!> @param[out]  num_edges_per_face  The number of edges around each face.
-!> @param[out]  num_nodes_per_face  The number of nodes around each edge.
+!> @param[out]  num_nodes              The number of nodes on the mesh.
+!> @param[out]  num_edges              The number of edges on the mesh.
+!> @param[out]  num_faces              The number of faces on the mesh.
+!> @param[out]  num_nodes_per_face     The number of nodes around each face.
+!> @param[out]  num_edges_per_face     The number of edges around each face.
+!> @param[out]  num_nodes_per_face     The number of nodes around each edge.
+!> @param[out]  max_num_faces_per_node The maximum number of faces surrounding
+!>                                     each node.
 !-------------------------------------------------------------------------------
-subroutine get_dimensions( self,                                   &
-                           num_nodes, num_edges, num_faces,        &
-                           num_nodes_per_face, num_edges_per_face, &
-                           num_nodes_per_edge )
+subroutine get_dimensions( self,                                       &
+                           num_nodes, num_edges, num_faces,            &
+                           num_nodes_per_face, num_edges_per_face,     &
+                           num_nodes_per_edge, max_num_faces_per_node )
   implicit none
 
   class(gen_planar_type),    intent(in) :: self
@@ -1633,6 +1639,7 @@ subroutine get_dimensions( self,                                   &
   integer(i_def), intent(out) :: num_nodes_per_face
   integer(i_def), intent(out) :: num_edges_per_face
   integer(i_def), intent(out) :: num_nodes_per_edge
+  integer(i_def), intent(out) :: max_num_faces_per_node
 
   num_nodes = self%n_nodes
   num_edges = self%n_edges
@@ -1641,6 +1648,8 @@ subroutine get_dimensions( self,                                   &
   num_nodes_per_face = self%nodes_per_face
   num_edges_per_face = self%edges_per_face
   num_nodes_per_edge = self%nodes_per_edge
+
+  max_num_faces_per_node = self%max_num_faces_per_node
 
   return
 end subroutine get_dimensions

@@ -136,9 +136,12 @@ abstract interface
   !> @param[out]    num_nodes_per_face     Number of nodes per face
   !> @param[out]    num_edges_per_face     Number of edges per face
   !> @param[out]    num_nodes_per_edge     Number of nodes per edge
+  !> @param[out]    max_num_faces_per_node Maximum number of faces surrounding
+  !>                                       each node
   !-----------------------------------------------------------------------------
-  subroutine get_dimensions_interface (self, num_nodes, num_edges, num_faces,  &
-                 num_nodes_per_face, num_edges_per_face, num_nodes_per_edge)
+  subroutine get_dimensions_interface (self, num_nodes, num_edges, num_faces, &
+                 num_nodes_per_face, num_edges_per_face, num_nodes_per_edge,  &
+                 max_num_faces_per_node )
 
     import :: ugrid_generator_type, i_def
 
@@ -152,6 +155,7 @@ abstract interface
     integer(i_def), intent(out) :: num_nodes_per_face
     integer(i_def), intent(out) :: num_edges_per_face
     integer(i_def), intent(out) :: num_nodes_per_edge
+    integer(i_def), intent(out) :: max_num_faces_per_node
 
   end subroutine get_dimensions_interface
 
