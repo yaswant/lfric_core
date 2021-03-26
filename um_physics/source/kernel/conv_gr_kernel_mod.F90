@@ -30,7 +30,7 @@ module conv_gr_kernel_mod
   !>
   type, public, extends(kernel_type) :: conv_gr_kernel_type
     private
-    type(arg_type) :: meta_args(80) = (/                              &
+    type(arg_type) :: meta_args(81) = (/                              &
         arg_type(GH_INTEGER, GH_READ),                                &! outer
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! rho_in_w3
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! wetrho_in_w3
@@ -71,6 +71,7 @@ module conv_gr_kernel_mod
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! shallow_prec
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! mid_prec
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! deep_term
+        arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cape_diluted
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cape_timescale
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! conv_rain
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! conv_snow
@@ -166,6 +167,7 @@ contains
   !> @param[in,out] shallow_prec         precipitation rate from shallow convection(kg/m2/s)
   !> @param[in,out] mid_prec             precipitation rate from mid convection(kg/m2/s)
   !> @param[in,out] deep_term            termination level number of deep convection
+  !> @param[in,out] cape_diluted         CAPE value
   !> @param[in,out] cape_timescale       cape timescale (s)
   !> @param[in,out] conv_rain            surface rainfall rate from convection (kg/m2/s)
   !> @param[in,out] conv_snow            surface snowfall rate from convection (kg/m2/s)
@@ -259,6 +261,7 @@ contains
                           shallow_prec,                      &
                           mid_prec,                          &
                           deep_term,                         &
+                          cape_diluted,                      &
                           cape_timescale,                    &
                           conv_rain,                         &
                           conv_snow,                         &
@@ -394,9 +397,9 @@ contains
     real(kind=r_def), dimension(undf_2d), intent(inout) :: deep_in_col,     &
                            shallow_in_col, mid_in_col,                      &
                            freeze_level, deep_prec, shallow_prec, mid_prec, &
-                           deep_term, cape_timescale, conv_rain, conv_snow, &
-                           lowest_cv_base, lowest_cv_top, cv_base, cv_top,  &
-                           dd_mf_cb
+                           deep_term, cape_diluted, cape_timescale,         &
+                           conv_rain, conv_snow, lowest_cv_base,            &
+                           lowest_cv_top, cv_base, cv_top, dd_mf_cb
 
     real(kind=r_def), dimension(undf_wth), intent(inout) :: dcfl_conv
     real(kind=r_def), dimension(undf_wth), intent(inout) :: dcff_conv
@@ -446,8 +449,8 @@ contains
          p_star, zhpar, zh, wstar, wthvs, zlcl_uv, entrain_coef,             &
          qsat_lcl, delthvu, flandg, uw0, vw0, it_lcca, it_cca_2d, it_cclwp,  &
          it_cclwp0, it_conv_rain, it_conv_snow, it_precip_dp, it_precip_sh,  &
-         it_precip_md, it_cape_out, it_dp_cfl_limited, it_md_cfl_limited,    &
-         cape_ts_used, it_ind_deep, it_ind_shall,                            &
+         it_precip_md, it_cape_diluted, it_dp_cfl_limited,                   &
+         it_md_cfl_limited, cape_ts_used, it_ind_deep, it_ind_shall,         &
          it_precip_cg, it_wstar_up, it_mb1, it_mb2
 
     ! single level integer fields
@@ -732,7 +735,7 @@ contains
       it_precip_dp(1,1) = 0.0_r_um
       it_precip_sh(1,1) = 0.0_r_um
       it_precip_md(1,1) = 0.0_r_um
-      it_cape_out(1,1)  = 0.0_r_um
+      it_cape_diluted(1,1)  = 0.0_r_um
       it_kterm_deep(1,1)  = 0
       it_kterm_shall(1,1) = 0
       it_mid_level(1,1) = .FALSE.
@@ -767,7 +770,7 @@ contains
         , uw0, vw0, w_max                                                   &
         , zlcl, zlcl_uv, tnuc_nlcl, zhpar, entrain_coef                     &
         , conv_prog_precip, conv_prog_flx, deep_flag, past_precip           &
-        , past_conv_ht, it_cape_out, n_deep, n_congestus, n_shallow         &
+        , past_conv_ht, it_cape_diluted, n_deep, n_congestus, n_shallow     &
         , n_mid, r_rho_levels(1,1,1), r_theta_levels(1,1,1)                 &
         , rho_wet, rho_wet_tq, rho_dry, rho_dry_theta, delta_smag           &
         , exner_rho_levels, exner_rho_minus_one, exner_theta_levels         &
@@ -861,6 +864,9 @@ contains
                                   it_precip_sh(1,1) *one_over_conv_calls
       mid_prec(map_2d(1)) = mid_prec(map_2d(1))+                            &
                               it_precip_md(1,1) *one_over_conv_calls
+
+      cape_diluted(map_2d(1)) = cape_diluted(map_2d(1)) +                   &
+                              it_cape_diluted(1,1)*one_over_conv_calls
 
       ! Frequency of deep convection terminating on level k
       if (it_ind_deep(1,1) == 1.0_r_um) then

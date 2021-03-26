@@ -497,6 +497,8 @@ contains
       'parcel_buoyancy',  twod_space, twod=.true. )
     call add_physics_field( convection_fields, depository, prognostic_fields,  &
       'qsat_at_lcl',  twod_space, twod=.true. )
+    call add_physics_field( convection_fields, depository, prognostic_fields,  &
+      'cape_diluted', twod_space, twod=.true. )
 
     ! 3D fields, don't need checkpointing
     call add_physics_field( convection_fields, depository, prognostic_fields,  &
@@ -513,6 +515,10 @@ contains
       'dcff_conv', wtheta_space )
     call add_physics_field(convection_fields, depository, prognostic_fields,   &
       'dbcf_conv', wtheta_space )
+    call add_physics_field(convection_fields, depository, prognostic_fields,   &
+      'massflux_up', wtheta_space )
+    call add_physics_field(convection_fields, depository, prognostic_fields,   &
+      'massflux_down', wtheta_space )
 
     ! 3D fields on W3 (rho) levels
     call add_physics_field( convection_fields, depository, prognostic_fields,  &

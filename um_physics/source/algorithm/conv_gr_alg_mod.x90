@@ -99,6 +99,9 @@ contains
     type( field_type ), pointer :: du_conv => null()
     type( field_type ), pointer :: dv_conv => null()
     type( field_type ), pointer :: dd_mf_cb => null()
+    type( field_type ), pointer :: massflux_up => null()
+    type( field_type ), pointer :: massflux_down => null()
+    type( field_type ), pointer :: cape_diluted => null()
 
     type( field_type ), pointer :: cf_ice  => null()
     type( field_type ), pointer :: cf_liq  => null()
@@ -114,7 +117,7 @@ contains
     type( field_type ) :: deep_in_col,shallow_in_col,mid_in_col,deep_term
     type( field_type ) :: deep_prec,shallow_prec,mid_prec,cv_base,cv_top
     type( field_type ) :: freeze_level,cape_timescale,lowest_cv_base,lowest_cv_top
-    type( field_type ) :: massflux_up,massflux_down,entrain_up,entrain_down
+    type( field_type ) :: entrain_up,entrain_down
     type( field_type ) :: detrain_up,detrain_down,dd_dt,dd_dq,deep_tops
     type( field_type ) :: deep_dt,deep_dq,deep_massflux
     type( field_type ) :: shallow_dt,shallow_dq,shallow_massflux
@@ -163,6 +166,9 @@ contains
     du_conv => convection_fields%get_field('du_conv')
     dv_conv => convection_fields%get_field('dv_conv')
     dd_mf_cb => convection_fields%get_field('dd_mf_cb')
+    massflux_up => convection_fields%get_field('massflux_up')
+    massflux_down => convection_fields%get_field('massflux_down')
+    cape_diluted => convection_fields%get_field('cape_diluted')
 
     ! Unpack cloud fields
     cf_ice => cloud_fields%get_field('ice_fraction')
@@ -192,8 +198,6 @@ contains
     call ntml%copy_field_properties(cv_top)
 
     ! Convective diagnostics - 3d  - theta levels
-    call theta_star%copy_field_properties(massflux_up)
-    call theta_star%copy_field_properties(massflux_down)
     call theta_star%copy_field_properties(entrain_up)
     call theta_star%copy_field_properties(entrain_down)
     call theta_star%copy_field_properties(detrain_up)
@@ -246,6 +250,7 @@ contains
                  setval_c(mid_prec, 0.0_r_def),         &
                  setval_c(shallow_prec, 0.0_r_def),     &
                  setval_c(deep_prec, 0.0_r_def),        &
+                 setval_c(cape_diluted, 0.0_r_def),     &                 
                  setval_c(cape_timescale, 0.0_r_def),   &
                  setval_c(lowest_cv_base, 0.0_r_def),   &
                  setval_c(lowest_cv_top, 0.0_r_def),    &
@@ -267,7 +272,8 @@ contains
                           cf_ice, cf_liq, cf_bulk, cca, ccw,                  &
                           deep_in_col, shallow_in_col, mid_in_col,            &
                           freeze_level, deep_prec, shallow_prec, mid_prec,    &
-                          deep_term, cape_timescale, conv_rain, conv_snow,    &
+                          deep_term, cape_diluted, cape_timescale,            &
+                          conv_rain, conv_snow,                               &
                           lowest_cv_base, lowest_cv_top, cv_base, cv_top,     &
                           dd_mf_cb, massflux_up, massflux_down, entrain_up,   &
                           entrain_down, detrain_up, detrain_down,             &
@@ -320,6 +326,7 @@ contains
       call shallow_prec%write_field('shallow_prec')
       call mid_prec%write_field('mid_prec')
       call deep_term%write_field('deep_term')
+      call cape_diluted%write_field('cape_diluted')
       call cape_timescale%write_field('cape_timescale')
       call freeze_level%write_field('freeze_level')
       call lowest_cv_base%write_field('lowest_cv_base ')

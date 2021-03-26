@@ -289,6 +289,7 @@
 	<field id="shallow_prec" name="shallow_prec" long_name="shallow_convective_precipitation_rate" unit="kg m-2 s-1" domain_ref="face" />
 	<field id="mid_prec" name="mid_prec" long_name="midlevel_convection_precipitation_rate" unit="kg m-2 s-1" domain_ref="face" />
 	<field id="deep_term" name="deep_term" long_name="termination_level_of_deep_convection" unit="level number" domain_ref="face" />
+        <field id="cape_diluted" name="cape_diluted" long_name="cape_diluted" unit="J/kg" domain_ref="face" />
 	<field id="cape_timescale" name="cape_timescale" long_name="cape_timescale" unit="s" domain_ref="face" />
 	<field id="freeze_level" name="freeze_level" long_name="freeze_level" unit="model level" domain_ref="face" />
 	<field id="lowest_cv_base" name="lowest_cv_base" long_name="lowest_cv_base" unit="model level" domain_ref="face" />
