@@ -87,6 +87,7 @@ contains
     type( field_type ), pointer :: dmt_mphys           => null()
     type( field_type ), pointer :: ls_rain             => null()
     type( field_type ), pointer :: ls_snow             => null()
+    type( field_type ), pointer :: lsca_2d             => null()
 
     type( field_type ), pointer :: cloud_drop_no_conc  => null()
 
@@ -121,6 +122,7 @@ contains
 
     ls_rain            => microphysics_fields%get_field('ls_rain')
     ls_snow            => microphysics_fields%get_field('ls_snow')
+    lsca_2d            => microphysics_fields%get_field('lsca_2d')
 
     cloud_drop_no_conc => aerosol_fields%get_field('cloud_drop_no_conc')
 
@@ -138,6 +140,7 @@ contains
                                      dmr_mphys(imr_v),  dmr_mphys(imr_cl),     &
                                      dmr_mphys(imr_ci), dmr_mphys(imr_r),      &
                                      dmr_mphys(imr_g), ls_rain, ls_snow,       &
+                                     lsca_2d,                                  &
                                      theta_inc, dcfl, dcff, dbcf, f_arr ) )
 
     ! Calculate increments required by the BL scheme
@@ -159,6 +162,7 @@ contains
 
       call ls_rain%write_field('ls_rain')
       call ls_snow%write_field('ls_snow')
+      call lsca_2d%write_field('lsca_2d')
 
     end if
 

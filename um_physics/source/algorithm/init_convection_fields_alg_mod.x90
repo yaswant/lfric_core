@@ -45,6 +45,7 @@ contains
     ! Prognostic fields
     type( field_type ), pointer :: conv_rain => null()
     type( field_type ), pointer :: conv_snow => null()
+    type( field_type ), pointer :: cca_2d    => null()
     type( field_type ), pointer :: dd_mf_cb  => null()
     type( field_type ), pointer :: cca       => null()
     type( field_type ), pointer :: ccw       => null()
@@ -61,6 +62,7 @@ contains
 
     conv_rain => convection_fields%get_field('conv_rain')
     conv_snow => convection_fields%get_field('conv_snow')
+    cca_2d    => convection_fields%get_field('cca_2d')
     dd_mf_cb  => convection_fields%get_field('dd_mf_cb')
     cca       => convection_fields%get_field('cca')
     ccw       => convection_fields%get_field('ccw')
@@ -78,6 +80,7 @@ contains
                  ! Set prognostic fields to zero for use without restart file
                  setval_c(conv_rain, 0.0_r_def), &
                  setval_c(conv_snow, 0.0_r_def), &
+                 setval_c(cca_2d,    0.0_r_def), &
                  setval_c(dd_mf_cb,  0.0_r_def), &
                  setval_c(ccw,       0.0_r_def), &
                  setval_c(cca,       0.0_r_def) )

@@ -28,11 +28,13 @@ module jules_extra_kernel_mod
   !>
   type, public, extends(kernel_type) :: jules_extra_kernel_type
     private
-    type(arg_type) :: meta_args(50) = (/                             &
+    type(arg_type) :: meta_args(53) = (/                             &
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! ls_rain
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! conv_rain
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! ls_snow
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! conv_snow
+        arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! lsca_2d
+        arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! cca_2d
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_2), & ! tile_fraction
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_3), & ! leaf_area_index
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_3), & ! canopy_height
@@ -46,6 +48,7 @@ module jules_extra_kernel_mod
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! soil_suction_sat
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! clapp_horn_b
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! soil_carbon_content
+        arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! soil_roughness
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! mean_topog_index
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! a_sat_frac
         arg_type(GH_FIELD, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! c_sat_frac
@@ -100,6 +103,8 @@ contains
   !> @param[in]     conv_rain              Convective rainfall rate (kg m-2 s-1)
   !> @param[in]     ls_snow                Large-scale snowfall rate (kg m-2 s-1)
   !> @param[in]     conv_snow              Convective snowfall rate (kg m-2 s-1)
+  !> @param[in]     lsca_2d                Large-scale cloud amout (2d)
+  !> @param[in]     cca_2d                 Convective cloud amout (2d) with no anvil
   !> @param[in]     tile_fraction          Surface tile fractions
   !> @param[in]     leaf_area_index        Leaf Area Index
   !> @param[in]     canopy_height          Canopy height (m)
@@ -113,6 +118,7 @@ contains
   !> @param[in]     soil_suction_sat       Saturated soil water suction (m)
   !> @param[in]     clapp_horn_b           Clapp and Hornberger b coefficient
   !> @param[in]     soil_carbon_content    Soil carbon content (kg m-2)
+  !> @param[in]     soil_roughness         Bare soil surface roughness length (m)
   !> @param[in]     mean_topog_index       Mean topographic index
   !> @param[in]     a_sat_frac             a gridbox saturated fraction
   !> @param[in]     c_sat_frac             c gridbox saturated fraction
@@ -167,6 +173,8 @@ contains
                conv_rain,                  &
                ls_snow,                    &
                conv_snow,                  &
+               lsca_2d,                    &
+               cca_2d,                     &
                tile_fraction,              &
                leaf_area_index,            &
                canopy_height,              &
@@ -180,6 +188,7 @@ contains
                soil_suction_sat,           &
                clapp_horn_b,               &
                soil_carbon_content,        &
+               soil_roughness,             &
                mean_topog_index,           &
                a_sat_frac,                 &
                c_sat_frac,                 &
@@ -274,7 +283,8 @@ contains
     integer(kind=i_def), dimension(ndf_snow),  intent(in) :: map_snow
 
     real(kind=r_def), dimension(undf_2d), intent(in) :: ls_rain, conv_rain,   &
-                                                        ls_snow, conv_snow
+                                                        ls_snow, conv_snow,   &
+                                                        lsca_2d, cca_2d
 
     real(kind=r_def), intent(in)    :: tile_fraction(undf_tile)
     real(kind=r_def), intent(in)    :: snow_sublimation(undf_tile)
@@ -297,6 +307,7 @@ contains
 
     real(kind=r_def), intent(in)    :: soil_thermal_cond(undf_2d)
     real(kind=r_def), intent(in)    :: soil_carbon_content(undf_2d)
+    real(kind=r_def), intent(in)    :: soil_roughness(undf_2d)
     real(kind=r_def), intent(in)    :: mean_topog_index(undf_2d)
     real(kind=r_def), intent(in)    :: a_sat_frac(undf_2d)
     real(kind=r_def), intent(in)    :: c_sat_frac(undf_2d)
@@ -356,7 +367,7 @@ contains
     ! Driving data
     real(r_um), dimension(row_length, rows) :: ls_rain_ij, con_rain_ij,       &
          ls_snow_ij, con_snow_ij, pstar_ij, ls_graup_ij, tl_1_ij,             &
-         lw_down_ij, qw_1_ij, u_1_ij, v_1_ij, cca_2d, soil_clay_ij,           &
+         lw_down_ij, qw_1_ij, u_1_ij, v_1_ij, cca_2d_ij, soil_clay_ij,        &
          flash_rate_ancil, pop_den_ancil, flandg, rho_star
 
     ! State
@@ -427,6 +438,8 @@ contains
     con_rain_ij(1,1) = conv_rain(map_2d(1)) ! Convective rainfall rate
     ls_snow_ij(1,1)  = ls_snow(map_2d(1))   ! Large-scale snowfall rate
     con_snow_ij(1,1) = conv_snow(map_2d(1)) ! Convective snowfallfall rate
+    ls_rainfrac_gb(1) = lsca_2d(map_2d(1))  ! Large-scale cloud amount
+    cca_2d_ij(1,1)   = cca_2d(map_2d(1))    ! Convective cloud amount
 
     !----------------------------------------------------------------------
     ! Surface fields as needed by Jules
@@ -474,6 +487,9 @@ contains
       ! Unloading rate of snow from plant functional types
       jules_vars%unload_backgrnd_pft(1, n) = real(snow_unload_rate(map_pft(1)+n-1), r_um)
     end do
+
+    ! Soil roughness
+    psparms%z0m_soil_gb = real(soil_roughness(map_2d(1)), r_um)
 
     ! Get catch_snow_surft and catch_surft from call to sparm
     call sparm(land_pts, n_land_tile, surft_pts, ainfo%surft_index,                   &
@@ -648,7 +664,7 @@ contains
 
     !IN
     land_pts, row_length, rows, river_row_length, river_rows,                 &
-    ls_graup_ij, cca_2d, nsurft, surft_pts,                                   &
+    ls_graup_ij, cca_2d_ij, nsurft, surft_pts,                                &
     lice_pts, soil_pts, stf_sub_surf_roff,fexp_soilt,                         &
     gamtot_soilt, ti_mean_soilt, ti_sig_soilt, cs_ch4_soilt, flash_rate_ancil,&
     pop_den_ancil, a_fsat_soilt, c_fsat_soilt, a_fwet_soilt, c_fwet_soilt,    &

@@ -65,6 +65,8 @@ contains
     type( field_type ), pointer :: ls_snow                => null()
     type( field_type ), pointer :: conv_rain              => null()
     type( field_type ), pointer :: conv_snow              => null()
+    type( field_type ), pointer :: lsca_2d                => null()
+    type( field_type ), pointer :: cca_2d                 => null()
 
     type( field_type ), pointer :: tile_fraction          => null()
     type( field_type ), pointer :: leaf_area_index        => null()
@@ -82,6 +84,7 @@ contains
     type( field_type ), pointer :: soil_suction_sat       => null()
     type( field_type ), pointer :: clapp_horn_b           => null()
     type( field_type ), pointer :: soil_carbon_content    => null()
+    type( field_type ), pointer :: soil_roughness         => null()
     type( field_type ), pointer :: mean_topog_index       => null()
     type( field_type ), pointer :: a_sat_frac             => null()
     type( field_type ), pointer :: c_sat_frac             => null()
@@ -117,6 +120,8 @@ contains
     ls_snow                => microphysics_fields%get_field('ls_snow')
     conv_rain              => convection_fields%get_field('conv_rain')
     conv_snow              => convection_fields%get_field('conv_snow')
+    lsca_2d                => microphysics_fields%get_field('lsca_2d')
+    cca_2d                 => convection_fields%get_field('cca_2d')
 
     ! Surface fields
     tile_fraction          => surface_fields%get_field('tile_fraction')
@@ -136,6 +141,7 @@ contains
     soil_suction_sat       => soil_fields%get_field('soil_suction_sat')
     clapp_horn_b           => soil_fields%get_field('clapp_horn_b')
     soil_carbon_content    => soil_fields%get_field('soil_carbon_content')
+    soil_roughness         => soil_fields%get_field('soil_roughness')
     mean_topog_index       => soil_fields%get_field('mean_topog_index')
     a_sat_frac             => soil_fields%get_field('a_sat_frac')
     c_sat_frac             => soil_fields%get_field('c_sat_frac')
@@ -166,12 +172,13 @@ contains
     snow_unload_rate       => snow_fields%get_field('snow_unload_rate')
 
     call invoke(jules_extra_kernel_type( ls_rain, conv_rain, ls_snow,          &
-                           conv_snow, tile_fraction, leaf_area_index,          &
+                           conv_snow, lsca_2d, cca_2d,                         &
+                           tile_fraction, leaf_area_index,                     &
                            canopy_height, snow_unload_rate,                    &
                            soil_moist_wilt, soil_moist_crit,                   &
                            soil_moist_sat, soil_cond_sat, soil_thermal_cap,    &
                            soil_thermal_cond, soil_suction_sat, clapp_horn_b,  &
-                           soil_carbon_content,                                &
+                           soil_carbon_content, soil_roughness,                &
                            mean_topog_index, a_sat_frac, c_sat_frac,           &
                            a_wet_frac, c_wet_frac, tile_temperature,           &
                            net_prim_prod, snow_sublimation, surf_heat_flux,    &

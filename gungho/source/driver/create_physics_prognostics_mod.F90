@@ -325,6 +325,8 @@ contains
       'ls_rain',  twod_space, twod=.true. )
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
       'ls_snow',  twod_space, twod=.true. )
+    call add_physics_field( microphysics_fields, depository, prognostic_fields,&
+      'lsca_2d',  twod_space, twod=.true. )
 
     ! 3D fields, don't need checkpointing
     call add_physics_field( microphysics_fields, depository, prognostic_fields,&
@@ -477,6 +479,8 @@ contains
       'ccw', wtheta_space, checkpoint_flag=checkpoint_flag)
 
     ! 2D fields, don't need checkpointing
+    call add_physics_field( convection_fields, depository, prognostic_fields,  &
+      'cca_2d',  twod_space, twod=.true. )
     call add_physics_field( convection_fields, depository, prognostic_fields,  &
       'shallow_flag',  twod_space, twod=.true. )
     call add_physics_field( convection_fields, depository, prognostic_fields,  &

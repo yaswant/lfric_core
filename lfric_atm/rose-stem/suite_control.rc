@@ -199,6 +199,16 @@
                          },
                      plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
                      )',
+    'run_application("lfric_atm", "basic_gal9",
+                     resolutions=[("C12",1800.0)],
+                     env={"crun":2, "nrun":72,
+                          "directives":{"C12":{"mpi_parts":6,
+                                               "threads":1,
+                                               "wallclock":"00:12:00"},
+                                       },
+                         },
+                     plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
+                     )',
     'run_with_restart_check("lfric_atm", "basic_gal7_short", 2,
                             resolutions=[("C12",1800.0)],
                             env={"crun":1, "nrun":2,

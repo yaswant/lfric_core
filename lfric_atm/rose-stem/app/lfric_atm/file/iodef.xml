@@ -283,6 +283,7 @@
 	<field id="mid_massflux" name="mid_massflux" long_name="massflux_for_mid_convection" unit="Pa s-1" grid_ref="full_level_face_grid" />
 	<field id="conv_rain" name="conv_rain" long_name="surface_convective_rainfall_rate" unit="kg m-2 s-1" domain_ref="face" />
 	<field id="conv_snow" name="conv_snow" long_name="surface_convective_snowfall_rate" unit="kg m-2 s-1" domain_ref="face" />
+	<field id="cca_2d" name="cca_2d" long_name="convective_cloud_amount_(2d)_with_no_anvil" unit="1" domain_ref="face" />
 	<field id="deep_in_col" name="deep_in_col" long_name="frequency_of_deep_convection" unit="1" domain_ref="face" />
 	<field id="shallow_in_col" name="shallow_in_col" long_name="frequency_of_shallow_convection" unit="1" domain_ref="face" />
 	<field id="mid_in_col" name="mid_in_col" long_name="frequency_of_midlevel_convection" unit="1" domain_ref="face" />
@@ -300,6 +301,7 @@
 	<!-- microphysics fields -->
 	<field id="ls_rain" name="ls_rain" long_name="surface_microphysical_rainfall_rate" unit="kg m-2 s-1" domain_ref="face" />
 	<field id="ls_snow" name="ls_snow" long_name="surface_microphysical_snowfall_rate" unit="kg m-2 s-1" domain_ref="face" />
+	<field id="lsca_2d" name="lsca_2d" long_name="large_scale_cloud_amount_(2d)" unit="1" domain_ref="face" />
 	<!-- spectral GWD fields -->
 	<field id="dtheta_spectral_gwd" name="dtheta_spectral_gwd" long_name="spectral_gravity_wave_drag_theta_increment" unit="K" grid_ref="full_level_face_grid" />
 	<field id="du_spectral_gwd" name="du_spectral_gwd" long_name="spectral_gravity_wave_drag_U_wind_increment" unit="m s-1" grid_ref="half_level_face_grid" />

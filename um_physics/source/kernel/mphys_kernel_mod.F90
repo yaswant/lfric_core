@@ -27,7 +27,7 @@ private
 
 type, public, extends(kernel_type) :: mphys_kernel_type
   private
-  type(arg_type) :: meta_args(30) = (/                                 &
+  type(arg_type) :: meta_args(31) = (/                                 &
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                       & ! mv_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                       & ! ml_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                       & ! mi_wth
@@ -53,6 +53,7 @@ type, public, extends(kernel_type) :: mphys_kernel_type
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       & ! dmg_wth
        arg_type(GH_FIELD,   GH_WRITE,   ANY_DISCONTINUOUS_SPACE_1),    & ! ls_rain
        arg_type(GH_FIELD,   GH_WRITE,   ANY_DISCONTINUOUS_SPACE_1),    & ! ls_snow
+       arg_type(GH_FIELD,   GH_WRITE,   ANY_DISCONTINUOUS_SPACE_1),    & ! lsca_2d
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                       & ! theta_inc
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                       & ! dcfl_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                       & ! dcff_wth
@@ -95,6 +96,7 @@ contains
 !> @param[out] dmg_wth             Increment to graupel mass mixing ratio
 !> @param[out] ls_rain_2d          Large scale rain from twod_fields
 !> @param[out] ls_snow_2d          Large scale snow from twod_fields
+!> @param[in,out] lsca_2d          Large scale cloud amount (2d)
 !> @param[out] theta_inc           Increment to theta
 !> @param[out] dcfl_wth            Increment to liquid cloud fraction
 !> @param[out] dcff_wth            Increment to ice cloud fraction
@@ -135,7 +137,7 @@ subroutine mphys_code( nlayers,                     &
                        dmv_wth,  dml_wth,  dmi_wth, &
                        dmr_wth,  dmg_wth,           &
                        ls_rain_2d, ls_snow_2d,      &
-                       theta_inc,                   &
+                       lsca_2d, theta_inc,          &
                        dcfl_wth, dcff_wth, dbcf_wth,&
                        f_arr_wth,                   &
                        ndf_wth, undf_wth, map_wth,  &
@@ -210,6 +212,7 @@ subroutine mphys_code( nlayers,                     &
     real(kind=r_def), intent(out), dimension(undf_wth) :: dmg_wth
     real(kind=r_def), intent(out), dimension(undf_2d)  :: ls_rain_2d
     real(kind=r_def), intent(out), dimension(undf_2d)  :: ls_snow_2d
+    real(kind=r_def), intent(inout), dimension(undf_2d):: lsca_2d
     real(kind=r_def), intent(out), dimension(undf_wth) :: theta_inc
     real(kind=r_def), intent(out), dimension(undf_wth) :: dcfl_wth
     real(kind=r_def), intent(out), dimension(undf_wth) :: dcff_wth
@@ -297,6 +300,7 @@ subroutine mphys_code( nlayers,                     &
     n_arcl_compnts = 1_i_um
 
     land_points = land_field
+    land_index  = 1_i_um
 
     deltaz(:,:,:)           = 0.0_r_um
     biogenic(:,:,:)         = 0.0_r_um
@@ -624,6 +628,7 @@ end if
   ! Copy ls_rain and ls_snow
   ls_rain_2d(map_2d(1))  = ls_rain(1,1)
   ls_snow_2d(map_2d(1))  = ls_snow(1,1)
+  lsca_2d(map_2d(1))     = ls_rainfrac(1)
 
   deallocate( precfrac_work )
   deallocate( qgraup_work )

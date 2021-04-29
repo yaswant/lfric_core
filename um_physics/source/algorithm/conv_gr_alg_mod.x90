@@ -77,6 +77,7 @@ contains
 
     type( field_type ), pointer :: conv_rain => null()
     type( field_type ), pointer :: conv_snow => null()
+    type( field_type ), pointer :: cca_2d => null()
     type( field_type ), pointer :: shallow_flag  => null()
     type( field_type ), pointer :: uw0_flux  => null()
     type( field_type ), pointer :: vw0_flux  => null()
@@ -148,6 +149,7 @@ contains
     ! Unpack convection fields
     conv_rain => convection_fields%get_field('conv_rain')
     conv_snow => convection_fields%get_field('conv_snow')
+    cca_2d => convection_fields%get_field('cca_2d')
     shallow_flag => convection_fields%get_field('shallow_flag')
     uw0_flux => convection_fields%get_field('uw0_flux')
     vw0_flux => convection_fields%get_field('vw0_flux')
@@ -262,6 +264,7 @@ contains
                  setval_c(cv_top, 0.0_r_def),           &
                  setval_c(conv_rain, 0.0_r_def),        &
                  setval_c(conv_snow, 0.0_r_def),        &
+                 setval_c(cca_2d, 0.0_r_def),           &
 
                  ! call the scheme
                  conv_gr_kernel_type( outer, rho, wetrho_in_w3,               &
@@ -278,6 +281,7 @@ contains
                           freeze_level, deep_prec, shallow_prec, mid_prec,    &
                           deep_term, cape_diluted, cape_timescale,            &
                           conv_rain, conv_snow,                               &
+                          cca_2d,                                             &
                           lowest_cv_base, lowest_cv_top, cv_base, cv_top,     &
                           dd_mf_cb, massflux_up, massflux_down, entrain_up,   &
                           entrain_down, detrain_up, detrain_down,             &
@@ -323,6 +327,7 @@ contains
       ! 2d convection diagnostics
       call conv_rain%write_field('conv_rain')
       call conv_snow%write_field('conv_snow')
+      call cca_2d%write_field('cca_2d')
       call deep_in_col%write_field('deep_in_col')
       call shallow_in_col%write_field('shallow_in_col')
       call mid_in_col%write_field('mid_in_col')

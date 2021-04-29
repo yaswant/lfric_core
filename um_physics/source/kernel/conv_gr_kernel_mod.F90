@@ -30,7 +30,7 @@ module conv_gr_kernel_mod
   !>
   type, public, extends(kernel_type) :: conv_gr_kernel_type
     private
-    type(arg_type) :: meta_args(81) = (/                              &
+    type(arg_type) :: meta_args(82) = (/                              &
         arg_type(GH_INTEGER, GH_READ),                                &! outer
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! rho_in_w3
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! wetrho_in_w3
@@ -75,6 +75,7 @@ module conv_gr_kernel_mod
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cape_timescale
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! conv_rain
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! conv_snow
+        arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cca_2d
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! lowest_cv_base
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! lowest_cv_top
         arg_type(GH_FIELD,   GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1),&! cv_base
@@ -171,6 +172,7 @@ contains
   !> @param[in,out] cape_timescale       cape timescale (s)
   !> @param[in,out] conv_rain            surface rainfall rate from convection (kg/m2/s)
   !> @param[in,out] conv_snow            surface snowfall rate from convection (kg/m2/s)
+  !> @param[in,out] cca_2d               convective cloud amout (2d) with no anvil
   !> @param[in,out] lowest_cv_base       level number for start of convection in column
   !> @param[in,out] lowest_cv_top        level number for end of lowest convection in column
   !> @param[in,out] cv_base              level number of base of highest convection in column
@@ -265,6 +267,7 @@ contains
                           cape_timescale,                    &
                           conv_rain,                         &
                           conv_snow,                         &
+                          cca_2d,                            &
                           lowest_cv_base,                    &
                           lowest_cv_top,                     &
                           cv_base,                           &
@@ -398,7 +401,7 @@ contains
                            shallow_in_col, mid_in_col,                      &
                            freeze_level, deep_prec, shallow_prec, mid_prec, &
                            deep_term, cape_diluted, cape_timescale,         &
-                           conv_rain, conv_snow, lowest_cv_base,            &
+                           conv_rain, conv_snow, cca_2d, lowest_cv_base,    &
                            lowest_cv_top, cv_base, cv_top, dd_mf_cb
 
     real(kind=r_def), dimension(undf_wth), intent(inout) :: dcfl_conv
@@ -858,6 +861,8 @@ contains
                                it_conv_rain(1,1) *one_over_conv_calls
       conv_snow(map_2d(1)) = conv_snow(map_2d(1))+                          &
                                it_conv_snow(1,1) *one_over_conv_calls
+      cca_2d(map_2d(1)) = cca_2d(map_2d(1))+                                &
+                               it_cca_2d(1,1) *one_over_conv_calls
       deep_prec(map_2d(1)) = deep_prec(map_2d(1))+                          &
                                it_precip_dp(1,1) *one_over_conv_calls
       shallow_prec(map_2d(1)) = shallow_prec(map_2d(1))+                    &

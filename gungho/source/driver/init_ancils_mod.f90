@@ -34,6 +34,7 @@ module init_ancils_mod
   use lfric_xios_time_axis_mod,       only : time_axis_type, update_interface
   use jules_control_init_mod,         only : n_land_tile
   use jules_surface_types_mod,        only : npft
+  use surface_config_mod,             only : l_vary_z0m_soil
 
   implicit none
 
@@ -145,6 +146,10 @@ contains
       !=====  SOIL ANCILS  =====
       call setup_ancil_field("soil_albedo", depository, ancil_fields, mesh_id, &
                               twod_mesh_id, twod=.true.)
+      if ( l_vary_z0m_soil ) then
+        call setup_ancil_field("soil_roughness", depository, ancil_fields, &
+                                mesh_id, twod_mesh_id, twod=.true.)
+      endif
       call setup_ancil_field("soil_carbon_content", depository, ancil_fields, &
                               mesh_id, twod_mesh_id, twod=.true.)
       call setup_ancil_field("soil_thermal_cond", depository, ancil_fields, &

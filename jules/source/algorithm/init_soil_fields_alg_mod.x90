@@ -48,6 +48,7 @@ contains
     type( field_type ), pointer :: soil_suction_sat    => null()
     type( field_type ), pointer :: clapp_horn_b        => null()
     type( field_type ), pointer :: soil_carbon_content => null()
+    type( field_type ), pointer :: soil_roughness      => null()
     type( field_type ), pointer :: mean_topog_index    => null()
     type( field_type ), pointer :: a_sat_frac          => null()
     type( field_type ), pointer :: c_sat_frac          => null()
@@ -73,6 +74,7 @@ contains
     soil_suction_sat    => soil_fields%get_field('soil_suction_sat')
     clapp_horn_b        => soil_fields%get_field('clapp_horn_b')
     soil_carbon_content => soil_fields%get_field('soil_carbon_content')
+    soil_roughness      => soil_fields%get_field('soil_roughness')
     mean_topog_index    => soil_fields%get_field('mean_topog_index')
     a_sat_frac          => soil_fields%get_field('a_sat_frac')
     c_sat_frac          => soil_fields%get_field('c_sat_frac')
@@ -107,6 +109,7 @@ contains
                  setval_c(soil_suction_sat, 0.31282_r_def),                 &
                  setval_c(clapp_horn_b, 9.3080_r_def),                      &
                  setval_c(soil_carbon_content, 12.1_r_def),                 &
+                 setval_c(soil_roughness, 0.001_r_def),                     &
                  setval_c(mean_topog_index, 1.0_r_def),                     &
                  ! These need calculating as per calc_fit_fsat in um-recon
                  setval_c(a_sat_frac, 1.0_r_def),                           &
