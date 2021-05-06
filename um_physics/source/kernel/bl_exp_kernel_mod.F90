@@ -28,7 +28,9 @@ module bl_exp_kernel_mod
   use kernel_mod,             only : kernel_type
   use blayer_config_mod,      only : fixed_flux_e, fixed_flux_h, flux_bc_opt, &
                                      flux_bc_opt_specified_scalars, bl_mix_w
-  use cloud_config_mod,       only : rh_crit_opt, rh_crit_opt_tke
+  use cloud_config_mod,       only : rh_crit_opt, rh_crit_opt_tke, scheme,    &
+                                     scheme_bimodal, scheme_pc2,              &
+                                     pc2ini, pc2ini_bimodal
   use convection_config_mod,  only : use_jules_flux
   use mixing_config_mod,      only : smagorinsky
   use surface_config_mod,     only : albedo_obs, sea_surf_alg, &
@@ -48,7 +50,7 @@ module bl_exp_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_exp_kernel_type
     private
-    type(arg_type) :: meta_args(119) = (/                           &
+    type(arg_type) :: meta_args(122) = (/                           &
         arg_type(GH_FIELD, GH_READ,      WTHETA),                   &! theta_in_wth
         arg_type(GH_FIELD, GH_READ,      W3),                       &! rho_in_w3
         arg_type(GH_FIELD, GH_READ,      W3),                       &! wetrho_in_w3
@@ -119,6 +121,8 @@ module bl_exp_kernel_mod
         arg_type(GH_FIELD, GH_READ,      WTHETA),                   &! ozone
         arg_type(GH_FIELD, GH_READ,      WTHETA),                   &! cf_bulk
         arg_type(GH_FIELD, GH_READWRITE, WTHETA),                   &! rh_crit
+        arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! dsldzm
+        arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! wvar
         arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! visc_m_blend
         arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! visc_h_blend
         arg_type(GH_FIELD, GH_INC,       W2),                       &! du_bl
@@ -136,6 +140,7 @@ module bl_exp_kernel_mod
         arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! rdz_uv_bl
         arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! fd_taux
         arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! fd_tauy
+        arg_type(GH_FIELD, GH_WRITE,     WTHETA),                   &! lmix_bl
         arg_type(GH_FIELD, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! alpha1_tile
         arg_type(GH_FIELD, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! ashtf_prime_tile
         arg_type(GH_FIELD, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2),&! dtstar_tile
@@ -411,6 +416,8 @@ contains
                          ozone,                                 &
                          cf_bulk,                               &
                          rh_crit,                               &
+                         dsldzm,                                &
+                         wvar,                                  &
                          visc_m_blend,                          &
                          visc_h_blend,                          &
                          du_bl,                                 &
@@ -428,6 +435,7 @@ contains
                          rdz_uv_bl,                             &
                          fd_taux,                               &
                          fd_tauy,                               &
+                         lmix_bl,                               &
                          alpha1_tile,                           &
                          ashtf_prime_tile,                      &
                          dtstar_tile,                           &
@@ -567,7 +575,9 @@ contains
     integer(kind=i_def), intent(in) :: tile_stencil_size
     integer(kind=i_def), dimension(ndf_tile,tile_stencil_size), intent(in) :: tile_stencil
 
-    real(kind=r_def), dimension(undf_wth), intent(inout):: rh_crit
+    real(kind=r_def), dimension(undf_wth), intent(inout):: rh_crit,            &
+                                                           dsldzm,             &
+                                                           wvar
     real(kind=r_def), dimension(undf_w2),  intent(inout):: du_bl
 
     real(kind=r_def), dimension(undf_wth), intent(inout):: visc_h_blend,       &
@@ -577,7 +587,8 @@ contains
                                                            bq_bl, bt_bl,       &
                                                            dtrdz_tq_bl,        &
                                                            rdz_uv_bl,          &
-                                                           fd_taux, fd_tauy
+                                                           fd_taux, fd_tauy,   &
+                                                           lmix_bl
     real(kind=r_def), dimension(undf_w3),  intent(inout):: rhokh_bl,           &
                                                            moist_flux_bl,      &
                                                            heat_flux_bl,       &
@@ -707,7 +718,7 @@ contains
     ! profile fields from level 1 upwards
     real(r_um), dimension(row_length,rows,nlayers) ::                        &
          rho_wet, rho_dry, z_rho, z_theta, bulk_cloud_fraction, rho_wet_tq,  &
-         u_p, v_p, zeros, rhcpt
+         u_p, v_p, rhcpt
 
     real(r_um), dimension(0:row_length+1,0:rows+1,nlayers) :: rho_wet_rsq,   &
          p_rho_levels, u_px, v_px, exner_rho_levels
@@ -812,7 +823,10 @@ contains
     integer(i_um), parameter :: nscmdpkgs=15
     logical,       parameter :: l_scmdiags(nscmdpkgs)=.false.
 
-    real(r_um), dimension(row_length,rows,nlayers) :: bl_w_var, tnuc_new
+    real(r_um), dimension(row_length,rows,nlayers) :: tgrad_bm 
+    real(r_um), dimension(row_length,rows,2:nlayers+1) :: bl_w_var
+
+    real(r_um), dimension(row_length,rows,nlayers) :: tnuc_new
 
     real(r_um), dimension(row_length,rows,bl_levels) ::                      &
          e_trb, tsq_trb, qsq_trb, cov_trb, dtrdz_v
@@ -881,8 +895,6 @@ contains
     ! surf_hgt_surft needs to be initialised in this kernel so it has the
     ! correct value for this grid-point when used within Jules
     jules_vars%surf_hgt_surft = 0.0_r_um
-
-    zeros=0.0_r_um
 
     ! Size this with stencil for use in UM routines called
     pdims_s%i_start=0
@@ -1374,7 +1386,7 @@ contains
          u_s_std_surft, kent, we_lim, t_frac, zrzi,                            &
          kent_dsc, we_lim_dsc, t_frac_dsc, zrzi_dsc, zhsc,                     &
     !     OUT fields
-         nbdsc,ntdsc,wstar,wthvs,uw0,vw0,taux_p,tauy_p,rhcpt,zeros             &
+         nbdsc,ntdsc,wstar,wthvs,uw0,vw0,taux_p,tauy_p,rhcpt,tgrad_bm             &
        )
     end if
 
@@ -1513,7 +1525,7 @@ contains
         u_s_std_surft, kent, we_lim, t_frac, zrzi,                      &
         kent_dsc, we_lim_dsc, t_frac_dsc, zrzi_dsc, zhsc,               &
       ! OUT fields
-        nbdsc,ntdsc,wstar,wthvs,uw0,vw0,taux_p,tauy_p,rhcpt,zeros       &
+        nbdsc,ntdsc,wstar,wthvs,uw0,vw0,taux_p,tauy_p,rhcpt,tgrad_bm    &
      )
 
     if (bl_mix_w) then
@@ -1591,6 +1603,7 @@ contains
     end if
     do k=2,bl_levels
       rdz_uv_bl(map_wth(1) + k) = rdz_u(1,1,k)
+      lmix_bl(map_wth(1) + k-1)  = BL_diag%elm3d(1,1,k)
       ngstress_bl(map_wth(1) + k) = f_ngstress(1,1,k)
     end do
 
@@ -1733,6 +1746,17 @@ contains
         rh_crit(map_wth(1)+k) = real(rhcpt(1,1,k), r_def)
       end do
       rh_crit(map_wth(1)) = rh_crit(map_wth(1)+1)
+    end if
+
+    ! Liquid temperature gradient for bimodal cloud scheme
+    if (scheme == scheme_bimodal .or. (scheme == scheme_pc2 .and.         &
+        pc2ini == pc2ini_bimodal ) ) then
+      do k = 1, nlayers
+        dsldzm(map_wth(1)+k) = tgrad_bm(1,1,k)
+      end do
+      do k = 2, nlayers
+        wvar(map_wth(1)+k-1) = bl_w_var(1,1,k)
+      end do
     end if
 
     ! deallocate diagnostics deallocated in atmos_physics2

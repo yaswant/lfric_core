@@ -36,8 +36,11 @@ module um_physics_init_mod
                                         zhloc_depth_fac_in => zhloc_depth_fac
 
   use cloud_config_mod,          only : scheme, scheme_smith, scheme_pc2,     &
+                                        scheme_bimodal,                       &
                                         rh_crit, rh_crit_opt,                 &
                                         rh_crit_opt_namelist, rh_crit_opt_tke,&
+                                        pc2ini, pc2ini_smith,                 &
+                                        pc2ini_bimodal,                       &
                                         cff_spread_rate_in => cff_spread_rate,&
                                         falliceshear_method_in =>             &
                                         falliceshear_method,                  &
@@ -193,9 +196,10 @@ contains
         a_ratio_fac, l_droplet_tpr, qclrime, l_shape_rime, ndrop_surf,       &
         z_surf, l_fsd_generator
     use pc2_constants_mod, only: i_cld_off, i_cld_smith, i_cld_pc2,        &
-         rhcpt_off, acf_off, real_shear, rhcpt_tke_based,                  &
+         i_cld_bimodal, rhcpt_off, acf_off, real_shear, rhcpt_tke_based,   &
          pc2eros_exp_rh,pc2eros_hybrid_allfaces,pc2eros_hybrid_sidesonly,  &
-         original_but_wrong, acf_cusack, cbl_and_cu, pc2init_smith
+         original_but_wrong, acf_cusack, cbl_and_cu, pc2init_smith,        &
+         pc2init_bimodal
     use rad_input_mod, only: two_d_fsd_factor
     use science_fixes_mod, only:  i_fix_mphys_drop_settle, second_fix,      &
          l_pc2_homog_turb_q_neg, l_fix_ccb_cct, l_fix_conv_precip_evap,     &
@@ -522,7 +526,6 @@ contains
       ! ...tau_thresh=0.01 should be set here if so
       l_subgrid_qv               = subgrid_qv
       rhcrit(1:number_of_layers) = real(rh_crit, r_um)
-
       ! Options which are bespoke to the choice of scheme
       select case (scheme)
 
@@ -542,10 +545,17 @@ contains
         i_pc2_checks_cld_frac_method = 2
         i_pc2_conv_coupling          = 3
         i_pc2_erosion_method         = pc2eros_hybrid_sidesonly
-        i_pc2_init_method            = pc2init_smith
         l_ensure_min_in_cloud_qcf    = .false.
         l_simplify_pc2_init_logic    = .false.
         starticetkelvin              = 263.15_r_um
+        if (pc2ini == pc2ini_smith)   i_pc2_init_method = pc2init_smith
+        if (pc2ini == pc2ini_bimodal) i_pc2_init_method = pc2init_bimodal
+
+      case(scheme_bimodal)
+        i_cld_vn   = i_cld_bimodal
+        forced_cu  = off
+        i_cld_area = acf_off 
+        i_eacf     = not_mixph
 
       case default
         write( log_scratch_space, '(A,I3)' )  &

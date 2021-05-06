@@ -422,6 +422,12 @@ contains
       'fd_taux', wtheta_space )
     call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
       'fd_tauy', wtheta_space )
+    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
+      'lmix_bl', wtheta_space )
+    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
+      'dsldzm',  wtheta_space )
+    call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
+      'wvar',    wtheta_space )
 
     ! 3D fields on W3 (rho) levels
     call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
@@ -567,6 +573,21 @@ contains
       'departure_exner_wth', wtheta_space, advection_flag=advection_flag)
     call add_physics_field(cloud_fields, depository, prognostic_fields, &
       'sigma_qcw',   wtheta_space )
+
+    ! Fields for bimodal cloud scheme
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'tau_dec_bm',  wtheta_space )
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'tau_hom_bm',  wtheta_space )
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'tau_mph_bm',  wtheta_space )
+
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'sskew_bm',     wtheta_space )
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'svar_bm',     wtheta_space )
+    call add_physics_field(cloud_fields, depository, prognostic_fields, &
+      'svar_tb',     wtheta_space )
 
     !========================================================================
     ! Fields owned by the surface exchange scheme

@@ -86,6 +86,17 @@ contains
     type( field_type ), pointer :: area_fraction   => null()
     type( field_type ), pointer :: rh_crit         => null()
 
+    type( field_type ), pointer :: dsldzm     => null()
+    type( field_type ), pointer :: wvar       => null()
+    type( field_type ), pointer :: tau_dec_bm => null()
+    type( field_type ), pointer :: tau_hom_bm => null()
+    type( field_type ), pointer :: tau_mph_bm => null()
+
+    type( field_type ), pointer :: sskew_bm   => null()
+    type( field_type ), pointer :: svar_bm    => null()
+    type( field_type ), pointer :: svar_tb    => null()
+
+
     type( field_type ), pointer :: zlcl_mixed      => null()
     type( field_type ), pointer :: r_cumulus       => null()
 
@@ -102,8 +113,19 @@ contains
     area_fraction   => cloud_fields%get_field('area_fraction')
     rh_crit         => cloud_fields%get_field('rh_crit')
 
+    tau_dec_bm      => cloud_fields%get_field('tau_dec_bm')
+    tau_hom_bm      => cloud_fields%get_field('tau_hom_bm')
+    tau_mph_bm      => cloud_fields%get_field('tau_mph_bm')
+
+    sskew_bm        => cloud_fields%get_field('sskew_bm')
+    svar_bm         => cloud_fields%get_field('svar_bm')
+    svar_tb         => cloud_fields%get_field('svar_tb')
+
     zlcl_mixed      => turbulence_fields%get_field('z_lcl')
     r_cumulus       => turbulence_fields%get_field('cumulus')
+
+    dsldzm          => turbulence_fields%get_field('dsldzm')
+    wvar            => turbulence_fields%get_field('wvar')
 
     height_wth      => get_height(Wtheta, theta%get_mesh_id())
 
@@ -124,6 +146,11 @@ contains
                                               theta,             &
                                               exner_wth,         &
                                               exner_w3,          &
+                                              dsldzm,            &
+                                              wvar,              &
+                                              tau_dec_bm,        &
+                                              tau_hom_bm,        &
+                                              tau_mph_bm,        &
                       ! Next 4 are start of timestep qv, qcl, theta
                       ! and exner to find RHt at start of timestep
                                               mr_n(imr_v),       &
@@ -141,6 +168,9 @@ contains
                                               dcfl_pc2_inc,      &
                                               dcff_pc2_inc,      &
                                               dbcf_pc2_inc,      &
+                                              sskew_bm,          &
+                                              svar_bm,           &
+                                              svar_tb,           &
                                               rh_crit       ) ,  &
                                                                  !
                 ! Update all field (apart from theta)

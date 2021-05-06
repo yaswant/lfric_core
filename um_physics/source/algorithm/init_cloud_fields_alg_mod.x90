@@ -52,7 +52,7 @@ contains
     ! Initialise cloud fractions to zero so other schemes will use them
     ! correctly if the cloud scheme is off or no values are provided
     ! by the um2lfric dump.
-    ! Also ensure sigma_qcw initialise with a default value.
+    ! Also ensure sigma_qcw initialised with a default value.
     call invoke( setval_c(area_fraction,   0.0_r_def),            &
                  setval_c(bulk_fraction,   0.0_r_def),            &
                  setval_c(liquid_fraction, 0.0_r_def),            &

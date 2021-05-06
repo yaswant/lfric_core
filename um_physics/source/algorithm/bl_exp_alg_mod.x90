@@ -111,6 +111,7 @@ contains
     type( field_type ), pointer :: fd_taux         => null()
     type( field_type ), pointer :: fd_tauy         => null()
     type( field_type ), pointer :: du_bl           => null()
+    type( field_type ), pointer :: lmix_bl         => null()
 
     type( field_type ), pointer :: cos_zenith_angle  => null()
     type( field_type ), pointer :: sw_heating_rate   => null()
@@ -135,6 +136,9 @@ contains
 
     type( field_type ), pointer :: cf_bulk => null()
     type( field_type ), pointer :: rh_crit => null()
+
+    type( field_type ), pointer :: dsldzm => null()
+    type( field_type ), pointer :: wvar   => null()
 
     type( field_type ), pointer :: dtl_mphys => null()
     type( field_type ), pointer :: dmt_mphys => null()
@@ -244,6 +248,9 @@ contains
     fd_taux         => turbulence_fields%get_field('fd_taux')
     fd_tauy         => turbulence_fields%get_field('fd_tauy')
     du_bl           => turbulence_fields%get_field('du_bl')
+    lmix_bl         => turbulence_fields%get_field('lmix_bl')
+    dsldzm          => turbulence_fields%get_field('dsldzm')
+    wvar            => turbulence_fields%get_field('wvar')
 
     ! Radiation fields
     cos_zenith_angle  => radiation_fields%get_field('cos_zenith_angle')
@@ -370,11 +377,12 @@ contains
                            lw_down_surf, sw_down_blue_surf, dd_mf_cb,          &
                            dtl_mphys, dmt_mphys,                               &
                            sw_heating_rate, lw_heating_rate, ozone,            &
-                           cf_bulk, rh_crit, visc_m, visc_h, du_bl,            &
+                           cf_bulk, rh_crit, dsldzm, wvar,                     &
+                           visc_m, visc_h, du_bl,                              &
                            rhokm_bl, rhokm_surf, rhokh_bl, ngstress_bl,        &
                            bq_bl, bt_bl, moist_flux_bl, heat_flux_bl,          &
                            dtrdz_uv_bl, dtrdz_tq_bl, rdz_tq_bl, rdz_uv_bl,     &
-                           fd_taux, fd_tauy,                                   &
+                           fd_taux, fd_tauy, lmix_bl,                          &
                            alpha1_tile, ashtf_prime_tile, dtstar_tile,         &
                            fraca_tile, z0h_tile, z0m_tile, rhokh_tile,         &
                            chr1p5m_tile, resfs_tile, canhc_tile,               &
@@ -396,6 +404,8 @@ contains
       call z0msea%write_field('z0msea')
       call gross_prim_prod%write_field('gross_prim_prod')
       call net_prim_prod%write_field('net_prim_prod')
+      call wvar%write_field('wvar')
+      call dsldzm%write_field('dsldzm')
 
     end if
 

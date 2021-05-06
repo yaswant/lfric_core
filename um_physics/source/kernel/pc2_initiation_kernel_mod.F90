@@ -25,7 +25,7 @@ private
 
 type, public, extends(kernel_type) :: pc2_initiation_kernel_type
   private
-  type(arg_type) :: meta_args(24) = (/                              &
+  type(arg_type) :: meta_args(32) = (/                              &
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! mv_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! ml_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! mi_wth
@@ -35,6 +35,11 @@ type, public, extends(kernel_type) :: pc2_initiation_kernel_type
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! theta_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! exner_wth
        arg_type(GH_FIELD,   GH_READ,    W3),                        & ! exner_w3
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! dsldzm
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! wvar
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! tau_dec_bm
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! tau_hom_bm
+       arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! tau_mph_bm
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! mv_n_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! ml_n_wth
        arg_type(GH_FIELD,   GH_READ,    WTHETA),                    & ! theta_n_wth
@@ -49,6 +54,9 @@ type, public, extends(kernel_type) :: pc2_initiation_kernel_type
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dcfl_inc_wth
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dcff_inc_wth
        arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! dbcf_inc_wth
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! sskew_bm 
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! svar_bm
+       arg_type(GH_FIELD,   GH_WRITE,   WTHETA),                    & ! svar_tb
        arg_type(GH_FIELD,   GH_READ,    WTHETA)                     & ! rh_crit_wth
        /)
    integer :: iterates_over = CELLS
@@ -73,6 +81,11 @@ contains
 !> @param[in] theta_wth       Potential temperature field
 !> @param[in] exner_wth       Exner pressure in theta space
 !> @param[in] exner_w3        Exner pressure in w3 space
+!> @param[in] dsldzm          Liquid potential temperature gradient in wth 
+!> @param[in] wvar            Vertical velocity variance in wth
+!> @param[in] tau_dec_bm      Decorrelation time scale in wth
+!> @param[in] tau_hom_bm      Homogenisation time scale in wth
+!> @param[in] tau_mph_bm      Phase-relaxation time scale in wth
 !> @param[in] mv_n_wth        Start of timestep vapour mass mixing ratio
 !> @param[in] ml_n_wth        Start of timestep liquid cloud mass mixing ratio
 !> @param[in] theta_n_wth     Start of timestep theta in theta space
@@ -87,6 +100,9 @@ contains
 !> @param[out] dcfl_inc_wth   Increment to liquid cloud fraction in theta space
 !> @param[out] dcff_inc_wth   Increment to ice cloud fraction in theta space
 !> @param[out] dbcf_inc_wth   Increment to bulk cloud fraction in theta space
+!> @param[in,out] sskew_bm    Bimodal skewness of SD PDF
+!> @param[in,out] svar_bm     Bimodal variance of SD PDF
+!> @param[in,out] svar_tb     Unimodal variance of SD PDF
 !> @param[in] rh_crit_wth     Critical relative humidity in theta space
 !> @param[in] ndf_wth         Number of degrees of freedom per cell for theta space
 !> @param[in] undf_wth        Number unique of degrees of freedom  for theta space
@@ -108,6 +124,11 @@ subroutine pc2_initiation_code( nlayers,                           &
                                 theta_wth,                         &
                                 exner_wth,                         &
                                 exner_w3,                          &
+                                dsldzm,                            &
+                                wvar,                              &
+                                tau_dec_bm,                        &
+                                tau_hom_bm,                        &
+                                tau_mph_bm,                        &
                                 ! Start of timestep values for RHt
                                 mv_n_wth,                          &
                                 ml_n_wth,                          &
@@ -124,6 +145,9 @@ subroutine pc2_initiation_code( nlayers,                           &
                                 dcfl_inc_wth,                      &
                                 dcff_inc_wth,                      &
                                 dbcf_inc_wth,                      &
+                                sskew_bm,                          &
+                                svar_bm,                           &
+                                svar_tb,                           &
                                 rh_crit_wth,                       &
                                 ! Other
                                 ndf_wth, undf_wth, map_wth,        &
@@ -168,6 +192,16 @@ subroutine pc2_initiation_code( nlayers,                           &
     real(kind=r_def), intent(in), dimension(undf_wth) :: exner_wth
     real(kind=r_def), intent(in), dimension(undf_w3)  :: exner_w3
 
+    real(kind=r_def), intent(in), dimension(undf_wth) :: dsldzm
+    real(kind=r_def), intent(in), dimension(undf_wth) :: wvar
+    real(kind=r_def), intent(in), dimension(undf_wth) :: tau_dec_bm
+    real(kind=r_def), intent(in), dimension(undf_wth) :: tau_hom_bm
+    real(kind=r_def), intent(in), dimension(undf_wth) :: tau_mph_bm
+
+    real(kind=r_def), intent(inout), dimension(undf_wth) :: sskew_bm
+    real(kind=r_def), intent(inout), dimension(undf_wth) :: svar_bm
+    real(kind=r_def), intent(inout), dimension(undf_wth) :: svar_tb
+
     real(kind=r_def), intent(in), dimension(undf_2d) :: zlcl_mixed
     real(kind=r_def), intent(in), dimension(undf_2d) :: r_cumulus
     real(kind=r_def), intent(in), dimension(undf_wth) :: height_wth
@@ -204,6 +238,12 @@ subroutine pc2_initiation_code( nlayers,                           &
                   rhcpt, zeros
 
     real(r_um), dimension(row_length,rows,model_levels) ::   &
+                  tgrad_in, tau_dec_in,                      &
+                  tau_hom_in, tau_mph_in, z_theta
+
+    real(r_um), dimension(row_length,rows,nlayers) :: wvar_in
+
+    real(r_um), dimension(row_length,rows,model_levels) ::   &
                   tlts, qtts, ptts, qsl_tl
 
     real(r_um), dimension(row_length,rows,model_levels) :: &
@@ -211,6 +251,9 @@ subroutine pc2_initiation_code( nlayers,                           &
 
     real(r_um), dimension(row_length,rows,model_levels+1) ::   &
                   p_rho_levels
+
+    real(r_um), dimension(row_length,rows,model_levels) ::        &
+                  sskew_out, svar_turb_out, svar_bm_out
 
     real(r_um), dimension(row_length,rows) :: t_n, p_star, zlcl_mix
 
@@ -259,6 +302,14 @@ subroutine pc2_initiation_code( nlayers,                           &
       ! pressure at layer boundaries
       p_rho_levels(1,1,k) = p_zero*( exner_w3(map_w3(1) + k-1))     &
                                            **(1.0_r_def/kappa)
+
+      ! Bimodal cloud scheme inputs
+      tgrad_in(1,1,k)   = dsldzm(map_wth(1) + k)
+      wvar_in(1,1,k)    = wvar(map_wth(1) + k)
+      tau_dec_in(1,1,k) = tau_dec_bm(map_wth(1) + k)
+      tau_hom_in(1,1,k) = tau_hom_bm(map_wth(1) + k)
+      tau_mph_in(1,1,k) = tau_mph_bm(map_wth(1) + k)
+      z_theta(1,1,k) = height_wth(map_wth(1) + k) - height_wth(map_wth(1) + 0)
 
       ! Moist prognostics
       qv_work(1,1,k)   = mv_wth(map_wth(1) + k)
@@ -341,12 +392,12 @@ subroutine pc2_initiation_code( nlayers,                           &
                             i_dummy,                       &
                             l_cumulus,                     &
                             rhcpt,                         &
-                            zeros,                         &
-                            zeros,                         &
-                            zeros,                         &
-                            zeros,                         &
-                            zeros,                         &
-                            zeros,                         &
+                            tgrad_in,                      &
+                            wvar_in,                       &
+                            tau_dec_in,                    &
+                            tau_hom_in,                    &
+                            tau_mph_in,                    &
+                            z_theta,                       &
                             calculate_increments,          &
                             ! Output increments
                             t_incr,                        &
@@ -356,9 +407,9 @@ subroutine pc2_initiation_code( nlayers,                           &
                             bcf_incr,                      &
                             cfl_incr,                      &
                             cff_incr,                      &
-                            zeros,                         &
-                            zeros,                         &
-                            zeros,                         &
+                            sskew_out,                     &
+                            svar_turb_out,                 &
+                            svar_bm_out,                   &
                             zeros,                         &
                             zeros )
 
@@ -380,6 +431,10 @@ subroutine pc2_initiation_code( nlayers,                           &
       dcfl_inc_wth(map_wth(1)+k) = cfl_work(1,1,k) - cfl_wth(map_wth(1) + k)
       dcff_inc_wth(map_wth(1)+k) = cff_work(1,1,k) - cff_wth(map_wth(1) + k)
       dbcf_inc_wth(map_wth(1)+k) = bcf_work(1,1,k) - bcf_wth(map_wth(1) + k)
+
+      sskew_bm(map_wth(1)+k)     = sskew_out(1,1,k)
+      svar_bm(map_wth(1)+k)      = svar_bm_out(1,1,k)
+      svar_tb(map_wth(1)+k)      = svar_turb_out(1,1,k)
 
     end do
 

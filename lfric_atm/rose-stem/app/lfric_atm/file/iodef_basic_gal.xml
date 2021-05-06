@@ -255,6 +255,12 @@
 	<field id="bulk_fraction" name="bulk_fraction" long_name="bulk_fraction" unit="1" grid_ref="full_level_face_grid" />
 	<field id="rh_crit" name="rh_crit" long_name="critical_relative_humidity" unit="1" grid_ref="full_level_face_grid" />
 	<field id="departure_exner_wth" name="departure_exner_wth" long_name="exner_at_departure_point" unit="1" grid_ref="full_level_face_grid" />
+        <field id="tau_dec_bm" name="tau_dec_bm" long_name="decorrelation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="tau_hom_bm" name="tau_hom_bm" long_name="homogenisation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="tau_mph_bm" name="tau_mph_bm" long_name="phase_relaxation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="sskew_bm" name="sskew_bm" long_name="skewness_of_bimodal_sd_pdf" unit="1" grid_ref="full_level_face_grid" />
+        <field id="svar_bm" name="svar_bm" long_name="variance_of_bimodal_sd_pdf" unit="kg2 kg-2" grid_ref="full_level_face_grid" />
+        <field id="svar_tb" name="svar_tb" long_name="variance_of_unimodal_sd_pdf" unit="kg2 kg-2" grid_ref="full_level_face_grid" />
         <field id="sigma_qcw" name="sigma_qcw" long_name="variability_cloud_condensate" unit="1" grid_ref="full_level_face_grid" />
 	<!-- convection fields -->
 	<field id="dt_conv" name="dt_conv" long_name="temperature_increment_from_convection" unit="K" grid_ref="full_level_face_grid" />
@@ -354,6 +360,8 @@
 	<field id="du_bl2" name="du_bl2" long_name="northward_wind_increment_from_bl_scheme" unit="m s-1" grid_ref="half_level_edge_grid" />
 	<field id="du_bl3" name="du_bl3" long_name="upward_air_velocity_increment_from_bl_scheme" unit="m s-1" grid_ref="full_level_face_grid" />
 	<field id="zh" name="zh" long_name="boundary_layer_depth" unit="m" domain_ref="face" />
+        <field id="dsldzm" name="dsldzm" long_name="liquid_temperature_gradient" unit="kg m-1" grid_ref="full_level_face_grid" />
+        <field id="wvar" name="wvar" long_name="vertical_velocity_variance" unit="m2 s-2" grid_ref="full_level_face_grid" />
 	<!-- radiation fields -->
 	<field id="lw_down_surf" name="lw_down_surf" long_name="surface_downward_longwave_flux" unit="W m-2" domain_ref="face" />
 	<field id="sw_down_surf" name="sw_down_surf" long_name="surface_downward_shortwave_flux" unit="W m-2" domain_ref="face" />
@@ -405,6 +413,12 @@
 	<field id="init_bulk_fraction" name="bulk_fraction" long_name="bulk_fraction"  unit="1" grid_ref="full_level_face_grid" />
 	<field id="init_rh_crit" name="rh_crit" long_name="critical_relative_humidity"  unit="1" grid_ref="full_level_face_grid" />
 	<field id="init_departure_exner_wth" name="departure_exner_wth" long_name="exner_at_departure_point"  unit="1" grid_ref="full_level_face_grid" />
+        <field id="init_tau_dec_bm" name="tau_dec_bm" long_name="decorrelation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="init_tau_hom_bm" name="tau_hom_bm" long_name="homogenisation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="init_tau_mph_bm" name="tau_mph_bm" long_name="phase_relaxation_time_scale" unit="s" grid_ref="full_level_face_grid" />
+        <field id="init_sskew_bm" name="sskew_bm" long_name="skewness_of_bimodal_sd_pdf" unit="1" grid_ref="full_level_face_grid" />
+        <field id="init_svar_bm" name="svar_bm" long_name="variance_of_bimodal_sd_pdf" unit="kg2 kg-2" grid_ref="full_level_face_grid" />
+        <field id="init_svar_tb" name="svar_tb" long_name="variance_of_unimodal_sd_pdf" unit="kg2 kg-2" grid_ref="full_level_face_grid" />
         <field id="init_sigma_qcw" name="sigma_qcw" long_name="variability_cloud_condensate"  unit="1" grid_ref="full_level_face_grid" />
 	<field id="init_soil_moisture" name="soil_moisture" long_name="soil_moisture" unit="kg m-2" domain_ref="face" axis_ref="soil_levels"/>
 	<field id="init_unfrozen_soil_moisture" name="unfrozen_soil_moisture" long_name="unfrozen_soil_moisture" unit="kg m-2" domain_ref="face" axis_ref="soil_levels"/>

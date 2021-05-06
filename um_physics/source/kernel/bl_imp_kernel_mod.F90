@@ -20,7 +20,8 @@ module bl_imp_kernel_mod
                                      ANY_DISCONTINUOUS_SPACE_7, &
                                      ANY_SPACE_1
   use section_choice_config_mod, only : cloud, cloud_um
-  use cloud_config_mod,       only : scheme, scheme_smith, scheme_pc2
+  use cloud_config_mod,       only : scheme, scheme_smith, scheme_pc2, &
+                                     scheme_bimodal
   use constants_mod,          only : i_def, i_um, r_def, r_um
   use fs_continuity_mod,      only : W3, Wtheta, W2
   use kernel_mod,             only : kernel_type
@@ -44,7 +45,7 @@ module bl_imp_kernel_mod
   !>
   type, public, extends(kernel_type) :: bl_imp_kernel_type
     private
-    type(arg_type) :: meta_args(85) = (/                              &
+    type(arg_type) :: meta_args(90) = (/                              &
         arg_type(GH_INTEGER, GH_READ),                                &! outer
         arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! theta_in_wth
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! wetrho_in_w3
@@ -96,6 +97,11 @@ module bl_imp_kernel_mod
         arg_type(GH_FIELD,   GH_READWRITE, WTHETA),                   &! cf_liq
         arg_type(GH_FIELD,   GH_READWRITE, WTHETA),                   &! cf_bulk
         arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! rh_crit_wth
+        arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! dsldzm
+        arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! wvar
+        arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! tau_dec_bm
+        arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! tau_hom_bm
+        arg_type(GH_FIELD,   GH_READ,      WTHETA),                   &! tau_mph_bm
         arg_type(GH_FIELD,   GH_READ,      W2),                       &! rhokm_w2
         arg_type(GH_FIELD,   GH_READ,      ANY_SPACE_1),              &! rhokm_surf_w2
         arg_type(GH_FIELD,   GH_READ,      W3),                       &! rhokh_bl
@@ -197,6 +203,11 @@ contains
   !> @param[in,out] cf_liq               Liquid cloud fraction
   !> @param[in,out] cf_bulk              Bulk cloud fraction
   !> @param[in]     rh_crit_wth          Critical relative humidity
+  !> @param[in]     dsldzm               Liquid potential temperature gradient in wth 
+  !> @param[in]     wvar                 Vertical velocity variance in wth
+  !> @param[in]     tau_dec_bm           Decorrelation time scale in wth
+  !> @param[in]     tau_hom_bm           Homogenisation time scale in wth
+  !> @param[in]     tau_mph_bm           Phase-relaxation time scale in wth
   !> @param[in]     rhokm_w2             Momentum eddy diffusivity mapped to cell faces
   !> @param[in]     rhokm_surf_w2        Surface eddy diffusivity mapped to cell faces
   !> @param[in]     rhokh_bl             Heat eddy diffusivity on BL levels
@@ -316,6 +327,11 @@ contains
                          cf_liq,                             &
                          cf_bulk,                            &
                          rh_crit_wth,                        &
+                         dsldzm,                             &
+                         wvar,                               &
+                         tau_dec_bm,                         &
+                         tau_hom_bm,                         &
+                         tau_mph_bm,                         &
                          rhokm_w2,                           &
                          rhokm_surf_w2,                      &
                          rhokh_bl,                           &
@@ -465,7 +481,12 @@ contains
                                                            dt_conv,            &
                                                            rh_crit_wth,        &
                                                            bq_bl, bt_bl,       &
-                                                           dtrdz_tq_bl
+                                                           dtrdz_tq_bl,        &
+                                                           dsldzm,             &
+                                                           wvar,               &
+                                                           tau_dec_bm,         &
+                                                           tau_hom_bm,         &
+                                                           tau_mph_bm
 
     real(kind=r_def), dimension(undf_w2),  intent(in)   :: u_physics,         &
                                                            u_physics_star,    &
@@ -547,7 +568,7 @@ contains
          bulk_cloud_fraction, rhcpt, t_latest, q_latest, qcl_latest,         &
          qcf_latest, qcf2_latest, cca_3d, area_cloud_fraction,               &
          cloud_fraction_liquid, cloud_fraction_frozen, rho_wet_tq,           &
-         cf_latest, cfl_latest, cff_latest, zeros
+         cf_latest, cfl_latest, cff_latest
 
     ! profile field on boundary layer levels
     real(r_um), dimension(row_length,rows,bl_levels) :: fqw, ftl, rhokh,     &
@@ -641,6 +662,11 @@ contains
          soot_aged, soot_cld, bmass_new, bmass_aged, bmass_cld, ocff_new,    &
          ocff_aged, ocff_cld, nitr_acc, nitr_diss, ozone_tracer, qrain
 
+    real(r_um), dimension(row_length,rows,nlayers) ::                        &
+         tgrad_in, tau_dec_in, tau_hom_in, tau_mph_in
+
+    real(r_um), dimension(row_length,rows,nlayers) :: wvar_in
+
     real(r_um), dimension(row_length,rows,0:nlayers,tr_vars) :: free_tracers
 
     real(r_um), dimension(row_length,rows) :: ti_sice,                       &
@@ -679,8 +705,6 @@ contains
     ! Initialisation of variables and arrays
     !-----------------------------------------------------------------------
     error_code=0
-
-    zeros=0.0_r_um
 
     call alloc_sf_expl(sf_diag, outer == outer_iterations)
     call alloc_bl_expl(bl_diag, outer == outer_iterations)
@@ -1146,6 +1170,17 @@ contains
     end do
     r_w(1,1,0) = u_physics_star(map_w2(5) + 0) - u_physics(map_w2(5) + 0)
 
+    !-----------------------------------------------------------------------
+    ! fields for bimodal cloud scheme
+    !-----------------------------------------------------------------------
+    do k = 1, nlayers
+      tgrad_in(1,1,k)    = dsldzm(map_wth(1) + k)
+      tau_dec_in(1,1,k)  = tau_dec_bm(map_wth(1) + k)
+      tau_hom_in(1,1,k)  = tau_hom_bm(map_wth(1) + k)
+      tau_mph_in(1,1,k)  = tau_mph_bm(map_wth(1) + k)
+      wvar_in(1,1,k)     = wvar(map_wth(1) + k )
+    end do
+
     if (scheme == scheme_pc2) then
       do k = 1, nlayers
         ! Assign _latest with current updated values
@@ -1212,8 +1247,8 @@ contains
           , cf_latest, cfl_latest, cff_latest                           &
           , R_u, R_v, R_w, cloud_fraction_liquid, cloud_fraction_frozen &
           , sum_eng_fluxes,sum_moist_flux, rhcpt                        &
-    ! Dummy arguments for bimodal scheme compliance
-          , zeros,zeros,zeros,zeros,zeros                               &
+    ! IN arguments for bimodal scheme
+          , tgrad_in, wvar_in, tau_dec_in, tau_hom_in, tau_mph_in       &
     ! INOUT tracer fields
           , aerosol, free_tracers,  resist_b,  resist_b_surft           &
           , dust_div1,dust_div2,dust_div3,dust_div4,dust_div5,dust_div6 &
@@ -1479,8 +1514,8 @@ contains
           , cf_latest, cfl_latest, cff_latest                           &
           , R_u, R_v, R_w, cloud_fraction_liquid, cloud_fraction_frozen &
           , sum_eng_fluxes,sum_moist_flux, rhcpt                        &
-    ! Dummy arguments for bimodal scheme compliance
-          , zeros,zeros,zeros,zeros,zeros                               &
+    ! IN arguments for bimodal scheme
+          , tgrad_in, wvar_in, tau_dec_in, tau_hom_in, tau_mph_in       &
     ! INOUT tracer fields
           , aerosol, free_tracers,  resist_b,  resist_b_surft           &
           , dust_div1,dust_div2,dust_div3,dust_div4,dust_div5,dust_div6 &
@@ -1554,7 +1589,7 @@ contains
 
     ! update cloud fractions only if using cloud scheme
     if ( cloud == cloud_um ) then
-      if ( scheme == scheme_smith ) then
+      if ( scheme == scheme_smith .or. scheme == scheme_bimodal ) then
         do k = 1, nlayers
           cf_bulk(map_wth(1) + k) = bulk_cloud_fraction(1,1,k)
           cf_ice(map_wth(1) + k)  = cloud_fraction_frozen(1,1,k)

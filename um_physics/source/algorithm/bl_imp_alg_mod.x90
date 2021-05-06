@@ -132,6 +132,12 @@ contains
     type( field_type ), pointer :: cf_bulk  => null()
     type( field_type ), pointer :: rh_crit => null()
 
+    type( field_type ), pointer :: dsldzm     => null()
+    type( field_type ), pointer :: wvar       => null()
+    type( field_type ), pointer :: tau_dec_bm => null()
+    type( field_type ), pointer :: tau_hom_bm => null()
+    type( field_type ), pointer :: tau_mph_bm => null()
+
     type( field_type ), pointer :: dt_conv => null()
     type( field_type ), pointer :: du_conv => null()
     type( field_type ), pointer :: dv_conv => null()
@@ -223,6 +229,8 @@ contains
     rdz_uv_bl => turbulence_fields%get_field('rdz_uv_bl')
     fd_taux => turbulence_fields%get_field('fd_taux')
     fd_tauy => turbulence_fields%get_field('fd_tauy')
+    dsldzm  => turbulence_fields%get_field('dsldzm')
+    wvar    => turbulence_fields%get_field('wvar')
 
     ! Unpack cloud fields
     cf_area => cloud_fields%get_field('area_fraction')
@@ -230,6 +238,10 @@ contains
     cf_liq => cloud_fields%get_field('liquid_fraction')
     cf_bulk => cloud_fields%get_field('bulk_fraction')
     rh_crit => cloud_fields%get_field('rh_crit')
+
+    tau_dec_bm => cloud_fields%get_field('tau_dec_bm')
+    tau_hom_bm => cloud_fields%get_field('tau_hom_bm')
+    tau_mph_bm => cloud_fields%get_field('tau_mph_bm')
 
     ! Unpack the convection
     dt_conv => convection_fields%get_field('dt_conv')
@@ -346,6 +358,8 @@ contains
                            dtheta_bl, du_bl, dt_conv, du_conv_w2,              &
                            mr(imr_v), mr(imr_cl), mr(imr_ci),                  &
                            cf_area, cf_ice, cf_liq, cf_bulk, rh_crit,          &
+                           dsldzm, wvar, tau_dec_bm, tau_hom_bm,               &
+                           tau_mph_bm,                                         &
                            rhokm_w2, rhokm_surf_w2, rhokh_bl, ngstress_w2,     &
                            bq_bl, bt_bl, moist_flux_bl, heat_flux_bl,          &
                            dtrdz_w2, dtrdz_tq_bl, rdz_tq_bl, rdz_w2, fd_tau_w2,&
