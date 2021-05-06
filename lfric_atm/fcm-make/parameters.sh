@@ -22,7 +22,7 @@ export shumlib_rev=um11.9
 export shumlib_sources=
 export socrates_rev=1009
 export socrates_sources=
-export um_rev=98102
+export um_rev=98515
 export um_sources=
 
 #### Do not edit the definitions below this line without

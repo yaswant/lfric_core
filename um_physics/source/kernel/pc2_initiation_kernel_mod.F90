@@ -261,7 +261,6 @@ subroutine pc2_initiation_code( nlayers,                           &
 
     ! Hardwired things for PC2
     !
-    integer(i_um), dimension(row_length,rows) :: i_dummy
     integer(i_um), parameter :: nSCMDpkgs=15
     logical,       parameter :: l_scmdiags(nscmdpkgs) = .false.
     logical,       parameter :: calculate_increments  = .false.
@@ -278,7 +277,6 @@ subroutine pc2_initiation_code( nlayers,                           &
     r_theta_levels(1,1,:) = height_wth(map_wth(1):map_wth(1)+nlayers) &
                           + planet_radius
 
-    i_dummy=1
     zeros=0.0_r_um
     !-----------------------------------------------------------------------
     ! Initialisation of prognostic variables and arrays
@@ -389,7 +387,6 @@ subroutine pc2_initiation_code( nlayers,                           &
                             p_rho_levels,                  &
                             p_star,                        &
                             p_theta_levels,                &
-                            i_dummy,                       &
                             l_cumulus,                     &
                             rhcpt,                         &
                             tgrad_in,                      &
