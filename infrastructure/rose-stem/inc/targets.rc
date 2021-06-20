@@ -64,7 +64,7 @@
     'meto-xc40' : {
         'hostname' : '$(rose host-select --rank-method=random xc)',
         'batcher' : 'pbs',
-        'build_root' : '\$RAMTMP',
+        'build_root' : '\${RAMTMP}',
         'update' : 'interupt',
         'setup' : {
             'base' : [
