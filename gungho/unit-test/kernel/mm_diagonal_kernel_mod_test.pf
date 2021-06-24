@@ -6,24 +6,22 @@
 
 module mm_diagonal_kernel_mod_test
 
-  use constants_mod, only : i_def, r_def
+  use constants_mod, only : i_def, r_single, r_double
   use pFUnit_Mod
 
   implicit none
 
   private
-  public :: test_all
+  public :: test_real64, test_real32
 
   @TestCase
   type, extends(TestCase), public :: mm_diagonal_test_type
     private
-    real(r_def),    allocatable :: mm(:,:,:)
-    integer(i_def), allocatable :: map(:,:)
-    real(r_def),    allocatable :: mm_diag(:), answer(:)
   contains
     procedure setUp
     procedure tearDown
-    procedure test_all
+    procedure test_real64
+    procedure test_real32
   end type mm_diagonal_test_type
 
   integer(i_def), parameter :: undf  = 5, &
@@ -39,11 +37,6 @@ contains
 
     class(mm_diagonal_test_type), intent(inout) :: this
 
-    allocate( this%mm(ndf,ndf,ncell) )
-    allocate( this%mm_diag(undf) )
-    allocate( this%map(ndf,ncell) )
-    allocate( this%answer(undf) )
-
   end subroutine setUp
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -53,13 +46,11 @@ contains
 
     class(mm_diagonal_test_type), intent(inout) :: this
 
-    deallocate( this%mm, this%mm_diag, this%map, this%answer )
-
   end subroutine tearDown
 
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TEST REAL64 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   @test
-  subroutine test_all( this )
+  subroutine test_real64( this )
 
     use mm_diagonal_kernel_mod,     only : mm_diagonal_kernel_code
 
@@ -67,36 +58,103 @@ contains
 
     class(mm_diagonal_test_type), intent(inout) :: this
 
-    real(r_def), parameter :: tol = 1.0e-12_r_def
-    integer(i_def), parameter :: nlayers = 1
+    real(r_double),   parameter :: tol = 1.0e-12_r_double
+    integer(i_def),   parameter :: nlayers = 1_i_def
 
-    integer(i_def) :: df, cell
+    integer(i_def)              :: df, cell
+
+    integer(i_def), allocatable :: map(:,:)
+    real(r_double), allocatable :: mm(:,:,:)
+    real(r_double), allocatable :: mm_diag(:), answer(:)
+
+    allocate( mm(ndf,ndf,ncell) )
+    allocate( mm_diag(undf) )
+    allocate( map(ndf,ncell) )
+    allocate( answer(undf) )
 
     ! Fill with some data
     do cell = 1,2
-      this%mm(:,1,cell) = (/ 4.0_r_def, 2.0_r_def, 1.0_r_def /)
-      this%mm(:,2,cell) = (/ 1.0_r_def, 6.0_r_def, 1.0_r_def /)
-      this%mm(:,3,cell) = (/ 1.0_r_def, 2.0_r_def, 4.0_r_def /)
+      mm(:,1,cell) = (/ 4.0_r_double, 2.0_r_double, 1.0_r_double /)
+      mm(:,2,cell) = (/ 1.0_r_double, 6.0_r_double, 1.0_r_double /)
+      mm(:,3,cell) = (/ 1.0_r_double, 2.0_r_double, 4.0_r_double /)
     end do
-    this%map(:,1) = (/ 1, 2, 3 /)
-    this%map(:,2) = (/ 3, 4, 5 /)
-    this%mm_diag(:) = 0.0_r_def
+    map(:,1) = (/ 1_i_def, 2_i_def, 3_i_def /)
+    map(:,2) = (/ 3_i_def, 4_i_def, 5_i_def /)
+    mm_diag(:) = 0.0_r_double
 
-    do cell = 1,ncell
+    do cell = 1, ncell
 
       call mm_diagonal_kernel_code(cell,            &
                                    nlayers,         &
-                                   this%mm_diag,    &
+                                   mm_diag,         &
                                    ncell,           &
-                                   this%mm,         &
+                                   mm,              &
                                    ndf,             &
                                    undf,            &
-                                   this%map(:,cell) &
+                                   map(:,cell)      &
                                    )
     end do
-    this%answer = (/ 4.0_r_def, 6.0_r_def, 8.0_r_def, 6.0_r_def, 4.0_r_def /)
-    @assertEqual(this%answer, this%mm_diag, tol)
+    answer = (/ 4.0_r_double, 6.0_r_double, 8.0_r_double, &
+                6.0_r_double, 4.0_r_double /)
+    @assertEqual(answer, mm_diag, tol)
 
-  end subroutine test_all
+    deallocate( mm, mm_diag, map, answer )
+
+  end subroutine test_real64
+
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TEST REAL32 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @test
+  subroutine test_real32( this )
+
+    use mm_diagonal_kernel_mod,     only : mm_diagonal_kernel_code
+
+    implicit none
+
+    class(mm_diagonal_test_type), intent(inout) :: this
+
+    real(r_single),   parameter :: tol = 1.0e-12_r_single
+    integer(i_def),   parameter :: nlayers = 1_i_def
+
+    integer(i_def)              :: df, cell
+
+    integer(i_def), allocatable :: map(:,:)
+    real(r_single), allocatable :: mm(:,:,:)
+    real(r_single), allocatable :: mm_diag(:), answer(:)
+
+    allocate( mm(ndf,ndf,ncell) )
+    allocate( mm_diag(undf) )
+    allocate( map(ndf,ncell) )
+    allocate( answer(undf) )
+
+    ! Fill with some data
+    do cell = 1,2
+      mm(:,1,cell) = (/ 4.0_r_single, 2.0_r_single, 1.0_r_single /)
+      mm(:,2,cell) = (/ 1.0_r_single, 6.0_r_single, 1.0_r_single /)
+      mm(:,3,cell) = (/ 1.0_r_single, 2.0_r_single, 4.0_r_single /)
+    end do
+    map(:,1) = (/ 1_i_def, 2_i_def, 3_i_def /)
+    map(:,2) = (/ 3_i_def, 4_i_def, 5_i_def /)
+    mm_diag(:) = 0.0_r_single
+
+    do cell = 1, ncell
+
+      call mm_diagonal_kernel_code(cell,            &
+                                   nlayers,         &
+                                   mm_diag,         &
+                                   ncell,           &
+                                   mm,              &
+                                   ndf,             &
+                                   undf,            &
+                                   map(:,cell)      &
+                                   )
+    end do
+    answer = (/ 4.0_r_single, 6.0_r_single, 8.0_r_single, &
+                6.0_r_single, 4.0_r_single /)
+    @assertEqual(answer, mm_diag, tol)
+
+    deallocate( mm, mm_diag, map, answer )
+
+  end subroutine test_real32
 
 end module mm_diagonal_kernel_mod_test

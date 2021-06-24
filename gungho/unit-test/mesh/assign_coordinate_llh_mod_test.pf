@@ -79,14 +79,16 @@ contains
   @Test( npes=[1] )
   subroutine test_all( this )
 
+    use, intrinsic :: iso_fortran_env, only: real64
     use assign_coordinate_field_mod, only : assign_coordinate_llh
 
     implicit none
 
     class(assign_coordinate_llh_test_type), intent(inout) :: this
 
-    real(kind=r_def), parameter :: tol = 1.0e-10_r_def
     real(kind=r_def), parameter :: dh = 2.4_r_def
+    real(kind=r_def), parameter :: tol = 1.0e-10_r_def  ! for r_def 64-bit
+    real(kind=r_def)            :: use_tol
 
     integer(kind=i_def) :: nlayers, ndf_chi, undf_chi, ndf_pid, undf_pid
     integer(kind=i_def) :: map_chi(1), map_pid(1), nverts, i
@@ -142,9 +144,27 @@ contains
 
     ! The answer should be the central point of the box
     ! lon = 5*pi/12, lat = 5*pi/24, h = dh / 2
-    @assertEqual( PI*5.0_r_def/12.0_r_def, longitude(1), tol )
-    @assertEqual( PI*5.0_r_def/24.0_r_def, latitude(1), tol )
-    @assertEqual( dh/2.0_r_def, height(1), tol )
+
+    if ( r_def == real64 ) then
+      use_tol = tol
+    else
+      use_tol = max( tol, 10.0_r_def*spacing( longitude(1) ))
+    end if
+    @assertEqual( PI*5.0_r_def/12.0_r_def, longitude(1), use_tol )
+
+    if ( r_def == real64 ) then
+      use_tol = tol
+    else
+      use_tol = max( tol, 10.0_r_def*spacing( latitude(1) ))
+    end if
+    @assertEqual( PI*5.0_r_def/24.0_r_def, latitude(1), use_tol )
+
+    if ( r_def == real64 ) then
+      use_tol = tol
+    else
+      use_tol = max( tol, 10.0_r_def*spacing( height(1) ))
+    end if
+    @assertEqual( dh/2.0_r_def, height(1), use_tol )
 
   end subroutine test_all
 

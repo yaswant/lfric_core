@@ -81,20 +81,20 @@ contains
 
     class(skeleton_test_type), intent(inout) :: this
 
-    real(kind=r_def) :: d(4,2), x(2), y(4), answer(4)
+    real(kind=r_def) :: d(4,2,1), x(2), y(4), answer(4)
     real(kind=r_def) :: tol
     integer          :: i
 
     ! Make up a matrix
-    d(1,:) = (/ 2.0_r_def, -2.0_r_def /)
-    d(2,:) = (/ 3.0_r_def, -1.0_r_def /)
-    d(3,:) = (/ 0.4_r_def,  1.3_r_def /)
-    d(4,:) = (/ -4.5_r_def, 7.9_r_def /)
+    d(1,:,1) = (/ 2.0_r_def, -2.0_r_def /)
+    d(2,:,1) = (/ 3.0_r_def, -1.0_r_def /)
+    d(3,:,1) = (/ 0.4_r_def,  1.3_r_def /)
+    d(4,:,1) = (/ -4.5_r_def, 7.9_r_def /)
     ! rhs vector
     x(:) = (/ 0.25_r_def, 1.5_r_def /)
     ! lhs vector
     y(:) = 0.0_r_def
-    answer = matmul(d,x)
+    answer = matmul(d(:,:,1),x)
 
     call matrix_vector_code(1, &
                             1, &
