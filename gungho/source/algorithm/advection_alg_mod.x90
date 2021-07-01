@@ -49,7 +49,8 @@ module advection_alg_mod
   use timestepping_config_mod,        only: time_method => method,          &
                                             method_rk,                      &
                                             method_semi_implicit, beta
-  use cosmic_threed_alg_mod,          only: cosmic_threed_transport_step
+  use cosmic_threed_alg_mod,          only: cosmic_threed_transport_step, &
+                                            cosmic_threed_advective_step
   use calc_dep_pts_alg_mod,           only: calc_dep_pts
   use transport_config_mod,           only: scheme,                         &
                                             scheme_cosmic_3D,               &
@@ -947,15 +948,14 @@ end subroutine advection_alg
     call u_scalar(3)%log_minmax(LOG_LEVEL_INFO, 'zdot')
 
     ! Compute reconstruction of each velocity component
-    ! Cosmic is not yet implemented and so must use method of lines scheme
     do dir = 1,3
       call u_scalar(dir)%copy_field(field)
       call invoke(setval_c(adv_wind_update(dir), 0.0_r_def))
       do sub_step_count = 1, n_substeps
         call field%copy_field(field_old)
         call field_inc%initialise( field%get_function_space() )
-        call advect_field(field_inc, field, advecting_wind, &
-                        scheme_method_of_lines, wind_n, wind_np1,            &
+        call advect_field(field_inc, field, advecting_wind,                  &
+                        scheme, wind_n, wind_np1,                            &
                         advect_density=.false., timestep=dt_substep,         &
                         si_advective_terms=from_si, shifted=.false.,         &
                         density_predictor=.false., logspace=.false.,         &
@@ -1262,9 +1262,18 @@ end subroutine advection_alg
 
             call calc_dep_pts( dep_pts_x, dep_pts_y, dep_pts_z, wind_divergence, &
                                wind_n, wind_np1, detj_at_w2, cell_orientation, dt )
-            call cosmic_threed_transport_step( advection_inc, field, dep_pts_x,  &
-                                               dep_pts_y, dep_pts_z, detj_at_w2, &
-                                               cell_orientation, dt )
+
+            if ( advect_density ) then
+              call cosmic_threed_transport_step( field, dep_pts_x, dep_pts_y, &
+                                                 dep_pts_z, detj_at_w2,       &
+                                                 cell_orientation, dt,        &
+                                                 advection_inc )
+            else
+              call cosmic_threed_advective_step( field, dep_pts_x, dep_pts_y, &
+                                                 dep_pts_z, detj_at_w2,       &
+                                                 cell_orientation, dt,        &
+                                                 advection_inc )
+            end if
             call invoke( inc_a_times_X(-1.0_r_def, advection_inc) )
             nullify( detj_at_w2 )
           case default

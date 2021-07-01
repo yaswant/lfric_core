@@ -39,7 +39,9 @@ contains
                                      rho_vertical_scheme_slice,  &
                                      theta_vertical_scheme_sl,   &
                                      slice_order_cubic,          &
-                                     vertical_sl_order_cubic
+                                     vertical_sl_order_cubic,    &
+                                     cosmic_flux_splitting_full, &
+                                     cosmic_advective_splitting_full
     implicit none
 
     class(poly1d_vert_adv_test_type), intent(inout) :: this
@@ -67,8 +69,10 @@ contains
                                  slice_order = slice_order_cubic,                  &
                                  vertical_sl_order = vertical_sl_order_cubic,      &
                                  use_density_predictor = .false.,                  &
-                                 log_rho=.true.,   &
-                                 log_theta=.false. &
+                                 log_rho=.true.,    &
+                                 log_theta=.false., &
+                                 cosmic_flux_splitting = cosmic_flux_splitting_full,           &
+                                 cosmic_advective_splitting = cosmic_advective_splitting_full  &
                                  )
 
   end subroutine setUp

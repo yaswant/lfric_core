@@ -427,9 +427,9 @@ contains
             call density_inc_update_alg(density, increment, dt)
 
           case ( scheme_cosmic_3D )
-            call cosmic_threed_transport_step( increment, density, dep_pts_x,   &
-                         dep_pts_y, dep_pts_z, detj_at_w2, cell_orientation,    &
-                         dt )
+            call cosmic_threed_transport_step( density, dep_pts_x, dep_pts_y,     &
+                                         dep_pts_z, detj_at_w2, cell_orientation, &
+                                         dt, increment )
             call density_inc_update_alg(density, increment, dt)
 
           case ( scheme_method_of_lines )

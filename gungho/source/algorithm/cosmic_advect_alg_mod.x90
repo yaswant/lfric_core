@@ -1,0 +1,170 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2021 Met Office. All rights reserved.
+! For further details please refer to the file COPYRIGHT.txt
+! which you should have received as part of this distribution.
+!-----------------------------------------------------------------------------
+!
+!-------------------------------------------------------------------------------
+!> @brief   One-dimensional operators for 3D Cosmic advective transport scheme.
+!> @details These routines are required for 3D Cosmic splitting.
+!>          They provide the calculation of one dimensional advective differences,
+!>          as well as calculating advective steps.
+
+module cosmic_advect_alg_mod
+
+  use constants_mod,                 only: r_def, i_def
+  use field_mod,                     only: field_type
+  use flux_direction_mod,            only: x_direction, y_direction, z_direction
+  use function_space_mod,            only: function_space_type
+  use log_mod,                       only: log_event, &
+                                           LOG_LEVEL_ERROR
+  use oned_density_update_alg_mod,   only: oned_density_update_alg
+  use vert_advective_cosmic_alg_mod, only: vert_advective_cosmic_alg
+
+  implicit none
+
+  private
+
+  public :: advect_step
+  public :: advect_diff
+
+contains
+
+  !===========================================================================!
+  !> @brief   Algorithm to calculate an advective step.
+  !> @details This algorithm performs a single advective step in the specified
+  !>          direction. We have separate inputs for rho:
+  !>          rho   is used to calculate the advective flux;
+  !>          rho_n is added to the update;
+  !>          The output (for direction xi= x, y or z) is:
+  !>          \f$rho^{n} - \mbox{step\_scale} \times \Delta{t}
+  !>          \times u \frac{\partial rho}{\partial \xi}\f$
+  !>          calculated in the form
+  !>          \f$(1-\mbox{step\_scale})rho^{n} + \mbox{step\_scale} \times
+  !>          (\rho^{n} - \Delta{t} \times u \frac{\partial rho}{\partial \xi})\f$
+  !>
+  !> @param[in]     direction         Direction (x/y/z)
+  !> @param[in]     rho_n             Density at time level n [kg m^-3]
+  !> @param[in]     rho               Density for advective difference [kg m^-3]
+  !> @param[in]     cell_orientation  Orientation of cells held in W3 field
+  !> @param[in]     dep_pts           Departure points in specified direction
+  !> @param[in]     detj_at_w2        Detj values at W2 dof locations
+  !> @param[in]     step_scale        How much of an increment to add
+  !> @param[in]     dt                Model timestep length [s]
+  !> @param[in,out] rho_adv_update    1D advective density update [kg m^-3]
+  subroutine advect_step( direction,        &
+                          rho_n,            &
+                          rho,              &
+                          cell_orientation, &
+                          dep_pts,          &
+                          detj_at_w2,       &
+                          step_scale,       &
+                          dt,               &
+                          rho_adv_update )
+
+    implicit none
+
+    integer(i_def),   intent(in) :: direction
+    type(field_type), intent(in) :: rho_n
+    type(field_type), intent(in) :: rho
+    type(field_type), intent(in) :: cell_orientation
+    type(field_type), intent(in) :: dep_pts
+    type(field_type), intent(in) :: detj_at_w2
+    real(r_def),      intent(in) :: step_scale
+    real(r_def),      intent(in) :: dt
+
+    type(field_type), intent(inout) :: rho_adv_update
+
+    type(field_type) :: rho_adv
+    real(r_def)      :: one_minus_step_scale
+
+    type(function_space_type), pointer :: rho_fs => null()
+
+    rho_fs => rho%get_function_space()
+    call rho_adv%initialise( vector_space = rho_fs )
+
+    select case(direction)
+
+    case(x_direction, y_direction)
+      ! Calculate rho - dt u dot grad rho
+      ! for specified horizontal direction.
+      call oned_density_update_alg( direction, dep_pts, cell_orientation, &
+                                    rho, rho_adv, dt )
+
+    case(z_direction)
+      ! Perform advective update in the Z direction.
+      call vert_advective_cosmic_alg( rho_adv, rho, dep_pts, detj_at_w2, &
+                                      cell_orientation, dt )
+
+    case default
+      call log_event ( 'Invalid advective step direction', LOG_LEVEL_ERROR )
+
+    end select
+
+    ! Average the advective density update with the density at timestep level n
+    one_minus_step_scale = 1.0_r_def - step_scale
+    call invoke( inc_X_minus_Y(rho_adv, rho),                     &
+                 inc_X_plus_Y(rho_adv, rho_n),                    &
+                 aX_plus_bY(rho_adv_update, one_minus_step_scale, &
+                            rho_n, step_scale, rho_adv) )
+
+    nullify( rho_fs )
+
+  end subroutine advect_step
+
+  !===========================================================================!
+  !> @brief   Algorithm to calculate an advective difference.
+  !> @details This algorithm performs a single step in the specified direction,
+  !>          giving an advective increment. The output (for direction xi= x, y or z) is:
+  !>          \f$-\Delta{t} u \frac{\partial \rho}{\partial \xi}\f$
+  !>
+  !> @param[in]     direction         Direction (x/y/z)
+  !> @param[in]     rho               Density for advective difference [kg m^-3]
+  !> @param[in]     cell_orientation  Orientation of cells held in W3 field
+  !> @param[in]     dep_pts           Departure points in specified direction
+  !> @param[in]     detj_at_w2        Detj values at W2 dof locations
+  !> @param[in]     dt                Model timestep length [s]
+  !> @param[in,out] increment         1D advective increment [kg m^-3]
+  subroutine advect_diff( direction,        &
+                          rho,              &
+                          cell_orientation, &
+                          dep_pts,          &
+                          detj_at_w2,       &
+                          dt,               &
+                          increment )
+
+    implicit none
+
+    integer(i_def),   intent(in) :: direction
+    type(field_type), intent(in) :: rho
+    type(field_type), intent(in) :: cell_orientation
+    type(field_type), intent(in) :: dep_pts
+    type(field_type), intent(in) :: detj_at_w2
+    real(r_def),      intent(in) :: dt
+
+    type(field_type), intent(inout) :: increment
+
+    select case(direction)
+
+    case(x_direction, y_direction)
+      ! Calculate rho - dt u dot grad rho
+      ! for specified horizontal direction.
+      call oned_density_update_alg( direction, dep_pts, cell_orientation, &
+                                    rho, increment, dt )
+
+    case(z_direction)
+      ! Perform advective update in the Z direction.
+      call vert_advective_cosmic_alg( increment, rho, dep_pts, detj_at_w2, &
+                                      cell_orientation, dt )
+
+    case default
+      call log_event ( 'Invalid advective step direction', LOG_LEVEL_ERROR )
+
+    end select
+
+    ! subtract rho to leave -dt u dot grad rho
+    call invoke( inc_X_minus_Y(increment, rho) )
+
+  end subroutine advect_diff
+
+end module cosmic_advect_alg_mod

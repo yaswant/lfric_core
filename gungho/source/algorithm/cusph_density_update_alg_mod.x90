@@ -32,12 +32,12 @@ contains
 !> @param[in] cell_orientation  Orientation of cells, in particular halo cells
 !> @param[in] direction         Direction of density update (x or y)
 !> @param[in] dt                The model timestep length
-subroutine cusph_density_update_alg( rho_n,                    &
-                                     mass_flux,                &
-                                     rho,                      &
-                                     cell_orientation,         &
-                                     direction,                &
-                                     dt )
+  subroutine cusph_density_update_alg(  rho_n,                    &
+                                        mass_flux,                &
+                                        rho,                      &
+                                        cell_orientation,         &
+                                        direction,                &
+                                        dt )
 
     implicit none
 
