@@ -74,7 +74,7 @@ contains
     real(kind=r_def), intent(inout), dimension(undf_wth) :: dX
 
     real(kind=r_def) :: lev_amp_factor
-    real(kind=i_def) :: k
+    integer(kind=i_def) :: k
 
     ! Set to zero below spt_level_bottom
     do k = 0,spt_level_bottom-1

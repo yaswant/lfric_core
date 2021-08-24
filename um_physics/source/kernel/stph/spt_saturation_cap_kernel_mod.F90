@@ -91,7 +91,7 @@ contains
     !UM definition for qsat capping
     real(kind=r_um) :: qsat
 
-    real(kind=i_def) :: k
+    integer(kind=i_def) :: k
 
     do k= spt_level_bottom, spt_level_top
 

@@ -90,7 +90,7 @@ contains
     real(kind=r_def), intent(in), dimension(undf_wth) :: fp_spt
     real(kind=r_def), intent(in), dimension(undf_2d)  :: sd_orog
 
-    real(kind=i_def) :: k
+    integer(kind=i_def) :: k
     logical(kind=l_def) :: orog_mask
 
     !!!!  Apply orographic capping
