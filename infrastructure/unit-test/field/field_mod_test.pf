@@ -28,7 +28,7 @@ module field_mod_test
   implicit none
 
   private
-  public :: test_field, test_field_proxy, test_cpl_functionality
+  public :: test_field, test_field_proxy, test_cpl_functionality, test_empty_field
 
   @TestCase
   type, extends(MPITestCase), public :: field_test_type
@@ -43,6 +43,7 @@ module field_mod_test
     procedure get_local_mesh_ptr
     procedure test_field
     procedure test_field_proxy
+    procedure test_empty_field
     procedure test_cpl_functionality
   end type field_test_type
 
@@ -315,6 +316,50 @@ contains
     @assertTrue ( multidata_order )
 
   end subroutine test_field_proxy
+
+  @Test( npes=[1] )
+  subroutine test_empty_field( this )
+
+    use field_mod,             only: field_type, field_proxy_type
+
+    implicit none
+
+    class(field_test_type), intent(inout) :: this
+
+    type(field_type)       :: f1
+    type(field_proxy_type) :: f1_p
+    integer(i_def)         :: i
+
+    real(r_def), target :: empty_data(1)
+
+    ! Make a field, but provide override data
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1', override_data = empty_data )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy returns the empty_data array
+    @assertTrue( associated( f1_p%data, empty_data ) )
+
+    ! Re-initialise as a normal field
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1' )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy does not return the empty_data array
+    @assertFalse( associated( f1_p%data, empty_data ) )
+
+    ! Re-initialise again with the override data
+    call f1%initialise( vector_space = this%w2_fs, name = 'f1', override_data = empty_data )
+
+    ! get the proxy
+    f1_p = f1%get_proxy()
+
+    ! Check that the proxy returns the empty_data array once again
+    @assertTrue( associated( f1_p%data, empty_data ) )
+
+  end subroutine test_empty_field
 
   @Test( npes=[1] )
   subroutine test_cpl_functionality( this )

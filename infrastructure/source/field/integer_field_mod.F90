@@ -9,7 +9,7 @@
 !> @details This is a version of a field object that can hold integer data
 !> values. It contains both a representation of an integer field which provides
 !> no access to the underlying data (to be used in the algorithm layer) and an
-!> accessor class (to be used in the Psy layer) are provided.
+!> accessor class (to be used in the Psy layer).
 
 module integer_field_mod
 
@@ -53,6 +53,9 @@ module integer_field_mod
 
     !> The integer values of the field
     integer(kind=i_def), allocatable :: data( : )
+    !> Enable field to point to bespoke data provided by application
+    !> instead of having allocated data
+    integer(kind=i_def), pointer :: override_data( : )
 
     ! IO interface procedure pointers
 
@@ -227,7 +230,12 @@ contains
     ! Call the routine that initialises the proxy for data held in the parent
     call self%field_parent_proxy_initialiser(get_proxy)
 
-    get_proxy%data   => self%data
+    if (allocated(self%data))then
+      get_proxy%data => self%data
+    else
+      ! Fields can alternatively point to bespoke data
+      get_proxy%data => self%override_data
+    end if
 
   end function get_proxy
 
@@ -238,15 +246,15 @@ contains
   !> @param [in] ndata_first Whether mutlidata fields have data ordered by
   !>                         the multidata dimension first
   !> @param [in] advection_flag Whether the field is to be advected
+  !> @param [in] override_data Optional alternative data that can be attached to field
   !>
   subroutine field_initialiser(self, &
                                vector_space, &
                                name, &
                                ndata_first, &
-                               advection_flag)
+                               advection_flag, &
+                               override_data)
 
-    use log_mod,         only : log_event, &
-                                LOG_LEVEL_ERROR
     implicit none
 
     class(integer_field_type), intent(inout)       :: self
@@ -254,20 +262,28 @@ contains
     character(*), optional, intent(in)             :: name
     logical,      optional, intent(in)             :: ndata_first
     logical,      optional, intent(in)             :: advection_flag
+    integer(i_def), target, optional, intent(in)   :: override_data( : )
 
-    ! If there's already data in the field, destruct it
-    ! ready for re-initialisation
-    if(allocated(self%data))call field_destructor_scalar(self)
+    ! In case the field is already initialised, destruct it ready for
+    ! re-initialisation
+    call field_destructor_scalar(self)
 
     call self%field_parent_initialiser(vector_space, &
                                        name=name, &
                                        fortran_type=integer_type, &
                                        fortran_kind=i_def, &
-                                       ndata_first= ndata_first, &
+                                       ndata_first=ndata_first, &
                                        advection_flag=advection_flag)
 
-    ! Create space for holding field data
-    allocate( self%data(vector_space%get_last_dof_halo()) )
+    ! Associate data with the field
+    if (present(override_data))then
+      ! Override normal field data if an alternative was provided
+      self%override_data => override_data
+    else
+      ! Create space for holding field data
+      allocate( self%data(vector_space%get_last_dof_halo()) )
+      self%override_data => null()
+    end if
 
   end subroutine field_initialiser
 
@@ -286,7 +302,7 @@ contains
   !
   ! The following finaliser doesn't do anything. Without it, the Gnu compiler
   ! tries to create its own, but only ends up producing an Internal Compiler
-  ! Error, so its included here to prevent that.
+  ! Error, so it is included here to prevent that.
   subroutine integer_field_pointer_destructor(self)
     implicit none
     type(integer_field_pointer_type), intent(inout) :: self
@@ -298,11 +314,18 @@ contains
   !> @param[out] dest   field object into which the copy will be made
   !> @param[in]  name   An optional argument that provides an identifying name
   subroutine copy_field(self, dest, name)
+    use log_mod,         only : log_event, &
+                                LOG_LEVEL_ERROR
 
     implicit none
     class(integer_field_type), target, intent(in)  :: self
     class(integer_field_type), target, intent(out) :: dest
     character(*), optional, intent(in)             :: name
+
+    if ( .not. allocated(self%data) ) then
+      call log_event( 'Error: copy_field: Copied field must have field data', &
+           LOG_LEVEL_ERROR )
+    end if
 
     if (present(name)) then
       call self%copy_field_properties(dest, name)
@@ -320,14 +343,13 @@ contains
   !> @param[out] dest   field object into which the copy will be made
   !> @param[in]  name   An optional argument that provides an identifying name
   subroutine copy_field_properties(self, dest, name)
-    use log_mod,         only : log_event, &
-                                LOG_LEVEL_ERROR
+
     implicit none
     class(integer_field_type), target, intent(in)  :: self
     class(integer_field_type), target, intent(out) :: dest
     character(*), optional, intent(in)             :: name
 
-    type(function_space_type), pointer ::function_space => null()
+    type(function_space_type), pointer :: function_space => null()
 
     ! Get function space from parent
     function_space => self%get_function_space()
@@ -466,7 +488,6 @@ contains
   end subroutine get_write_behaviour
 
   !> Setter for read behaviour
-  !> @param[in,out]  self  field_type
   !> @param [in] read_behaviour - pointer to procedure implementing read method
   subroutine set_read_behaviour(self, read_behaviour)
     implicit none

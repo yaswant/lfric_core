@@ -6,10 +6,10 @@
 !
 !> @brief A module providing field related classes.
 !>
-!> @details Both a representation of a field which provides no access to the
-!> underlying data (to be used in the algorithm layer) and an accessor class
-!> (to be used in the Psy layer) are provided.
-
+!> @details This is a version of a field object that can hold real data
+!> values. It contains both a representation of an real field which provides
+!> no access to the underlying data (to be used in the algorithm layer) and an
+!> accessor class (to be used in the Psy layer).
 
 module field_mod
 
@@ -53,6 +53,9 @@ module field_mod
 
     !> The floating point values of the field
     real(kind=r_def), allocatable :: data( : )
+    !> Enable field to point to bespoke data provided by application
+    !> instead of having allocated data
+    real(kind=r_def), pointer :: override_data( : )
 
     ! IO interface procedure pointers
 
@@ -223,14 +226,19 @@ contains
   !>
   !> @return The proxy type with public pointers to the elements of
   !> field_type
-  type(field_proxy_type ) function get_proxy(self)
+  type(field_proxy_type) function get_proxy(self)
     implicit none
     class(field_type), target, intent(in)  :: self
 
     ! Call the routine that initialises the proxy for data held in the parent
     call self%field_parent_proxy_initialiser(get_proxy)
 
-    get_proxy%data   => self%data
+    if (allocated(self%data))then
+      get_proxy%data => self%data
+    else
+      ! Fields can alternatively point to bespoke data
+      get_proxy%data => self%override_data
+    end if
 
   end function get_proxy
 
@@ -241,15 +249,15 @@ contains
   !> @param [in] ndata_first Whether mutlidata fields have data ordered by
   !>                         the multidata dimension first
   !> @param [in] advection_flag Whether the field is to be advected
+  !> @param [in] override_data Optional alternative data that can be attached to field
   !>
   subroutine field_initialiser(self, &
                                vector_space, &
                                name, &
                                ndata_first, &
-                               advection_flag)
+                               advection_flag, &
+                               override_data)
 
-    use log_mod,         only : log_event, &
-                                LOG_LEVEL_ERROR
     implicit none
 
     class(field_type), intent(inout)               :: self
@@ -257,10 +265,11 @@ contains
     character(*), optional, intent(in)             :: name
     logical,      optional, intent(in)             :: ndata_first
     logical,      optional, intent(in)             :: advection_flag
+    real(r_def), target, optional, intent(in)      :: override_data( : )
 
-    ! If there's already data in the field, destruct it
-    ! ready for re-initialisation
-    if(allocated(self%data))call field_destructor_scalar(self)
+    ! In case the field is already initialised, destruct it ready for
+    ! re-initialisation
+    call field_destructor_scalar(self)
 
     call self%field_parent_initialiser(vector_space, &
                                        name=name, &
@@ -269,8 +278,15 @@ contains
                                        ndata_first=ndata_first, &
                                        advection_flag=advection_flag)
 
-    ! Create space for holding field data
-    allocate( self%data(vector_space%get_last_dof_halo()) )
+    ! Associate data with the field
+    if (present(override_data))then
+      ! Override normal field data if an alternative was provided
+      self%override_data => override_data
+    else
+      ! Create space for holding field data
+      allocate( self%data(vector_space%get_last_dof_halo()) )
+      self%override_data => null()
+    end if
 
   end subroutine field_initialiser
 
@@ -301,11 +317,18 @@ contains
   !> @param[out] dest   field object into which the copy will be made
   !> @param[in]  name   An optional argument that provides an identifying name
   subroutine copy_field(self, dest, name)
+    use log_mod,         only : log_event, &
+                                LOG_LEVEL_ERROR
 
     implicit none
     class(field_type), target, intent(in)  :: self
     class(field_type), target, intent(out) :: dest
     character(*), optional, intent(in)     :: name
+
+    if ( .not. allocated(self%data) ) then
+      call log_event( 'Error: copy_field: Copied field must have field data', &
+           LOG_LEVEL_ERROR )
+    end if
 
     if (present(name)) then
       call self%copy_field_properties(dest, name)
@@ -323,8 +346,7 @@ contains
   !> @param[out] dest   field object into which the copy will be made
   !> @param[in]  name   An optional argument that provides an identifying name
   subroutine copy_field_properties(self, dest, name)
-    use log_mod,         only : log_event, &
-                                LOG_LEVEL_ERROR
+
     implicit none
     class(field_type), target, intent(in)  :: self
     class(field_type), target, intent(out) :: dest
