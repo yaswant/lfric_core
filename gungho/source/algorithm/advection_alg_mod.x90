@@ -536,7 +536,11 @@ end subroutine advection_alg
   !> @param[in]     dt_step Full length of model timestep
   !> @param[in]     n_substep number of steps
   subroutine advection_mr_alg( mr_inc, mr, wind_n, wind_np1, dt_step, n_substeps )
+
+    use field_bundle_mod, only: set_bundle_scalar
+
     implicit none
+
     type(field_type), intent(inout) :: mr_inc(nummr)
     type(field_type), intent(in)    :: mr(nummr)
     type(field_type), intent(in)    :: wind_n, wind_np1
@@ -560,6 +564,8 @@ end subroutine advection_alg
     ! substepping timesteps
     dt_fraction = 1.0_r_def/real(n_substeps, r_def)
     dt_substep = dt_step*dt_fraction
+
+    call set_bundle_scalar(0.0_r_def, mr_inc, nummr)
 
     do imr = 1, nummr_to_advect
       call mr(imr)%copy_field(field)

@@ -23,6 +23,9 @@ use planet_config_mod,              only : gravity, &
                                            Rd, Cp, p_zero, kappa, scaling_factor
 use initial_wind_config_mod,        only : u0
 use formulation_config_mod,         only : rotating
+use log_mod,                        only : log_scratch_space, log_event, &
+                                           LOG_LEVEL_ERROR
+
 implicit none
 
 private
@@ -79,6 +82,15 @@ implicit none
 
 ! Compute surface temperture
   tsurf = bigG + (T_EQUATOR - bigG)*exp( -(u0*bvf_square/(4.0_r_def*gravity**2))*exp_fac )
+
+
+! Raise a helpful error here to prevent crashes if Tsurf is negative
+  if (tsurf <= 0.0_r_def) then
+    write(log_scratch_space,'(A)') 'The choice of u0 is too high for this '// &
+                                   'test, it is resulting in negative ' // &
+                                   'surface temperature (in Kelvins).'
+    call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+  end if
 
 ! Compute surface pressure
   psurf = p_equator*exp( (u0/(4.0_r_def*bigG*Rd))*exp_fac  ) * (tsurf/T_EQUATOR)**(Cp/Rd)

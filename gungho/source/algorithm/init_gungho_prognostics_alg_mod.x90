@@ -306,6 +306,8 @@ contains
         case default
           call log_event( "Gungho: Unrecognised method in initial_pressure", LOG_LEVEL_ERROR )
       end select
+      ! Set exner as rho
+      call invoke( setval_X(exner, rho) )
     else
       ! Initialise rho using equation of state, either sampled or projected
       select case(eos_method)

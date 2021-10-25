@@ -99,7 +99,8 @@ contains
   !> @param[in,out] theta    Temperature like tracer
   !> @param[in,out] mr       Bundle of moisture variables as tracers
   subroutine rk_transport_step( timestep, dt, wind, rho, theta, mr )
-    use field_bundle_mod, only: clone_bundle, add_bundle, copy_bundle
+    use field_bundle_mod, only: clone_bundle, add_bundle, &
+                                copy_bundle, set_bundle_scalar
 
     implicit none
 
@@ -144,6 +145,8 @@ contains
       allocate(mr_out(nummr))
       call clone_bundle(mr, mr_inc, nummr)
       call clone_bundle(mr, mr_out, nummr)
+      call set_bundle_scalar(0.0_r_def, mr_inc, nummr)
+      call set_bundle_scalar(0.0_r_def, mr_out, nummr)
     end if
 
     mesh_id = wind%get_mesh_id()
