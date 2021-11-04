@@ -468,7 +468,7 @@ contains
   !> @param[in] i_multidata_lev multidata-level for which coupling id is requested
   !> @return field coupling id
   function get_cpl_id(self, i_multidata_lev) result(dcpl_id)
-    use log_mod, only : log_event, log_scratch_space, LOG_LEVEL_INFO
+    use log_mod, only : log_event, log_scratch_space, LOG_LEVEL_ERROR
     implicit none
 
     class (field_parent_type), intent(in) :: self
@@ -485,7 +485,7 @@ contains
        ' larger than number of multidata-levels available (', &
        function_space%get_ndata(), &
        ') for', self%name
-       call log_event(log_scratch_space,LOG_LEVEL_INFO )
+       call log_event(log_scratch_space,LOG_LEVEL_ERROR )
        dcpl_id = imdi
     elseif(allocated(self%cpl_id)) then
        dcpl_id = self%cpl_id(i_multidata_lev)

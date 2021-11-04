@@ -22,8 +22,7 @@ use netcdf,         only : nf90_max_name, nf90_open, nf90_write, nf90_noerr,   &
                            nf90_inq_attname, nf90_inquire_attribute,           &
                            nf90_redef, nf90_close, nf90_put_att,               &
                            nf90_64bit_offset
-use log_mod,        only : log_event, log_scratch_space, LOG_LEVEL_ERROR,      &
-                           LOG_LEVEL_INFO
+use log_mod,        only : log_event, log_scratch_space, LOG_LEVEL_ERROR
 
 implicit none
 

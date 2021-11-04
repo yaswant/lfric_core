@@ -789,8 +789,7 @@ contains
   !> @param [in] field_name - field name / id to read
   subroutine read_field( self, field_name)
     use log_mod,         only : log_event, &
-                                LOG_LEVEL_ERROR, &
-                                LOG_LEVEL_INFO
+                                LOG_LEVEL_ERROR
 
     implicit none
 

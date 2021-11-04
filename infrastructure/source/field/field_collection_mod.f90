@@ -23,7 +23,7 @@ module field_collection_mod
                                      r_solver_field_pointer_type
   use pure_abstract_field_mod, only: pure_abstract_field_type
   use log_mod,                 only: log_event, log_scratch_space, &
-                                     LOG_LEVEL_ERROR, LOG_LEVEL_INFO
+                                     LOG_LEVEL_ERROR
   use linked_list_data_mod,    only: linked_list_data_type
   use linked_list_mod,         only: linked_list_type, &
                                      linked_list_item_type

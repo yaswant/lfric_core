@@ -383,10 +383,6 @@ contains
     id_cpl = f1%get_cpl_id( 1_i_def )
     @assertEqual (id_cpl, 12_i_def)
 
-    !try to get coupling id for non-existent level
-    id_cpl = f1%get_cpl_id( 5_i_def )
-    @assertEqual (id_cpl, imdi)
-
  end subroutine test_cpl_functionality
 
 end module field_mod_test

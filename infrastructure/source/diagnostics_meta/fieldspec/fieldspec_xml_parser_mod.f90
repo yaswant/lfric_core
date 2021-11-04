@@ -37,7 +37,7 @@ module fieldspec_xml_parser_mod
   use io_driver_enum_mod,           only: io_driver_from_name
   use non_spatial_dimension_mod,    only: NUMERICAL, CATEGORICAL
   use log_mod,                      only: log_event, log_scratch_space, &
-                                          LOG_LEVEL_ERROR, LOG_LEVEL_INFO
+                                          LOG_LEVEL_ERROR
 
   implicit none
 

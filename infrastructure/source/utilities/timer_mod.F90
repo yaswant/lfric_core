@@ -121,7 +121,7 @@ contains
                         global_min,        &
                         global_max
      use log_mod, only: log_event,         &
-                        LOG_LEVEL_INFO,    &
+                        LOG_LEVEL_ERROR,   &
                         log_scratch_space
 
      implicit none
@@ -140,8 +140,8 @@ contains
        if( start_stop(k) ) then
          write( log_scratch_space, '(A,A,A)') &
                     'Timer for routine ',trim(routine_name(k)), &
-                    ' not closed. Timing information will be incorrect'
-         call log_event( log_scratch_space, LOG_LEVEL_INFO )
+                    ' not closed.'
+         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
        end if
      end do
 

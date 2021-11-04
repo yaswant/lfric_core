@@ -17,7 +17,7 @@ module global_mesh_collection_mod
   use linked_list_mod,       only : linked_list_type, linked_list_item_type
   use log_mod,               only : log_event, log_scratch_space,     &
                                     LOG_LEVEL_ERROR, LOG_LEVEL_TRACE, &
-                                    LOG_LEVEL_INFO, LOG_LEVEL_WARNING
+                                    LOG_LEVEL_WARNING
 
   implicit none
 

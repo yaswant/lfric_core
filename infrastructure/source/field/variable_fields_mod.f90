@@ -9,10 +9,6 @@ module variable_fields_mod
   use constants_mod,                 only : r_def, r_second, str_def
   use clock_mod,                     only : clock_type
   use field_collection_mod,          only : field_collection_type
-  use log_mod,                       only : log_event, &
-                                            log_scratch_space, &
-                                            LOG_LEVEL_INFO, &
-                                            LOG_LEVEL_ERROR
   use lfric_xios_time_axis_mod,      only : time_axis_type
   use linked_list_mod,               only : linked_list_type, &
                                             linked_list_item_type
@@ -89,10 +85,6 @@ contains
       select type( list_item => loop%payload )
         type is (time_axis_type)
           time_axis => list_item
-
-          write(log_scratch_space, '(A,A)') 'Updating variable fields from ', &
-                                              trim(time_axis%get_name())
-          call log_event(log_scratch_space, LOG_LEVEL_INFO)
 
           ! Step time axis forward
           call time_axis%step()

@@ -25,8 +25,6 @@ contains
 !> @param[in] mesh_id  The id of the mesh object the model runs on
   subroutine project_output(field, projected_field, d, output_fs, mesh_id)
 
-    use log_mod,                   only: log_event, log_scratch_space, &
-                                         LOG_LEVEL_INFO, LOG_LEVEL_ERROR
     use constants_mod,             only: r_def, str_max_filename, i_def
     use field_mod,                 only: field_type
     use field_parent_mod,          only: write_interface
@@ -63,9 +61,6 @@ contains
 
     ! determine the input function space
     fs_handle = field%which_function_space()
-
-    write( log_scratch_space, '(A,I6,A,I6)' ) 'IO - Projecting from : ', fs_handle, ' to ', output_fs
-    call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
     ! Create the output field
     do dir = 1,d

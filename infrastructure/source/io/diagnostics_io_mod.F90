@@ -30,13 +30,6 @@ module diagnostics_io_mod
   use field_mod,                     only: field_type
   use field_parent_mod,              only: write_interface
   use fs_continuity_mod,             only: W3
-  use log_mod,                       only: log_event,         &
-                                           log_set_level,     &
-                                           log_scratch_space, &
-                                           LOG_LEVEL_ERROR,   &
-                                           LOG_LEVEL_INFO,    &
-                                           LOG_LEVEL_DEBUG,   &
-                                           LOG_LEVEL_TRACE
 
   implicit none
   private

@@ -15,7 +15,6 @@ module mesh_colouring_mod
   use constants_mod,           only : i_def, i_native, l_def
   use local_mesh_mod,          only : local_mesh_type
   use log_mod,                 only : log_event, LOG_LEVEL_ERROR,   &
-                                                 LOG_LEVEL_INFO,    &
                                                  LOG_LEVEL_DEBUG,   &
                                                  log_scratch_space
   use reference_element_mod,   only : W, S, E, N
