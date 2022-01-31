@@ -103,7 +103,7 @@ contains
     call initialise_model_data( model_data, clock )
 
     ! Initial output
-    call write_initial_output( mesh_id, model_data, &
+    call write_initial_output( mesh_id, twod_mesh_id, model_data, &
                                io_context, nodal_output_on_w3 )
 
     ! Model configuration initialisation
@@ -183,9 +183,10 @@ contains
            .and. ( write_diag ) ) then
 
         ! Calculation and output diagnostics
-        call gungho_diagnostics_driver( mesh_id,    &
-                                        model_data, &
-                                        clock,      &
+        call gungho_diagnostics_driver( mesh_id,      &
+                                        twod_mesh_id, &
+                                        model_data,   &
+                                        clock,        &
                                         nodal_output_on_w3 )
       end if
 

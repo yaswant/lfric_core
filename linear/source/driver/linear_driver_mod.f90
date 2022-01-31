@@ -121,9 +121,10 @@ contains
     ! Initial output
     if ( clock%is_initialisation() .and. write_diag ) then
         ! Calculation and output of diagnostics
-        call gungho_diagnostics_driver( mesh_id,    &
-                                        model_data, &
-                                        clock,      &
+        call gungho_diagnostics_driver( mesh_id,      &
+                                        twod_mesh_id, &
+                                        model_data,   &
+                                        clock,        &
                                         nodal_output_on_w3 )
 
         call linear_diagnostics_driver( mesh_id,    &
@@ -168,9 +169,10 @@ contains
            .and. ( write_diag ) ) then
 
         ! Calculation and output diagnostics
-        call gungho_diagnostics_driver( mesh_id,    &
-                                        model_data, &
-                                        clock,      &
+        call gungho_diagnostics_driver( mesh_id,      &
+                                        twod_mesh_id, &
+                                        model_data,   &
+                                        clock,        &
                                         nodal_output_on_w3 )
 
         call linear_diagnostics_driver( mesh_id,    &

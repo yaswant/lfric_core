@@ -27,16 +27,17 @@ contains
 
   !> @brief Outputs simple diagnostics from Gungho/LFRic
   !> @param[in] mesh_id The identifier of the primary mesh
+  !> @param[in] twod_mesh_id The identifier given to the current 2d mesh
   !> @param[in] model_data The working data set for the model run
   !> @param[in] io_context The model IO context
   !> @param[in] nodal_output_on_w3 Flag that determines if vector fields
   !>                  should be projected to W3 for nodal output
-  subroutine write_initial_output( mesh_id, model_data, io_context, &
-                                   nodal_output_on_w3 )
+  subroutine write_initial_output( mesh_id, twod_mesh_id, model_data, &
+                                   io_context, nodal_output_on_w3 )
 
     implicit none
 
-    integer(i_def),         intent(in)    :: mesh_id
+    integer(i_def),         intent(in)    :: mesh_id, twod_mesh_id
     type(model_data_type),  intent(in)    :: model_data
     class(io_context_type), intent(inout) :: io_context
     logical(l_def),         intent(in)    :: nodal_output_on_w3
@@ -52,9 +53,10 @@ contains
 
     if (clock%is_initialisation() .and. write_diag) then
       ! Calculation and output of initial conditions
-      call gungho_diagnostics_driver( mesh_id,    &
-                                      model_data, &
-                                      clock,      &
+      call gungho_diagnostics_driver( mesh_id,      &
+                                      twod_mesh_id, &
+                                      model_data,   &
+                                      clock,        &
                                       nodal_output_on_w3 )
   end if
 

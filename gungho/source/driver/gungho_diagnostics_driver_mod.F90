@@ -23,6 +23,8 @@ module gungho_diagnostics_driver_mod
   use field_collection_iterator_mod, &
                                  only : field_collection_iterator_type
   use field_collection_mod,      only : field_collection_type
+  use diagnostic_alg_mod,        only : column_total_diagnostics_alg, &
+                                        calc_wbig_diagnostic_alg
   use gungho_model_data_mod,     only : model_data_type
   use field_mod,                 only : field_type
   use field_parent_mod,          only : field_parent_type
@@ -46,18 +48,20 @@ contains
 
   !> @brief Outputs simple diagnostics from Gungho/LFRic
   !> @param[in] mesh_id The identifier of the primary mesh
+  !> @param[in] twod_mesh_id The identifier given to the current 2d mesh
   !> @param[in] model_data The working data set for the model run
   !> @param[in] timestep The timestep at which the fields are valid
   !> @param[in] nodal_output_on_w3 Flag that determines if vector fields
   !>                  should be projected to W3 for nodal output
-  subroutine gungho_diagnostics_driver( mesh_id,    &
-                                        model_data, &
-                                        clock,      &
+  subroutine gungho_diagnostics_driver( mesh_id,      &
+                                        twod_mesh_id, &
+                                        model_data,   &
+                                        clock,        &
                                         nodal_output_on_w3 )
 
     implicit none
 
-    integer(i_def),        intent(in)         :: mesh_id
+    integer(i_def),        intent(in)         :: mesh_id, twod_mesh_id
     type(model_data_type), intent(in), target :: model_data
     class(clock_type),     intent(in)         :: clock
     logical,               intent(in)         :: nodal_output_on_w3
@@ -78,6 +82,7 @@ contains
     type( field_type), pointer :: exner => null()
     type( field_type), pointer :: panel_id => null()
     type( field_type), pointer :: u_star => null()
+    type( field_type), pointer :: w_physics => null()
     ! Iterator for field collection
     type(field_collection_iterator_type)  :: iterator
 
@@ -200,11 +205,18 @@ contains
       ! Output u_star as diagnostic
       u_star => derived_fields%get_field('u_star')
       call write_vector_diagnostic('u_star',u_star,clock,mesh_id,nodal_output_on_w3)
+
+      ! Get w_physics for WBig calculation
+      w_physics => derived_fields%get_field('w_physics')
+      call calc_wbig_diagnostic_alg(w_physics, mesh_id)
+
     end if
 
     ! Other derived diagnostics with special pre-processing
     call write_divergence_diagnostic(u, clock, mesh_id)
     call write_hydbal_diagnostic(theta, moist_dyn, exner, mesh_id)
+    call column_total_diagnostics_alg(rho, mr, mesh_id, twod_mesh_id)
+
 
   end subroutine gungho_diagnostics_driver
 

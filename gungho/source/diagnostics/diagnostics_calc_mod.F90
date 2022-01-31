@@ -47,7 +47,6 @@ module diagnostics_calc_mod
             write_hydbal_diagnostic,     &
             write_vorticity_diagnostic
 
-
 contains
 
 !-------------------------------------------------------------------------------
@@ -150,6 +149,4 @@ subroutine write_vorticity_diagnostic(u_field, clock)
 
 end subroutine write_vorticity_diagnostic
 
-
 end module diagnostics_calc_mod
-

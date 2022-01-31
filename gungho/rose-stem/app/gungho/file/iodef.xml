@@ -119,6 +119,16 @@
        <field id="u3" name="u3" long_name="upward_air_velocity" standard_name="upward_air_velocity" unit="m s-1" grid_ref="full_level_face_grid" />
        <field id="divergence" name="divergence" long_name="divergence_of_wind" standard_name="divergence_of_wind" unit="s-1" grid_ref="half_level_face_grid" />
        <field id="exner" name="exner" long_name="exner_pressure" unit="1" grid_ref="half_level_face_grid" />
+       <!-- Column total fields -->
+       <field id="tot_col_dry_air_mass" name="tot_col_dry_air_mass" long_name="atmosphere_mass_of_air_per_unit_area" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_v" name="tot_col_m_v" long_name="atmosphere_mass_content_of_water_vapor" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_cl" name="tot_col_m_cl" long_name="atmosphere_mass_content_of_cloud_liquid_water" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_r" name="tot_col_m_r" long_name="atmosphere_mass_content_of_liquid_precipitation" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_ci" name="tot_col_m_ci" long_name="atmosphere_mass_content_of_cloud_ice" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_s" name="tot_col_m_s" long_name="atmosphere_mass_content_of_snow" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_m_g" name="tot_col_m_g" long_name="atmosphere_mass_content_of_graupel" unit="kg m-2" domain_ref="face" />
+       <field id="tot_col_wetplusdry_mass" name="tot_col_wetplusdry_mass" long_name="atmosphere_wetplusdry_mass_per_unit_area" unit="kg m-2" domain_ref="face" />
+       <field id="wbig" name="wbig" long_name="wbig_eq_1_where_wphysics_gt_1" unit="1" grid_ref="full_level_face_grid" />
      </field_group>
 
       <!-- Initial conditions group -->
@@ -209,6 +219,9 @@
         <field field_ref="u3"/>
         <field field_ref="divergence"/>
         <field field_ref="exner"/>
+        <field field_ref="tot_col_dry_air_mass" />
+        <field field_ref="tot_col_wetplusdry_mass" />
+        <field field_ref="wbig" />
       </file>
 
       <file id="lfric_averages" name="lfric_averages" output_freq="12h" convention="UGRID" enabled=".TRUE.">

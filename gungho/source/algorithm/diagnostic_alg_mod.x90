@@ -28,6 +28,7 @@ module diagnostic_alg_mod
   use log_mod,                          only: log_event,         &
                                               log_scratch_space, &
                                               LOG_LEVEL_INFO
+
   implicit none
 
   private
@@ -40,6 +41,8 @@ module diagnostic_alg_mod
   public :: vorticity_diagnostic_alg
   public :: l2norm_diff_2fields
   public :: extract_w2h_diagnostic_alg
+  public :: column_total_diagnostics_alg
+  public :: calc_wbig_diagnostic_alg
 
 contains
 
@@ -563,5 +566,152 @@ contains
     call invoke( split_w2_field_kernel_type(h_wind, v_wind, wind) )
 
   end subroutine extract_w2h_diagnostic_alg
+
+!=============================================================================!
+  !> @brief Calculate column totals of dry and wet fields.
+  !> @details Calculates column totals for wet + dry air, dry air only and each
+  !!          of the different moisture spieces represented by LFRic.
+  !> @param[in] rho_field 3D dry density field
+  !> @param[in] mr Bundle of moisture mixing ratios (nummr is index for speices X)
+  !> @param[in] mesh_id The identifier of the primary mesh
+  !> @param[in] twod_mesh_id The identifier given to the current 2D mesh
+
+  subroutine column_total_diagnostics_alg(rho_field, mr, mesh_id, twod_mesh_id)
+
+    use compute_column_mass_kernel_mod,   only: compute_column_mass_kernel_type
+    use geometric_constants_mod,          only: get_height
+    use io_config_mod,                    only: write_diag, use_xios_io
+    use lfric_xios_write_mod,             only: write_field_single_face
+    use field_parent_mod,                 only: write_interface
+    use mr_indices_mod,                   only: nummr, mr_names
+    use function_space_mod,               only: function_space_type
+    use physics_mappings_alg_mod,         only: map_physics_scalars
+    use planet_config_mod,                only: radius
+
+    implicit none
+
+    type(field_type),  intent(in)    :: rho_field
+    type(field_type),  intent(in)    :: mr(nummr)
+    integer(i_def),    intent(in)    :: mesh_id
+    integer(i_def),    intent(in)    :: twod_mesh_id
+
+    ! Set up local fields
+    ! 3D fields
+    type( field_type ) :: mr_w3(nummr)         ! mixing ratio of moist species X
+    type( field_type ) :: rho_moist_X(nummr)   ! moist mass per unit volume in cell (rho_field * mr_w3)
+
+    ! 2D fields
+    type( field_type ) :: tot_col_dry_air_mass      ! dry column mass
+    type( field_type ) :: tot_col_moist_mass(nummr) ! moist column mass total for species X
+    type( field_type ) :: tot_col_wetplusdry_mass   ! moist + dry mass column total
+
+    integer(kind=i_def)  :: i_mr
+
+    ! Set pointers
+    type( field_type ), pointer :: height_w3 => null()
+    type( field_type ), pointer :: height_wth => null()
+    type(function_space_type), pointer :: w3_fs => null()
+    procedure(write_interface), pointer :: write_diag_behaviour => null()
+
+    height_w3 => get_height(W3, mesh_id)
+    height_wth => get_height(Wtheta, mesh_id)
+    w3_fs => rho_field%get_function_space()
+    write_diag_behaviour => write_field_single_face
+
+    ! Set up tot_col_dry_air_mass field and make it writeable
+    call tot_col_dry_air_mass%initialise( vector_space = &
+                    function_space_collection%get_fs(twod_mesh_id, 0, W3) )
+
+    call tot_col_dry_air_mass%copy_field_properties(tot_col_wetplusdry_mass)
+
+    ! Make the 2D column total fields write-enabled for diagnostic purposes
+    call tot_col_dry_air_mass%set_write_behaviour(write_diag_behaviour)
+    call tot_col_wetplusdry_mass%set_write_behaviour(write_diag_behaviour)
+
+    call invoke( compute_column_mass_kernel_type(rho_field, height_w3, &
+                                                height_wth, tot_col_dry_air_mass, &
+                                                radius) )
+
+    call invoke( setval_X(tot_col_wetplusdry_mass, tot_col_dry_air_mass) )
+
+    do i_mr = 1, nummr
+
+      ! Initialise the moisture fields
+      call mr_w3(i_mr)%initialise( vector_space = w3_fs )
+
+      call rho_moist_X(i_mr)%initialise( vector_space = w3_fs )
+
+      call tot_col_moist_mass(i_mr)%initialise( vector_space = &
+                      function_space_collection%get_fs(twod_mesh_id, 0, W3) )
+
+      call tot_col_moist_mass(i_mr)%set_write_behaviour(write_diag_behaviour)
+
+      ! Get mr field on w3
+      call map_physics_scalars(mr_w3(i_mr), mr(i_mr))  ! argument order is target, source
+
+      call invoke( X_times_Y(rho_moist_X(i_mr), rho_field, mr_w3(i_mr)) )
+
+      call invoke( compute_column_mass_kernel_type(rho_moist_X(i_mr), height_w3, &
+                                                  height_wth, tot_col_moist_mass(i_mr), &
+                                                  radius) )
+
+      if (write_diag .and. use_xios_io) then
+
+        call tot_col_moist_mass(i_mr)%write_field('tot_col_'//trim(mr_names(i_mr)))
+
+      end if
+
+      ! Increment by each moisture species to get total wet + dry mass
+      call invoke( inc_X_plus_Y(tot_col_wetplusdry_mass, tot_col_moist_mass(i_mr)) )
+
+    end do
+
+    if (write_diag .and. use_xios_io) then
+
+      call tot_col_dry_air_mass%write_field('tot_col_dry_air_mass')
+      call tot_col_wetplusdry_mass%write_field('tot_col_wetplusdry_mass')
+
+    end if
+
+  end subroutine column_total_diagnostics_alg
+
+!=============================================================================!
+  !> @brief Calculates Wbig: set 3D field to 1 where vertical velocity exceeds
+  !!          1 m s-1 and output.
+  !> @details Wbig is given a value of 1 if the value of w (vertical velocity)
+  !!          at that location is larger than 1 m s-1, otherwise it is set to
+  !!          zero. The diagnostic's primary use is in long, climate runs where
+  !!          it is averaged in time to help indicate whether the model has any
+  !!          stability problems.
+  !> @param[in] w_physics 3D vertical velocity field seen by the model physics
+  !> @param[in] mesh_id Mesh_id The identifier of the primary mesh
+
+  subroutine calc_wbig_diagnostic_alg(w_physics, mesh_id)
+
+    use calc_wbig_kernel_mod,             only: calc_wbig_kernel_type
+    use io_config_mod,                    only: write_diag, use_xios_io
+    use lfric_xios_write_mod,             only: write_field_single_face
+    use field_parent_mod,                 only: write_interface
+
+    implicit none
+
+    ! Set up necessary fields
+    type(field_type),  intent(in)    :: w_physics
+    integer(i_def),    intent(in)    :: mesh_id
+
+    type( field_type ) :: wbig
+
+    ! Give wbig the same properties as w_physics (on WTHETA levels)
+    call w_physics%copy_field_properties(wbig)
+
+    call invoke( calc_wbig_kernel_type(w_physics, wbig) )
+
+    if (write_diag .and. use_xios_io) then
+
+      call wbig%write_field('wbig')
+
+    end if
+
+  end subroutine calc_wbig_diagnostic_alg
 
 end module diagnostic_alg_mod

@@ -143,6 +143,7 @@ contains
    if ( clock%is_initialisation() .and. write_diag .and. &
         multires_coupling_mode /= multires_coupling_mode_test ) then
      call multires_coupling_diagnostics_driver( dynamics_mesh_id,         &
+                                                dynamics_2D_mesh_id,      &
                                                 dynamics_mesh_model_data, &
                                                 clock, nodal_output_on_w3 )
    end if
@@ -189,6 +190,7 @@ contains
         if ( (mod(clock%get_step(), diagnostic_frequency) == 0) &
               .and. (write_diag) ) then
               call multires_coupling_diagnostics_driver( dynamics_mesh_id,         &
+                                                         dynamics_2D_mesh_id,      &
                                                          dynamics_mesh_model_data, &
                                                          clock, nodal_output_on_w3 )
         end if
