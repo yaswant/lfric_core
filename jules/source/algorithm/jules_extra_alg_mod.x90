@@ -15,6 +15,10 @@ module jules_extra_alg_mod
 
   ! xios output
   use io_config_mod, only: write_diag, use_xios_io
+  use jules_snow_diags_mod, only: initialise_diags_for_jules_snow, &
+                                  output_diags_for_jules_snow
+  use jules_soil_diags_mod, only: initialise_diags_for_jules_soil, &
+                                  output_diags_for_jules_soil
 
   implicit none
 
@@ -113,6 +117,16 @@ contains
     type( field_type ), pointer :: snow_layer_rgrain      => null()
     type( field_type ), pointer :: snow_unload_rate       => null()
 
+    ! local variables
+    type( field_type ) :: soil_moisture_content
+    type( field_type ) :: grid_canopy_water
+    type( field_type ) :: grid_snow_mass
+    type( field_type ) :: grid_snowmelt
+    type( field_type ) :: throughfall
+    type( field_type ) :: grid_throughfall
+    type( field_type ) :: surface_runoff
+    type( field_type ) :: sub_surface_runoff
+
     if ( subroutine_timers ) call timer('jules_extra_alg')
 
     ! Unpack precipitation fields
@@ -171,6 +185,20 @@ contains
     snow_layer_rgrain      => snow_fields%get_field('snow_layer_rgrain')
     snow_unload_rate       => snow_fields%get_field('snow_unload_rate')
 
+    ! Initialise the snow diagnostics
+    call initialise_diags_for_jules_snow(soil_moist_sat,                       &
+                                         grid_snow_mass, grid_snowmelt)
+
+    ! Initialise the soil diagnostics
+    call initialise_diags_for_jules_soil(soil_moist_sat,                       &
+                                         tile_fraction,                        &
+                                         soil_moisture_content,                &
+                                         grid_canopy_water,                    &
+                                         throughfall,                          &
+                                         grid_throughfall,                     &
+                                         surface_runoff,                       &
+                                         sub_surface_runoff)
+
     call invoke(jules_extra_kernel_type( ls_rain, conv_rain, ls_snow,          &
                            conv_snow, lsca_2d, cca_2d,                         &
                            tile_fraction, leaf_area_index,                     &
@@ -191,33 +219,33 @@ contains
                            snowpack_density, snow_layer_thickness,             &
                            snow_layer_ice_mass, snow_layer_liq_mass,           &
                            snow_layer_temp, snow_layer_rgrain, total_snowmelt, &
-                           soil_sat_frac, water_table,                         &
-                           wetness_under_soil) )
+                           soil_sat_frac, water_table, wetness_under_soil,     &
+                           soil_moisture_content, grid_snow_mass,              &
+                           throughfall, surface_runoff,                        &
+                           sub_surface_runoff) )
 
     if ( subroutine_timers ) call timer('jules_extra_alg')
 
     if (use_xios_io .and. write_diag) then
-      if ( subroutine_timers ) call timer("jules_extra_xios")
 
-      call soil_moisture%write_field('soil_moisture')
-      call unfrozen_soil_moisture%write_field('unfrozen_soil_moisture')
-      call soil_temperature%write_field('soil_temperature')
+      ! Output the jules snow diagnostics
+      call output_diags_for_jules_snow(tile_fraction, tile_snow_mass,          &
+                                     total_snowmelt,                           &
+                                     snow_depth, tile_snow_rgrain,             &
+                                     snowpack_density, snow_layer_temp,        &
+                                     snow_layer_thickness, snow_layer_ice_mass,&
+                                     snow_layer_liq_mass, snow_layer_rgrain,   &
+                                     grid_snow_mass, grid_snowmelt)
 
-      call water_table%write_field('water_table')
+      ! Output the jules soil diagnostics
+      call output_diags_for_jules_soil(tile_fraction, soil_moisture_content,   &
+                                     canopy_water, soil_moisture,              &
+                                     soil_temperature, unfrozen_soil_moisture, &
+                                     frozen_soil_moisture, throughfall,        &
+                                     surface_runoff, sub_surface_runoff,       &
+                                     water_table,                              &
+                                     grid_canopy_water,grid_throughfall)
 
-      ! Snow diagnostics
-      call total_snowmelt%write_field('total_snowmelt')
-      call snow_depth%write_field('snow_depth')
-      call tile_snow_rgrain%write_field('tile_snow_rgrain')
-      call snowpack_density%write_field('snowpack_density')
-
-      call snow_layer_temp%write_field('snow_layer_temp')
-      call snow_layer_thickness%write_field('snow_layer_thickness')
-      call snow_layer_ice_mass%write_field('snow_layer_ice_mass')
-      call snow_layer_liq_mass%write_field('snow_layer_liq_mass')
-      call snow_layer_rgrain%write_field('snow_layer_rgrain')
-
-      if ( subroutine_timers ) call timer("jules_extra_xios")
     end if
 
   end subroutine jules_extra_alg

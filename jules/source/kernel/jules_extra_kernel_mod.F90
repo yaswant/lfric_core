@@ -9,7 +9,8 @@ module jules_extra_kernel_mod
 
   use argument_mod,            only : arg_type,                  &
                                       GH_FIELD, GH_REAL,         &
-                                      GH_READ, GH_READWRITE,     &
+                                      GH_READ, GH_WRITE,         &
+                                      GH_READWRITE,              &
                                       ANY_DISCONTINUOUS_SPACE_1, &
                                       ANY_DISCONTINUOUS_SPACE_2, &
                                       ANY_DISCONTINUOUS_SPACE_3, &
@@ -18,6 +19,7 @@ module jules_extra_kernel_mod
                                       CELL_COLUMN
   use constants_mod,           only : i_def, i_um, r_def, r_um
   use kernel_mod,              only : kernel_type
+  use empty_data_mod,          only : empty_real_data
 
   implicit none
 
@@ -30,7 +32,7 @@ module jules_extra_kernel_mod
   !>
   type, public, extends(kernel_type) :: jules_extra_kernel_type
     private
-    type(arg_type) :: meta_args(53) = (/                                       &
+    type(arg_type) :: meta_args(58) = (/                                       &
          arg_type(GH_FIELD, GH_REAL, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! ls_rain
          arg_type(GH_FIELD, GH_REAL, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! conv_rain
          arg_type(GH_FIELD, GH_REAL, GH_READ,      ANY_DISCONTINUOUS_SPACE_1), & ! ls_snow
@@ -83,7 +85,12 @@ module jules_extra_kernel_mod
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_2), & ! total_snowmelt
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! soil_sat_frac
          arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! water_table
-         arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1)  & ! wetness_under_soil
+         arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1), & ! wetness_under_soil
+         arg_type(GH_FIELD, GH_REAL, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1), & ! soil_moisture_content
+         arg_type(GH_FIELD, GH_REAL, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1), & ! grid_snow_mass
+         arg_type(GH_FIELD, GH_REAL, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_2), & ! throughfall
+         arg_type(GH_FIELD, GH_REAL, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1), & ! surface_runoff
+         arg_type(GH_FIELD, GH_REAL, GH_WRITE,     ANY_DISCONTINUOUS_SPACE_1)  & ! sub_surface_runoff
         /)
     integer :: operates_on = CELL_COLUMN
   contains
@@ -154,6 +161,11 @@ contains
   !> @param[in,out] soil_sat_frac          Soil saturated fraction
   !> @param[in,out] water_table            Water table depth (m)
   !> @param[in,out] wetness_under_soil     Soil wetness below soil column
+  !> @param[in,out] soil_moisture_content  Soil moisture content of soil column
+  !> @param[in,out] grid_snow_mass         Gridbox total snow mass (canopy + under canopy)
+  !> @param[in,out] throughfall            Throughfall from land tiles
+  !> @param[in,out] surface_runoff         Runoff from surface
+  !> @param[in,out] sub_surface_runoff     Runoff from sub-surface
   !> @param[in]     ndf_2d                 Total DOFs per cell for 2D fields
   !> @param[in]     undf_2d                Unique DOFs per cell for 2D fields
   !> @param[in]     map_2d                 DOFmap for cells for 2D fields
@@ -224,6 +236,11 @@ contains
                soil_sat_frac,              &
                water_table,                &
                wetness_under_soil,         &
+               soil_moisture_content,      &
+               grid_snow_mass,             &
+               throughfall,                &
+               surface_runoff,             &
+               sub_surface_runoff,         &
                ndf_2d,                     &
                undf_2d,                    &
                map_2d,                     &
@@ -349,6 +366,12 @@ contains
     real(kind=r_def), intent(inout) :: soil_sat_frac(undf_2d)
     real(kind=r_def), intent(inout) :: water_table(undf_2d)
     real(kind=r_def), intent(inout) :: wetness_under_soil(undf_2d)
+
+    real(kind=r_def), pointer, intent(inout) :: soil_moisture_content(:)
+    real(kind=r_def), pointer, intent(inout) :: grid_snow_mass(:)
+    real(kind=r_def), pointer, intent(inout) :: throughfall(:)
+    real(kind=r_def), pointer, intent(inout) :: surface_runoff(:)
+    real(kind=r_def), pointer, intent(inout) :: sub_surface_runoff(:)
 
     ! Local variables for the kernel
     integer(kind=i_def) :: i, j, n, i_snow
@@ -740,6 +763,32 @@ contains
 
     ! Wetness below soil column
     wetness_under_soil(map_2d(1)) = real(sthzw_soilt(1,1), r_def)
+
+    if (.not. associated(soil_moisture_content, empty_real_data) ) then
+      if (land_sea_mask(1,1)) then
+        soil_moisture_content(map_2d(1)) = progs%smc_soilt(1,1)
+      else
+        soil_moisture_content(map_2d(1)) = 0.0_r_def
+      end if
+    end if
+
+    if (.not. associated(grid_snow_mass, empty_real_data) ) then
+      grid_snow_mass(map_2d(1)) = progs%snow_mass_ij(1,1)
+    end if
+
+    if (.not. associated(throughfall, empty_real_data) ) then
+      do i = 1, n_land_tile
+        throughfall(map_tile(1)+i-1) = fluxes%tot_tfall_surft(1,i)
+      end do
+    end if
+
+    if (.not. associated(surface_runoff, empty_real_data) ) then
+      surface_runoff(map_2d(1)) = fluxes%surf_roff_gb(1)
+    end if
+
+    if (.not. associated(sub_surface_runoff, empty_real_data) ) then
+      sub_surface_runoff(map_2d(1)) = fluxes%sub_surf_roff_gb(1)
+    end if
 
     ! Reset land_pts to 1 before exit
     ! This is required because prior to calling the kernel, it is unknown
