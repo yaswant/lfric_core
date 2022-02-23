@@ -30,9 +30,10 @@ module gungho_driver_mod
                                          diagnostic_frequency, &
                                          nodal_output_on_w3
   use io_context_mod,             only : io_context_type
-  use initialization_config_mod,  only : lbc_option,     &
-                                         lbc_option_file, &
-                                         ancil_option, &
+  use initialization_config_mod,  only : lbc_option,               &
+                                         lbc_option_gungho_file,   &
+                                         lbc_option_um2lfric_file, &
+                                         ancil_option,             &
                                          ancil_option_updating
   use init_gungho_lbcs_alg_mod,   only : update_lbcs_file_alg
   use log_mod,                    only : log_event,         &
@@ -165,12 +166,12 @@ contains
       endif
 #endif
 
-      if ( lbc_option == lbc_option_file ) then
+      if ( lbc_option == lbc_option_gungho_file .or. &
+           lbc_option == lbc_option_um2lfric_file) then
 
         call update_lbcs_file_alg( model_data%lbc_times_list, &
                                    clock, model_data%lbc_fields )
       endif
-
 
       ! Perform a timestep
       call gungho_step( mesh, twod_mesh, model_data, &

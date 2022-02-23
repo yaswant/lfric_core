@@ -87,7 +87,8 @@
                      plotstr="linear.py $NODAL_DATA_DIR/lfric_diag.nc $PLOT_DIR 5 linear-semi-implicit rho 120:0:3")',
     'run_application("linear", "dcmip301",
                      resolutions=[("C24",10.0)], env={"nrun":180,
-                                                      "directives":{"default":{"mpi_parts":6} } },
+                                                      "directives":{"default":{"mpi_parts":6,
+                                                                               "wallclock":"00:20:00"} } },
                      plotstr="linear.py $NODAL_DATA_DIR/lfric_diag.nc $PLOT_DIR 10 linear-dcmip theta:exner:rho:u1:u2:u3 120:0:5")'
 
   ],

@@ -91,10 +91,11 @@ module gungho_model_mod
   use simple_io_context_mod,      only : simple_io_context_type
   use time_config_mod,            only : timestep_start, timestep_end
   use timer_mod,                  only : timer, output_timer, init_timer
-  use timestepping_config_mod,    only : dt,                   &
-                                         method,               &
-                                         method_semi_implicit, &
-                                         method_rk,            &
+  use timestepping_config_mod,    only : dt,                     &
+                                         method,                 &
+                                         method_semi_implicit,   &
+                                         method_rk,              &
+                                         method_no_timestepping, &
                                          spinup_period
   use yaxt,                       only : xt_initialize, xt_finalize
 #ifdef COUPLED
@@ -481,6 +482,12 @@ contains
                                            mr,               &
                                            'Before timestep' )
         end if
+      case( method_no_timestepping )
+        write( log_scratch_space, &
+           '(A, A)' ) 'CAUTION: Running with no timestepping. ' // &
+                      ' Prognostic fields not evolved'
+        call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
       case default
         call log_event("Gungho: Incorrect time stepping option chosen, "// &
                         "stopping program! ",LOG_LEVEL_ERROR)

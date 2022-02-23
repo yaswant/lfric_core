@@ -13,12 +13,14 @@ module create_fd_prognostics_mod
   use field_mod,                      only : field_type
   use field_parent_mod,               only : read_interface, &
                                              write_interface
-  use lfric_xios_read_mod,            only : read_field_face
-  use lfric_xios_write_mod,           only : write_field_face
+  use lfric_xios_read_mod,            only : read_field_face, &
+                                             read_field_edge
+  use lfric_xios_write_mod,           only : write_field_face, &
+                                             write_field_edge
   use finite_element_config_mod,      only : element_order
   use function_space_collection_mod,  only : function_space_collection
   use field_collection_mod,           only : field_collection_type
-  use fs_continuity_mod,              only : W3, Wtheta
+  use fs_continuity_mod,              only : W3, Wtheta, W2H
   use log_mod,                        only : log_event,      &
                                              LOG_LEVEL_INFO, &
                                              LOG_LEVEL_ERROR
@@ -27,7 +29,8 @@ module create_fd_prognostics_mod
   use initialization_config_mod,      only : ancil_option,                &
                                              ancil_option_start_dump,     &
                                              ancil_option_fixed,          &
-                                             ancil_option_updating
+                                             ancil_option_updating,       &
+                                             read_w2h_wind
   use nlsizes_namelist_mod,           only : sm_levels
   use jules_control_init_mod,         only : n_land_tile
   use jules_physics_init_mod,         only : snow_lev_tile
@@ -60,6 +63,7 @@ contains
     ! FD field declarations
     type( field_type ) :: ew_wind_in_w3 ! U wind
     type( field_type ) :: ns_wind_in_w3 ! V wind
+    type( field_type ) :: h_wind_in_w2h ! Horizontal wind (i.e. on W2h dofs)
     type( field_type ) :: dry_rho_in_w3 ! Dry rho
     ! Vertical theta levels
     type( field_type ) :: upward_wind_in_wtheta ! W wind
@@ -79,34 +83,52 @@ contains
     ! Create the field collection
     call fd_field_collection%initialise(name="fd_prognostics")
 
-    ! Setup I/O behaviour handler. In the case of FD prognostic fields these
-    ! are currently read from a UM2LFRic dump
+    if ( read_w2h_wind )then
+       ! In this case we read in directly onto the W2H dofs
+       tmp_read_ptr => read_field_edge
+       tmp_write_ptr => write_field_edge
+       call h_wind_in_w2h%initialise( vector_space = &
+         function_space_collection%get_fs(mesh, element_order, W2H), &
+         name='h_wind')
+       call h_wind_in_w2h%set_read_behaviour(tmp_read_ptr)
+       call h_wind_in_w2h%set_write_behaviour(tmp_write_ptr)
+       call fd_field_collection%add_field(h_wind_in_w2h)
+
+    else
+
+      ! Setup I/O behaviour handler. In the case of FD prognostic fields these
+      ! are currently read from a UM2LFRic dump
+      tmp_read_ptr => read_field_face
+      tmp_write_ptr => write_field_face
+
+      ! Create the fields, set the I/O behaviour and add to
+      ! the field collection
+      !========================================================================
+      ! W3 fields - rho levels
+      !========================================================================
+
+      call ew_wind_in_w3%initialise( vector_space = &
+        function_space_collection%get_fs(mesh, element_order, W3), &
+        name='ew_wind_in_w3')
+
+      call ew_wind_in_w3%set_read_behaviour(tmp_read_ptr)
+      call ew_wind_in_w3%set_write_behaviour(tmp_write_ptr)
+
+      call fd_field_collection%add_field(ew_wind_in_w3)
+
+      call ns_wind_in_w3%initialise( vector_space = &
+        function_space_collection%get_fs(mesh, element_order, W3), &
+        name='ns_wind_in_w3')
+
+      call ns_wind_in_w3%set_read_behaviour(tmp_read_ptr)
+      call ns_wind_in_w3%set_write_behaviour(tmp_write_ptr)
+
+      call fd_field_collection%add_field(ns_wind_in_w3)
+
+    end if
+
     tmp_read_ptr => read_field_face
     tmp_write_ptr => write_field_face
-
-    ! Create the fields, set the I/O behaviour and add to
-    ! the field collection
-    !========================================================================
-    ! W3 fields - rho levels
-    !========================================================================
-
-    call ew_wind_in_w3%initialise( vector_space = &
-         function_space_collection%get_fs(mesh, element_order, W3), &
-         name='ew_wind_in_w3')
-
-    call ew_wind_in_w3%set_read_behaviour(tmp_read_ptr)
-    call ew_wind_in_w3%set_write_behaviour(tmp_write_ptr)
-
-    call fd_field_collection%add_field(ew_wind_in_w3)
-
-    call ns_wind_in_w3%initialise( vector_space = &
-         function_space_collection%get_fs(mesh, element_order, W3), &
-         name='ns_wind_in_w3')
-
-    call ns_wind_in_w3%set_read_behaviour(tmp_read_ptr)
-    call ns_wind_in_w3%set_write_behaviour(tmp_write_ptr)
-
-    call fd_field_collection%add_field(ns_wind_in_w3)
 
     call dry_rho_in_w3%initialise( vector_space = &
          function_space_collection%get_fs(mesh, element_order, W3), &

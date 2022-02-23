@@ -25,17 +25,19 @@ module map_fd_to_prognostics_alg_mod
   use fem_constants_mod,               only: get_rmultiplicity
   use geometric_constants_mod,         only: get_height,          &
                                              get_coordinates,     &
-                                             get_panel_id
+                                             get_panel_id,        &
+                                             get_da_at_w2
   use physical_op_constants_mod,       only: get_coriolis,  &
                                              get_u_lon_map, &
                                              get_u_lat_map, &
                                              get_u_up_map
   use fs_continuity_mod,               only: W3, W2
-  use initialization_config_mod,       only: hydro_coriolis
+  use initialization_config_mod,       only: hydro_coriolis, read_w2h_wind
   use planet_config_mod,               only: gravity, p_zero, kappa, rd, cp
   use sort_ref_kernel_mod,             only: sort_ref_kernel_type
   use io_config_mod,                   only: subroutine_timers
   use timer_mod,                       only: timer
+  use combine_w2_field_kernel_mod,     only: combine_w2_field_kernel_type
 
   implicit none
 
@@ -48,13 +50,13 @@ contains
   !> @param[in,out] prognostic_fields  Collection of prognostic fields
   !> @param[in,out] mr                 Array of moisture mixing ratios
   !> @param[in]     fd_fields          Collection of input Finite Difference
-  !>                                    fields
+  !>                                   fields
   subroutine map_fd_to_prognostics(prognostic_fields, mr, moist_dyn,          &
                                    fd_fields)
 
     use mr_indices_mod,             only : imr_v, imr_cl, imr_ci, imr_r, &
                                            imr_s, imr_g
-    use moist_dyn_mod,              only : num_moist_factors
+    use moist_dyn_mod,              only : num_moist_factors, gas_law
     use moist_dyn_factors_alg_mod,  only : moist_dyn_factors_alg
 
     implicit none
@@ -73,6 +75,7 @@ contains
     type( field_type ), pointer :: exner                  => null()
 
     ! FD  fields
+    type( field_type ), pointer :: h_wind_in_w2h          => null()
     type( field_type ), pointer :: ew_wind_in_w3          => null()
     type( field_type ), pointer :: ns_wind_in_w3          => null()
     type( field_type ), pointer :: dry_rho_in_w3          => null()
@@ -82,10 +85,17 @@ contains
     type( field_type ), pointer :: mcl_in_wtheta          => null()
     type( field_type ), pointer :: mcf_in_wtheta          => null()
     type( field_type ), pointer :: mr_in_wtheta           => null()
+    type( field_type ), pointer :: dA => null()
+    integer(i_def)              :: mesh_id
 
     !FD (source) fields
-    ew_wind_in_w3         => fd_fields%get_field('ew_wind_in_w3')
-    ns_wind_in_w3         => fd_fields%get_field('ns_wind_in_w3')
+    if ( read_w2h_wind ) then
+      h_wind_in_w2h       => fd_fields%get_field('h_wind')
+    else
+      ew_wind_in_w3       => fd_fields%get_field('ew_wind_in_w3')
+      ns_wind_in_w3       => fd_fields%get_field('ns_wind_in_w3')
+    end if
+
     dry_rho_in_w3         => fd_fields%get_field('dry_rho_in_w3')
     upward_wind_in_wtheta => fd_fields%get_field('upward_wind_in_wtheta')
     theta_in_wtheta       => fd_fields%get_field('theta_in_wtheta')
@@ -115,7 +125,17 @@ contains
                  setval_c(exner, 0.0_r_def),          &
                  setval_c(upward_wind_in_wtheta, 0.0_r_def))
 
-    call set_wind( u, ew_wind_in_w3, ns_wind_in_w3, upward_wind_in_wtheta )
+    if ( read_w2h_wind )then
+     ! We read in the horizontal (normal to face) winds on the w2h points
+     mesh_id = u%get_mesh_id()
+     dA => get_da_at_w2(mesh_id)
+     call invoke( combine_w2_field_kernel_type( u, h_wind_in_w2h, &
+                                                upward_wind_in_wtheta),    &
+                  inc_X_times_Y(u, dA) )
+    else
+     ! We read in cell centred zonal/meridional winds
+      call set_wind( u, ew_wind_in_w3, ns_wind_in_w3, upward_wind_in_wtheta )
+    end if
 
     ! Update factors for moist dynamics
     call moist_dyn_factors_alg( moist_dyn, mr )

@@ -21,6 +21,7 @@
       <axis id="entrainment_levels" name="entrainment_levels" n_glo="3"/>
       <axis id="dust_divisions" name="dust_divisions" n_glo="6"/>
       <axis id="radiation_levels" name="radiation_levels"/>
+      <axis id="lbc_axis" name="lbc_axis" n_glo="7"/>
     </axis_definition>
 
     <domain_definition>
@@ -60,6 +61,21 @@
 	<domain domain_ref="face"/>
 	<axis axis_ref="monthly_axis"/>
 	<axis axis_ref="plant_func_types"/>
+      </grid>
+      <grid id="full_level_face_time_grid">
+	<domain domain_ref="face"/>
+	<axis axis_ref="vert_axis_full_levels"/>
+	<axis axis_ref="lbc_axis"/>
+      </grid>
+      <grid id="half_level_face_time_grid">
+	<domain domain_ref="face"/>
+	<axis axis_ref="vert_axis_half_levels"/>
+	<axis axis_ref="lbc_axis"/>
+      </grid>
+      <grid id="half_level_edge_time_grid">
+	<domain domain_ref="edge"/>
+	<axis axis_ref="vert_axis_half_levels"/>
+	<axis axis_ref="lbc_axis"/>
       </grid>
     </grid_definition>
 
@@ -851,6 +867,39 @@
         <field id="init_svar_tb" name="svar_tb" long_name="variance_of_unimodal_sd_pdf" unit="kg2 kg-2" grid_ref="full_level_face_grid" />
         <field id="init_sigma_qcw" name="sigma_qcw" long_name="variability_cloud_condensate"  unit="1" grid_ref="full_level_face_grid" />
       </field_group>
+     <field_group id="lbc_diags" freq_op="1ts" operation="instant" enabled=".TRUE." >
+	<field id="lbc_u1" name="lbc_u1" long_name="eastward_wind" standard_name="eastward_wind" unit="m s-1" grid_ref="half_level_edge_grid" />
+	<field id="lbc_u2" name="lbc_u2" long_name="northward_wind" standard_name="northward_wind" unit="m s-1" grid_ref="half_level_edge_grid" />
+	<field id="lbc_u3" name="lbc_u3" long_name="upward_air_velocity" standard_name="upward_air_velocity" unit="m s-1" grid_ref="full_level_face_grid" />
+	<field id="lbc_theta" name="lbc_theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_grid" />
+	<field id="lbc_m_v" name="lbc_m_v" long_name="m_v"  unit="kg kg-1" grid_ref="full_level_face_grid" />
+        <field id="lbc_q" name="lbc_q" long_name="m_v"  unit="kg kg-1" grid_ref="full_level_face_grid" />
+	<field id="lbc_rho" name="lbc_rho" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_grid" />
+        <field id="lbc_rho_r2" name="lbc_rho_r2" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_grid" />
+	<field id="lbc_exner" name="lbc_exner" long_name="exner_pressure" unit="1" grid_ref="half_level_face_grid" />
+       <field id="readlbc_h_u" name="h_wind" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="readlbc_v_u" name="upward_wind" long_name="vertical_wind" standard_name="vertical_wind" unit="m s-1" grid_ref="full_level_face_grid"/>
+       <field id="readlbc_h_u1" name="h_wind1" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="readlbc_h_u2" name="h_wind2" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="readlbc_h_u3" name="h_wind3" long_name="horizontal_wind" unit="m s-1" grid_ref="full_level_face_grid"/>
+     </field_group>
+
+     <field_group id="init_lbc_diags" freq_op="1ts" operation="once" enabled=".TRUE." >
+	<field id="init_lbc_u1" name="lbc_u1" long_name="eastward_wind" standard_name="eastward_wind" unit="m s-1" grid_ref="half_level_edge_grid" />
+	<field id="init_lbc_u2" name="lbc_u2" long_name="northward_wind" standard_name="northward_wind" unit="m s-1" grid_ref="half_level_edge_grid" />
+	<field id="init_lbc_u3" name="lbc_u3" long_name="upward_air_velocity" standard_name="upward_air_velocity" unit="m s-1" grid_ref="full_level_face_grid" />
+	<field id="init_lbc_theta" name="lbc_theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_grid" />
+	<field id="init_lbc_m_v" name="lbc_m_v" long_name="m_v"  unit="kg kg-1" grid_ref="full_level_face_grid" />
+        <field id="init_lbc_q" name="lbc_q" long_name="q"  unit="kg kg-1" grid_ref="full_level_face_grid" />
+	<field id="init_lbc_rho" name="lbc_rho" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_grid" />
+        <field id="init_lbc_rho_r2" name="lbc_rho_r2" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_grid" />
+	<field id="init_lbc_exner" name="lbc_exner" long_name="exner_pressure" unit="1" grid_ref="half_level_face_grid" />
+       <field id="init_readlbc_h_u" name="h_wind" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="init_readlbc_v_u" name="upward_wind" long_name="vertical_wind" standard_name="vertical_wind" unit="m s-1" grid_ref="full_level_face_grid"/>
+       <field id="init_readlbc_h_u1" name="h_wind1" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="init_readlbc_h_u2" name="h_wind2" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid"/>
+       <field id="init_readlbc_h_u3" name="h_wind3" long_name="horizontal_wind" unit="m s-1" grid_ref="full_level_face_grid"/>
+     </field_group>
 
     </field_definition>
 
@@ -1204,6 +1253,7 @@
         <field field_ref="tot_col_dry_air_mass" />
         <field field_ref="tot_col_wetplusdry_mass" />        
         <field field_ref="wbig" />
+	<field_group group_ref="lbc_diags" />
       </file>
 
       <file id="lfric_averages" name="lfric_averages" output_freq="12h" convention="UGRID" enabled=".TRUE.">
@@ -1218,6 +1268,7 @@
 
       <file id="lfric_initial" name="lfric_initial" output_freq="1ts" convention="UGRID" enabled=".TRUE.">
         <field_group group_ref="initial_fields" />
+	<field_group group_ref="init_lbc_diags" />
       </file>
 
       <!-- File definition for writing an FD dump -->
@@ -1227,8 +1278,7 @@
       <!-- File definition for reading in from a UM2LFRic FD UGRID format dump  -->
       <file id="read_lfric_fd_dump" name="lfric_fd_dump" mode="read" output_freq="1ts" convention="UGRID" cyclic="false" enabled=".FALSE.">
 	<!-- aquaplanet fields -->
-	<field id="read_ew_wind_in_w3" name="ew_wind" long_name="eastward_wind" standard_name="eastward_wind" unit="m s-1" grid_ref="half_level_face_grid" operation="once" />
-	<field id="read_ns_wind_in_w3" name="ns_wind" long_name="northward_wind" standard_name="northward_wind" unit="m s-1" grid_ref="half_level_face_grid" operation="once" />
+        <field id="read_h_wind" name="h_wind" long_name="horizontal_wind" standard_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_grid" operation="once" />
 	<field id="read_upward_wind_in_wtheta" name="upward_wind" long_name="upward_air_velocity" standard_name="upward_air_velocity" unit="m s-1" grid_ref="full_level_face_grid" operation="once" />
 	<field id="read_theta_in_wtheta" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_grid" operation="once" />
 	<field id="read_dry_rho_in_w3" name="rho" long_name="air_density" unit="1" grid_ref="half_level_face_grid" operation="once" />
@@ -1280,7 +1330,7 @@
       </file>
 
       <file id="land_area_ancil" name="land_area_ancil" mode="read" output_freq="1ts" convention="UGRID" cyclic="false" enabled=".FALSE.">
-	<field id="land_area_fraction" name="land_area_fraction" long_name="land_area_fraction" unit="1" operation="once" domain_ref="face"/>
+	<field id="land_area_fraction" name="land_binary_mask" long_name="land_area_fraction" unit="1" operation="once" domain_ref="face"/>
       </file>
 
       <file id="sea_ancil" name="sea_ancil" mode="read" output_freq="1mo" convention="UGRID" cyclic="true" enabled=".FALSE.">
@@ -1332,7 +1382,7 @@
       </file>
 
       <file id="plant_func_ancil" name="plant_func_ancil" mode="read" output_freq="1mo" convention="UGRID" cyclic="true" enabled=".FALSE.">
-	<field id="plant_func_time" name="month_number" unit="months" operation="once" axis_ref="monthly_axis"/>
+        <field id="plant_func_time" name="time" unit="hours" operation="once" axis_ref="monthly_axis"/>
 	<field id="canopy_height_data" name="canopy_height" long_name="canopy_height" unit="1" operation="once" grid_ref="pft_monthly_grid"/>
 	<field id="leaf_area_index_data" name="leaf_area_index" long_name="leaf_area_index" unit="1" operation="once" grid_ref="pft_monthly_grid"/>
       </file>
@@ -1455,6 +1505,25 @@
       <file id="oh_ancil" name="oh_ancil" mode="read" output_freq="1mo" convention="UGRID" cyclic="true" enabled=".FALSE.">
        <field id="oh_time" name="time" unit="hours" operation="once" axis_ref="monthly_axis"/>
        <field id="oh_data" name="OH" long_name="OH mass mixing ratio" unit="1" operation="instant" grid_ref="3D_monthly_grid"/>
+       </file>
+
+       <!-- LBC files -->
+       <file id="lbc" name="lbc" mode="read" output_freq="1ts" convention="UGRID" cyclic="true" enabled=".FALSE.">
+       <field id="lbc_time" name="time" unit="seconds" operation="once" axis_ref="lbc_axis" />
+       <field id="lbc_theta_data" name="theta" long_name="air_potential_temperature" standard_name="air_potential_temperature" unit="K" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_rho_data" name="rho" long_name="air_density" standard_name="air_density" unit="kg m-3" grid_ref="half_level_face_time_grid" operation="once"/>
+       <field id="lbc_rho_r2_data" name="rho_r2" long_name="density_times_r_squared" unit="kg m-1" grid_ref="half_level_face_time_grid" operation="once"/>
+       <field id="lbc_h_u_data" name="h_wind" long_name="horizontal_wind" unit="m s-1" grid_ref="half_level_edge_time_grid" operation="once"/>
+       <field id="lbc_v_u_data" name="upward_wind" long_name="vertical_wind" standard_name="vertical_wind" unit="m s-1" grid_ref="full_level_face_time_grid" operation="once"/>
+       <field id="lbc_q_data" name="q" standard_name="specific_humidity" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_qcf_data" name="qcf" long_name="specific_humidity_cloud_ice" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_qcl_data" name="qcl" long_name="specific_humidity_cloud_liquid" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_qrain_data" name="qrain" long_name="mass_fraction_of_rain_in_air" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_m_v_data" name="m_v" long_name="humidity_mixing_ratio" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_m_cl_data" name="m_cl" long_name="cloud_liquid_water_mixing_ratio" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_m_ci_data" name="m_cf" long_name="cloud_ice_mixing_ratio" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+       <field id="lbc_m_r_data" name="m_r" long_name="rain_mixing_ratio" unit="1" grid_ref="full_level_face_time_grid" operation="once" />
+
        </file>
 
     </file_definition>

@@ -13,6 +13,10 @@ module init_gungho_lbcs_alg_mod
   use field_collection_mod,            only: field_collection_type
   use formulation_config_mod,          only: use_moisture
   use fs_continuity_mod,               only: W2, W3, Wtheta
+  use geometric_constants_mod,         only: get_da_at_w2
+  use initialization_config_mod,       only: lbc_option,             &
+                                             lbc_option_gungho_file, &
+                                             lbc_option_um2lfric_file
   use log_mod,                         only: log_event,         &
                                              log_scratch_space, &
                                              LOG_LEVEL_INFO
@@ -137,6 +141,22 @@ module init_gungho_lbcs_alg_mod
     call init_variable_fields( lbc_times_list, &
                                clock, lbc_fields )
 
+    ! Map to derived fields, e.g. winds in W2H and Wtheta to W2
+    select case( lbc_option )
+      case ( lbc_option_gungho_file )
+        call combine_lbc_winds( lbc_fields, extensive=.true. )
+
+      case ( lbc_option_um2lfric_file )
+        call combine_lbc_winds( lbc_fields, extensive=.false. )
+        call map_lbc_inputs( lbc_fields )
+
+      case default
+        call log_event('This lbc_option not available', LOG_LEVEL_INFO)
+    end select
+
+    ! Define boundary_u_driving
+    call define_boundary_u( lbc_fields )
+
   end subroutine init_lbcs_file_alg
 
   !> @brief   Update the time-varying LBCs from a file.
@@ -156,8 +176,18 @@ module init_gungho_lbcs_alg_mod
     call update_variable_fields( lbc_times_list, &
                                  clock,lbc_fields )
 
-    ! Combine h_wind (W2h) and v_wind (wtheta) into wind (w2)
-    call combine_lbc_winds( lbc_fields )
+    ! Map to derived fields, e.g. winds in W2H and Wtheta to W2
+    select case( lbc_option )
+      case ( lbc_option_gungho_file )
+        call combine_lbc_winds( lbc_fields, extensive=.true. )
+
+      case ( lbc_option_um2lfric_file )
+        call combine_lbc_winds( lbc_fields, extensive=.false. )
+        call map_lbc_inputs( lbc_fields )
+
+      case default
+        call log_event('This lbc_option not available', LOG_LEVEL_INFO)
+    end select
 
     ! Define boundary_u_driving
     call define_boundary_u( lbc_fields )
@@ -169,16 +199,20 @@ module init_gungho_lbcs_alg_mod
   !!          winds are read in as Wtheta. This combines them into a
   !!          single W2 field.
   !> @param[in,out] fields  The collection of lbc fields
-  subroutine combine_lbc_winds( fields )
+  subroutine combine_lbc_winds( fields, extensive )
 
     use combine_w2_field_kernel_mod, only: combine_w2_field_kernel_type
 
     implicit none
 
     type( field_collection_type ), intent(inout) :: fields
+    logical, intent(in)                          :: extensive
     type(field_type), pointer                    :: wind => null()
     type(field_type), pointer                    :: h_wind => null()
     type(field_type), pointer                    :: v_wind => null()
+
+    type( field_type ), pointer :: dA => null()
+    integer(i_def)              :: mesh_id
 
     write(log_scratch_space,'(A)') "Combining winds "
     call log_event(log_scratch_space, LOG_LEVEL_INFO)
@@ -187,7 +221,14 @@ module init_gungho_lbcs_alg_mod
     v_wind => fields%get_field("lbc_v_u")
     wind => fields%get_field("lbc_u")
 
-    call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind) )
+    if (extensive)then
+      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind))
+    else
+      mesh_id = wind%get_mesh_id()
+      dA => get_da_at_w2(mesh_id)
+      call invoke( combine_w2_field_kernel_type(wind, h_wind, v_wind),    &
+                   inc_X_times_Y(wind, dA) )
+    end if
 
   end subroutine combine_lbc_winds
 
@@ -230,5 +271,54 @@ module init_gungho_lbcs_alg_mod
     nullify( boundary_u, lbc_field, w2_boundary_mask, mesh )
 
   end subroutine define_boundary_u
+
+  !> @brief   Map from LBC fields read from file to derived LBC fields.
+  !> @details LBC files from the UM contain rho*r**2 and specific humidities
+  !>          whereas LFRic needs dry rho and mixing ratios.  So manipulate
+  !>          these accordingly.
+  !> @param[in,out] lbc_fields  The collection of lbc fields
+  subroutine map_lbc_inputs( lbc_fields )
+    use map_um_lbc_inputs_alg_mod, only: map_um_lbc_inputs
+
+    implicit none
+
+    type( field_collection_type ), intent(inout) :: lbc_fields
+
+    type(field_type), pointer :: lbc_rho_r2 => null()
+    type(field_type), pointer :: lbc_rho => null()
+    type(field_type), pointer :: lbc_q => null()
+    type(field_type), pointer :: lbc_qcl => null()
+    type(field_type), pointer :: lbc_qcf => null()
+    type(field_type), pointer :: lbc_qrain => null()
+    type(field_type), pointer :: lbc_m_v => null()
+    type(field_type), pointer :: lbc_m_cl => null()
+    type(field_type), pointer :: lbc_m_ci => null()
+    type(field_type), pointer :: lbc_m_r => null()
+
+    write(log_scratch_space,'(A)') 'Recovering density, and mixing ratios for LBCs. '
+    call log_event(log_scratch_space, LOG_LEVEL_INFO)
+
+    lbc_rho_r2 => lbc_fields%get_field( 'lbc_rho_r2' )
+    lbc_rho    => lbc_fields%get_field( 'lbc_rho' )
+    lbc_q      => lbc_fields%get_field( 'lbc_q' )
+    lbc_qcl    => lbc_fields%get_field( 'lbc_qcl' )
+    lbc_qcf    => lbc_fields%get_field( 'lbc_qcf' )
+    lbc_qrain  => lbc_fields%get_field( 'lbc_qrain' )
+    lbc_m_v    => lbc_fields%get_field( 'lbc_m_v' )
+    lbc_m_ci   => lbc_fields%get_field( 'lbc_m_ci' )
+    lbc_m_cl   => lbc_fields%get_field( 'lbc_m_cl' )
+    lbc_m_r    => lbc_fields%get_field( 'lbc_m_r' )
+
+    call map_um_lbc_inputs(lbc_q, lbc_qcl, lbc_qcf, lbc_qrain, lbc_rho_r2, &
+                           lbc_m_v, lbc_m_cl, lbc_m_ci, lbc_m_r, lbc_rho   &
+                           )
+
+    call lbc_rho%log_minmax(LOG_LEVEL_INFO, 'lbc_rho')
+    call lbc_m_v%log_minmax(LOG_LEVEL_INFO, 'lbc_m_v')
+    call lbc_m_cl%log_minmax(LOG_LEVEL_INFO, 'lbc_m_cl')
+    call lbc_m_ci%log_minmax(LOG_LEVEL_INFO, 'lbc_m_ci')
+    call lbc_m_r%log_minmax(LOG_LEVEL_INFO, 'lbc_m_r')
+
+end subroutine map_lbc_inputs
 
 end module init_gungho_lbcs_alg_mod

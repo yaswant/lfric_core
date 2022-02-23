@@ -257,6 +257,15 @@
                                        },
                          }
                      )',
+
+   'run_application("lfric_atm", "basic_ral_setup", checkkgo=False,
+	             resolutions=[("n96_lam",120.)],
+	             env={"crun":3, "nrun":20,
+	             "directives":{"default":{"mpi_parts":4,
+	                                      "threads":1,
+	                                      "use_xios":"True",
+	                                      "wallclock":"0:30:00"} } },
+	             plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR")',
     'check_compilers("lfric_atm", "basic_gal7_copy", "full-debug",
                      resolution=("C12",1800.0))',
     'canned_test("lfric_atm")'

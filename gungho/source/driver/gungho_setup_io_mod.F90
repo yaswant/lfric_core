@@ -61,7 +61,8 @@ module gungho_setup_io_mod
                                        ancil_option_fixed,        &
                                        ancil_option_updating,     &
                                        lbc_option,                &
-                                       lbc_option_file,           &
+                                       lbc_option_gungho_file,    &
+                                       lbc_option_um2lfric_file,  &
                                        ls_option,                 &
                                        ls_option_file
   use io_config_mod,             only: diagnostic_frequency,      &
@@ -332,7 +333,8 @@ module gungho_setup_io_mod
     end if
 
     ! Setup the lbc file
-    if ( lbc_option == lbc_option_file ) then
+    if ( lbc_option == lbc_option_gungho_file .or. &
+         lbc_option == lbc_option_um2lfric_file ) then
       write(lbc_fname,'(A)') trim(lbc_directory)//'/'// &
                              trim(lbc_filename)
       call tmp_file%init_xios_file("lbc", path=lbc_fname)

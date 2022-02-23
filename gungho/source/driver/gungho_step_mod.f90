@@ -38,7 +38,8 @@ module gungho_step_mod
   use rk_alg_timestep_mod,            only : rk_alg_step
   use timestepping_config_mod,        only : method, &
                                              method_semi_implicit, &
-                                             method_rk
+                                             method_rk,            &
+                                             method_no_timestepping
 
   implicit none
 
@@ -140,6 +141,12 @@ module gungho_step_mod
       case( method_rk )             ! RK
         call rk_alg_step(u, rho, theta, moist_dyn, exner, mr, cloud_fields,  &
                          dt, clock)
+      case( method_no_timestepping )
+        write( log_scratch_space, &
+           '(A, A)' ) 'CAUTION: Running with no timestepping. ' // &
+                      ' Prognostic fields not evolved'
+        call log_event( log_scratch_space, LOG_LEVEL_INFO )
+
     end select
 
     if ( write_conservation_diag ) then

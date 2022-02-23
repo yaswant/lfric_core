@@ -39,7 +39,8 @@ module gungho_model_data_mod
                                                  lbc_option,                  &
                                                  lbc_option_none,             &
                                                  lbc_option_analytic,         &
-                                                 lbc_option_file
+                                                 lbc_option_gungho_file,      &
+                                                 lbc_option_um2lfric_file
   use io_config_mod,                      only : checkpoint_read,  &
                                                  checkpoint_write, &
                                                  write_dump
@@ -521,10 +522,17 @@ contains
         case ( lbc_option_analytic )
           call init_lbcs_analytic_alg( model_data%prognostic_fields, &
                                        model_data%lbc_fields )
-        case ( lbc_option_file )
+
+        case ( lbc_option_gungho_file )
           call init_lbcs_file_alg( model_data%lbc_times_list, &
                                    clock,                     &
                                    model_data%lbc_fields )
+
+        case ( lbc_option_um2lfric_file )
+          call init_lbcs_file_alg( model_data%lbc_times_list, &
+                                   clock,                     &
+                                   model_data%lbc_fields )
+
         case ( lbc_option_none )
           call log_event( "Gungho: No LBC option specified, yet limited area", LOG_LEVEL_ERROR )
       end select

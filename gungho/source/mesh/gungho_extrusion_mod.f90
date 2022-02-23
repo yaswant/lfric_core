@@ -40,6 +40,7 @@ module gungho_extrusion_mod
                                    method_dcmip,               &
                                    method_um_L38_29t_9s_40km,  &
                                    method_um_L85_50t_35s_85km, &
+                                   method_um_L70_61t_9s_40km,  &
                                    method_um_L70_50t_20s_80km, &
                                    domain_top,                 &
                                    number_of_layers
@@ -96,6 +97,20 @@ module gungho_extrusion_mod
   interface um_L85_50t_35s_85km_extrusion_type
     module procedure um_L85_50t_35s_85km_extrusion_constructor
   end interface um_L85_50t_35s_85km_extrusion_type
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Extrudes with specific UM configuration L70_61t_9s_40km
+  !>
+  type, public, extends(extrusion_type) :: um_L70_61t_9s_40km_extrusion_type
+    private
+  contains
+    private
+    procedure, public :: extrude => um_L70_61t_9s_40km_extrude
+  end type um_L70_61t_9s_40km_extrusion_type
+
+  interface um_L70_61t_9s_40km_extrusion_type
+    module procedure um_L70_61t_9s_40km_extrusion_constructor
+  end interface um_L70_61t_9s_40km_extrusion_type
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Extrudes using DCMIP scheme.
@@ -318,6 +333,68 @@ contains
 
   end subroutine um_L70_50t_20s_80km_extrude
 
+  !> @brief Extrudes the mesh with specific UM configuration L70_61t_9s_40km
+  !>
+  !> @param[out] eta Nondimensional vertical coordinate.
+  !>
+  subroutine um_L70_61t_9s_40km_extrude( this, eta )
+
+    implicit none
+
+    class(um_L70_61t_9s_40km_extrusion_type), intent(in)  :: this
+    real(r_def),                   intent(out) :: eta(0:)
+
+    if (this%get_number_of_layers() /= 70)then
+      call log_event( "Extrusion L70_61t_9s_40km reqires 70 levels", log_level_error )
+    end if
+
+    eta(0:this%get_number_of_layers()) = (/ &
+       0.0000000E+00,   0.1250000E-03,   0.5416666E-03,   0.1125000E-02,   0.1875000E-02, &
+       0.2791667E-02,   0.3875000E-02,   0.5125000E-02,   0.6541667E-02,   0.8125000E-02, &
+       0.9875000E-02,   0.1179167E-01,   0.1387500E-01,   0.1612500E-01,   0.1854167E-01, &
+       0.2112500E-01,   0.2387500E-01,   0.2679167E-01,   0.2987500E-01,   0.3312500E-01, &
+       0.3654167E-01,   0.4012500E-01,   0.4387500E-01,   0.4779167E-01,   0.5187500E-01, &
+       0.5612501E-01,   0.6054167E-01,   0.6512500E-01,   0.6987500E-01,   0.7479167E-01, &
+       0.7987500E-01,   0.8512500E-01,   0.9054167E-01,   0.9612500E-01,   0.1018750E+00, &
+       0.1077917E+00,   0.1138750E+00,   0.1201250E+00,   0.1265417E+00,   0.1331250E+00, &
+       0.1398750E+00,   0.1467917E+00,   0.1538752E+00,   0.1611287E+00,   0.1685623E+00, &
+       0.1761954E+00,   0.1840590E+00,   0.1921980E+00,   0.2006732E+00,   0.2095645E+00, &
+       0.2189729E+00,   0.2290236E+00,   0.2398690E+00,   0.2516917E+00,   0.2647077E+00, &
+       0.2791699E+00,   0.2953717E+00,   0.3136506E+00,   0.3343919E+00,   0.3580330E+00, &
+       0.3850676E+00,   0.4160496E+00,   0.4515977E+00,   0.4924007E+00,   0.5392213E+00, &
+       0.5929016E+00,   0.6543679E+00,   0.7246365E+00,   0.8048183E+00,   0.8961251E+00, &
+       0.1000000E+01 &
+       /)
+
+  end subroutine um_L70_61t_9s_40km_extrude
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !> @brief Creates a um_L70_61t_9s_40km_extrusion_type object.
+  !>
+  !> @param[in] atmosphere_bottom Bottom of the atmosphere in meters.
+  !> @param[in] atmosphere_top Top of the atmosphere in meters.
+  !> @param[in] number_of_layers Number of layers in the atmosphere.
+  !>
+  !> @return New uniform_extrusion_type object.
+  !>
+  function um_L70_61t_9s_40km_extrusion_constructor( atmosphere_bottom, &
+                                                     atmosphere_top,    &
+                                                     number_of_layers,   &
+                                                     extrusion_id ) result(new)
+    implicit none
+
+    real(r_def),    intent(in) :: atmosphere_bottom
+    real(r_def),    intent(in) :: atmosphere_top
+    integer(i_def), intent(in) :: number_of_layers
+    integer(i_def), intent(in) :: extrusion_id
+
+    type(um_L70_61t_9s_40km_extrusion_type) :: new
+
+    call new%extrusion_constructor( atmosphere_bottom, atmosphere_top, &
+                                    number_of_layers, extrusion_id )
+
+  end function um_L70_61t_9s_40km_extrusion_constructor
+
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Creates a dcmip_extrusion_type object.
   !>
@@ -435,6 +512,11 @@ contains
                                                                  PRIME_EXTRUSION ) )
       case (method_um_L70_50t_20s_80km)
         allocate( new, source=um_L70_50t_20s_80km_extrusion_type( atmosphere_bottom, &
+                                                                 domain_top,         &
+                                                                 number_of_layers,   &
+                                                                 PRIME_EXTRUSION ) )
+      case (method_um_L70_61t_9s_40km)
+       allocate( new, source=um_L70_61t_9s_40km_extrusion_type( atmosphere_bottom,   &
                                                                  domain_top,         &
                                                                  number_of_layers,   &
                                                                  PRIME_EXTRUSION ) )

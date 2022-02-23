@@ -158,6 +158,18 @@ contains
         call write_scalar_diagnostic('readlbc_v_u', v_u, &
                                  clock, mesh, nodal_output_on_w3)
 
+        if (use_moisture) then
+          theta => lbc_fields%get_field('lbc_m_v')
+          call write_scalar_diagnostic('lbc_m_v', theta, &
+                                   clock, mesh, nodal_output_on_w3)
+          theta => lbc_fields%get_field('lbc_q')
+          call write_scalar_diagnostic('lbc_q', theta, &
+                                   clock, mesh, nodal_output_on_w3)
+          rho => lbc_fields%get_field('lbc_rho_r2')
+          call write_scalar_diagnostic('lbc_rho_r2', rho, &
+                                   clock, mesh, nodal_output_on_w3)
+        end if
+
         ! Vector fields
         call write_vector_diagnostic('lbc_u', u, &
                                  clock, mesh, nodal_output_on_w3)
