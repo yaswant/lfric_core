@@ -119,7 +119,7 @@ contains
     use function_space_collection_mod, only: function_space_collection
     use fs_continuity_mod,             only: W2, W2v, W2h, W3
     use timestepping_config_mod,       only: beta
-    use map_w2_to_sh_w2_alg_mod,       only: map_w2_to_sh_w2_alg
+    use map_w2_to_sh_w2_alg_mod,       only: sample_w2_to_sh_w2_alg
     use dg_matrix_vector_kernel_mod,   only: dg_matrix_vector_kernel_type
     use fem_constants_mod,             only: get_div, &
                                              get_inverse_W3_mass_matrix
@@ -212,8 +212,8 @@ contains
       call shifted_wind_np1%initialise( vector_space = &
               function_space_collection%get_fs(shifted_mesh, element_order, W2) )
 
-      call map_w2_to_sh_w2_alg(shifted_wind_n,   primal_wind_n)
-      call map_w2_to_sh_w2_alg(shifted_wind_np1, primal_wind_np1)
+      call sample_w2_to_sh_w2_alg(shifted_wind_n,   primal_wind_n)
+      call sample_w2_to_sh_w2_alg(shifted_wind_np1, primal_wind_np1)
     end if
 
 

@@ -3,9 +3,9 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> Test the w3_to_sh_w3_ints kernel
+!> Test the proj_w3_to_sh_w3_rhs_op kernel
 !>
-module w3_to_sh_w3_ints_kernel_mod_test
+module proj_w3_to_sh_w3_rhs_op_kernel_mod_test
   use constants_mod,                       only : i_def, r_def
   use get_unit_test_m3x3_q3x3x3_sizes_mod, only : get_w0_m3x3_q3x3x3_size,  &
                                                   get_w3_m3x3_q3x3x3_size
@@ -22,17 +22,17 @@ module w3_to_sh_w3_ints_kernel_mod_test
 
   private
 
-  public :: w3_to_sh_w3_ints_kernel_test_type, test_all
+  public :: proj_w3_to_sh_w3_rhs_op_kernel_test_type, test_all
 
   @TestCase
-  type, extends(MPITestCase) :: w3_to_sh_w3_ints_kernel_test_type
+  type, extends(MPITestCase) :: proj_w3_to_sh_w3_rhs_op_kernel_test_type
     private
 
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type w3_to_sh_w3_ints_kernel_test_type
+  end type proj_w3_to_sh_w3_rhs_op_kernel_test_type
 
 contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -45,7 +45,7 @@ contains
 
     implicit none
 
-    class(w3_to_sh_w3_ints_kernel_test_type), intent(inout) :: this
+    class(proj_w3_to_sh_w3_rhs_op_kernel_test_type), intent(inout) :: this
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -71,7 +71,7 @@ contains
     implicit none
 
 
-    class(w3_to_sh_w3_ints_kernel_test_type), intent(inout) :: this
+    class(proj_w3_to_sh_w3_rhs_op_kernel_test_type), intent(inout) :: this
 
     call final_configuration()
 
@@ -89,11 +89,11 @@ contains
   subroutine test_all( this)
 
     use, intrinsic :: iso_fortran_env, only : real64
-    use w3_to_sh_w3_ints_kernel_mod,   only : w3_to_sh_w3_ints_code
+    use proj_w3_to_sh_w3_rhs_op_kernel_mod,   only : proj_w3_to_sh_w3_rhs_op_code
 
     implicit none
 
-    class(w3_to_sh_w3_ints_kernel_test_type), intent(inout) :: this
+    class(proj_w3_to_sh_w3_rhs_op_kernel_test_type), intent(inout) :: this
 
     real(kind=r_def), parameter :: tol = 1.0e-12_r_def  ! r_def 64bit tolerance
     real(kind=r_def), parameter :: dx = 4.0_r_def
@@ -176,25 +176,25 @@ contains
     allocate( T_i( undf_w3 ) )
 
     cell = 5
-    call w3_to_sh_w3_ints_code(                                   &
-                                nlayers,                          &
-                                T_ip1,                            &
-                                T_i,                              &
-                                dummy_w3_sh,                      &
-                                dl_chi1,                          &
-                                dl_chi2,                          &
-                                dl_chi3,                          &
-                                panel_id,                         &
-                                ndf_w3, undf_w3,                  &
-                                map_w3(:,cell),                   &
-                                ndf_w3_sh, undf_w3_sh,            &
-                                map_w3_sh(:,cell),                &
-                                ndf_dl_w0, undf_dl_w0,            &
-                                map_dl_w0(:,cell),                &
-                                basis_w0, diff_basis_w0,          &
-                                ndf_pid, undf_pid, map_pid,       &
-                                nqp_h, nqp_v, wh, wv              &
-                              )
+    call proj_w3_to_sh_w3_rhs_op_code(                                    &
+                                        nlayers,                          &
+                                        T_ip1,                            &
+                                        T_i,                              &
+                                        dummy_w3_sh,                      &
+                                        dl_chi1,                          &
+                                        dl_chi2,                          &
+                                        dl_chi3,                          &
+                                        panel_id,                         &
+                                        ndf_w3, undf_w3,                  &
+                                        map_w3(:,cell),                   &
+                                        ndf_w3_sh, undf_w3_sh,            &
+                                        map_w3_sh(:,cell),                &
+                                        ndf_dl_w0, undf_dl_w0,            &
+                                        map_dl_w0(:,cell),                &
+                                        basis_w0, diff_basis_w0,          &
+                                        ndf_pid, undf_pid, map_pid,       &
+                                        nqp_h, nqp_v, wh, wv              &
+                                      )
 
     answer = dV / 2.0
 
@@ -231,4 +231,4 @@ contains
 
   end subroutine test_all
 
-end module w3_to_sh_w3_ints_kernel_mod_test
+end module proj_w3_to_sh_w3_rhs_op_kernel_mod_test

@@ -33,8 +33,10 @@ module intermesh_constants_mod
   use fem_constants_mod,                 only: get_qr
 
   ! Kernels
-  use mr_to_sh_mass_ints_kernel_mod,     only: mr_to_sh_mass_ints_kernel_type
-  use w3_to_sh_w3_ints_kernel_mod,       only: w3_to_sh_w3_ints_kernel_type
+  use proj_mr_to_sh_rho_rhs_op_kernel_mod, &
+                                         only: proj_mr_to_sh_rho_rhs_op_kernel_type
+  use proj_w3_to_sh_w3_rhs_op_kernel_mod,  &
+                                         only: proj_w3_to_sh_w3_rhs_op_kernel_type
 
   implicit none
 
@@ -44,15 +46,15 @@ module intermesh_constants_mod
   ! functions returning pointers to them
 
   ! Double level mesh features
-  type(field_type), target, dimension(:), allocatable :: mr_to_sh_mass_integrals
-  type(field_type), target, dimension(:), allocatable :: w3_to_sh_w3_integrals
+  type(field_type), target, dimension(:), allocatable :: proj_mr_to_sh_rho_rhs_op
+  type(field_type), target, dimension(:), allocatable :: proj_w3_to_sh_w3_rhs_op
 
   ! Public functions to create and access the module contents
 
   public :: create_intermesh_constants
   public :: final_intermesh_constants
-  public :: get_mr_to_sh_mass_integrals
-  public :: get_w3_to_sh_w3_integrals
+  public :: get_proj_mr_to_sh_rho_rhs_op
+  public :: get_proj_w3_to_sh_w3_rhs_op
 
 
 contains
@@ -105,34 +107,34 @@ contains
 
     !======== Create transform matrix stuff for wtheta to shifted W3 ========!
 
-    allocate(mr_to_sh_mass_integrals(4))
+    allocate(proj_mr_to_sh_rho_rhs_op(4))
     do i = 1, 4
-      call mr_to_sh_mass_integrals(i)%initialise( vector_space = w3_fs )
-      call invoke( setval_c(mr_to_sh_mass_integrals(i), 0.0_r_def) )
+      call proj_mr_to_sh_rho_rhs_op(i)%initialise( vector_space = w3_fs )
+      call invoke( setval_c(proj_mr_to_sh_rho_rhs_op(i), 0.0_r_def) )
     end do
 
     call dummy_theta%initialise( vector_space = wtheta_fs )
-    call invoke( mr_to_sh_mass_ints_kernel_type( mr_to_sh_mass_integrals, &
-                                                 double_level_chi,        &
-                                                 panel_id,                &
-                                                 dummy_theta,             &
-                                                 qr                       &
-                                                    ) )
+    call invoke( proj_mr_to_sh_rho_rhs_op_kernel_type(                 &
+                                              proj_mr_to_sh_rho_rhs_op, &
+                                              double_level_chi,        &
+                                              panel_id,                &
+                                              dummy_theta,             &
+                                              qr ) )
     !========== Create transform matrix stuff for W3 to shifted W3 ==========!
 
-    allocate(w3_to_sh_w3_integrals(2))
+    allocate(proj_w3_to_sh_w3_rhs_op(2))
     do i = 1, 2
-      call w3_to_sh_w3_integrals(i)%initialise( vector_space = w3_fs )
-      call invoke( setval_c(w3_to_sh_w3_integrals(i), 0.0_r_def) )
+      call proj_w3_to_sh_w3_rhs_op(i)%initialise( vector_space = w3_fs )
+      call invoke( setval_c(proj_w3_to_sh_w3_rhs_op(i), 0.0_r_def) )
     end do
 
     call dummy_w3_shifted%initialise( vector_space = w3_shift_fs )
-    call invoke( w3_to_sh_w3_ints_kernel_type( w3_to_sh_w3_integrals,     &
-                                               dummy_w3_shifted,          &
-                                               double_level_chi,          &
-                                               panel_id,                  &
-                                               qr                         &
-                                              ) )
+    call invoke( proj_w3_to_sh_w3_rhs_op_kernel_type(                    &
+                                              proj_w3_to_sh_w3_rhs_op,     &
+                                              dummy_w3_shifted,          &
+                                              double_level_chi,          &
+                                              panel_id,                  &
+                                              qr ) )
 
     nullify( w3_fs  )
     nullify( wtheta_fs )
@@ -148,21 +150,21 @@ contains
   !> @brief Returns a pointer to the Wtheta to shifted W3 ints
   !> @return The integrals for transforming a mixing ratio in Wtheta
   !> to a density in shifted W3
-  function get_mr_to_sh_mass_integrals() result(ptr)
+  function get_proj_mr_to_sh_rho_rhs_op() result(ptr)
     implicit none
     type(field_type), pointer :: ptr(:)
-    ptr => mr_to_sh_mass_integrals
+    ptr => proj_mr_to_sh_rho_rhs_op
 
-  end function get_mr_to_sh_mass_integrals
+  end function get_proj_mr_to_sh_rho_rhs_op
 
   !> @brief Returns a pointer to the W3 to shifted W3 ints
   !> @return The integrals for transforming from W3 to shifted W3
-  function get_w3_to_sh_w3_integrals() result(ptr)
+  function get_proj_w3_to_sh_w3_rhs_op() result(ptr)
     implicit none
     type(field_type), pointer :: ptr(:)
-    ptr => w3_to_sh_w3_integrals
+    ptr => proj_w3_to_sh_w3_rhs_op
 
-  end function get_w3_to_sh_w3_integrals
+  end function get_proj_w3_to_sh_w3_rhs_op
 
 
   !> @brief Explicitly reclaim memory from module scope variables
@@ -171,8 +173,8 @@ contains
 
     implicit none
 
-    if (allocated(mr_to_sh_mass_integrals)) deallocate(mr_to_sh_mass_integrals)
-    if (allocated(w3_to_sh_w3_integrals)) deallocate(w3_to_sh_w3_integrals)
+    if (allocated(proj_mr_to_sh_rho_rhs_op)) deallocate(proj_mr_to_sh_rho_rhs_op)
+    if (allocated(proj_w3_to_sh_w3_rhs_op)) deallocate(proj_w3_to_sh_w3_rhs_op)
 
 
   end subroutine final_intermesh_constants

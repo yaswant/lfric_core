@@ -10,8 +10,8 @@
 !> performed over the double level mesh.
 !> The resulting (non-square) matrix is bi-diagonal.
 !> We store the components in W3 fields.
-!>
-module w3_to_sh_w3_ints_kernel_mod
+!> This is only designed to worked for the lowest-order elements.
+module proj_w3_to_sh_w3_rhs_op_kernel_mod
 
   use argument_mod,          only : arg_type, func_type,       &
                                     GH_FIELD, GH_REAL,         &
@@ -35,7 +35,7 @@ module w3_to_sh_w3_ints_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> Psy layer.
   !>
-  type, public, extends(kernel_type) :: w3_to_sh_w3_ints_kernel_type
+  type, public, extends(kernel_type) :: proj_w3_to_sh_w3_rhs_op_kernel_type
     private
     type(arg_type) :: meta_args(4) = (/                                      &
          arg_type(GH_FIELD*2, GH_REAL, GH_WRITE, W3),                        & ! T_ip1, T_i
@@ -49,13 +49,13 @@ module w3_to_sh_w3_ints_kernel_mod
     integer :: operates_on = CELL_COLUMN
     integer :: gh_shape = GH_QUADRATURE_XYoZ
   contains
-    procedure, nopass :: w3_to_sh_w3_ints_code
+    procedure, nopass :: proj_w3_to_sh_w3_rhs_op_code
   end type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: w3_to_sh_w3_ints_code
+  public :: proj_w3_to_sh_w3_rhs_op_code
 
 contains
 
@@ -88,33 +88,33 @@ contains
 !> @param[in] nqp_v Number of quadrature points in the vertical
 !> @param[in] wqp_h Horizontal quadrature weights
 !> @param[in] wqp_v Vertical quadrature weights
-subroutine w3_to_sh_w3_ints_code( nlayers,        &
-                                  T_ip1,          &
-                                  T_i,            &
-                                  dummy_w3_sh,    &
-                                  chi_dl_1,       &
-                                  chi_dl_2,       &
-                                  chi_dl_3,       &
-                                  panel_id,       &
-                                  ndf_w3,         &
-                                  undf_w3,        &
-                                  map_w3,         &
-                                  ndf_w3_sh,      &
-                                  undf_w3_sh,     &
-                                  map_w3_sh,      &
-                                  ndf_wchi_dl,    &
-                                  undf_wchi_dl,   &
-                                  map_wchi_dl,    &
-                                  chi_basis,      &
-                                  chi_diff_basis, &
-                                  ndf_pid,        &
-                                  undf_pid,       &
-                                  map_pid,        &
-                                  nqp_h,          &
-                                  nqp_v,          &
-                                  wqp_h,          &
-                                  wqp_v           &
-                                )
+subroutine proj_w3_to_sh_w3_rhs_op_code( nlayers,        &
+                                         T_ip1,          &
+                                         T_i,            &
+                                         dummy_w3_sh,    &
+                                         chi_dl_1,       &
+                                         chi_dl_2,       &
+                                         chi_dl_3,       &
+                                         panel_id,       &
+                                         ndf_w3,         &
+                                         undf_w3,        &
+                                         map_w3,         &
+                                         ndf_w3_sh,      &
+                                         undf_w3_sh,     &
+                                         map_w3_sh,      &
+                                         ndf_wchi_dl,    &
+                                         undf_wchi_dl,   &
+                                         map_wchi_dl,    &
+                                         chi_basis,      &
+                                         chi_diff_basis, &
+                                         ndf_pid,        &
+                                         undf_pid,       &
+                                         map_pid,        &
+                                         nqp_h,          &
+                                         nqp_v,          &
+                                         wqp_h,          &
+                                         wqp_v           &
+                                       )
 
   use coordinate_jacobian_mod,  only: coordinate_jacobian
 
@@ -199,6 +199,6 @@ subroutine w3_to_sh_w3_ints_code( nlayers,        &
     T_i( map_w3(1) + k) = T_i_e
   end do
 
-end subroutine w3_to_sh_w3_ints_code
+end subroutine proj_w3_to_sh_w3_rhs_op_code
 
-end module w3_to_sh_w3_ints_kernel_mod
+end module proj_w3_to_sh_w3_rhs_op_kernel_mod

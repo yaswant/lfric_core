@@ -3,8 +3,8 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> Test the rhs_w3_to_sh_w3_kernel
-module rhs_w3_to_sh_w3_kernel_mod_test
+!> Test the apply_w3_to_sh_w3_kernel
+module apply_w3_to_sh_w3_kernel_mod_test
 
   use constants_mod,                       only : i_def, r_def
   use get_unit_test_m3x3_q3x3x3_sizes_mod, only : get_w3_m3x3_q3x3x3_size
@@ -16,16 +16,16 @@ module rhs_w3_to_sh_w3_kernel_mod_test
   implicit none
 
   private
-  public :: rhs_w3_to_sh_w3_test_type, test_all
+  public :: apply_w3_to_sh_w3_test_type, test_all
 
   @TestCase
-  type, extends(MPITestCase) :: rhs_w3_to_sh_w3_test_type
+  type, extends(MPITestCase) :: apply_w3_to_sh_w3_test_type
     private
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type rhs_w3_to_sh_w3_test_type
+  end type apply_w3_to_sh_w3_test_type
 
 contains
 
@@ -38,7 +38,7 @@ contains
 
     implicit none
 
-    class(rhs_w3_to_sh_w3_test_type), intent(inout) :: this
+    class(apply_w3_to_sh_w3_test_type), intent(inout) :: this
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -61,7 +61,7 @@ contains
 
     implicit none
 
-    class(rhs_w3_to_sh_w3_test_type), intent(inout) :: this
+    class(apply_w3_to_sh_w3_test_type), intent(inout) :: this
 
     ! Finalise YAXT
     call xt_finalize()
@@ -74,11 +74,11 @@ contains
   @Test( npes=[1] )
   subroutine test_all( this )
 
-    use rhs_w3_to_sh_w3_kernel_mod, only : rhs_w3_to_sh_w3_code
+    use apply_w3_to_sh_w3_kernel_mod, only : apply_w3_to_sh_w3_code
 
    implicit none
 
-    class(rhs_w3_to_sh_w3_test_type), intent(inout) :: this
+    class(apply_w3_to_sh_w3_test_type), intent(inout) :: this
 
     real(kind=r_def),      parameter :: tol = 1.0e-12_r_def
     real(kind=r_def),      parameter :: dx = 5.0_r_def
@@ -142,19 +142,19 @@ contains
     end do
 
     cell = 1
-    call rhs_w3_to_sh_w3_code(                     &
-                                nlayers_sh,        &
-                                rhs_w3_sh,         &
-                                field_w3,          &
-                                T_ip1,             &
-                                T_i,               &
-                                ndf_w3_sh,         &
-                                undf_w3_sh,        &
-                                map_w3_sh(:,cell), &
-                                ndf_w3,            &
-                                undf_w3,           &
-                                map_w3(:,cell)     &
-                              )
+    call apply_w3_to_sh_w3_code(                    &
+                                 nlayers_sh,        &
+                                 rhs_w3_sh,         &
+                                 field_w3,          &
+                                 T_ip1,             &
+                                 T_i,               &
+                                 ndf_w3_sh,         &
+                                 undf_w3_sh,        &
+                                 map_w3_sh(:,cell), &
+                                 ndf_w3,            &
+                                 undf_w3,           &
+                                 map_w3(:,cell)     &
+                               )
 
     ! Look at first column
     rhs_answer(:) = 0.0_r_def
@@ -178,4 +178,4 @@ contains
 
   end subroutine test_all
 
-end module rhs_w3_to_sh_w3_kernel_mod_test
+end module apply_w3_to_sh_w3_kernel_mod_test

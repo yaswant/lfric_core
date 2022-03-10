@@ -3,10 +3,13 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Maps a field from W2 to shifted W2.
-!> @details Calculates a shifted W2 field from a W2 by doing some averaging.
-!>
-module w2_to_sh_w2_kernel_mod
+!> @brief Samples a field from W2 to shifted W2.
+!> @details Calculates a shifted W2 field from a W2 by sampling the velocity
+!!          and using area weightings. This preserves a horizontal velocity that
+!!          varies linearly in the vertical.
+!!          This kernel only works with the lowest-order finite element spaces
+!!          on quadrilateral cells.
+module sample_w2_to_sh_w2_kernel_mod
 
   use argument_mod,          only : arg_type,                  &
                                     GH_FIELD, GH_REAL,         &
@@ -29,7 +32,7 @@ module w2_to_sh_w2_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> Psy layer.
   !>
-  type, public, extends(kernel_type) :: w2_to_sh_w2_kernel_type
+  type, public, extends(kernel_type) :: sample_w2_to_sh_w2_kernel_type
     private
     type(arg_type) :: meta_args(7) = (/                                   &
          arg_type(GH_FIELD, GH_REAL, GH_INC,  ANY_SPACE_2),               & ! field_w2_sh
@@ -42,17 +45,17 @@ module w2_to_sh_w2_kernel_mod
          /)
     integer :: operates_on = CELL_COLUMN
   contains
-    procedure, nopass :: w2_to_sh_w2_code
+    procedure, nopass :: sample_w2_to_sh_w2_code
   end type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: w2_to_sh_w2_code
+  public :: sample_w2_to_sh_w2_code
 
 contains
 
-!> @brief Maps a field from W2 to the W2 shifted space.
+!> @brief Samples a W2 field in the W2 shifted space.
 !>
 !> @param[in] nlayers_sh Number of layers in the shifted mesh
 !> @param[in,out] field_w2_sh Field in the shifted W2 space to be returned.
@@ -77,30 +80,30 @@ contains
 !> @param[in] ndf_wt Number of degrees of freedom per cell for Wtheta
 !> @param[in] undf_wt Number of (local) unique degrees of freedom for Wtheta
 !> @param[in] map_wt Dofmap for the cell at the base of the column for Wtheta
-subroutine w2_to_sh_w2_code(  nlayers_sh,       &
-                              field_w2_sh,      &
-                              field_w2,         &
-                              area_w2_sh,       &
-                              area_w2,          &
-                              area_w2_dl,       &
-                              height_wt_sh,     &
-                              height_wt,        &
-                              ndf_w2_sh,        &
-                              undf_w2_sh,       &
-                              map_w2_sh,        &
-                              ndf_w2,           &
-                              undf_w2,          &
-                              map_w2,           &
-                              ndf_w2_dl,        &
-                              undf_w2_dl,       &
-                              map_w2_dl,        &
-                              ndf_wt_sh,        &
-                              undf_wt_sh,       &
-                              map_wt_sh,        &
-                              ndf_wt,           &
-                              undf_wt,          &
-                              map_wt            &
-                            )
+subroutine sample_w2_to_sh_w2_code( nlayers_sh,       &
+                                    field_w2_sh,      &
+                                    field_w2,         &
+                                    area_w2_sh,       &
+                                    area_w2,          &
+                                    area_w2_dl,       &
+                                    height_wt_sh,     &
+                                    height_wt,        &
+                                    ndf_w2_sh,        &
+                                    undf_w2_sh,       &
+                                    map_w2_sh,        &
+                                    ndf_w2,           &
+                                    undf_w2,          &
+                                    map_w2,           &
+                                    ndf_w2_dl,        &
+                                    undf_w2_dl,       &
+                                    map_w2_dl,        &
+                                    ndf_wt_sh,        &
+                                    undf_wt_sh,       &
+                                    map_wt_sh,        &
+                                    ndf_wt,           &
+                                    undf_wt,          &
+                                    map_wt            &
+                                  )
 
   implicit none
 
@@ -180,6 +183,6 @@ subroutine w2_to_sh_w2_code(  nlayers_sh,       &
       * field_w2(map_w2(df)+k-1)
   end do
 
-end subroutine w2_to_sh_w2_code
+end subroutine sample_w2_to_sh_w2_code
 
-end module w2_to_sh_w2_kernel_mod
+end module sample_w2_to_sh_w2_kernel_mod

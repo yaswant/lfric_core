@@ -15,20 +15,20 @@ module map_w2_to_sh_w2_alg_mod
                                               get_height
   use mesh_mod,                         only: mesh_type
   use mesh_collection_mod,              only: mesh_collection
-  use w2_to_sh_w2_kernel_mod,           only: w2_to_sh_w2_kernel_type
+  use sample_w2_to_sh_w2_kernel_mod,    only: sample_w2_to_sh_w2_kernel_type
 
   implicit none
 
   private
 
-  public :: map_w2_to_sh_w2_alg
+  public :: sample_w2_to_sh_w2_alg
 
 contains
 
-  !> @brief Input a W2 field and map to the shifted W2 mesh.
-  !> @param[in,out] w2_field_shifted The W2 field mapped to the shifted W2 mesh
+  !> @brief Sample a W2 field in the shifted W2 function space.
+  !> @param[in,out] w2_field_shifted The W2 field sampled in shifted W2
   !> @param[in]     w2_field         The W2 field to map
-  subroutine map_w2_to_sh_w2_alg(w2_field_shifted, w2_field)
+  subroutine sample_w2_to_sh_w2_alg(w2_field_shifted, w2_field)
 
     implicit none
 
@@ -65,19 +65,19 @@ contains
     height_wt_shifted => get_height(WTHETA, shifted_mesh_id)
 
     ! Map field to shifted mesh
-    call invoke( w2_to_sh_w2_kernel_type( w2_field_shifted,   &
-                                          w2_field,           &
-                                          dA_w2_shifted,      &
-                                          dA_w2,              &
-                                          dA_w2_double_level, &
-                                          height_wt_shifted,  &
-                                          height_wt           &
-                                          ) )
+    call invoke( sample_w2_to_sh_w2_kernel_type( w2_field_shifted,   &
+                                                 w2_field,           &
+                                                 dA_w2_shifted,      &
+                                                 dA_w2,              &
+                                                 dA_w2_double_level, &
+                                                 height_wt_shifted,  &
+                                                 height_wt           &
+                                                 ) )
 
     nullify( primary_mesh, shifted_mesh, double_level_mesh, &
              dA_w2, dA_w2_shifted, dA_w2_double_level,      &
              height_wt, height_wt_shifted )
 
-  end subroutine map_w2_to_sh_w2_alg
+  end subroutine sample_w2_to_sh_w2_alg
 
 end module map_w2_to_sh_w2_alg_mod

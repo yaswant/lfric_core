@@ -22,7 +22,7 @@
 !>    mesh.
 !> 3. We assume rehabilitation and do not divide by det J for W3 fields.
 !>
-module mr_to_sh_mass_ints_kernel_mod
+module proj_mr_to_sh_rho_rhs_op_kernel_mod
 
   use argument_mod,      only : arg_type, func_type,                    &
                                 GH_FIELD, GH_REAL, GH_WRITE, GH_READ,   &
@@ -43,7 +43,7 @@ module mr_to_sh_mass_ints_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> PSy layer.
   !>
-  type, public, extends(kernel_type) :: mr_to_sh_mass_ints_kernel_type
+  type, public, extends(kernel_type) :: proj_mr_to_sh_rho_rhs_op_kernel_type
     private
     type(arg_type) :: meta_args(4) = (/                                      &
          arg_type(GH_FIELD*4, GH_REAL, GH_WRITE, W3),                        & ! I_lower/upper
@@ -58,13 +58,13 @@ module mr_to_sh_mass_ints_kernel_mod
     integer :: operates_on = CELL_COLUMN
     integer :: gh_shape = GH_QUADRATURE_XYoZ
   contains
-    procedure, nopass :: mr_to_sh_mass_ints_code
+    procedure, nopass :: proj_mr_to_sh_rho_rhs_op_code
   end type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: mr_to_sh_mass_ints_code
+  public :: proj_mr_to_sh_rho_rhs_op_code
 contains
 
 !> @brief Compute integrals for matrix transforming from mixing ratio to density.
@@ -104,24 +104,24 @@ contains
 !! @param[in] nqp_v Number of quadrature points in the vertical
 !! @param[in] wqp_h Horizontal quadrature weights
 !! @param[in] wqp_v Vertical quadrature weights
-subroutine mr_to_sh_mass_ints_code(                                      &
-                                    nlayers,                             &
-                                    I_lower_i_ip1,                       &
-                                    I_lower_i_i,                         &
-                                    I_upper_i_i,                         &
-                                    I_upper_i_im1,                       &
-                                    chi_dl_1, chi_dl_2, chi_dl_3,        &
-                                    panel_id,                            &
-                                    dummy_theta,                         &
-                                    ndf_w3, undf_w3, map_w3,             &
-                                    ndf_chi_dl, undf_chi_dl, map_chi_dl, &
-                                    chi_dl_basis,                        &
-                                    chi_dl_diff_basis,                   &
-                                    ndf_pid, undf_pid, map_pid,          &
-                                    ndf_wtheta, undf_wtheta,             &
-                                    map_wtheta, wtheta_basis,            &
-                                    nqp_h, nqp_v, wqp_h, wqp_v           &
-                                   )
+subroutine proj_mr_to_sh_rho_rhs_op_code(                                      &
+                                          nlayers,                             &
+                                          I_lower_i_ip1,                       &
+                                          I_lower_i_i,                         &
+                                          I_upper_i_i,                         &
+                                          I_upper_i_im1,                       &
+                                          chi_dl_1, chi_dl_2, chi_dl_3,        &
+                                          panel_id,                            &
+                                          dummy_theta,                         &
+                                          ndf_w3, undf_w3, map_w3,             &
+                                          ndf_chi_dl, undf_chi_dl, map_chi_dl, &
+                                          chi_dl_basis,                        &
+                                          chi_dl_diff_basis,                   &
+                                          ndf_pid, undf_pid, map_pid,          &
+                                          ndf_wtheta, undf_wtheta,             &
+                                          map_wtheta, wtheta_basis,            &
+                                          nqp_h, nqp_v, wqp_h, wqp_v           &
+                                         )
 
   use coordinate_jacobian_mod,  only: coordinate_jacobian
 
@@ -235,6 +235,6 @@ subroutine mr_to_sh_mass_ints_code(                                      &
     end do
   end do
 
-end subroutine mr_to_sh_mass_ints_code
+end subroutine proj_mr_to_sh_rho_rhs_op_code
 
-end module mr_to_sh_mass_ints_kernel_mod
+end module proj_mr_to_sh_rho_rhs_op_kernel_mod

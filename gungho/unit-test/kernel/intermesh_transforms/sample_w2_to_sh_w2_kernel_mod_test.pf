@@ -4,9 +4,9 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 
-!> Test the kernel mapping from W2 to the shifted W2 space
+!> Test the kernel sampling from W2 to the shifted W2 space
 !>
-module w2_to_sh_w2_kernel_mod_test
+module sample_w2_to_sh_w2_kernel_mod_test
 
   use constants_mod,         only: i_def, r_def
   use reference_element_mod, only: E, W, N, S, T, B
@@ -18,10 +18,10 @@ module w2_to_sh_w2_kernel_mod_test
   implicit none
 
   private
-  public :: w2_to_sh_w2_test_type, test_all
+  public :: sample_w2_to_sh_w2_test_type, test_all
 
   @TestCase
-  type, extends(MPITestCase) :: w2_to_sh_w2_test_type
+  type, extends(MPITestCase) :: sample_w2_to_sh_w2_test_type
     private
   contains
 
@@ -29,7 +29,7 @@ module w2_to_sh_w2_kernel_mod_test
     procedure tearDown
     procedure test_all
 
-  end type w2_to_sh_w2_test_type
+  end type sample_w2_to_sh_w2_test_type
 
 contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -37,7 +37,7 @@ contains
 
     implicit none
 
-    class(w2_to_sh_w2_test_type), intent(inout) :: this
+    class(sample_w2_to_sh_w2_test_type), intent(inout) :: this
 
     ! Initialise YAXT
     call xt_initialize(this%getMpiCommunicator())
@@ -53,7 +53,7 @@ contains
 
     implicit none
 
-    class(w2_to_sh_w2_test_type), intent(inout) :: this
+    class(sample_w2_to_sh_w2_test_type), intent(inout) :: this
 
     call final_configuration()
 
@@ -68,11 +68,11 @@ contains
   @Test( npes=[1] )
   subroutine test_all( this )
 
-    use w2_to_sh_w2_kernel_mod, only : w2_to_sh_w2_code
+    use sample_w2_to_sh_w2_kernel_mod, only : sample_w2_to_sh_w2_code
 
     implicit none
 
-    class(w2_to_sh_w2_test_type), intent(inout) :: this
+    class(sample_w2_to_sh_w2_test_type), intent(inout) :: this
 
     real(r_def), parameter ::  tol = 1.0e-12_r_def
     real(r_def), parameter ::   dx = 5.0_r_def
@@ -236,30 +236,30 @@ contains
       height_wt_sh(map_wt_sh(2, cell)+nlayers_sh-1) * dx * dy
 
     ! Perform kernel
-    call w2_to_sh_w2_code(  nlayers_sh,   &
-                            u_sh_field,   &
-                            u_field,      &
-                            area_w2_sh,   &
-                            area_w2,      &
-                            area_w2_dl,   &
-                            height_wt_sh, &
-                            height_wt,    &
-                            ndf_w2_sh,    &
-                            undf_w2_sh,   &
-                            map_w2_sh,    &
-                            ndf_w2,       &
-                            undf_w2,      &
-                            map_w2,       &
-                            ndf_w2_dl,    &
-                            undf_w2_dl,   &
-                            map_w2_dl,    &
-                            ndf_wt_sh,    &
-                            undf_wt_sh,   &
-                            map_wt_sh,    &
-                            ndf_wt,       &
-                            undf_wt,      &
-                            map_wt        &
-                          )
+    call sample_w2_to_sh_w2_code( nlayers_sh,   &
+                                  u_sh_field,   &
+                                  u_field,      &
+                                  area_w2_sh,   &
+                                  area_w2,      &
+                                  area_w2_dl,   &
+                                  height_wt_sh, &
+                                  height_wt,    &
+                                  ndf_w2_sh,    &
+                                  undf_w2_sh,   &
+                                  map_w2_sh,    &
+                                  ndf_w2,       &
+                                  undf_w2,      &
+                                  map_w2,       &
+                                  ndf_w2_dl,    &
+                                  undf_w2_dl,   &
+                                  map_w2_dl,    &
+                                  ndf_wt_sh,    &
+                                  undf_wt_sh,   &
+                                  map_wt_sh,    &
+                                  ndf_wt,       &
+                                  undf_wt,      &
+                                  map_wt        &
+                                )
 
     @assertEqual(answer(:), u_sh_field(:), tol)
 
@@ -280,4 +280,4 @@ contains
 
   end subroutine test_all
 
-end module w2_to_sh_w2_kernel_mod_test
+end module sample_w2_to_sh_w2_kernel_mod_test

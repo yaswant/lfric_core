@@ -16,7 +16,7 @@ module moist_mr_transport_alg_mod
   use fs_continuity_mod,              only: W2, W3
   use function_space_mod,             only: function_space_type
   use function_space_collection_mod,  only: function_space_collection
-  use intermesh_constants_mod,        only: get_mr_to_sh_mass_integrals
+  use intermesh_constants_mod,        only: get_proj_mr_to_sh_rho_rhs_op
   use io_config_mod,                  only: subroutine_timers
   use log_mod,                        only: log_event,       &
                                             LOG_LEVEL_ERROR
@@ -32,10 +32,10 @@ module moist_mr_transport_alg_mod
   use transport_runtime_collection_mod,   &
                                       only: get_transport_runtime
   use tri_matrix_vector_kernel_mod,   only: tri_matrix_vector_kernel_type
-  use tri_mat_mr_to_sh_mass_kernel_mod,   &
-                                      only: tri_mat_mr_to_sh_mass_kernel_type
-  use tri_solve_sh_mass_to_mr_kernel_mod, &
-                                      only: tri_solve_sh_mass_to_mr_kernel_type
+  use proj_mr_to_sh_rho_rhs_update_kernel_mod,   &
+                                      only: proj_mr_to_sh_rho_rhs_update_kernel_type
+  use tri_solve_sh_rho_to_mr_kernel_mod, &
+                                      only: tri_solve_sh_rho_to_mr_kernel_type
 
   implicit none
 
@@ -72,14 +72,14 @@ contains
     ! Internal variables
     integer(kind=i_def)                :: i, imr
     integer(kind=i_def)                :: num_dry_steps
-    type(field_type)                   :: matrix_mr_to_sh_mass_n(3)
-    type(field_type)                   :: matrix_mr_to_sh_mass_star(3)
+    type(field_type)                   :: matrix_mr_to_sh_rho_n(3)
+    type(field_type)                   :: matrix_mr_to_sh_rho_star(3)
     type(field_type)                   :: rho_X_n(nummr), rho_X_star(nummr)
     type(field_type),          pointer :: rho_d_n => null()
     type(field_type),          pointer :: rho_d_star => null()
     type(field_type),          pointer :: mm_w3_shifted_inv_diag => null()
     type(field_type),          pointer :: mm_w3_shifted_diag => null()
-    type(field_type),          pointer :: mr_to_sh_mass_integrals(:) => null()
+    type(field_type),          pointer :: proj_mr_to_sh_rho_rhs_op(:) => null()
     type(function_space_type), pointer :: w3_shifted_fs => null()
     type(function_space_type), pointer :: w2_shifted_fs => null()
     type(mesh_type),           pointer :: primary_mesh => null()
@@ -113,7 +113,7 @@ contains
       shifted_mesh => mesh_collection%get_mesh(primary_mesh, SHIFTED)
       double_level_mesh => mesh_collection%get_mesh(primary_mesh, DOUBLE_LEVEL)
 
-      mr_to_sh_mass_integrals => get_mr_to_sh_mass_integrals()
+      proj_mr_to_sh_rho_rhs_op => get_proj_mr_to_sh_rho_rhs_op()
       mm_w3_shifted_inv_diag => get_inverse_lumped_mass_matrix(W3, shifted_mesh%get_id())
       mm_w3_shifted_diag => get_mass_matrix_diagonal(W3, shifted_mesh%get_id())
       w3_shifted_fs => function_space_collection%get_fs(shifted_mesh, 0_i_def, W3)
@@ -124,8 +124,8 @@ contains
 
       ! Initialise fields for transforming between mixing ratio and shifted density
       do i = 1, 3
-        call matrix_mr_to_sh_mass_n(i)%initialise( vector_space=w3_shifted_fs )
-        call matrix_mr_to_sh_mass_star(i)%initialise( vector_space=w3_shifted_fs )
+        call matrix_mr_to_sh_rho_n(i)%initialise( vector_space=w3_shifted_fs )
+        call matrix_mr_to_sh_rho_star(i)%initialise( vector_space=w3_shifted_fs )
       end do
 
       do imr = 1, nummr_to_transport
@@ -141,14 +141,16 @@ contains
       rho_d_star => transport_runtime%get_rho_d_np1(primary_mesh%get_id(), num_dry_steps)
 
       ! Use dry densities to get tridiagonal matrices
-      call invoke( name = "calculate_tridiagonal_matrix_values",                 &
-                   tri_mat_mr_to_sh_mass_kernel_type( matrix_mr_to_sh_mass_n,    &
-                                                      rho_d_n,                   &
-                                                      mr_to_sh_mass_integrals    &
-                                                    ),                           &
-                   tri_mat_mr_to_sh_mass_kernel_type( matrix_mr_to_sh_mass_star, &
-                                                      rho_d_star,                &
-                                                      mr_to_sh_mass_integrals    &
+      call invoke( name = "calculate_tridiagonal_matrix_values",                &
+                   proj_mr_to_sh_rho_rhs_update_kernel_type(                    &
+                                                      matrix_mr_to_sh_rho_n,    &
+                                                      rho_d_n,                  &
+                                                      proj_mr_to_sh_rho_rhs_op  &
+                                                    ),                          &
+                   proj_mr_to_sh_rho_rhs_update_kernel_type(                    &
+                                                      matrix_mr_to_sh_rho_star, &
+                                                      rho_d_star,               &
+                                                      proj_mr_to_sh_rho_rhs_op  &
                                                     ) )
 
       do imr = 1, nummr_to_transport
@@ -157,11 +159,11 @@ contains
         ! Turn mixing ratios into densities on shifted mesh
         ! -------------------------------------------------------------------- !
 
-        call invoke( name = "get_wet_densities_in shifted_W3",             &
-                     tri_matrix_vector_kernel_type(rho_X_n(imr),           &
-                                                   matrix_mr_to_sh_mass_n, &
-                                                   mr_in(imr)),            &
-                     inc_X_times_Y(rho_X_n(imr), mm_w3_shifted_inv_diag)   )
+        call invoke( name = "get_wet_densities_in shifted_W3",            &
+                     tri_matrix_vector_kernel_type(rho_X_n(imr),          &
+                                                   matrix_mr_to_sh_rho_n, &
+                                                   mr_in(imr)),           &
+                     inc_X_times_Y(rho_X_n(imr), mm_w3_shifted_inv_diag)  )
 
         ! -------------------------------------------------------------------- !
         ! Actually transport densities
@@ -177,14 +179,14 @@ contains
         call invoke( name = "get_mixing_ratio_from_shifted_density",    &
                      inc_X_times_Y(rho_X_star(imr), mm_w3_shifted_diag) )
         ! These are separate invoke statements as they use different meshes
-        call invoke( tri_solve_sh_mass_to_mr_kernel_type(               &
+        call invoke( tri_solve_sh_rho_to_mr_kernel_type(                &
                                               mr_out(imr),              &
                                               rho_X_star(imr),          &
-                                              matrix_mr_to_sh_mass_star) )
+                                              matrix_mr_to_sh_rho_star) )
 
       end do
 
-      nullify( rho_d_n, rho_d_star, mr_to_sh_mass_integrals, &
+      nullify( rho_d_n, rho_d_star, proj_mr_to_sh_rho_rhs_op, &
                transport_runtime, mm_w3_shifted_diag,        &
                mm_w3_shifted_inv_diag, w3_shifted_fs, w2_shifted_fs, &
                primary_mesh, shifted_mesh, double_level_mesh )

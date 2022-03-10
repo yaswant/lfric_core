@@ -3,9 +3,9 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Makes tridiagonal matrix to get mixing ratio from Wtheta to mass in
+!> @brief Makes tridiagonal matrix to get mixing ratio from Wtheta to density in
 !> shifted W3
-!> @details To transform from a mixing ratio in Wtheta to a mass in shifted W3
+!> @details To transform from a mixing ratio in Wtheta to a density in shifted W3
 !>  we need a  tridiagonal transform matrix whose elements are the integrals
 !> \f[ \int( \phi_i * \Phi_j \Psi_k dV \f]
 !> where \phi_i are the basis functions of the W3 shifted space, \Phi_j are
@@ -14,7 +14,7 @@
 !> the integrals by the coefficients of the dry density.
 !> Only valid for the lowest order elements.
 !>
-module tri_mat_mr_to_sh_mass_kernel_mod
+module proj_mr_to_sh_rho_rhs_update_kernel_mod
 
   use argument_mod,      only : arg_type,                  &
                                 GH_FIELD, GH_REAL,         &
@@ -35,7 +35,7 @@ module tri_mat_mr_to_sh_mass_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> PSy layer.
   !>
-  type, public, extends(kernel_type) :: tri_mat_mr_to_sh_mass_kernel_type
+  type, public, extends(kernel_type) :: proj_mr_to_sh_rho_rhs_update_kernel_type
     private
     type(arg_type) :: meta_args(3) = (/                                      &
          arg_type(GH_FIELD*3, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_3), & ! tri_below/diag/above
@@ -44,13 +44,13 @@ module tri_mat_mr_to_sh_mass_kernel_mod
          /)
     integer :: operates_on = CELL_COLUMN
   contains
-    procedure, nopass :: tri_mat_mr_to_sh_mass_code
+    procedure, nopass :: proj_mr_to_sh_rho_rhs_update_code
   end type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: tri_mat_mr_to_sh_mass_code
+  public :: proj_mr_to_sh_rho_rhs_update_code
 contains
 
 !> @brief Compute the terms of the tridiagonal matrix for transforming from
@@ -77,19 +77,19 @@ contains
 !! @param[in] ndf_w3 The number of degrees of freedom per cell for w3
 !! @param[in] undf_w3 The number of unique degrees of freedom for w3
 !! @param[in] map_w3 Dofmap for the cell at the base of the column for w3
-subroutine tri_mat_mr_to_sh_mass_code(                                     &
-                                        nlayers_shifted,                   &
-                                        tri_below,                         &
-                                        tri_diag,                          &
-                                        tri_above,                         &
-                                        rho_d,                             &
-                                        I_lower_i_ip1,                     &
-                                        I_lower_i_i,                       &
-                                        I_upper_i_i,                       &
-                                        I_upper_i_im1,                     &
-                                        ndf_sh_w3, undf_sh_w3, map_sh_w3,  &
-                                        ndf_w3, undf_w3, map_w3            &
-                                      )
+subroutine proj_mr_to_sh_rho_rhs_update_code(                                    &
+                                              nlayers_shifted,                   &
+                                              tri_below,                         &
+                                              tri_diag,                          &
+                                              tri_above,                         &
+                                              rho_d,                             &
+                                              I_lower_i_ip1,                     &
+                                              I_lower_i_i,                       &
+                                              I_upper_i_i,                       &
+                                              I_upper_i_im1,                     &
+                                              ndf_sh_w3, undf_sh_w3, map_sh_w3,  &
+                                              ndf_w3, undf_w3, map_w3            &
+                                            )
 
   implicit none
 
@@ -134,6 +134,6 @@ subroutine tri_mat_mr_to_sh_mass_code(                                     &
     end do
   end do
 
-end subroutine tri_mat_mr_to_sh_mass_code
+end subroutine proj_mr_to_sh_rho_rhs_update_code
 
-end module tri_mat_mr_to_sh_mass_kernel_mod
+end module proj_mr_to_sh_rho_rhs_update_kernel_mod

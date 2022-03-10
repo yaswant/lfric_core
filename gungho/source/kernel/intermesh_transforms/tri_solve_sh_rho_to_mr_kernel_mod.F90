@@ -12,7 +12,7 @@
 !>          and matrix A using the Thomas algorithm.
 !>          Code is only valid for lowest order elements.
 !>
-module tri_solve_sh_mass_to_mr_kernel_mod
+module tri_solve_sh_rho_to_mr_kernel_mod
 
   use argument_mod,      only: arg_type,          &
                                GH_FIELD, GH_REAL, &
@@ -29,7 +29,7 @@ module tri_solve_sh_mass_to_mr_kernel_mod
   !---------------------------------------------------------------------------
   ! Public types
   !---------------------------------------------------------------------------
-  type, public, extends(kernel_type) :: tri_solve_sh_mass_to_mr_kernel_type
+  type, public, extends(kernel_type) :: tri_solve_sh_rho_to_mr_kernel_type
     private
     type(arg_type) :: meta_args(3) = (/                   &
          arg_type(GH_FIELD,   GH_REAL, GH_WRITE, Wtheta), & ! field_wt
@@ -38,13 +38,13 @@ module tri_solve_sh_mass_to_mr_kernel_mod
          /)
     integer :: operates_on = CELL_COLUMN
   contains
-    procedure, nopass :: tri_solve_sh_mass_to_mr_code
-  end type tri_solve_sh_mass_to_mr_kernel_type
+    procedure, nopass :: tri_solve_sh_rho_to_mr_code
+  end type tri_solve_sh_rho_to_mr_kernel_type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: tri_solve_sh_mass_to_mr_code
+  public :: tri_solve_sh_rho_to_mr_code
 
 contains
 
@@ -64,12 +64,12 @@ contains
 !> @param[in]  ndf_sh_w3 Number of dofs per cell for shifted W3. Should be 1.
 !> @param[in]  undf_sh_w3 Size of shifted W3 field arrays.
 !> @param[in]  map_sh_w3 Dofmap for shifted W3 space
-subroutine tri_solve_sh_mass_to_mr_code(                                   &
-                                          nlayers,                         &
-                                          field_wt, field_sh_w3,           &
-                                          tri_below, tri_diag, tri_above,  &
-                                          ndf_wt, undf_wt, map_wt,         &
-                                          ndf_sh_w3, undf_sh_w3, map_sh_w3 &
+subroutine tri_solve_sh_rho_to_mr_code(                                  &
+                                        nlayers,                         &
+                                        field_wt, field_sh_w3,           &
+                                        tri_below, tri_diag, tri_above,  &
+                                        ndf_wt, undf_wt, map_wt,         &
+                                        ndf_sh_w3, undf_sh_w3, map_sh_w3 &
                                         )
 
   implicit none
@@ -113,7 +113,7 @@ subroutine tri_solve_sh_mass_to_mr_code(                                   &
     field_wt(ij+k) = rhs_new(k+1) - tri_above_new(k+1)*field_wt(ij+k+1)
   end do
 
-end subroutine tri_solve_sh_mass_to_mr_code
+end subroutine tri_solve_sh_rho_to_mr_code
 
-end module tri_solve_sh_mass_to_mr_kernel_mod
+end module tri_solve_sh_rho_to_mr_kernel_mod
 

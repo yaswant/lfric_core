@@ -3,15 +3,12 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Forms the right hand side for a projection from W3 to shifted W3.
-
-!> @details Calculates the right hand side for projecting a field from w3
-!> to the vertically-shifted W3 space.
-!> This is formed from a density rho and the transform
-!> integrals T that have been pre-computed.
-
-!>
-module rhs_w3_to_sh_w3_kernel_mod
+!> @brief Applies an operator to take a field from W3 to shifted W3.
+!> @details Applies a pre-computed operator to map a W3 field to the shifted W3
+!!          function space. The operator is stored in two W3 fields, which
+!!          represent contributions from the lower and upper halves of cells.
+!!          This is only designed to worked for the lowest-order elements.
+module apply_w3_to_sh_w3_kernel_mod
 
   use argument_mod,            only : arg_type,                  &
                                       GH_FIELD, GH_REAL,         &
@@ -33,7 +30,7 @@ module rhs_w3_to_sh_w3_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> Psy layer.
   !>
-  type, public, extends(kernel_type) :: rhs_w3_to_sh_w3_kernel_type
+  type, public, extends(kernel_type) :: apply_w3_to_sh_w3_kernel_type
     private
     type(arg_type) :: meta_args(3) = (/                                      &
          arg_type(GH_FIELD,   GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_3), & ! rhs_w3_sh
@@ -42,17 +39,17 @@ module rhs_w3_to_sh_w3_kernel_mod
          /)
     integer :: operates_on = CELL_COLUMN
   contains
-    procedure, nopass :: rhs_w3_to_sh_w3_code
+    procedure, nopass :: apply_w3_to_sh_w3_code
   end type
 
 !-----------------------------------------------------------------------------
 ! Contained functions/subroutines
 !-----------------------------------------------------------------------------
-public :: rhs_w3_to_sh_w3_code
+public :: apply_w3_to_sh_w3_code
 
 contains
 
-!> @brief Compute the right hand side to initialise the wind field.
+!> @brief Applies an operator to take a field from W3 to shifted W3.
 !> @param[in] nlayers_sh  Number of layers in the vertically-shifted mesh.
 !> @param[in,out] rhs_w3_sh Right hand side vector to compute.
 !> It is a field in w3 shifted.
@@ -65,19 +62,19 @@ contains
 !> @param[in] ndf_w3 Number of degrees of freedom per cell for w3
 !> @param[in] undf_w3 Number of (local) unique degrees of freedom for w3
 !> @param[in] map_w3 Dofmap for the cell at the base of the column for w3
-subroutine rhs_w3_to_sh_w3_code(                 &
-                                  nlayers_sh,    &
-                                  rhs_w3_sh,     &
-                                  field_w3,      &
-                                  T_ip1,         &
-                                  T_i,           &
-                                  ndf_w3_sh,     &
-                                  undf_w3_sh,    &
-                                  map_w3_sh,     &
-                                  ndf_w3,        &
-                                  undf_w3,       &
-                                  map_w3         &
-                               )
+subroutine apply_w3_to_sh_w3_code(                &
+                                   nlayers_sh,    &
+                                   rhs_w3_sh,     &
+                                   field_w3,      &
+                                   T_ip1,         &
+                                   T_i,           &
+                                   ndf_w3_sh,     &
+                                   undf_w3_sh,    &
+                                   map_w3_sh,     &
+                                   ndf_w3,        &
+                                   undf_w3,       &
+                                   map_w3         &
+                                 )
 
   implicit none
 
@@ -109,6 +106,6 @@ subroutine rhs_w3_to_sh_w3_code(                 &
                                 T_ip1(map_w3(1)+k-1) * field_w3(map_w3(1)+k-1)
   end do
 
-end subroutine rhs_w3_to_sh_w3_code
+end subroutine apply_w3_to_sh_w3_code
 
-end module rhs_w3_to_sh_w3_kernel_mod
+end module apply_w3_to_sh_w3_kernel_mod
