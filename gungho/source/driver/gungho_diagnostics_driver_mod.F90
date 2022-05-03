@@ -97,6 +97,7 @@ contains
     type( field_type), pointer :: height_w3 => null()
     type( field_type), pointer :: height_wth => null()
     type( field_type), pointer :: exner_in_wth => null()
+    type( field_type), pointer :: theta_in_w3 => null()
     type( field_type), pointer :: u_in_w2h => null()
     type( field_type), pointer :: v_in_w2h => null()
     type( field_type), pointer :: w_in_wth => null()
@@ -257,6 +258,8 @@ contains
       theta => prognostic_fields%get_field('theta')
       call pmsl_alg(exner, derived_fields, theta, twod_mesh)
 #endif
+      theta_in_w3 => derived_fields%get_field('theta_in_w3')
+      call column_total_diagnostics_alg(rho, mr, theta_in_w3, exner, mesh, twod_mesh)
 
     end if
 
@@ -265,7 +268,6 @@ contains
       ! Don't output for the tangent linear model
       call write_divergence_diagnostic( u, clock, mesh )
       call write_hydbal_diagnostic( theta, moist_dyn, exner, mesh )
-      call column_total_diagnostics_alg( rho, mr, mesh, twod_mesh )
     end if
 
     if ( subroutine_timers ) call timer('gungho_diagnostics_driver')

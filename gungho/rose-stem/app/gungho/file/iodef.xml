@@ -138,6 +138,8 @@
        <field id="processed__tot_col_m_s" name="tot_col_m_s" long_name="atmosphere_mass_content_of_snow" unit="kg m-2" domain_ref="face" />
        <field id="processed__tot_col_m_g" name="tot_col_m_g" long_name="atmosphere_mass_content_of_graupel" unit="kg m-2" domain_ref="face" />
        <field id="processed__tot_col_wetplusdry_mass" name="tot_col_wetplusdry_mass" long_name="atmosphere_wetplusdry_mass_per_unit_area" unit="kg m-2" domain_ref="face" />
+       <field id="processed__tot_col_int_energy" name="tot_col_int_energy" long_name="atmosphere_energy_content" unit="J m-2" domain_ref="face" />
+       <field id="processed__tot_col_pot_energy" name="tot_col_pot_energy" long_name="atmosphere_potential_energy_content" unit="J m-2" domain_ref="face" />
        <field id="processed__wbig" name="wbig" long_name="wbig_eq_1_where_wphysics_gt_1" unit="1" grid_ref="full_level_face_grid" />
        <field id="processed__pressure_in_w3" name="pressure_in_w3" long_name="pressure_at_cell_centres" unit="Pa" grid_ref="half_level_face_grid" />
        <field id="processed__pressure_in_wth" name="pressure_in_wth" long_name="pressure_at_cell_interfaces" unit="Pa" grid_ref="full_level_face_grid" />
@@ -253,6 +255,8 @@
         <field field_ref="exner"/>
         <field field_ref="processed__tot_col_dry_air_mass" />
         <field field_ref="processed__tot_col_wetplusdry_mass" />
+        <field field_ref="processed__tot_col_int_energy" />
+        <field field_ref="processed__tot_col_pot_energy" />
         <field field_ref="processed__wbig" />
       </file>
 
