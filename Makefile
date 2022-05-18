@@ -28,6 +28,7 @@ OPERATE_ON ?= lfric_atm                                  \
               miniapps/diagnostics                       \
               miniapps/gravity_wave                      \
               miniapps/solver_miniapp                    \
+              miniapps/shallow_water                     \
               miniapps/io_dev                            \
               miniapps/lfric_coupled                     \
               miniapps/transport                         \

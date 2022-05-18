@@ -26,6 +26,12 @@ module field_indices_mod
   integer, parameter :: igw_uv = igw_u ! uv wind if split - must be the same as igw_u
   integer, parameter :: igw_w = 4  ! w wind if split
 
+  ! For shallow water mini app
+  integer, parameter :: isw_u = 1  ! wind
+  integer, parameter :: isw_g = 2  ! geopotential
+  integer, parameter :: isw_b = 3  ! buoyancy
+  integer, parameter :: isw_q = 4  ! vorticity
+
   ! For Semi-Implicit Solver
   integer, parameter :: isol_u = 1       ! wind
   integer, parameter :: isol_uv = isol_u ! uv wind if split - must be the same as isol_u

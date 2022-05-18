@@ -43,6 +43,7 @@ default_project_names=( infrastructure  \
                         diagnostics     \
                         gravity_wave    \
                         io_dev          \
+                        shallow_water   \
                         solver_miniapp  \
                         transport       \
                         multires_coupling  )
@@ -59,6 +60,8 @@ default_app_names=( infrastructure:none            \
                     diagnostics:diagnostics        \
                     gravity_wave:gravity_wave      \
                     io_dev:io_dev                  \
+                    shallow_water:shallow_water    \
+                    shallow_water:mesh             \
                     solver_miniapp:solver_miniapp  \
                     transport:transport            \
                     transport:mesh                 \
@@ -105,6 +108,7 @@ project_folder_location=(                  \
   [diagnostics]=miniapps/diagnostics       \
   [gravity_wave]=miniapps/gravity_wave     \
   [io_dev]=miniapps/io_dev                 \
+  [shallow_water]=miniapps/shallow_water   \
   [solver_miniapp]=miniapps/solver_miniapp \
   [transport]=miniapps/transport           \
   [multires_coupling]=miniapps/multires_coupling )
@@ -123,6 +127,7 @@ project_primary_app=(             \
   [diagnostics]=diagnostics       \
   [gravity_wave]=gravity_wave     \
   [io_dev]=io_dev                 \
+  [shallow_water]=shallow_water   \
   [solver_miniapp]=solver_miniapp \
   [transport]=transport           \
   [multires_coupling]=multires_coupling )
