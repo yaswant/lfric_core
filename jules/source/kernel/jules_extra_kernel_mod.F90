@@ -342,6 +342,7 @@ contains
     use jules_rivers_mod,         only: rivers_type, rivers_data_type,         &
                                         rivers_assoc, jules_rivers_alloc,      &
                                         rivers_nullify, rivers_dealloc
+    use cable_fields_mod,         only: work_vars_cbl
 
     use nlsizes_namelist_mod, only: row_length, rows, land_pts => land_field,  &
                                     sm_levels, ntiles, bl_levels
@@ -874,7 +875,9 @@ contains
     fluxes,                                                                   &
     lake_vars,                                                                &
     forcing,                                                                  &
-    rivers)
+    rivers,                                                                   &
+    work_vars_cbl                                                             &
+    )
 
   !---------------------------------------------------------------------------
   ! Return the updated prognostic values to jules_prognostics.

@@ -214,7 +214,8 @@ subroutine sw_rad_tile_code(nlayers,                                &
   use fluxes_mod,               only: fluxes_type, fluxes_data_type,          &
                                       fluxes_alloc, fluxes_assoc,             &
                                       fluxes_nullify, fluxes_dealloc
-
+  use cable_fields_mod,         only: progs_cbl_vars
+  
   use tilepts_mod, only: tilepts
   use sparm_mod, only: sparm
   use surf_couple_radiation_mod, only: surf_couple_radiation
@@ -543,7 +544,9 @@ subroutine sw_rad_tile_code(nlayers,                                &
     albobs_sc, open_sea_albedo, &
     ! JULES types
     psparms, ainfo, urban_param, progs, coast, jules_vars, &
-    fluxes, lake_vars)
+    fluxes, lake_vars, &
+    progs_cbl_vars  &
+    )
 
   df_rtile = 0
   do i_band = 1, n_band
