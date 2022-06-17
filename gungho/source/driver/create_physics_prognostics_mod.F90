@@ -48,6 +48,10 @@ module create_physics_prognostics_mod
   use spectral_gwd_config_mod,        only : add_cgw
   use microphysics_config_mod,        only : turb_gen_mixph
   use derived_config_mod,             only : l_esm_couple
+#ifdef UM_PHYSICS
+  use multidata_field_dimensions_mod, only :                                   &
+       get_ndata_val => get_multidata_field_dimension
+#endif
 
   implicit none
 
@@ -55,6 +59,7 @@ module create_physics_prognostics_mod
   public :: create_physics_prognostics
 
 contains
+
   !>@brief Routine to initialise the field objects required by the physics
   !> @param[in]    mesh      The current 3d mesh
   !> @param[in]    twod_mesh The current 2d mesh
@@ -94,16 +99,6 @@ contains
                                          snow_fields,           &
                                          chemistry_fields,      &
                                          aerosol_fields )
-
-#ifdef UM_PHYSICS
-    use jules_control_init_mod,  only: n_surf_tile, n_sea_ice_tile,            &
-         soil_lev_tile, n_surf_interp, n_land_tile
-    use jules_physics_init_mod,  only: snow_lev_tile
-    use jules_surface_types_mod, only: npft
-    use nlsizes_namelist_mod,    only: sm_levels
-    use ancil_info,              only: rad_nband
-    use dust_parameters_mod,     only: ndiv
-#endif
 
     implicit none
 
@@ -176,11 +171,16 @@ contains
     w2h_space => function_space_collection%get_fs(mesh, 0, W2H)
 #ifdef UM_PHYSICS
     twod_space  => function_space_collection%get_fs(twod_mesh, 0, W3)
-    surft_space => function_space_collection%get_fs(twod_mesh, 0, W3, n_surf_tile)
-    pft_space   => function_space_collection%get_fs(twod_mesh, 0, W3, npft)
-    soil_space  => function_space_collection%get_fs(twod_mesh, 0, W3, sm_levels)
-    sice_space  => function_space_collection%get_fs(twod_mesh, 0, W3, n_sea_ice_tile)
-    snow_space  => function_space_collection%get_fs(twod_mesh, 0, W3, snow_lev_tile)
+    surft_space => function_space_collection%get_fs(twod_mesh, 0, W3,          &
+         get_ndata_val('surface_tiles'))
+    pft_space   => function_space_collection%get_fs(twod_mesh, 0, W3,          &
+         get_ndata_val('plant_types'))
+    soil_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
+         get_ndata_val('soil_levels'))
+    sice_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
+         get_ndata_val('sea_ice_tiles'))
+    snow_space  => function_space_collection%get_fs(twod_mesh, 0, W3,          &
+         get_ndata_val('snow_layers_and_tiles'))
 #endif
 
     !========================================================================
@@ -608,7 +608,8 @@ contains
       'level_ent_dsc', twod_space, twod=.true. )
 
     ! Space for the 7 BL types
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3, 7)
+    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
+         get_ndata_val('boundary_layer_types'))
     call add_integer_field( turbulence_fields, depository, prognostic_fields,  &
       adv_fields_last_outer, &
       'bl_type_ind',  vector_space, twod=.true. )
@@ -665,7 +666,8 @@ contains
       'tau_w2', w2_space )
 
     ! Fields on entrainment levels, don't need checkpointing
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3, 3)
+    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
+         get_ndata_val('entrainment_levels'))
     call add_physics_field( turbulence_fields, depository, prognostic_fields,  &
       adv_fields_last_outer, &
       'ent_we_lim', vector_space, twod=.true. )
@@ -923,8 +925,8 @@ contains
       adv_fields_last_outer, &
       'canopy_water', surft_space, checkpoint_flag=checkpoint_flag, twod=.true. )
 
-    vector_space=>function_space_collection%get_fs(twod_mesh, 0, W3, &
-                                                   n_land_tile*rad_nband)
+    vector_space=>function_space_collection%get_fs(twod_mesh, 0, W3,           &
+         get_ndata_val('land_tile_rad_band'))
     call add_physics_field( surface_fields, depository, prognostic_fields,     &
       adv_fields_last_outer, &
       'albedo_obs_scaling', vector_space,                                      &
@@ -1022,7 +1024,8 @@ contains
       'wspd10m', twod_space, twod=.true. )
 
     ! Space for variables required for regridding to cell faces
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W2, n_surf_interp)
+    vector_space => function_space_collection%get_fs(twod_mesh, 0, W2,         &
+         get_ndata_val('surface_regrid_vars'))
     call add_physics_field( surface_fields, depository, prognostic_fields,     &
       adv_fields_last_outer, &
       'surf_interp_w2',  vector_space, twod=.true. )
@@ -1037,10 +1040,12 @@ contains
       'tau_ssi_w2',  vector_space, twod=.true. )
 
     ! Field on soil levels and land tiles
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3, soil_lev_tile)
+    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
+         get_ndata_val('soil_levels_and_tiles'))
     call add_physics_field( surface_fields, depository, prognostic_fields,     &
       adv_fields_last_outer, &
       'tile_water_extract', vector_space, twod=.true. )
+
 
     !========================================================================
     ! Fields owned by the soil hydrology scheme
@@ -1619,7 +1624,8 @@ contains
       'pvol_du_cor_ins', wtheta_space, checkpoint_flag=checkpoint_flag )
 
     ! Fields on dust space, might need checkpointing
-    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3, ndiv)
+    vector_space => function_space_collection%get_fs(twod_mesh, 0, W3,         &
+         get_ndata_val('dust_divisions'))
     call add_physics_field( aerosol_fields, depository, prognostic_fields,     &
       adv_fields_last_outer, &
       'dust_mrel', vector_space, twod=.true. , checkpoint_flag=checkpoint_flag )
