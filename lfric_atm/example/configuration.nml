@@ -8,10 +8,12 @@ prime_mesh_name='dynamics',
 topology='fully_periodic',
 /
 &blayer
+a_ent_2=0.056
 a_ent_shr=1.6,
 bl_levels=97,
 bl_mix_w=.false.,
 cbl_opt='conventional',
+dec_thres_cloud=0.1
 dyn_diag='zi_l_cu',
 fixed_flux_e=0.0,
 fixed_flux_h=300.0,
@@ -19,6 +21,7 @@ flux_bc_opt='specified_scalars',
 free_atm_mix='to_sharp',
 fric_heating=.true.,
 interp_local='cf_dbdz',
+near_neut_z_on_l=1.6
 new_kcloudtop=.true.,
 noice_in_turb=.false.,
 p_unstable=1.0,

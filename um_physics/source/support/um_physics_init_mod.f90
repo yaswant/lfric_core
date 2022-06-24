@@ -25,31 +25,34 @@ module um_physics_init_mod
                                         prec_file,                             &
                                         l_radaer
 
-  use blayer_config_mod,         only : a_ent_shr, cbl_opt,                   &
-                                        cbl_opt_conventional,                 &
-                                        cbl_opt_standard,                     &
-                                        dyn_diag, dyn_diag_zi_l_sea,          &
-                                        dyn_diag_ri_based, dyn_diag_zi_l_cu,  &
-                                        flux_bc_opt_in => flux_bc_opt,        &
-                                        flux_bc_opt_interactive,              &
-                                        flux_bc_opt_specified_scalars,        &
-                                        fric_heating_in => fric_heating,      &
-                                        free_atm_mix, free_atm_mix_to_sharp,  &
-                                        free_atm_mix_ntml_corrected,          &
-                                        free_atm_mix_free_trop_layer,         &
-                                        interp_local, interp_local_gradients, &
-                                        interp_local_cf_dbdz,                 &
-                                        new_kcloudtop, p_unstable,            &
-                                        reduce_fa_mix, noice_in_turb,         &
-                                        reduce_fa_mix_inv_and_cu_lcl,         &
-                                        reduce_fa_mix_inv_only,               &
-                                        relax_sc_over_cu_in=>relax_sc_over_cu,&
-                                        sbl_opt, sbl_opt_sharpest,            &
-                                        sbl_opt_sharp_sea_mes_land,           &
-                                        sg_orog_mixing_in => sg_orog_mixing,  &
-                                        sg_orog_mixing_none,                  &
-                                        sg_orog_mixing_shear_plus_lambda,     &
-                                        zhloc_depth_fac_in => zhloc_depth_fac,&
+  use blayer_config_mod,         only : a_ent_shr, a_ent_2_in => a_ent_2,      &
+                                        cbl_opt, cbl_opt_conventional,         &
+                                        cbl_opt_standard, cbl_opt_adjustable,  &
+                                        cbl_mix_fac,                           &
+                                        dec_thres_cloud_in => dec_thres_cloud, &
+                                        dyn_diag, dyn_diag_zi_l_sea,           &
+                                        dyn_diag_ri_based, dyn_diag_zi_l_cu,   &
+                                        near_neut_z_on_l_in=>near_neut_z_on_l, &
+                                        flux_bc_opt_in => flux_bc_opt,         &
+                                        flux_bc_opt_interactive,               &
+                                        flux_bc_opt_specified_scalars,         &
+                                        fric_heating_in => fric_heating,       &
+                                        free_atm_mix, free_atm_mix_to_sharp,   &
+                                        free_atm_mix_ntml_corrected,           &
+                                        free_atm_mix_free_trop_layer,          &
+                                        interp_local, interp_local_gradients,  &
+                                        interp_local_cf_dbdz,                  &
+                                        new_kcloudtop, p_unstable,             &
+                                        reduce_fa_mix, noice_in_turb,          &
+                                        reduce_fa_mix_inv_and_cu_lcl,          &
+                                        reduce_fa_mix_inv_only,                &
+                                        relax_sc_over_cu_in=>relax_sc_over_cu, &
+                                        sbl_opt, sbl_opt_sharpest,             &
+                                        sbl_opt_sharp_sea_mes_land,            &
+                                        sg_orog_mixing_in => sg_orog_mixing,   &
+                                        sg_orog_mixing_none,                   &
+                                        sg_orog_mixing_shear_plus_lambda,      &
+                                        zhloc_depth_fac_in => zhloc_depth_fac, &
                                         bl_levels_in => bl_levels
 
   use cloud_config_mod,          only : scheme, scheme_smith, scheme_pc2,     &
@@ -176,13 +179,14 @@ contains
          a_ent_shr_nml, alpha_cd, puns, pstb, nl_bl_levels, kprof_cu,      &
          non_local_bl, flux_bc_opt, i_bl_vn_9c, sharp_sea_mes_land,        &
          lem_conven, to_sharp_across_1km, off, on, DynDiag_Ribased,        &
-         blend_allpoints, ng_stress, lem_std, interactive_fluxes,          &
-         specified_fluxes_only, DynDiag_ZL_corrn, except_disc_inv,         &
+         DynDiag_ZL_corrn, blend_allpoints, ng_stress, lem_std, lem_adjust,&
+         interactive_fluxes, specified_fluxes_only, except_disc_inv,       &
          ntml_level_corrn, free_trop_layers, sharpest, sg_shear_enh_lambda,&
          l_new_kcloudtop, buoy_integ, l_reset_dec_thres, DynDiag_ZL_CuOnly,&
          var_diags_opt, i_interp_local, i_interp_local_gradients,          &
          split_tke_and_inv, l_noice_in_turb, l_use_var_fixes,              &
-         i_interp_local_cf_dbdz, tke_diag_fac
+         i_interp_local_cf_dbdz, tke_diag_fac, a_ent_2, dec_thres_cloud,   &
+         dec_thres_cu, near_neut_z_on_l, cbl_mix_fac_nml
     use cloud_inputs_mod, only: i_cld_vn, forced_cu, i_rhcpt, i_cld_area,  &
          rhcrit, ice_fraction_method,falliceshear_method, cff_spread_rate, &
          l_subgrid_qv, ice_width, min_liq_overlap, i_eacf, not_mixph,      &
@@ -345,6 +349,7 @@ contains
       end if
 
       a_ent_shr_nml = real(a_ent_shr, r_um)
+      a_ent_2       = real(a_ent_2_in, r_um)
       bl_levels     = bl_levels_in
       if(allocated(alpha_cd))deallocate(alpha_cd)
       allocate(alpha_cd(bl_levels))
@@ -357,8 +362,12 @@ contains
           cbl_op = lem_conven
         case(cbl_opt_standard)
           cbl_op = lem_std
+        case(cbl_opt_adjustable)
+          cbl_op = lem_adjust
       end select
 
+      dec_thres_cloud = real(dec_thres_cloud_in, r_um)
+      dec_thres_cu = 0.5_r_um * dec_thres_cloud_in
       entr_smooth_dec = on
 
       select case (flux_bc_opt_in)
@@ -386,6 +395,7 @@ contains
         case(dyn_diag_ri_based)
           idyndiag = DynDiag_Ribased
       end select
+      near_neut_z_on_l = real(near_neut_z_on_l_in, r_um)
 
       ! Interpolate the vertical gradients of sl,qw and calculate
       ! stability dbdz and Kh on theta-levels
