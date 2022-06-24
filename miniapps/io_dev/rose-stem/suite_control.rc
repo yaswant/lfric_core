@@ -31,7 +31,7 @@
 {%- set mesh_build      = "fast-debug" %}
 {%- set MAXRUNAHEAD     = 1 %}
 
-{%- set application_configurations = { 'io_dev' : ['read_write', 'gen_dump', 'check_decomp',
+{%- set application_configurations = { 'io_dev' : ['read_write', 'gen_dump', 'check_decomp', 'default_cf',
                                                    'time_var', 'time_var_short', 'time_var_10ts',
                                                    'checkpoints', 'default', 'read_write_int', 'default_int'] } %}
 
@@ -51,6 +51,9 @@
                      plotstr="plot_io_dev.py $NODAL_DATA_DIR/io_dev_diag.nc time_var:domains W0_field:W2H_field:W3_field")',
     'run_application("io_dev", "default_int", resolutions=[("C12", 3.0)],
                      env={"crun":1, "nrun":20,}, checkkgo=False)',
+    'run_application("io_dev", "default_cf", resolutions=[("C12", 3.0)],
+                     env={"crun":1, "nrun":20,}, checkkgo=False,
+                     plotstr="plot_io_dev.py $NODAL_DATA_DIR/io_dev_diag.nc time_var:domains W0_field:W2H_field:W3_field")',
     'run_application("io_dev", "checkpoints", resolutions=[("C12", 3.0)],
                      env={"crun":2, "nrun":10,}, checkkgo=True)',
     'run_application("io_dev", "read_write",

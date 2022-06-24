@@ -107,6 +107,7 @@ stretching_method='linear',
   write_dump                = .false.
   write_fluxes              = .false.
   diagnostic_frequency      = 10
+  file_convention           = 'UGRID'
   nodal_output_on_w3        = .false.
   subroutine_timers         = .true.
   timer_output_path         = 'timer.txt'

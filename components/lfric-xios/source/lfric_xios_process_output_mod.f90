@@ -9,6 +9,9 @@
 !>
 module lfric_xios_process_output_mod
 
+  use io_config_mod,       only: file_convention,       &
+                                 file_convention_ugrid, &
+                                 file_convention_cf
   use lfric_ncdf_file_mod, only: lfric_ncdf_file_type, &
                                  LFRIC_NCDF_WRITE,     &
                                  LFRIC_NCDF_OPEN
@@ -63,7 +66,15 @@ subroutine format_version(file_ncdf)
   type(lfric_ncdf_file_type), intent(inout) :: file_ncdf
 
   call file_ncdf%set_attribute("description", "LFRic file format v0.1.0")
-  call file_ncdf%set_attribute("Conventions", "UGRID-1.0")
+
+  select case(file_convention)
+  case (file_convention_ugrid)
+    call file_ncdf%set_attribute("Conventions", "UGRID-1.0")
+
+  case (file_convention_cf)
+    call file_ncdf%set_attribute("Conventions", "CF")
+
+  end select
 
 end subroutine format_version
 

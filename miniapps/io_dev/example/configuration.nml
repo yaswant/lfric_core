@@ -22,6 +22,7 @@
   write_diag                = .true.
   write_dump                = .false.
   diagnostic_frequency      = 1
+  file_convention           = 'UGRID'
   subroutine_timers         = .false.
   subroutine_counters       = .false.
   checkpoint_read           = .false.
