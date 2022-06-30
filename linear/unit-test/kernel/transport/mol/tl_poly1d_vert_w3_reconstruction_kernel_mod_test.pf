@@ -47,16 +47,15 @@ module tl_poly1d_vert_w3_reconstruction_kernel_mod_test
   real(r_def), parameter :: tol = 1.0e-12_r_def  ! r_def 64bit tolerance
 
   integer(i_def), parameter :: nfaces_v = 2
-  integer(i_def), parameter :: nfaces_h = 4
-  integer(i_def), parameter :: nlayers = 3
+  integer(i_def), parameter :: nlayers = 5
   integer(i_def), parameter :: mol_order = 2
   integer(i_def), parameter :: ndata = (mol_order+1)*nfaces_v
   integer(i_def), parameter :: ndf_w2 = 6
   integer(i_def), parameter :: ndf_w3 = 1
   integer(i_def), parameter :: ndf_c  = 1
-  integer(i_def), parameter :: undf_w2 = nfaces_h*nlayers + (nlayers+1)
+  integer(i_def), parameter :: undf_w2 = (nlayers+1)
   integer(i_def), parameter :: undf_w3 = ndf_w3*nlayers
-  integer(i_def), parameter :: undf_c  = ndata*nlayers
+  integer(i_def), parameter :: undf_c  = ndata*(nlayers+1)
 
 contains
 
@@ -81,11 +80,8 @@ contains
 
     this%map_w3(1) = 1
     this%map_c(1) = 1
-    do df = 1,nfaces_h
-      this%map_w2(df) = 1 + (df-1)*nlayers
-    end do
-    this%map_w2(5) = 1 + nfaces_h*nlayers
-    this%map_w2(6) = this%map_w2(5) + 1
+    this%map_w2(1:4) = 0
+    this%map_w2(5:6) = (/1, 2/)
 
     ! Quadratic fit for most of the domain
     do k = 1, nlayers-1
