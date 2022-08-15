@@ -66,7 +66,7 @@ do-integration-tests/run: $(foreach test,$(ALL_INTEGRATION_TESTS),do-integration
 do-integration-tests/run/%: do-integration-tests/build
 	$(call MESSAGE,Running,$*)
 	$Qcd $(TEST_RUN_DIR)/$(dir $*); \
-	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
+	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$*)
 
 # The addition of this target is a bit messy but it allows us to guarantee that
 # no build will happen when running from a test suite.
@@ -75,7 +75,7 @@ do-integration-tests/rerun: $(foreach test,$(ALL_INTEGRATION_TESTS),do-integrati
 do-integration-tests/rerun/%:
 	$(call MESSAGE,Rerunning,$*)
 	$Qcd $(TEST_RUN_DIR)/$(dir $*); \
-	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$(notdir $*))
+	    ./$(notdir $(addsuffix .py,$*)) $(addprefix $(BIN_DIR)/,$*)
 
 do-integration-tests/build: do-integration-tests/generate \
                            $(addsuffix /extract, $(TEST_DIR))

@@ -13,7 +13,6 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from time import time
 
-
 ##############################################################################
 # Databases throw this exception.
 #

@@ -28,7 +28,6 @@ import re
 import subprocess
 from time import time
 
-
 ###############################################################################
 # Interface for analysers
 #

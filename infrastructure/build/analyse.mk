@@ -21,9 +21,6 @@
 
 .NOTPARALLEL:
 
-# Force everything into debug logging mode
-VERBOSE_ARG = -debug
-
 DATABASE ?= dependencies.db
 
 SOURCE_FILES := $(subst ./,,$(shell find . -name '*.[Ff]90' -print))

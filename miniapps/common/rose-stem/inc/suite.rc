@@ -315,6 +315,8 @@
     [[{{compiler_family}}]]
         [[[environment]]]
             BIN_DIR               = $OUTPUT_ROOT/{{compiler_label}}/bin
+            LIB_DIR               = $OUTPUT_ROOT/{{compiler_label}}/lib
+            MOD_DIR               = $OUTPUT_ROOT/{{compiler_label}}/mod
             COMPILER              = {{compiler}}
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{compiler_label}}
             SOURCE_DIRECTORY      = $SOURCE_ROOT/{{appPathFragment}}{{projectName}}
@@ -329,6 +331,8 @@
 
         [[[environment]]]
             BIN_DIR               = $OUTPUT_ROOT/{{label}}/bin
+            LIB_DIR               = $OUTPUT_ROOT/{{label}}/lib
+            MOD_DIR               = $OUTPUT_ROOT/{{label}}/mod
             DESTINATION_DIRECTORY = $OUTPUT_ROOT/{{label}}
 
 

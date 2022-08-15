@@ -18,6 +18,7 @@ ifeq ($(shell test $(GFORTRAN_VERSION) -lt 040900; echo $$?), 0)
 endif
 
 F_MOD_DESTINATION_ARG     = -J
+F_MOD_SOURCE_ARG          = -I
 OPENMP_ARG = -fopenmp
 
 FFLAGS_COMPILER           = -ffree-line-length-none

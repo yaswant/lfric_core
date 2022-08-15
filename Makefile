@@ -25,6 +25,7 @@ OPERATE_ON ?= lfric_atm                                  \
               mesh_tools                                 \
               linear                                     \
               miniapps/skeleton                          \
+              miniapps/da_dev                            \
               miniapps/diagnostics                       \
               miniapps/gravity_wave                      \
               miniapps/solver_miniapp                    \

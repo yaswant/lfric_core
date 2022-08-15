@@ -78,8 +78,8 @@ if __name__ == '__main__':
         with open(args.output, 'wt') as listFile:
             print('# Program objects', file=listFile)
             programs = []
-            for program, objects in processor.determineLinkDependencies():
-                programs.append(program + '.o')
+            for program, _, objects in processor.determineLinkDependencies():
+                programs.append(program + ".o")
                 text = '{program}_OBJS = {objects}'
                 print(text.format(program=os.path.basename(program).upper(),
                                   objects=' '.join(objects)),

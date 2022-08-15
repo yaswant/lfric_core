@@ -18,6 +18,8 @@ ifeq ($(shell test $(CRAYFTN_VERSION) -lt 008003004; echo $$?), 0)
   $(error CrayFTN is too old. It must be at least 8.3.4)
 endif
 
+F_MOD_DESTINATION_ARG     = -J
+F_MOD_SOURCE_ARG          = -p
 OPENMP_ARG            = -h omp
 
 FFLAGS_COMPILER           =

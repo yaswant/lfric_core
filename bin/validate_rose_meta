@@ -40,6 +40,7 @@ default_project_names=( infrastructure  \
                         mesh_tools      \
                         linear          \
                         skeleton        \
+                        da_dev          \
                         diagnostics     \
                         gravity_wave    \
                         io_dev          \
@@ -57,6 +58,7 @@ default_app_names=( infrastructure:none            \
                     mesh_tools:mesh                \
                     linear:linear                  \
                     skeleton:skeleton              \
+                    da_dev:da_dev                  \
                     diagnostics:diagnostics        \
                     gravity_wave:gravity_wave      \
                     io_dev:io_dev                  \
@@ -105,6 +107,7 @@ project_folder_location=(                  \
   [mesh_tools]=mesh_tools                  \
   [linear]=linear                          \
   [skeleton]=miniapps/skeleton             \
+  [da_dev]=miniapps/da_dev                 \
   [diagnostics]=miniapps/diagnostics       \
   [gravity_wave]=miniapps/gravity_wave     \
   [io_dev]=miniapps/io_dev                 \
@@ -124,6 +127,7 @@ project_primary_app=(             \
   [mesh_tools]=mesh               \
   [linear]=linear                 \
   [skeleton]=skeleton             \
+  [da_dev]=da_dev                 \
   [diagnostics]=diagnostics       \
   [gravity_wave]=gravity_wave     \
   [io_dev]=io_dev                 \

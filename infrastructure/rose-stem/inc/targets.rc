@@ -149,7 +149,7 @@
             'build' : {
                 'launcher' : 'mpiexec',
                 'directives' : [
-                    '-l select=1:ncpus=6:mem=6GB:tmpsize=3GB',
+                    '-l select=1:ncpus=6:mem=6GB:tmpsize=4GB',
                     '-l walltime=01:00:00',
                     '-q=shared'
                 ]
@@ -207,7 +207,7 @@
             'build' : {
                 'launcher' : 'mpiexec',
                 'directives' : [
-                    '-l select=1:ncpus=6:mem=6GB:tmpsize=3GB',
+                    '-l select=1:ncpus=6:mem=6GB:tmpsize=4GB',
                     '-l walltime=01:00:00',
                     '-q=shared'
                 ]

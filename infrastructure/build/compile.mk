@@ -61,6 +61,10 @@ ALL_OBJECTS = $(foreach proj, $(shell echo $(PROGRAMS) | tr a-z A-Z), $($(proj)_
 applications: FFLAGS += $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
 applications: $(addprefix $(BIN_DIR)/, $(PROGRAMS))
 
+.PHONY: libraries
+libraries: FFLAGS += $(foreach group, $(FFLAG_GROUPS), $(FFLAGS_$(group)))
+libraries: $(addsuffix .a, $(addprefix $(LIB_DIR)/lib, $(PROGRAMS)))
+
 ##############################################################################
 
 include $(LFRIC_BUILD)/lfric.mk
@@ -69,11 +73,14 @@ include $(LFRIC_BUILD)/cxx.mk
 -include $(COMPILE_OPTIONS)
 
 BIN_DIR ?= $(ROOT)/bin
+LIB_DIR ?= .
+MOD_DIR ?= .
 
 # If the compiler produces module files, tell it where to put them
 #
 ifdef F_MOD_DESTINATION_ARG
-  MODULE_DESTINATION_ARGUMENT = $(F_MOD_DESTINATION_ARG)$(dir $@)
+  MODULE_DESTINATION_ARGUMENT = $(F_MOD_DESTINATION_ARG)$(MOD_DIR)
+  MODULE_SOURCE_ARGUMENT = $(F_MOD_SOURCE_ARG)$(MOD_DIR)
 endif
 
 ifdef CXX_LINK
@@ -99,35 +106,41 @@ else
 endif
 
 ##############################################################################
-$(BIN_DIR)/%: %.x | $(BIN_DIR)
-	$(call MESSAGE,Installing,$*)
-	$(Q)cp $< $(BIN_DIR)/$(notdir $*)
 
-.PRECIOUS: %.x
-%.x: $$($$(shell basename $$* | tr a-z A-Z)_OBJS)
-	$(call MESSAGE,Linking,$@)
-	$(Q)$(LDMPI) $(LDFLAGS) -o $@ \
-	             $^ \
-	             $(patsubst %,-l%,$(EXTERNAL_STATIC_LIBRARIES)) \
-	             $(patsubst %,-l%,$(EXTERNAL_DYNAMIC_LIBRARIES))
+.PRECIOUS: $(BIN_DIR)/%
+$(BIN_DIR)/%: %.o $$(LIB_DIR)/lib$$(*F).a
+	$(call MESSAGE,Linking,$*)
+	$(Q)mkdir -p $(@D)
+	$(Q)$(LDMPI) $(LDFLAGS) -o $@ $^ \
+	            $(patsubst %,-l%,$(EXTERNAL_STATIC_LIBRARIES)) \
+	            $(patsubst %,-l%,$(EXTERNAL_DYNAMIC_LIBRARIES))
+
+.PRECIOUS: $(LIB_DIR)/lib%.a
+$(LIB_DIR)/lib%.a: $$($$(shell basename $$* | tr a-z A-Z)_OBJS) | $(LIB_DIR)
+	$(call MESSAGE,Archiving,$(@F))
+	$(Q) ar -rcs $@ $^
 
 .PRECIOUS: %.o
-%.o: %.f90
+%.o: %.f90 | $(MOD_DIR)
 	$(call MESSAGE,Compile,$<)
 	$(Q)$(FC) $(FFLAGS) \
 	          $(MODULE_DESTINATION_ARGUMENT) \
+			  $(MODULE_SOURCE_ARGUMENT) \
 	          $(INCLUDE_ARGS) -c -o $(basename $@).o $<
 
-%.o: %.F90
+%.o: %.F90 | $(MOD_DIR)
 	$(call MESSAGE,Pre-process and compile,$<)
 	$(Q)$(FC) $(FFLAGS) \
 	          $(MODULE_DESTINATION_ARGUMENT) \
+			  $(MODULE_SOURCE_ARGUMENT) \
 	          $(INCLUDE_ARGS) $(MACRO_ARGS) -c -o $(basename $@).o $<
+
 
 #############################################################################
 # Directories
-#
-$(BIN_DIR):
+
+# Sort removes duplicates in this list
+$(sort $(LIB_DIR) $(MOD_DIR)):
 	$(call MESSAGE,Creating,$@)
 	$(Q)mkdir -p $@
 

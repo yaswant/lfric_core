@@ -12,7 +12,6 @@ import os.path
 
 from utilities.path import replaceExtension
 
-
 ###############################################################################
 # Process dependency database.
 #
@@ -126,9 +125,8 @@ class FortranProcessor():
             program_object_file = os.path.join(self._objectDirectory,
                                                replaceExtension(unit_file,
                                                                 'o'))
-            prerequisites.add(program_object_file)
             yield os.path.join(self._objectDirectory, program), \
-                  sorted(list(prerequisites))
+                  program_object_file, sorted(list(prerequisites))
 
     ##########################################################################
     def _descend(self, programUnit, prerequisites):

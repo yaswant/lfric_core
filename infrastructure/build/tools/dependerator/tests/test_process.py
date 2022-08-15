@@ -57,10 +57,10 @@ class TestFortranProcessor():
         uut = FortranProcessor(databases[0], "objects", "modules")
         result = list(uut.determineLinkDependencies())
 
-        assert [(u'objects/foo', ['objects/bits/bar.o',
-                                  'objects/bits/baz.o',
-                                  'objects/bobs/qux.o',
-                                  'objects/foo.o', 'objects/quux.o'])] == result
+        assert [(u'objects/foo', 'objects/foo.o', ['objects/bits/bar.o',
+                                                   'objects/bits/baz.o',
+                                                   'objects/bobs/qux.o',
+                                                   'objects/quux.o'])] == result
 
     def _populate_database( self, database: FortranDependencies ):
         database.addProgram( 'foo', 'foo.f90' )

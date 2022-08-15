@@ -20,6 +20,7 @@ ifeq ($(shell test $(IFORT_VERSION) -lt 0150001; echo $$?), 0)
 endif
 
 F_MOD_DESTINATION_ARG = -module$(SPACE)
+F_MOD_SOURCE_ARG      = -I
 OPENMP_ARG            = -qopenmp
 FORTRAN_RUNTIME       = 
 
