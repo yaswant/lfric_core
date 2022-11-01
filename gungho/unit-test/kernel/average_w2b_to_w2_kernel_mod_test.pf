@@ -1,0 +1,196 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> Test the kernel mapping for restoring continuity to broken W2 field
+!>
+module average_w2b_to_w2_kernel_mod_test
+
+  use constants_mod,         only: i_def, r_def
+  use reference_element_mod, only: E, W, N, S, T, B
+  use pFUnit_Mod
+
+
+  implicit none
+
+  private
+  public :: average_w2b_to_w2_test_type, test_all
+
+  @TestCase
+  type, extends(TestCase) :: average_w2b_to_w2_test_type
+    private
+  contains
+
+    procedure test_all
+
+  end type average_w2b_to_w2_test_type
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test
+  subroutine test_all( this )
+
+    use average_w2b_to_w2_kernel_mod, only : average_w2b_to_w2_code
+
+    implicit none
+
+    ! ------------------------------------------------------------------------ !
+    ! Declare variables
+    ! ------------------------------------------------------------------------ !
+
+    class(average_w2b_to_w2_test_type), intent(inout) :: this
+
+    real(kind=r_def), parameter ::  tol = 1.0e-12_r_def
+    real(kind=r_def), parameter ::   u_B = 7.0_r_def
+    real(kind=r_def), parameter ::   u_E = 11.0_r_def
+    real(kind=r_def), parameter ::   u_N = 3.0_r_def
+    real(kind=r_def), parameter ::   u_S = 4.0_r_def
+
+    ! Fields
+    real(kind=r_def), allocatable :: w2b_field(:)
+    real(kind=r_def), allocatable :: w2_field(:)
+    real(kind=r_def), allocatable :: answer(:)
+    real(kind=r_def), allocatable :: rmultiplicity_w2(:)
+
+    integer(kind=i_def) :: cell, k
+
+    ! Sizes
+    integer(kind=i_def) :: nlayers, ncols
+    integer(kind=i_def) :: ndf_w2b, ndf_w2
+    integer(kind=i_def) :: undf_w2b, undf_w2
+
+    ! Dofmaps
+    integer(kind=i_def), allocatable :: map_w2(:,:), map_w2b(:,:)
+
+    ! ------------------------------------------------------------------------ !
+    ! Set variables describing function spaces
+    ! ------------------------------------------------------------------------ !
+
+    ! Consider three columns of three layers
+    nlayers = 3
+    ndf_w2 = 6
+    undf_w2 = 42
+    ndf_w2b = 6
+    undf_w2b = 54
+    ncols = 3
+
+    ! Create the data
+    allocate( w2b_field(undf_w2b) )
+    allocate( w2_field(undf_w2) )
+    allocate( answer(undf_w2) )
+    allocate( rmultiplicity_w2(undf_w2) )
+    allocate( map_w2b(ndf_w2b, ncols) )
+    allocate( map_w2(ndf_w2, ncols) )
+
+    map_w2(:,:) =  reshape( [  1_i_def,  4_i_def,  7_i_def, &
+                              10_i_def, 13_i_def, 14_i_def, &
+                               7_i_def, 17_i_def, 20_i_def, &
+                              23_i_def, 26_i_def, 27_i_def, &
+                              20_i_def, 30_i_def, 33_i_def, &
+                              36_i_def, 39_i_def, 40_i_def  ], [6,3])
+    map_w2b(:,:) = reshape( [  1_i_def,  4_i_def,  7_i_def, &
+                              10_i_def, 13_i_def, 16_i_def, &
+                              19_i_def, 22_i_def, 25_i_def, &
+                              28_i_def, 31_i_def, 34_i_def, &
+                              37_i_def, 40_i_def, 43_i_def, &
+                              46_i_def, 49_i_def, 52_i_def], [6,3])
+
+    ! ------------------------------------------------------------------------ !
+    ! Set values of input fields
+    ! ------------------------------------------------------------------------ !
+
+    ! The discontinuous field is set so the values vary on top/bottom faces, and
+    ! east/west faces. To be sure that the kernel is working correctly, the
+    ! values vary bi-linearly (as a function of both height and column index).
+    ! A constant offset is added to the east faces relative to the west faces,
+    ! so that the true answer is determined by the average of the offset.
+    ! The north and south DoFs are not shared between columns so the values
+    ! are equal for the broken W2 field and the continuous W2 field.
+
+    ! Set horizontal values -- Vary with cell and height
+    do k = 0, nlayers - 1
+      do cell = 1, 3
+        w2b_field(map_w2b(W,cell)+k) = u_E*real(cell+k,r_def)
+        w2b_field(map_w2b(E,cell)+k) = u_E*(real(cell+k,r_def) + 2.0_r_def)
+        w2b_field(map_w2b(N,cell)+k) = u_N*real(cell+k,r_def)
+        w2b_field(map_w2b(S,cell)+k) = u_S*real(cell+k,r_def)
+        w2b_field(map_w2b(B,cell)+k) = u_B*real(cell+k,r_def)
+        w2b_field(map_w2b(T,cell)+k) = u_B*(real(cell+k,r_def) + 2.0_r_def)
+        answer(map_w2(N,cell)+k) = u_N*real(cell+k,r_def)
+        answer(map_w2(S,cell)+k) = u_S*real(cell+k,r_def)
+      end do
+
+      ! Values shared between columns
+      do cell = 1, 2
+        answer(map_w2(E,cell)+k) = u_E*(real(cell+k,r_def) + 1.5_r_def)
+      end do
+
+      ! Values not shared between columns
+      cell = 1
+      answer(map_w2(W,cell)+k) = u_E*real(cell+k,r_def)
+      cell = 3
+      answer(map_w2(E,cell)+k) = u_E*(real(cell+k,r_def) + 2.0_r_def)
+    end do
+
+    ! Vertical DoFs for answer
+    do cell = 1, 3
+      k = 0
+      answer(map_w2(B,cell)+k) = u_B*real(cell+k,r_def)
+      k = nlayers - 1
+      answer(map_w2(T,cell)+k) = u_B*(real(cell+k,r_def) + 2.0_r_def)
+      do k = 1, nlayers - 1
+        answer(map_w2(B,cell)+k) = u_B*(real(cell+k,r_def) + 0.5_r_def)
+      end do
+    end do
+
+    ! Most rmuliplicity values are 1.0
+    rmultiplicity_w2(:) = 1.0_r_def
+    ! Correct rmultiplicity for vertical values
+    do cell = 1, 3
+      do k = 1, nlayers - 1
+        rmultiplicity_w2(map_w2(B, cell)+k) = 0.5_r_def
+      end do
+    end do
+
+    ! Set rmultiplicity for shared horizontal DoFs
+    do cell = 1, 2
+      do k = 0, nlayers - 1
+        rmultiplicity_w2(map_w2(E, cell)+k) = 0.5_r_def
+      end do
+    end do
+
+    ! ------------------------------------------------------------------------ !
+    ! Run kernel
+    ! ------------------------------------------------------------------------ !
+
+    w2_field(:) = 0.0_r_def
+
+    do cell = 1, ncols
+      call average_w2b_to_w2_code( nlayers,          &
+                                   w2_field,         &
+                                   w2b_field,        &
+                                   rmultiplicity_w2, &
+                                   ndf_w2,           &
+                                   undf_w2,          &
+                                   map_w2(:,cell),   &
+                                   ndf_w2b,          &
+                                   undf_w2b,         &
+                                   map_w2b(:,cell)   &
+                                 )
+    end do
+
+    @assertEqual(answer(:), w2_field(:), tol)
+
+    deallocate( w2b_field )
+    deallocate( w2_field )
+    deallocate( answer )
+    deallocate( rmultiplicity_w2 )
+    deallocate( map_w2b )
+    deallocate( map_w2 )
+
+  end subroutine test_all
+
+end module average_w2b_to_w2_kernel_mod_test

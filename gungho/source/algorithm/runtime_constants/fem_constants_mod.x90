@@ -73,6 +73,7 @@ module fem_constants_mod
                                                     operator_x_times_y_kernel_type, &
                                                     operator_setval_x_kernel_type
   use project_ws_to_w2_operator_kernel_mod,   only: project_ws_to_w2_operator_kernel_type
+  use project_w3_to_w2b_operator_kernel_mod,  only: project_w3_to_w2b_operator_kernel_type
   use w2_normalisation_kernel_mod,            only: w2_normalisation_kernel_type
   use psykal_lite_mod,                        only: invoke_copy_to_rsolver
 
@@ -95,6 +96,7 @@ module fem_constants_mod
   type(operator_type), allocatable, dimension(:), target :: mm_dl
   type(operator_type), allocatable, dimension(:), target :: mm_w2_si
   type(operator_type), allocatable, dimension(:), target :: mm_w3_inv
+  type(operator_type), allocatable, dimension(:), target :: mm_w2b_inv
 
   ! Differential operators
   type(operator_type), allocatable, dimension(:), target :: div
@@ -135,6 +137,9 @@ module fem_constants_mod
   type(operator_type), allocatable, dimension(:), target :: project_xdot_to_w2
   type(operator_type), allocatable, dimension(:), target :: project_ydot_to_w2
   type(operator_type), allocatable, dimension(:), target :: project_zdot_to_w2
+  type(operator_type), allocatable, dimension(:), target :: project_xdot_to_w2b
+  type(operator_type), allocatable, dimension(:), target :: project_ydot_to_w2b
+  type(operator_type), allocatable, dimension(:), target :: project_zdot_to_w2b
 
   ! Quadrature objects
   type( quadrature_xyoz_type ),target                    :: qr
@@ -159,6 +164,7 @@ module fem_constants_mod
   public :: get_mass_matrix_diagonal
   public :: get_inverse_lumped_mass_matrix
   public :: get_inverse_w3_mass_matrix
+  public :: get_inverse_w2b_mass_matrix
   public :: get_dl_mass_matrix
   public :: get_w2_si_mass_matrix
   public :: get_grad
@@ -177,6 +183,9 @@ module fem_constants_mod
   public :: get_project_xdot_to_w2
   public :: get_project_ydot_to_w2
   public :: get_project_zdot_to_w2
+  public :: get_project_xdot_to_w2b
+  public :: get_project_ydot_to_w2b
+  public :: get_project_zdot_to_w2b
 
   ! Getters for r_solver objects
   public :: get_div_r_solver
@@ -264,6 +273,7 @@ contains
              broken_div(num_meshes),                &
              mm_w3_inv(num_meshes),                 &
              mm_w3_inv_r_solver(num_meshes),        &
+             mm_w2b_inv(num_meshes),                &
              mm_w2v(num_meshes),                    &
              mm_w2h(num_meshes),                    &
              div_v(num_meshes),                     &
@@ -297,7 +307,10 @@ contains
              detj_at_w3_r_solver(num_meshes),       &
              project_xdot_to_w2(num_meshes),        &
              project_ydot_to_w2(num_meshes),        &
-             project_zdot_to_w2(num_meshes) )
+             project_zdot_to_w2(num_meshes),        &
+             project_xdot_to_w2b(num_meshes),       &
+             project_ydot_to_w2b(num_meshes),       &
+             project_zdot_to_w2b(num_meshes)        )
 
     !======================== Create quadrature object ========================!
 
@@ -411,6 +424,17 @@ contains
         call invoke( operator_x_times_y_kernel_type( im3_div(i), mm_w3_inv(i), div(i) ),     &
                      operator_x_times_y_kernel_type( im3_div_h(i), mm_w3_inv(i), div_h(i) ), &
                      operator_x_times_y_kernel_type( im3_div_v(i), mm_w3_inv(i), div_v(i) )  )
+      end if
+
+      !======================== Inverse W2b mass matrix =======================!
+
+      if ( label_list(i) /= twod_mesh_label .and. &
+           label_list(i) /= multigrid_mesh_label ) then
+
+        call mm_w2b_inv(i)%initialise( w2b_fs, w2b_fs )
+
+        call invoke( name = "create_W2b_inv_mass_matrix", &
+                     invert_local_operator_kernel_type(mm_w2b_inv(i), mm_w2b(i)) )
       end if
 
       !========================= Special mass matrices ========================!
@@ -676,6 +700,20 @@ contains
                      project_ws_to_w2_operator_kernel_type(                   &
                                         project_zdot_to_w2(i), chi_list(:,i), &
                                         panel_id_list(i), zdirection, qr) )
+
+        call project_xdot_to_w2b(i)%initialise( w2b_fs, w3_fs )
+        call project_ydot_to_w2b(i)%initialise( w2b_fs, w3_fs )
+        call project_zdot_to_w2b(i)%initialise( w2b_fs, w3_fs )
+        call invoke( name="compute_w3_to_broken_w2b_operators",                &
+                     project_w3_to_w2b_operator_kernel_type(                   &
+                                        project_xdot_to_w2b(i), chi_list(:,i), &
+                                        panel_id_list(i), xdirection, qr),     &
+                     project_w3_to_w2b_operator_kernel_type(                   &
+                                        project_ydot_to_w2b(i), chi_list(:,i), &
+                                        panel_id_list(i), ydirection, qr),     &
+                     project_w3_to_w2b_operator_kernel_type(                   &
+                                        project_zdot_to_w2b(i), chi_list(:,i), &
+                                        panel_id_list(i), zdirection, qr) )
       end if
 
 
@@ -886,6 +924,23 @@ contains
     sol_mm_w3_inv_op => mm_w3_inv_r_solver(mesh_index)
 
   end function get_inverse_w3_mass_matrix_r_solver
+
+  !> @brief Returns a pointer to the inverse W2b mass matrix operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The inverse W2b mass matrix operator
+  function get_inverse_w2b_mass_matrix(mesh_id) result(mm_w2b_inv_op)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    integer(kind=i_def)               :: mesh_index
+    type(operator_type),      pointer :: mm_w2b_inv_op
+    character(str_def)                :: op_name
+
+    mesh_index = find_mesh_index(mesh_id)
+    op_name = 'inverse_w2b_mass_matrix'
+    mm_w2b_inv_op => mm_w2b_inv(mesh_index)
+    call check_initialised_operator(mm_w2b_inv_op, op_name, mesh_id)
+
+  end function get_inverse_w2b_mass_matrix
 
   !> @brief Returns a pointer to the damping layer W2 mass matrix operator
   !> @param[in] mesh_id The ID of the mesh to get the object for
@@ -1322,12 +1377,66 @@ contains
 
   end function get_project_zdot_to_w2
 
+  !> @brief Returns a pointer to the operator projection from xdot to W2b
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_xdot_to_w2b(mesh_id) result(proj_op)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    integer(kind=i_def)               :: mesh_index
+    type(operator_type),      pointer :: proj_op
+    character(str_def)                :: op_name
+
+    mesh_index = find_mesh_index(mesh_id)
+    op_name = 'project_xdot_to_w2b'
+    proj_op => project_xdot_to_w2b(mesh_index)
+    call check_initialised_operator(proj_op, op_name, mesh_id)
+
+  end function get_project_xdot_to_w2b
+
+  !> @brief Returns a pointer to the operator projection from ydot to W2b
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_ydot_to_w2b(mesh_id) result(proj_op)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    integer(kind=i_def)               :: mesh_index
+    type(operator_type),      pointer :: proj_op
+    character(str_def)                :: op_name
+
+    mesh_index = find_mesh_index(mesh_id)
+    op_name = 'project_ydot_to_w2b'
+    proj_op => project_ydot_to_w2b(mesh_index)
+    call check_initialised_operator(proj_op, op_name, mesh_id)
+
+  end function get_project_ydot_to_w2b
+
+  !> @brief Returns a pointer to the operator projection from zdot to W2b
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_zdot_to_w2b(mesh_id) result(proj_op)
+    implicit none
+    integer(kind=i_def),   intent(in) :: mesh_id
+    integer(kind=i_def)               :: mesh_index
+    type(operator_type),      pointer :: proj_op
+    character(str_def)                :: op_name
+
+    mesh_index = find_mesh_index(mesh_id)
+    op_name = 'project_zdot_to_w2b'
+    proj_op => project_zdot_to_w2b(mesh_index)
+    call check_initialised_operator(proj_op, op_name, mesh_id)
+
+  end function get_project_zdot_to_w2b
+
   !> @brief Explicitly reclaim memory from module scope variables
   !
   subroutine final_fem_constants()
 
     implicit none
 
+    deallocate(project_zdot_to_w2b)
+    deallocate(project_ydot_to_w2b)
+    deallocate(project_xdot_to_w2b)
     deallocate(project_zdot_to_w2)
     deallocate(project_ydot_to_w2)
     deallocate(project_xdot_to_w2)
@@ -1358,6 +1467,7 @@ contains
     deallocate(div_v)
     deallocate(mm_w2h)
     deallocate(mm_w2v)
+    deallocate(mm_w2b_inv)
     deallocate(mm_w3_inv)
     deallocate(broken_div)
     deallocate(curl)

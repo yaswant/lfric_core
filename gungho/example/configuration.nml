@@ -132,6 +132,7 @@ stretching_method='linear',
 
 &physics
   blayer_placement = 'fast'
+  broken_w2_projection = .true.
   convection_placement = 'fast'
   microphysics_placement = 'slow'
   radiation_placement = 'slow'
@@ -222,6 +223,7 @@ stretching_method='linear',
 
 &transport
   advective_then_flux = .true.
+  broken_w2_projection = .false.
   moisture_eqn='advective'
   profile_size = 3
   field_names = 'density', 'potential_temperature', 'wind'

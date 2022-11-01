@@ -327,6 +327,7 @@ tau_u=0.55,
 /
 &transport
 advective_then_flux=.false.
+broken_w2_projection=.false.
 cfl_mol_1d_stab=2.0,
 cfl_mol_2d_stab=2.0,
 cfl_mol_3d_stab=2.0,

@@ -1,0 +1,313 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+module compute_map_u_broken_ops_kernel_mod_test
+
+  use constants_mod,                 only : i_def, r_def, pi
+  use pFUnit_Mod
+
+  implicit none
+
+  private
+  public :: compute_map_u_broken_ops_test_type, test_all
+
+  @TestCase
+  type, extends(TestCase) :: compute_map_u_broken_ops_test_type
+    private
+  contains
+    procedure setUp
+    procedure tearDown
+    procedure test_all
+  end type compute_map_u_broken_ops_test_type
+
+  real(r_def), parameter :: gravity  = 10.0_r_def
+  real(r_def), parameter :: radius   = 6000000_r_def
+  real(r_def), parameter :: omega    = 8.0E-5_r_def
+  real(r_def), parameter :: p_zero   = 100000.0_r_def
+  real(r_def), parameter :: rd       = 300.0_r_def
+  real(r_def), parameter :: cp       = 1000.0_r_def
+  real(r_def), parameter :: scaling  = 1.0_r_def
+
+contains
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine setUp( this )
+
+    use base_mesh_config_mod,      only : geometry_spherical, &
+                                          topology_fully_periodic
+    use chi_transform_mod,         only : init_chi_transforms
+    use finite_element_config_mod, only : cellshape_quadrilateral, &
+                                          coord_system_lonlatz
+    use feign_config_mod,          only : feign_finite_element_config, &
+                                          feign_base_mesh_config,      &
+                                          feign_planet_config
+
+    implicit none
+
+    class(compute_map_u_broken_ops_test_type), intent(inout) :: this
+
+    call feign_base_mesh_config( filename='foo',                   &
+                                 prime_mesh_name='unit_test',      &
+                                 geometry=geometry_spherical,      &
+                                 offline_partitioning=.false.,     &
+                                 topology=topology_fully_periodic, &
+                                 fplane=.false., f_lat_deg=0.0_r_def )
+
+    call feign_finite_element_config(           &
+             cellshape=cellshape_quadrilateral, &
+             element_order=0_i_def,             &
+             rehabilitate=.true.,               &
+             coord_order = 0_i_def,             &
+             coord_system=coord_system_lonlatz, &
+             vorticity_in_w1=.false. )
+
+    call feign_planet_config( gravity=gravity, radius=radius, omega=omega, &
+                              rd=rd, cp=cp, p_zero=p_zero,                 &
+                              scaling_factor=scaling )
+
+    call init_chi_transforms()
+
+  end subroutine setUp
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine tearDown( this )
+
+    use configuration_mod,        only: final_configuration
+    use chi_transform_mod,        only: final_chi_transforms
+
+    implicit none
+
+    class(compute_map_u_broken_ops_test_type), intent(inout) :: this
+
+    call final_configuration()
+    call final_chi_transforms()
+
+  end subroutine tearDown
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  @Test
+  subroutine test_all( this )
+
+    use matrix_vector_kernel_mod,            only : matrix_vector_code
+    use compute_map_u_broken_ops_kernel_mod, only : compute_map_u_broken_ops_code
+    use compute_mass_matrix_kernel_w2_mod,   only : compute_mass_matrix_w2_code
+
+   implicit none
+
+    class(compute_map_u_broken_ops_test_type), intent(inout) :: this
+
+    ! ------------------------------------------------------------------------ !
+    ! Declare variables
+    ! ------------------------------------------------------------------------ !
+    real(kind=r_def), parameter :: tol = 1.0_r_def
+
+    ! Mesh (single cell)
+    integer(kind=i_def), parameter :: ncell   = 1
+    integer(kind=i_def), parameter :: nlayers = 1
+    integer(kind=i_def), parameter :: cell    = 1
+    ! Number of DoFs per cell
+    integer(kind=i_def), parameter :: ndf_w2b = 6_i_def
+    integer(kind=i_def), parameter :: ndf_w3  = 1_i_def
+    integer(kind=i_def), parameter :: ndf_wt  = 2_i_def
+    integer(kind=i_def), parameter :: ndf_wx  = 8_i_def
+    integer(kind=i_def), parameter :: ndf_pid = 1_i_def
+    ! Number of DoFs in domain
+    integer(kind=i_def), parameter :: undf_w2b = ndf_w2b
+    integer(kind=i_def), parameter :: undf_w3  = ndf_w3
+    integer(kind=i_def), parameter :: undf_wt  = ndf_wt
+    integer(kind=i_def), parameter :: undf_wx  = ndf_wx
+    integer(kind=i_def), parameter :: undf_pid = ndf_pid
+    ! Operators to test
+    real(kind=r_def), dimension(ndf_w2b,ndf_w3,ncell)  :: lat_op
+    real(kind=r_def), dimension(ndf_w2b,ndf_w3,ncell)  :: lon_op
+    real(kind=r_def), dimension(ndf_w2b,ndf_wt,ncell)  :: z_op
+    real(kind=r_def), dimension(ndf_w2b,ndf_w2b,ncell) :: mm
+    ! Maps
+    integer(kind=i_def), dimension(ndf_w2b) :: map_w2b
+    integer(kind=i_def), dimension(ndf_w3)  :: map_w3
+    integer(kind=i_def), dimension(ndf_wt)  :: map_wt
+    integer(kind=i_def), dimension(ndf_wx)  :: map_wx
+    integer(kind=i_def), dimension(ndf_pid) :: map_pid
+    ! Basis arrays
+    real(kind=r_def), dimension(3,ndf_w2b) :: basis_w2b
+    real(kind=r_def), dimension(1,ndf_w3)  :: basis_w3
+    real(kind=r_def), dimension(1,ndf_wt)  :: basis_wt
+    real(kind=r_def), dimension(1,ndf_wx)  :: basis_wx
+    real(kind=r_def), dimension(3,ndf_wx)  :: diff_basis_wx
+    ! Quadrature
+    integer(kind=i_def), parameter   :: nqp = 1_i_def
+    real(kind=r_def), dimension(nqp) :: wgt
+    ! Fields
+    real(kind=r_def), dimension(undf_pid) :: panel_id
+    real(kind=r_def), dimension(ndf_w2b)  :: answer
+    real(kind=r_def), dimension(ndf_w2b)  :: u_hdiv
+    real(kind=r_def), dimension(ndf_w2b)  :: r_u_data
+    real(kind=r_def), dimension(ndf_w3)   :: u_lon_data
+    real(kind=r_def), dimension(ndf_w3)   :: u_lat_data
+    real(kind=r_def), dimension(ndf_wt)   :: u_up_data
+    ! Scalars
+    integer(kind=i_def) :: direction
+    integer(kind=i_def) :: i
+    ! Coordinate fields
+    real(kind=r_def), dimension(undf_wx) :: lon, lat, z
+    real(kind=r_def), parameter :: dlon = 0.001
+    real(kind=r_def), parameter :: dlat = 0.05
+    real(kind=r_def), parameter :: dz = 10.0_r_def
+    real(kind=r_def), parameter :: u_lon = 40.0_r_def
+    real(kind=r_def), parameter :: u_lat = 5.0_r_def
+    real(kind=r_def), parameter :: u_up = 0.1_r_def
+    real(kind=r_def), parameter :: zero = 0.0_r_def
+
+    ! ------------------------------------------------------------------------ !
+    ! Set coordinates
+    ! ------------------------------------------------------------------------ !
+    lon = (/ zero, dlon,   dlon,   zero, zero, dlon,   dlon, zero /)
+    lat = (/ zero, zero, dlat,   dlat,   zero, zero, dlat, dlat /)
+    z = (/ zero, zero, zero, zero, dz,   dz,   dz, dz /)
+
+    ! ------------------------------------------------------------------------ !
+    ! Set DoF maps
+    ! ------------------------------------------------------------------------ !
+    ! Mesh is a single cell so these are very simple
+    do i = 1, ndf_wx
+      map_wx(i) = int(i,i_def)
+    end do
+    do i = 1, ndf_pid
+      map_pid(i) = int(i,i_def)
+    end do
+    do i = 1, ndf_w2b
+      map_w2b(i) = int(i,i_def)
+    end do
+    do i = 1, ndf_w3
+      map_w3(i) = int(i,i_def)
+    end do
+    do i = 1, ndf_wt
+      map_wt(i) = int(i,i_def)
+    end do
+
+    ! ------------------------------------------------------------------------ !
+    ! Basis functions at quadrature points
+    ! ------------------------------------------------------------------------ !
+    wgt(:) = 1.0_r_def
+    ! W2b basis functions evaluated at the one quadrature point
+    basis_w2b(:,1) = (/ 0.5_r_def, 0.0_r_def, 0.0_r_def /)
+    basis_w2b(:,2) = (/ 0.5_r_def, 0.0_r_def, 0.0_r_def /)
+    basis_w2b(:,3) = (/ 0.0_r_def, 0.5_r_def, 0.0_r_def /)
+    basis_w2b(:,4) = (/ 0.0_r_def, 0.5_r_def, 0.0_r_def /)
+    basis_w2b(:,5) = (/ 0.0_r_def, 0.0_r_def, 0.5_r_def /)
+    basis_w2b(:,6) = (/ 0.0_r_def, 0.0_r_def, 0.5_r_def /)
+    ! W3 basis function evaluated at the one quadrature point
+    basis_w3(1,1) = 1.0_r_def
+    ! Wt basis functions evaluated at the one quadrature point
+    basis_wt(1,1) = 0.5_r_def
+    basis_wt(1,2) = 0.5_r_def
+    ! Coordinate basis
+    diff_basis_wx(:,1) = (/ -1.0_r_def, -1.0_r_def, -1.0_r_def /)
+    diff_basis_wx(:,2) = (/  1.0_r_def, -1.0_r_def, -1.0_r_def /)
+    diff_basis_wx(:,3) = (/  1.0_r_def,  1.0_r_def, -1.0_r_def /)
+    diff_basis_wx(:,4) = (/ -1.0_r_def,  1.0_r_def, -1.0_r_def /)
+    diff_basis_wx(:,5) = (/ -1.0_r_def, -1.0_r_def,  1.0_r_def /)
+    diff_basis_wx(:,6) = (/  1.0_r_def, -1.0_r_def,  1.0_r_def /)
+    diff_basis_wx(:,7) = (/  1.0_r_def,  1.0_r_def,  1.0_r_def /)
+    diff_basis_wx(:,8) = (/ -1.0_r_def,  1.0_r_def,  1.0_r_def /)
+    diff_basis_wx= 0.25_r_def*diff_basis_wx
+    basis_wx(:,:) = 0.125_r_def
+
+    ! ------------------------------------------------------------------------ !
+    ! Input fields
+    ! ------------------------------------------------------------------------ !
+    panel_id = (/ 1.0_r_def /)
+    u_lon_data = (/ u_lon /)
+    u_lat_data = (/ u_lat /)
+    u_up_data = (/ u_up, u_up /)
+
+    ! ------------------------------------------------------------------------ !
+    ! Compute correct answer
+    ! ------------------------------------------------------------------------ !
+    ! finite element wind is multiplied by areas of faces
+    u_hdiv(1) = u_lon*radius*dlat*dz
+    u_hdiv(2) = u_lon*radius*dlat*dz
+    u_hdiv(3) = u_lat*radius*cos(dlat/2.0_r_def)*dlon*dz
+    u_hdiv(4) = u_lat*radius*cos(dlat/2.0_r_def)*dlon*dz
+    u_hdiv(5) = u_up*radius**2*cos(dlat/2.0_r_def)*dlon*dlat
+    u_hdiv(6) = u_up*radius**2*cos(dlat/2.0_r_def)*dlon*dlat
+    ! ------------------------------------------------------------------------ !
+    ! Call kernel to compute operators
+    ! ------------------------------------------------------------------------ !
+    lon_op(:,:,:) = 0.0_r_def
+    lat_op(:,:,:) = 0.0_r_def
+    z_op(:,:,:) = 0.0_r_def
+
+    call compute_map_u_broken_ops_code(                                  &
+                                        cell, nlayers,                   &
+                                        ncell, lon_op,                   &
+                                        ncell, lat_op,                   &
+                                        ncell, z_op,                     &
+                                        lon, lat, z,                     &
+                                        panel_id,                        &
+                                        ndf_w2b, basis_w2b,              &
+                                        ndf_w3, basis_w3,                &
+                                        ndf_wt, basis_wt,                &
+                                        ndf_wx, undf_wx, map_wx,         &
+                                        basis_wx, diff_basis_wx,         &
+                                        ndf_pid, undf_pid, map_pid,      &
+                                        nqp, nqp, wgt, wgt               &
+                                       )
+
+    ! ------------------------------------------------------------------------ !
+    ! Apply operators
+    ! ------------------------------------------------------------------------ !
+    ! It is difficult to analytically derive all the values of the operators
+    ! Instead we check if the operator acts in the correct way.
+    ! Our equation is:
+    ! MM_W2 * u_hdiv = lon_op * u_lon + lat_op * u_lat + z_op * u_up
+    ! We will assemble both sides and check they are equal
+
+    ! Obtain right-hand side vector for this spherical components
+    r_u_data(:) = 0.0_r_def
+    call matrix_vector_code(cell, nlayers,                   &
+                            r_u_data, u_lon_data,            &
+                            ncell, lon_op,                   &
+                            ndf_w2b, undf_w2b, map_w2b,      &
+                            ndf_w3, undf_w3, map_w3)
+    call matrix_vector_code(cell, nlayers,                   &
+                            r_u_data, u_lat_data,            &
+                            ncell, lat_op,                   &
+                            ndf_w2b, undf_w2b, map_w2b,      &
+                            ndf_w3, undf_w3, map_w3)
+
+    call matrix_vector_code(cell, nlayers,                   &
+                            r_u_data, u_up_data,             &
+                            ncell, z_op,                     &
+                            ndf_w2b, undf_w2b, map_w2b,      &
+                            ndf_wt, undf_wt, map_wt)
+
+    ! Compute W2b mass matrix
+    mm(:,:,:) = 0.0_r_def
+    call compute_mass_matrix_w2_code(cell, nlayers, ncell, mm,   &
+                                     lon, lat, z, panel_id,      &
+                                     ndf_w2b, basis_w2b,         &
+                                     ndf_wx, undf_wx, map_wx,    &
+                                     basis_wx, diff_basis_wx,    &
+                                     ndf_pid, undf_pid, map_pid, &
+                                     nqp, nqp, wgt, wgt)
+
+    ! Answer for right-hand side is W2b mass matrix multiplying true HDiv field
+    answer(:) = 0.0_r_def
+    call matrix_vector_code(cell, nlayers,               &
+                            answer, u_hdiv,              &
+                            ncell, mm,                   &
+                            ndf_w2b, undf_w2b, map_w2b,  &
+                            ndf_w2b, undf_w2b, map_w2b)
+
+    ! ------------------------------------------------------------------------ !
+    ! Check answer
+    ! ------------------------------------------------------------------------ !
+    @assertEqual(answer(:), r_u_data(:), tol)
+
+  end subroutine test_all
+
+end module compute_map_u_broken_ops_kernel_mod_test

@@ -50,6 +50,7 @@ contains
                                  fv_vertical_order = 2,                                    &
                                  fv_horizontal_order = 2,                                  &
                                  advective_then_flux = .false.,                            &
+                                 broken_w2_projection = .false.,                           &
                                  consistent_metric  = .false.,                             &
                                  oned_reconstruction = .false.,                            &
                                  cfl_mol_1d_stab = 1.0_r_def,                              &
