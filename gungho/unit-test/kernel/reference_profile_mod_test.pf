@@ -35,6 +35,7 @@ module reference_profile_mod_test
   real(r_def), parameter :: bvf_square = 0.0001_r_def
   real(r_def), parameter :: theta_surf = 300.0_r_def
   real(r_def), parameter :: pert_width_scaling = 1.0_r_def
+  real(r_def), parameter :: pert_centre = 120.0_r_def
   integer(i_def),                                                  &
                parameter :: profile_size       = 4
   real(r_def), parameter :: profile_data(4)    = (/ 280.0_r_def,   &
@@ -82,6 +83,7 @@ contains
 
     call feign_initial_temperature_config( bvf_square=bvf_square,                 &
                                            theta_surf=theta_surf,                 &
+                                           pert_centre=pert_centre,               &
                                            pert_width_scaling=pert_width_scaling, &
                                            perturb=perturb_none,                  &
                                            profile_size=profile_size,             &

@@ -90,7 +90,7 @@ def make_xz_figure(plotpath, field, component, timestep):
   out_file_name = plotpath + "/" "dcmip301_xz_" + field + "_" + timestep +  ".png"
   plt.savefig(out_file_name , bbox_inches='tight')
 
-def make_hovmoller_figure(datapath, plotpath, field, component):
+def make_hovmoller_figure(datapath, plotpath, field, component, step):
 
   val_col = 'c' + str(component)
 
@@ -104,7 +104,7 @@ def make_hovmoller_figure(datapath, plotpath, field, component):
 
   for t in range(0,nt):
 
-    timestep = "T"+str(36*t).zfill(6)
+    timestep = "T"+str(step*t).zfill(6)
     filestem =  datapath + "/diagGungho_nodal_" + field + "_" + timestep + "*"
 
     data = read_nodal_data(filestem, 1, 1)
@@ -155,7 +155,7 @@ def make_hovmoller_figure(datapath, plotpath, field, component):
   u1 = u1/a * r2d
   u2 = u2/a * r2d
 
-  x0 = 2.0/3.0*np.pi * r2d
+  x0 = -1.0/3.0*np.pi * r2d
 
   plt.plot([x0,x0+u1*3600.0],[0,3600.0],'k',linewidth=4)
   plt.plot([x0,x0+u2*3600.0],[0,3600.0],'k',linewidth=4)
@@ -167,9 +167,9 @@ def make_hovmoller_figure(datapath, plotpath, field, component):
 if __name__ == "__main__":
 
   try:
-    config, datapath, fields, timesteps, plotpath = sys.argv[1:6]
+    config, datapath, fields, timesteps, step, plotpath = sys.argv[1:7]
   except ValueError:
-    print("Usage: {0} <file_stem_name> <datapath> <field_names> <timestep_list> <plotpath>".format(sys.argv[0]))
+    print("Usage: {0} <file_stem_name> <datapath> <field_names> <timestep_list> <step> <plotpath>".format(sys.argv[0]))
     exit(1)
 
   # Split out the list of fields
@@ -193,6 +193,6 @@ if __name__ == "__main__":
         make_xz_figure(plotpath,field, 1, ts)
 
 
-    make_hovmoller_figure(datapath, plotpath, field, 1)
+    make_hovmoller_figure(datapath, plotpath, field, 1, int(step))
 
 

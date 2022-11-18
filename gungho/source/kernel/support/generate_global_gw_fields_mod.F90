@@ -17,7 +17,8 @@ module generate_global_gw_fields_mod
 use constants_mod,                  only : r_def, pi
 use initial_pressure_config_mod,    only : surface_pressure
 use initial_temperature_config_mod, only : bvf_square, &
-                                           pert_width_scaling
+                                           pert_width_scaling, &
+                                           pert_centre
 use planet_config_mod,              only : gravity, &
                                            scaled_radius, scaled_omega, &
                                            Rd, Cp, p_zero, kappa, scaling_factor
@@ -128,19 +129,19 @@ implicit none
 
   real(kind=r_def) :: sin_tmp, cos_tmp, r, shape_function
 
-real(kind=r_def), parameter :: LAMBDAC = 2.0_r_def/3.0_r_def*pi,     &     ! Lon of Pert Center
-                                 D       = 625000.0_r_def,             &     ! Width for Pert
+  real(kind=r_def), parameter :: D       = 625000.0_r_def,             &     ! Width for Pert
                                  PHIC    = 0.0_r_def,                  &     ! Lat of Pert Center
                                  DELTA_THETA = 1.0_r_def,              &     ! Max Amplitude of Pert
                                  LZ      = 10000.0_r_def                     ! Vertical half-Wavelength of Pert
 
- real(kind=r_def) :: D_scaled
+ real(kind=r_def) :: D_scaled, lambda_c
 
   sin_tmp = sin(lat) * sin(PHIC)
   cos_tmp = cos(lat) * cos(PHIC)
 
 ! great circle distance
-  r  = scaled_radius * acos (sin_tmp + cos_tmp*cos(lon-LAMBDAC))
+  lambda_c = pert_centre/180.0_r_def * pi
+  r  = scaled_radius * acos (sin_tmp + cos_tmp*cos(lon-lambda_c))
   D_scaled = pert_width_scaling*D/scaling_factor
   shape_function = (D_scaled**2)/(D_scaled**2 + r**2)
 

@@ -38,6 +38,7 @@ module analytic_buoyancy_profiles_mod_test
   real(r_def),    parameter :: profile_heights(1) = (/ 0.0_r_def /)
   real(r_def),    parameter :: theta_surf         = 300.0_r_def
   real(r_def),    parameter :: pert_width_scaling = 1.0_r_def
+  real(r_def),    parameter :: pert_centre        = 120.0_r_def
   integer(i_def), parameter :: profile_size       = 1_i_def
 
   real(r_def), parameter :: surface_pressure = 1000.0e2_r_def
@@ -73,6 +74,7 @@ contains
                                            profile_heights=profile_heights, &
                                            profile_size=profile_size,       &
                                            theta_surf=theta_surf,           &
+                                           pert_centre=pert_centre,         &
                                            pert_width_scaling=pert_width_scaling )
 
     call feign_initial_pressure_config( method=method_balanced,             &

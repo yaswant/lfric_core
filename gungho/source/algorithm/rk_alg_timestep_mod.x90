@@ -19,7 +19,8 @@ module rk_alg_timestep_mod
   ! Configuration options
   use finite_element_config_mod,          only: element_order, &
                                                 vorticity_in_w1
-  use formulation_config_mod,             only: rotating
+  use formulation_config_mod,             only: rotating, &
+                                                vector_invariant
   use runge_kutta_init_mod,               only: get_rk_timestepping_weights
   use timestepping_config_mod,            only: runge_kutta_method
   use derived_config_mod,                 only: bundle_size
@@ -200,9 +201,6 @@ contains
     class(reference_element_type), pointer :: reference_element =>null()
     type(mesh_type),               pointer :: mesh => null()
 
-    ! Temporary items
-    type(field_type) :: diagnostic_field
-
     ! Temps for retrieving things from runtime_constants
     type(field_type),    pointer :: geopotential => null()
     type(field_type),    pointer :: chi(:) => null()
@@ -253,16 +251,22 @@ contains
         call invoke( matrix_vector_kernel_type( rhs_prediction(igh_u,stage),   &
                                                 state(igh_u), coriolis ) )
       end if
-      call compute_vorticity_alg(vorticity, state(igh_u), .false.)
-      if ( vorticity_in_w1 ) then
-        call invoke( vorticity_advection_kernel_type(rhs_prediction(igh_u,stage), &
-                                                     state(igh_u), vorticity,     &
-                                                     chi, panel_id, qr) )
-      else
-        call invoke( w2_vorticity_advection_kernel_type(rhs_prediction(igh_u,stage), &
-                                                        state(igh_u), vorticity,     &
-                                                        chi, panel_id, qr) )
+      if ( vector_invariant ) then
+        call compute_vorticity_alg(vorticity, state(igh_u), .false.)
+        if ( vorticity_in_w1 ) then
+          call invoke( vorticity_advection_kernel_type(rhs_prediction(igh_u,stage), &
+                                                       state(igh_u), vorticity,     &
+                                                       chi, panel_id, qr) )
+        else
+          call invoke( w2_vorticity_advection_kernel_type(rhs_prediction(igh_u,stage), &
+                                                          state(igh_u), vorticity,     &
+                                                          chi, panel_id, qr) )
+        end if
+        call invoke( kinetic_energy_gradient_kernel_type(                             &
+                                        rhs_prediction(igh_u,stage), state(igh_u),    &
+                                        chi, panel_id, qr) )
       end if
+
 
       call invoke( name = "Compute new rhs",                                        &
                    pressure_gradient_bd_kernel_type( rhs_prediction(igh_u, stage),  &
@@ -271,9 +275,6 @@ contains
                    hydrostatic_kernel_type( rhs_prediction(igh_u,stage),            &
                                             state(igh_p), state(igh_t),             &
                                             moist_dyn, geopotential, cp, qr ),      &
-                   kinetic_energy_gradient_kernel_type(                             &
-                                        rhs_prediction(igh_u,stage), state(igh_u),  &
-                                        chi, panel_id, qr ),                        &
                    enforce_bc_kernel_type( rhs_prediction(1,stage) ) )
       call set_bundle_scalar(0.0_r_def, rhs, bundle_size)
 
@@ -303,15 +304,10 @@ contains
                                                      state(igh_t), moist_dyn(gas_law), &
                                                      chi, panel_id, m3_inv, qr ) )
       ! Diagnostics
-      call inc(igh_t)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'theta_inc')
-      call inc(igh_u)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'u_inc')
-      call inc(igh_d)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'rho_inc')
-      call inc(igh_p)%copy_field(diagnostic_field)
-      call diagnostic_field%log_minmax(LOG_LEVEL_TRACE, 'exner_inc')
-      call inc(igh_t)%log_minmax(LOG_LEVEL_TRACE, 'theta_inc')
+      call inc(igh_t)%log_minmax(LOG_LEVEL_INFO, 'theta_inc')
+      call inc(igh_u)%log_minmax(LOG_LEVEL_INFO, 'u_inc')
+      call inc(igh_d)%log_minmax(LOG_LEVEL_INFO, 'rho_inc')
+      call inc(igh_p)%log_minmax(LOG_LEVEL_INFO, 'exner_inc')
 
     end do
 

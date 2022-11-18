@@ -48,7 +48,7 @@ levels = None
 data = None
 
 
-def make_figure(plotpath, nx, ny, field, component, timestep, small):
+def make_figure(plotpath, nx, ny, field, component, timestep):
 
     val_col = 'c' + str(component)
 
@@ -83,32 +83,11 @@ def make_figure(plotpath, nx, ny, field, component, timestep, small):
     cc = np.linspace(0.05, 0.5, 10)
 
     if timestep == 'T000000':
-        if small == '0':
-            plotlevel = 18*2
-        else:
-            plotlevel = 9*2
-    if timestep == 'T000040':
-        if small == '1':  # only using this for the small bubble
-            plotlevel = 10*2
-    if timestep == 'T000080':
-        if small == '1':  # only using this for the small bubble
-            plotlevel = 11*2
-    if timestep == 'T000120':
-        if small == '1':  # only using this for the small bubble
-            plotlevel = 12*2
+        plotlevel = 38
     elif timestep == 'T000160':
-        if small == '0':
-            plotlevel = 40*2
-        else:
-            plotlevel = 13*2
-    elif timestep == 'T000180':
-        if small == '1':  # only using this for the small bubble
-            plotlevel = 14*2
+        plotlevel = 54
     else:
-        if small == '0':
-            plotlevel = 40*2
-        else:
-            plotlevel = 20*2
+        plotlevel = 80
 
     f = plt.figure(figsize=(20, 10))
 
@@ -185,9 +164,9 @@ def make_figure(plotpath, nx, ny, field, component, timestep, small):
 if __name__ == "__main__":
 
     try:
-        config, datapath, nx, ny, fields, timesteps, plotpath, small = sys.argv[1:9]
+        config, datapath, nx, ny, fields, timesteps, plotpath, = sys.argv[1:8]
     except ValueError:
-        print("Usage: {0} <file_stem_name> <datapath> <nx> <ny> <field_names> <small>"
+        print("Usage: {0} <file_stem_name> <datapath> <nx> <ny> <field_names>"
               "<timestep_list> <plotpath>".format(sys.argv[0]))
         exit(1)
 
@@ -212,4 +191,4 @@ if __name__ == "__main__":
 
             # Only try to plot if we found some files for this timestep
             if len(levels) > 0:
-                make_figure(plotpath, nx, ny, field, 1, ts, small)
+                make_figure(plotpath, nx, ny, field, 1, ts)

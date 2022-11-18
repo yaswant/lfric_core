@@ -73,6 +73,7 @@ stretching_method='linear',
 &initial_temperature
   bvf_square = 0.0001
   perturb = 'none'
+  pert_centre = -60.0
   pert_width_scaling = 1.0
 /
 

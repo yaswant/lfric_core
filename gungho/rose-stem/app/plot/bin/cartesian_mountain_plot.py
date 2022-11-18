@@ -510,8 +510,11 @@ def make_figure(plotpath, field, component, timestep, plotlevel_x,
 
         if case == 'schar3d':
             cc = np.linspace(np.min(dval), np.max(dval), 13)
-            cf = plt.contour(x_plt, y_plt, np.round(dval, 10), cc,
-                             cmap=cm.Spectral, linewidths=3)
+            cf = plt.contourf(x_plt, y_plt, np.round(dval, 10), cc,
+                             cmap=c_map, linewidths=3)
+            cl = plt.contour(x_plt, y_plt, np.round(dval, 10),
+                             cc, linewidths=2, colors='k')
+
 
             plt.xlim(-20, 20)
             plt.ylim(-20, 20)
@@ -578,7 +581,7 @@ def make_figure(plotpath, field, component, timestep, plotlevel_x,
             plt.tick_params(axis='both', labelsize=32)
 
             out_file_name = plotpath + "/" "nodal_slices_xy_" + field + \
-                component + '_' + ts + "_zlev4.eps"
+                component + '_' + ts + "_zlev4.png"
             plt.tight_layout()
             plt.savefig(out_file_name)
 

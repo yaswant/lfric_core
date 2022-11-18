@@ -78,7 +78,7 @@ def make_figures(filein, plotpath, fields, vertical_spacing):
 
     direction = 'xy'  # , 'yz', 'xz'
 
-    for t in [-1, -3]:
+    for t in [-1]:
         if fields is None:
             fields = ['surface_pressure_temperature']
 
