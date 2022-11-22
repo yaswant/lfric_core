@@ -14,7 +14,8 @@ module log_mod_test
                            log_level, log_level_debug, log_level_error,     &
                            log_level_info, log_level_trace,                 &
                            log_level_warning, log_set_alert_stream,         &
-                           log_set_level, log_set_info_stream
+                           log_set_level, log_set_info_stream,              &
+                           log_forget_timestep
   use pFUnit_Mod
 
   implicit none
@@ -115,6 +116,7 @@ contains
 
     ! Initialise log_mod to use the serial method for logging
     call initialise_logging(0, 1, 'log_mod_unit_test')
+    call log_forget_timestep()
 
     open( INFO_UNIT, status='scratch', action='readwrite', &
           iostat=condition )

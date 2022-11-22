@@ -38,6 +38,7 @@ contains
     implicit none
     integer :: condition
     call initialise_logging(0, 1, 'log_mod_clock_test')
+    call log_forget_timestep()
     open( info_unit, status='scratch', action='readwrite', &
           iostat=condition )
     @assertEqual( condition, 0 )
