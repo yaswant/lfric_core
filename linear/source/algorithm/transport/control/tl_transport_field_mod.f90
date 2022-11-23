@@ -13,12 +13,12 @@ module tl_transport_field_mod
   use field_mod,                        only: field_type
   use log_mod,                          only: log_event, LOG_LEVEL_ERROR
   use transport_metadata_mod,           only: transport_metadata_type
-  use transport_enumerated_types_mod,   only: scheme_mol_3d,         &
-                                              scheme_ffsl_3d,        &
-                                              scheme_split,          &
-                                              direction_3d,          &
-                                              equation_conservative, &
-                                              equation_advective
+  use transport_enumerated_types_mod,   only: scheme_mol_3d,              &
+                                              scheme_ffsl_3d,             &
+                                              scheme_split,               &
+                                              direction_3d,               &
+                                              equation_form_conservative, &
+                                              equation_form_advective
   use tl_mol_conservative_alg_mod,      only: tl_mol_conservative_alg
   use tl_mol_advective_alg_mod,         only: tl_mol_advective_alg
   use tl_transport_runtime_collection_mod, &
@@ -65,12 +65,12 @@ contains
     ! -------------------------------------------------------------------------!
     case ( scheme_mol_3d )
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
          call tl_mol_conservative_alg(field_np1, field_n, ls_field_n, &
                                       direction_3d, transport_metadata)
 
-      case ( equation_advective )
+      case ( equation_form_advective )
          call tl_mol_advective_alg(field_np1, field_n, ls_field_n, &
                                    direction_3d, transport_metadata)
 

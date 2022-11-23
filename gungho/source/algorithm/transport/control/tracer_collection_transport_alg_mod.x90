@@ -17,8 +17,8 @@ module tracer_collection_transport_mod
                                             LOG_LEVEL_ERROR, &
                                             LOG_LEVEL_INFO
   use timer_mod,                      only: timer
-  use transport_enumerated_types_mod, only: equation_advective, &
-                                            equation_consistent
+  use transport_enumerated_types_mod, only: equation_form_advective, &
+                                            equation_form_consistent
   use transport_field_mod,            only: transport_field
   use transport_metadata_mod,         only: transport_metadata_type
 
@@ -61,12 +61,12 @@ contains
     if ( subroutine_timers ) call timer('tracer collection transport')
 
     ! Choose form of transport equation
-    select case ( transport_metadata%get_equation() )
+    select case ( transport_metadata%get_equation_form() )
 
     ! ------------------------------------------------------------------------ !
     ! Advective form of transport equation
     ! ------------------------------------------------------------------------ !
-  case ( equation_advective, equation_consistent )
+  case ( equation_form_advective, equation_form_consistent )
 
       if ( fields_in%get_length() > 0 ) then
 

@@ -13,6 +13,7 @@ module transport_runtime_alg_mod
   use check_configuration_mod,        only: check_any_scheme_mol,   &
                                             check_any_scheme_ffsl,  &
                                             check_any_scheme_split, &
+                                            check_any_shifted,      &
                                             check_horz_dep_pts,     &
                                             check_vert_dep_pts
   use constants_mod,                  only: r_def, r_second, i_def, l_def,  &
@@ -32,9 +33,6 @@ module transport_runtime_alg_mod
   use model_clock_mod,                only: model_clock_type
   use runtime_tools_mod,              only: check_initialised_field
   use transport_enumerated_types_mod, only: scheme_split
-  use transport_config_mod,           only: moisture_eqn,            &
-                                            moisture_eqn_consistent, &
-                                            moisture_eqn_conservative
 
   implicit none
 
@@ -175,7 +173,7 @@ contains
     real(kind=r_def)               :: v_cfl_min, v_cfl_max
     real(r_def)                    :: cast_dt
     logical(kind=l_def)            :: any_scheme_mol, any_scheme_split
-    logical(kind=l_def)            :: any_scheme_ffsl
+    logical(kind=l_def)            :: any_scheme_ffsl, any_shifted
     logical(kind=l_def)            :: any_horz_dep_pts, any_vert_dep_pts
     type(operator_type),   pointer :: mm_w3_inv => null(), &
                                       div       => null()
@@ -198,6 +196,7 @@ contains
     any_scheme_split = check_any_scheme_split()
     any_horz_dep_pts = check_horz_dep_pts()
     any_vert_dep_pts = check_vert_dep_pts()
+    any_shifted = check_any_shifted()
 
     ! ======================================================================== !
     ! Determine number of meshes
@@ -208,7 +207,7 @@ contains
     if ( present(shifted_mesh) ) then
       self%n_meshes = 2
       ! Only compute things on the shifted mesh if we need to
-      if (moisture_eqn == moisture_eqn_conservative .or. any_scheme_ffsl) then
+      if (any_shifted) then
         num_compute_meshes = 2
       end if
     else
@@ -579,6 +578,7 @@ contains
                                         only: consist_w2v_to_sh_w2v_kernel_type
     use fem_constants_mod,              only: get_rmultiplicity
     use intermesh_constants_mod,        only: get_consist_w3_to_sh_w3_op
+    use check_configuration_mod,        only: check_any_eqn_consistent
     use split_w2_field_kernel_mod,      only: split_w2_field_kernel_type
 
     implicit none
@@ -589,7 +589,7 @@ contains
     type(field_type),                      intent(in)    :: dry_flux
 
     integer(kind=i_def)       :: fs_idx
-    logical(kind=i_def)       :: any_w3_consistent
+    logical(kind=i_def)       :: any_w3_consistent, any_eqn_consistent
     type(field_type), pointer :: consist_w3_to_sh_w3_op(:) => null()
     type(field_type), pointer :: rmultiplicity_w2 => null()
     type(mesh_type),  pointer :: prime_extrusion_mesh => null()
@@ -631,8 +631,10 @@ contains
       end select
     end if
 
-    if (self%n_meshes > 1 .and. moisture_eqn == moisture_eqn_consistent) then
-      ! Transform these densities to the shifted mesh
+    any_eqn_consistent = check_any_eqn_consistent()
+
+    if (self%n_meshes > 1 .and. any_eqn_consistent) then
+      ! Transform these densities and dry fluxes to the shifted mesh
       consist_w3_to_sh_w3_op => get_consist_w3_to_sh_w3_op()
 
       call invoke( name='shift_dry_densities',                                 &

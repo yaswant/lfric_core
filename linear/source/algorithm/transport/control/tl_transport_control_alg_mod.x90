@@ -14,8 +14,6 @@ module tl_transport_control_alg_mod
   use log_mod,                           only: log_event,         &
                                                LOG_LEVEL_INFO
   use model_clock_mod,                   only: model_clock_type
-  use transport_config_mod,              only: moisture_eqn, &
-                                               moisture_eqn_conservative
   use tl_transport_runtime_collection_mod, &
                                          only: tl_transport_runtime
   use transport_metadata_mod,            only: transport_metadata_type
@@ -57,7 +55,7 @@ contains
                                       ls_wind_np1, ls_wind_n, ls_mr_in, &
                                       model_clock )
 
-    use check_configuration_mod,         only: check_any_scheme_ffsl
+    use check_configuration_mod,         only: check_any_shifted
     use derived_config_mod,              only: bundle_size
     use extrusion_mod,                   only: SHIFTED
     use fem_constants_mod,               only: get_mass_matrix
@@ -95,7 +93,7 @@ contains
     ! Internal variables
     type(field_type)    :: temp_inc
     type(field_type)    :: fields_np1(bundle_size)
-    logical(kind=l_def) :: any_ffsl
+    logical(kind=l_def) :: any_shifted
     real(r_def)         :: cast_dt
     type(operator_type), pointer :: mm_wt => null()
     type(mesh_type),     pointer :: primary_mesh => null()
@@ -111,10 +109,10 @@ contains
     ! ------------------------------------------------------------------------ !
 
     ! Check if any horizontal method is ffsl
-    any_ffsl = check_any_scheme_ffsl()
+    any_shifted = check_any_shifted()
 
     ! Create transport_runtime object (advecting wind etc)
-    if ( moisture_eqn == moisture_eqn_conservative .or. any_ffsl ) then
+    if ( any_shifted ) then
       primary_mesh => ls_wind_n%get_mesh()
       shifted_mesh => mesh_collection%get_mesh(primary_mesh, SHIFTED)
 

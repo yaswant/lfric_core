@@ -18,13 +18,13 @@ module transport_field_mod
   use transport_metadata_mod,           only: transport_metadata_type
   use transport_runtime_alg_mod,        only: transport_runtime_type
   use transport_runtime_collection_mod, only: get_transport_runtime
-  use transport_enumerated_types_mod,   only: scheme_mol_3d,         &
-                                              scheme_ffsl_3d,        &
-                                              scheme_split,          &
-                                              direction_3d,          &
-                                              equation_conservative, &
-                                              equation_advective,    &
-                                              equation_consistent
+  use transport_enumerated_types_mod,   only: scheme_mol_3d,              &
+                                              scheme_ffsl_3d,             &
+                                              scheme_split,               &
+                                              direction_3d,               &
+                                              equation_form_conservative, &
+                                              equation_form_advective,    &
+                                              equation_form_consistent
   use mol_conservative_alg_mod,         only: mol_conservative_alg
   use mol_advective_alg_mod,            only: mol_advective_alg
   use mol_consistent_alg_mod,           only: mol_consistent_alg
@@ -70,16 +70,16 @@ contains
     ! -------------------------------------------------------------------------!
     case ( scheme_mol_3d )
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
          call mol_conservative_alg(field_np1, field_n, &
                                    direction_3d, transport_metadata)
 
-      case ( equation_advective )
+      case ( equation_form_advective )
          call mol_advective_alg(field_np1, field_n, &
                                 direction_3d, transport_metadata)
 
-      case ( equation_consistent )
+      case ( equation_form_consistent )
          call mol_consistent_alg(field_np1, field_n, &
                                  direction_3d, transport_metadata)
 
@@ -94,12 +94,12 @@ contains
     ! -------------------------------------------------------------------------!
     case ( scheme_ffsl_3d )
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
         call ffsl_conservative_control(field_np1, field_n, direction_3d, &
                                        model_dt, transport_metadata)
 
-      case ( equation_advective )
+      case ( equation_form_advective )
         call ffsl_advective_control(field_np1, field_n, direction_3d, &
                                     model_dt, transport_metadata)
 

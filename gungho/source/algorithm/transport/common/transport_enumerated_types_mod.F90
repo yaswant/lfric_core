@@ -13,9 +13,9 @@ module transport_enumerated_types_mod
 
   implicit none
 
-  integer(kind=i_def), parameter :: equation_conservative = 421_i_def
-  integer(kind=i_def), parameter :: equation_advective    = 311_i_def
-  integer(kind=i_def), parameter :: equation_consistent   = 919_i_def
+  integer(kind=i_def), parameter :: equation_form_conservative = 1_i_def
+  integer(kind=i_def), parameter :: equation_form_advective    = 2_i_def
+  integer(kind=i_def), parameter :: equation_form_consistent   = 3_i_def
 
   integer(kind=i_def), parameter :: splitting_none       = 1_i_def
   integer(kind=i_def), parameter :: splitting_strang_vhv = 2_i_def

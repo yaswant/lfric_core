@@ -20,7 +20,6 @@ module mol_conservative_alg_mod
   use advective_increment_alg_mod,    only: advective_increment_alg
   use advective_and_flux_alg_mod,     only: advective_and_flux_alg
   use mesh_mod,                       only: mesh_type
-  use transport_enumerated_types_mod, only: equation_conservative
   use transport_runtime_alg_mod,      only: transport_runtime_type
   use transport_runtime_collection_mod, &
                                       only: get_transport_runtime

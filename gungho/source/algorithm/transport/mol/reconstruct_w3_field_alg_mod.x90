@@ -70,7 +70,7 @@ module reconstruct_w3_field_alg_mod
                                             vertical_monotone_none,       &
                                             vertical_monotone_koren,      &
                                             vertical_monotone_clipping,   &
-                                            equation_consistent
+                                            equation_form_consistent
   use transport_metadata_mod,         only: transport_metadata_type
   use polyv_w3_koren_kernel_mod,      only: polyv_w3_koren_kernel_type
   use polyh_w3_koren_kernel_mod,      only: polyh_w3_koren_kernel_type
@@ -430,7 +430,7 @@ contains
         select case ( direction )
         case ( direction_3d )
           transport_runtime => get_transport_runtime(mesh)
-          if (transport_metadata%get_equation() == equation_consistent) then
+          if (transport_metadata%get_equation_form() == equation_form_consistent) then
             transport_step = transport_runtime%get_tracer_step_ctr()
             wind_h => transport_runtime%get_hori_dry_flux(mesh%get_id(),transport_step)
             wind_v => transport_runtime%get_vert_dry_flux(mesh%get_id(),transport_step)

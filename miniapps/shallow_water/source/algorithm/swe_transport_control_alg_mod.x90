@@ -35,8 +35,6 @@ module swe_transport_control_alg_mod
                                                momentum_form,          &
                                                momentum_form_momentum, &
                                                momentum_form_vector_invariant
-  use transport_enumerated_types_mod,    only: equation_conservative, &
-                                               equation_advective
   use transport_metadata_mod,            only: transport_metadata_type
   use transport_metadata_collection_mod, only: transport_metadata_collection_type
   use transport_runtime_alg_mod,         only: transport_runtime_type
@@ -68,6 +66,7 @@ contains
     use wt_advective_update_alg_mod,  only: wt_advective_update_alg_init
     use transport_config_mod,         only: profile_size,          &
                                             field_names,           &
+                                            equation_form,         &
                                             scheme,                &
                                             splitting,             &
                                             horizontal_method,     &
@@ -85,7 +84,6 @@ contains
 
     type(mesh_type), pointer, intent(in) :: mesh
 
-    integer(kind=i_def)           :: equation_form
     integer(kind=i_def)           :: config
     logical(kind=l_def)           :: use_divergence_factor
     type(transport_metadata_type) :: transport_metadata
@@ -105,19 +103,13 @@ contains
       ! Set hardwired defaults based upon which field is being advected
       if ( trim(field_names(config)) == 'geopot' .or. &
            trim(field_names(config)) == 'q' ) then
-        equation_form = equation_conservative
-      else
-        equation_form = equation_advective
-      end if
-      if ( trim(field_names(config)) == 'geopot' .or. &
-           trim(field_names(config)) == 'q' ) then
         use_divergence_factor = use_density_predictor
       else
         use_divergence_factor = .false.
       end if
 
       transport_metadata = transport_metadata_type( field_names(config),             &
-                                                    equation_form,                   &
+                                                    equation_form(config),           &
                                                     splitting(config),               &
                                                     scheme(config),                  &
                                                     horizontal_method(config),       &

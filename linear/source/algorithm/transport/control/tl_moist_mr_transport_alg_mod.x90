@@ -15,8 +15,8 @@ module tl_moist_mr_transport_alg_mod
                                             LOG_LEVEL_ERROR
   use mr_indices_mod,                 only: nummr
   use timer_mod,                      only: timer
-  use transport_enumerated_types_mod, only: equation_advective, &
-                                            equation_conservative
+  use transport_enumerated_types_mod, only: equation_form_advective, &
+                                            equation_form_conservative
   use tl_transport_field_mod,         only: tl_transport_field
   use transport_metadata_mod,         only: transport_metadata_type
 
@@ -61,12 +61,12 @@ contains
     if ( subroutine_timers ) call timer('tl moist mixing ratio transport')
 
     ! Choose form of transport equation
-    select case ( transport_metadata%get_equation() )
+    select case ( transport_metadata%get_equation_form() )
 
     ! ------------------------------------------------------------------------ !
     ! Advective form of transport equation
     ! ------------------------------------------------------------------------ !
-    case ( equation_advective )
+    case ( equation_form_advective )
 
       ! Simply transport all the mixing ratio fields as they are in Wtheta
 
@@ -78,7 +78,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Conservative form of transport equation
     ! ------------------------------------------------------------------------ !
-    case ( equation_conservative )
+    case ( equation_form_conservative )
       call log_event('Conservative moisture transport equation not ' // &
                      'yet implemented', LOG_LEVEL_ERROR)
 

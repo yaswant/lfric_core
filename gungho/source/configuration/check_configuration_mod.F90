@@ -22,13 +22,18 @@ module check_configuration_mod
                                   horizontal_method,           &
                                   vertical_method,             &
                                   max_vert_cfl_calc,           &
-                                  max_vert_cfl_calc_dep_point
-  use transport_enumerated_types_mod,                     &
-                            only: scheme_mol_3d,          &
-                                  scheme_ffsl_3d,         &
-                                  scheme_split,           &
-                                  split_method_mol,       &
-                                  split_method_ffsl
+                                  max_vert_cfl_calc_dep_point, &
+                                  equation_form,               &
+                                  dry_field_name,              &
+                                  field_names
+  use transport_enumerated_types_mod,                          &
+                            only: scheme_mol_3d,               &
+                                  scheme_ffsl_3d,              &
+                                  scheme_split,                &
+                                  split_method_mol,            &
+                                  split_method_ffsl,           &
+                                  equation_form_advective,     &
+                                  equation_form_consistent
 
   implicit none
 
@@ -38,6 +43,8 @@ module check_configuration_mod
   public :: check_any_scheme_mol
   public :: check_any_scheme_split
   public :: check_any_scheme_ffsl
+  public :: check_any_shifted
+  public :: check_any_eqn_consistent
   public :: check_horz_dep_pts
   public :: check_vert_dep_pts
   public :: get_required_stencil_depth
@@ -404,6 +411,93 @@ contains
     end do
 
   end function check_any_scheme_ffsl
+
+  !> @brief   Determine whether any of the transport schemes need shifted mesh
+  !> @details Loops through the transport schemes specified for different
+  !>          variables and determines whether any need the shifted mesh
+  !> @return  any_shifted
+  function check_any_shifted() result(any_shifted)
+
+    use extrusion_mod,       only: SHIFTED
+    use mesh_collection_mod, only: mesh_collection
+    use mesh_mod,            only: mesh_type
+    use constants_mod,       only: str_def
+
+    implicit none
+
+    logical(kind=l_def)      :: any_shifted, shifted_mesh_exists
+    integer(kind=i_def)      :: i
+    type(mesh_type), pointer :: mesh => null()
+    character(len=str_def), allocatable, dimension(:) :: mesh_names
+
+    any_shifted = .false.
+    shifted_mesh_exists = .false.
+
+    ! First check if the mesh collection has a shifted mesh
+    ! Extract all names and use these to loop through meshes
+    mesh_names = mesh_collection%get_mesh_names()
+    do i = 1, SIZE(mesh_names)
+      mesh => mesh_collection%get_mesh(mesh_names(i))
+      if (mesh%get_extrusion_id() == SHIFTED) then
+        shifted_mesh_exists = .true.
+        exit
+      end if
+    end do
+
+    if (shifted_mesh_exists) then
+      ! Need a shifted mesh if:
+      ! (a) a variable uses the conservative or consistent transport equation
+      ! (b) a Wtheta variable uses FFSL
+      do i = 1, profile_size
+        ! Check for a variable using conservative/consistent equation
+        ! (but don't include "dry_field" which will never use shifted grid)
+        if ( equation_form(i) /= equation_form_advective &
+             .and. field_names(i) /= dry_field_name ) then
+            any_shifted = .true.
+            return
+        end if
+
+        ! Check if there is a transport scheme using FFSL
+        select case (scheme(i))
+          ! It could be either 3D FFSL or split scheme using FFSL
+          case (scheme_ffsl_3d)
+            any_shifted = .true.
+            return
+
+          case (scheme_split)
+            if ( vertical_method(i) == split_method_ffsl &
+                 .or. horizontal_method(i) == split_method_ffsl ) then
+              any_shifted = .true.
+              return
+            end if
+
+        end select
+       end do
+    end if
+
+  end function check_any_shifted
+
+  !> @brief   Determine whether any of the transport equations are consistent
+  !> @details Loops through the transport equations specified for different
+  !>          variables and determines whether any are using consistent form
+  !> @return  any_eqn_consistent
+  function check_any_eqn_consistent() result(any_eqn_consistent)
+
+    implicit none
+
+    logical(kind=l_def) :: any_eqn_consistent
+    integer(kind=i_def) :: i
+
+    any_eqn_consistent = .false.
+
+    do i = 1, profile_size
+      if ( equation_form(i) == equation_form_consistent ) then
+        any_eqn_consistent = .true.
+        exit
+      end if
+    end do
+
+  end function check_any_eqn_consistent
 
   !> @brief   Determine whether horizontal departure points need computing
   !> @details Loops through the transport schemes specified for different

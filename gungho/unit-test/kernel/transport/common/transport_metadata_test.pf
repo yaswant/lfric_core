@@ -9,7 +9,7 @@
 module transport_metadata_test
 
   use constants_mod,                  only : r_def, l_def, str_def, i_def
-  use transport_enumerated_types_mod, only : equation_advective,           &
+  use transport_enumerated_types_mod, only : equation_form_advective,      &
                                              splitting_hv,                 &
                                              scheme_split,                 &
                                              split_method_ffsl,            &
@@ -69,7 +69,7 @@ contains
 
     ! Set parameters for metadata
     character(len=str_def)        :: fname = 'some_field'
-    integer(kind=i_def)           :: equation_form = equation_advective
+    integer(kind=i_def)           :: equation_form = equation_form_advective
     integer(kind=i_def)           :: scheme = scheme_split
     integer(kind=i_def)           :: splitting = splitting_hv
     integer(kind=i_def)           :: horizontal_method = split_method_ffsl
@@ -103,7 +103,7 @@ contains
 
     ! Check all properties of metadata object
     @assertEqual(fname, our_metadata%get_name())
-    @assertEqual(equation_form, our_metadata%get_equation())
+    @assertEqual(equation_form, our_metadata%get_equation_form())
     @assertEqual(splitting, our_metadata%get_splitting())
     @assertEqual(scheme, our_metadata%get_scheme())
     @assertEqual(horizontal_method, our_metadata%get_horizontal_method())

@@ -24,9 +24,9 @@ module moist_mr_transport_alg_mod
   use mesh_collection_mod,            only: mesh_collection
   use mr_indices_mod,                 only: nummr
   use timer_mod,                      only: timer
-  use transport_enumerated_types_mod, only: equation_advective,    &
-                                            equation_conservative, &
-                                            equation_consistent
+  use transport_enumerated_types_mod, only: equation_form_advective,    &
+                                            equation_form_conservative, &
+                                            equation_form_consistent
   use transport_field_mod,            only: transport_field
   use transport_metadata_mod,         only: transport_metadata_type
   use transport_runtime_alg_mod,      only: transport_runtime_type
@@ -92,12 +92,12 @@ contains
     if ( subroutine_timers ) call timer('moist mixing ratio transport')
 
     ! Choose form of transport equation
-    select case ( transport_metadata%get_equation() )
+    select case ( transport_metadata%get_equation_form() )
 
     ! ------------------------------------------------------------------------ !
     ! Advective and consistent forms of transport equation
     ! ------------------------------------------------------------------------ !
-    case ( equation_advective, equation_consistent )
+    case ( equation_form_advective, equation_form_consistent )
 
       ! Advective:  Simply transport all the mixing ratio fields in Wtheta
       ! Consistent: Transformation to densities and evaluation of fluxes is in
@@ -109,7 +109,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Conservative form of transport equation
     ! ------------------------------------------------------------------------ !
-    case ( equation_conservative )
+    case ( equation_form_conservative )
 
       primary_mesh => mr_in(1)%get_mesh()
       shifted_mesh => mesh_collection%get_mesh(primary_mesh, SHIFTED)

@@ -20,7 +20,7 @@ module transport_metadata_mod
     private
 
     character(len=str_def) :: fname ! Name of the field (or field_group)
-    integer(kind=i_def)    :: equation  ! Advection or transport equation ( = transport, advection)
+    integer(kind=i_def)    :: equation_form  ! Form of transport equation ( = advective, conservative, consistent)
     integer(kind=i_def)    :: splitting ! Horizontal/vertical splitting ( = none, strang_vhv/_hvh, hv, vh)
     integer(kind=i_def)    :: scheme    ! Transport scheme (= mol3d, ffsl3d, split)
     integer(kind=i_def)    :: horizontal_method ! Horizontal transport method (= mol, ffsl)
@@ -37,7 +37,7 @@ module transport_metadata_mod
     contains
 
     procedure, public :: get_name
-    procedure, public :: get_equation
+    procedure, public :: get_equation_form
     procedure, public :: get_splitting
     procedure, public :: get_scheme
     procedure, public :: get_horizontal_method
@@ -65,17 +65,17 @@ module transport_metadata_mod
 
 contains
 
-    function transport_metadata_constructor(fname, equation, splitting, &
-                                            scheme, horizontal_method,  &
-                                            vertical_method,            &
-                                            horizontal_monotone,        &
-                                            vertical_monotone,          &
-                                            vertical_monotone_order,    &
-                                            enforce_min_value,          &
-                                            min_value,                  &
-                                            log_space,                  &
-                                            divergence_factor,          &
-                                            reversible)                 &
+    function transport_metadata_constructor(fname, equation_form, splitting, &
+                                            scheme, horizontal_method,       &
+                                            vertical_method,                 &
+                                            horizontal_monotone,             &
+                                            vertical_monotone,               &
+                                            vertical_monotone_order,         &
+                                            enforce_min_value,               &
+                                            min_value,                       &
+                                            log_space,                       &
+                                            divergence_factor,               &
+                                            reversible)                      &
                                             result(self)
 
     implicit none
@@ -83,7 +83,7 @@ contains
     type(transport_metadata_type) :: self
 
     character(len=str_def), intent(in) :: fname
-    integer(kind=i_def),    intent(in) :: equation
+    integer(kind=i_def),    intent(in) :: equation_form
     integer(kind=i_def),    intent(in) :: splitting
     integer(kind=i_def),    intent(in) :: scheme
     integer(kind=i_def),    intent(in) :: horizontal_method
@@ -98,7 +98,7 @@ contains
     logical(kind=l_def),    intent(in) :: reversible
 
     self%fname                   = trim(fname)
-    self%equation                = equation
+    self%equation_form           = equation_form
     self%splitting               = splitting
     self%scheme                  = scheme
     self%horizontal_method       = horizontal_method
@@ -128,19 +128,19 @@ contains
 
   end function get_name
 
-  !> @brief Get the equation type
+  !> @brief Get the equation form
   !> @param[in] self     The transport_metadata object
   !> @return             The equation type (conservative, advective)
-  function get_equation(self) result(equation)
+  function get_equation_form(self) result(equation_form)
 
     implicit none
 
     class(transport_metadata_type), intent(in) :: self
-    integer(kind=i_def)                        :: equation
+    integer(kind=i_def)                        :: equation_form
 
-    equation = self%equation
+    equation_form = self%equation_form
 
-  end function get_equation
+  end function get_equation_form
 
   !> @brief Get the splitting type
   !> @param[in] self     The transport_metadata object

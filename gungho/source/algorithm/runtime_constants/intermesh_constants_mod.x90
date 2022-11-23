@@ -15,7 +15,7 @@
 module intermesh_constants_mod
 
   ! Infrastructure
-  use constants_mod,                     only: i_def, r_def
+  use constants_mod,                     only: i_def, r_def, l_def
   use field_mod,                         only: field_type
   use function_space_mod,                only: function_space_type
   use function_space_collection_mod,     only: function_space_collection
@@ -29,9 +29,9 @@ module intermesh_constants_mod
   ! Configuration
   use finite_element_config_mod,         only: element_order, nqp_exact
   use io_config_mod,                     only: subroutine_timers
-  use transport_config_mod,              only: moisture_eqn, &
-                                               moisture_eqn_consistent
+
   ! Other algorithms
+  use check_configuration_mod,           only: check_any_eqn_consistent
   use fem_constants_mod,                 only: get_qr, get_mass_matrix, &
                                                get_inverse_W3_mass_matrix
 
@@ -99,6 +99,7 @@ contains
     type(quadrature_xyoz_type), pointer :: qr => null()
     type(field_type)                    :: dummy_theta
     type(field_type)                    :: dummy_w3_shifted
+    logical(kind=l_def)                 :: any_eqn_consistent
 
     integer(i_def) :: i
 
@@ -130,7 +131,9 @@ contains
                                               qr ) )
     !========== Create transform matrix stuff for W3 to shifted W3 ==========!
 
-    if (moisture_eqn == moisture_eqn_consistent) then
+    any_eqn_consistent = check_any_eqn_consistent()
+
+    if (any_eqn_consistent) then
       allocate(consist_w3_to_sh_w3_op(2))
       do i = 1, 2
         call consist_w3_to_sh_w3_op(i)%initialise( vector_space = w3_fs )

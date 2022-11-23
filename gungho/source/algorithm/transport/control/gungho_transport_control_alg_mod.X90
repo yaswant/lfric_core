@@ -18,13 +18,7 @@ module gungho_transport_control_alg_mod
                                                LOG_LEVEL_INFO
   use mesh_collection_mod,               only: mesh_collection
   use mesh_mod,                          only: mesh_type
-  use transport_config_mod,              only: moisture_eqn, &
-                                               moisture_eqn_conservative, &
-                                               moisture_eqn_consistent
-  use transport_enumerated_types_mod,    only: equation_conservative, &
-                                               equation_advective,    &
-                                               equation_consistent,   &
-                                               scheme_mol_3d
+  use transport_enumerated_types_mod,    only: scheme_mol_3d
   use transport_metadata_mod,            only: transport_metadata_type
   use transport_runtime_alg_mod,         only: transport_runtime_type
   use transport_runtime_collection_mod,  only: init_transport_runtime_collection, &
@@ -53,6 +47,7 @@ contains
     use wt_advective_update_alg_mod,  only: wt_advective_update_alg_init
     use transport_config_mod,         only: profile_size,          &
                                             field_names,           &
+                                            equation_form,         &
                                             scheme,                &
                                             splitting,             &
                                             horizontal_method,     &
@@ -70,7 +65,6 @@ contains
 
     type(mesh_type), pointer, intent(in) :: mesh
 
-    integer(kind=i_def)           :: equation_form
     integer(kind=i_def)           :: config
     logical(kind=l_def)           :: use_divergence_factor
     type(transport_metadata_type) :: transport_metadata
@@ -89,16 +83,6 @@ contains
       call log_event(log_scratch_space, LOG_LEVEL_INFO)
 
       ! Set hardwired defaults based upon which field is being advected
-      if ( trim(field_names(config)) == 'density' .or. &
-          (trim(field_names(config)) == 'moisture' .and. &
-           moisture_eqn == moisture_eqn_conservative ) ) then
-        equation_form = equation_conservative
-      else if ( trim(field_names(config)) == 'moisture' .and. &
-                moisture_eqn == moisture_eqn_consistent ) then
-        equation_form = equation_consistent
-      else
-        equation_form = equation_advective
-      end if
       if ( trim(field_names(config)) == 'density' ) then
         use_divergence_factor = use_density_predictor
       else
@@ -106,7 +90,7 @@ contains
       end if
 
       transport_metadata = transport_metadata_type( field_names(config),             &
-                                                    equation_form,                   &
+                                                    equation_form(config),           &
                                                     splitting(config),               &
                                                     scheme(config),                  &
                                                     horizontal_method(config),       &
@@ -164,7 +148,7 @@ contains
                                           adv_fields_last_outer,           &
                                           adv_fields_last_outer_after_slow)
 
-    use check_configuration_mod,         only: check_any_scheme_ffsl
+    use check_configuration_mod,         only: check_any_shifted
     use derived_config_mod,              only: bundle_size
     use fem_constants_mod,               only: get_mass_matrix
     use field_bundle_mod,                only: clone_bundle, set_bundle_scalar
@@ -207,7 +191,7 @@ contains
     type(field_type)    :: temp_inc
     type(field_type)    :: fields_np1(bundle_size)
     logical(kind=l_def) :: do_moisture_diagnostics
-    logical(kind=l_def) :: any_ffsl
+    logical(kind=l_def) :: any_shifted
     real(r_def)         :: cast_dt
     type(operator_type), pointer :: mm_wt => null()
     type(mesh_type),     pointer :: primary_mesh => null()
@@ -222,12 +206,11 @@ contains
     ! Pre-transport initialisation tasks
     ! ------------------------------------------------------------------------ !
 
-    ! Check if any horizontal method is ffsl
-    any_ffsl = check_any_scheme_ffsl()
+    ! Check if any transport scheme needs a shifted mesh
+    any_shifted = check_any_shifted()
 
     ! Create transport_runtime object (advecting wind etc)
-    if ( moisture_eqn == moisture_eqn_conservative .or. &
-         moisture_eqn == moisture_eqn_consistent .or. any_ffsl ) then
+    if ( any_shifted ) then
       primary_mesh => wind_n%get_mesh()
       shifted_mesh => mesh_collection%get_mesh(primary_mesh, SHIFTED)
 

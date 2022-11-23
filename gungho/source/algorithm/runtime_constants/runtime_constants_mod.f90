@@ -11,24 +11,22 @@
 !>          throughout the algorithm layers.
 module runtime_constants_mod
 
-  use boundaries_config_mod, only: limited_area
-  use constants_mod,         only: i_def, r_def, str_def
-  use field_mod,             only: field_type
-  use io_config_mod,         only: subroutine_timers
-  use log_mod,               only: log_event, LOG_LEVEL_INFO
-  use mesh_collection_mod,   only: mesh_collection
-  use mesh_mod,              only: mesh_type
-  use model_clock_mod,       only: model_clock_type
-  use runtime_tools_mod,     only: primary_mesh_label,      &
-                                   shifted_mesh_label,      &
-                                   double_level_mesh_label, &
-                                   twod_mesh_label,         &
-                                   multigrid_mesh_label,    &
-                                   extra_mesh_label
-  use timer_mod,             only: timer
-  use transport_config_mod,  only: moisture_eqn, &
-                                   moisture_eqn_conservative, &
-                                   moisture_eqn_consistent
+  use boundaries_config_mod,   only: limited_area
+  use check_configuration_mod, only: check_any_shifted
+  use constants_mod,           only: i_def, r_def, str_def, l_def
+  use field_mod,               only: field_type
+  use io_config_mod,           only: subroutine_timers
+  use log_mod,                 only: log_event, LOG_LEVEL_INFO
+  use mesh_collection_mod,     only: mesh_collection
+  use mesh_mod,                only: mesh_type
+  use model_clock_mod,         only: model_clock_type
+  use runtime_tools_mod,       only: primary_mesh_label,      &
+                                     shifted_mesh_label,      &
+                                     double_level_mesh_label, &
+                                     twod_mesh_label,         &
+                                     multigrid_mesh_label,    &
+                                     extra_mesh_label
+  use timer_mod,               only: timer
 
   implicit none
 
@@ -107,6 +105,7 @@ contains
     type(mesh_type), optional, intent(in), pointer :: double_level_mesh
 
     ! Internal variables
+    logical(kind=l_def)                         :: any_shifted
     integer(kind=i_def)                         :: num_meshes, mesh_counter, i, j
     integer(kind=i_def),            allocatable :: mesh_id_list(:)
     integer(kind=i_def),            allocatable :: label_list(:)
@@ -260,8 +259,9 @@ contains
                                          label_list )
     end if
 
-    if ( moisture_eqn == moisture_eqn_conservative .or. &
-         moisture_eqn == moisture_eqn_consistent ) then
+    any_shifted = check_any_shifted()
+
+    if ( any_shifted ) then
       call create_intermesh_constants(mesh,              &
                                       chi,               &
                                       panel_id,          &
@@ -300,12 +300,15 @@ contains
 
     implicit none
 
+    logical(kind=l_def) :: any_shifted
+
+    any_shifted = check_any_shifted()
+
     call final_geometric_constants()
     call final_fem_constants()
     call final_physical_op_constants()
     if ( limited_area ) call final_limited_area_constants()
-    if ( moisture_eqn == moisture_eqn_conservative ) &
-      call final_intermesh_constants()
+    if ( any_shifted ) call final_intermesh_constants()
     call final_hierarchical_mesh_id_list()
     call final_mesh_id_list()
 

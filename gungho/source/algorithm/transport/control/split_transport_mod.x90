@@ -14,19 +14,19 @@ module split_transport_mod
   use log_mod,                          only: log_event, LOG_LEVEL_ERROR
   use transport_config_mod,             only: advective_then_flux
   use transport_metadata_mod,           only: transport_metadata_type
-  use transport_enumerated_types_mod,   only: splitting_strang_vhv,  &
-                                              splitting_strang_hvh,  &
-                                              splitting_hv,          &
-                                              splitting_vh,          &
-                                              direction_h,           &
-                                              direction_v,           &
-                                              split_method_null,     &
-                                              split_method_mol,      &
-                                              split_method_ffsl,     &
-                                              split_method_sl,       &
-                                              equation_conservative, &
-                                              equation_advective,    &
-                                              equation_consistent
+  use transport_enumerated_types_mod,   only: splitting_strang_vhv,       &
+                                              splitting_strang_hvh,       &
+                                              splitting_hv,               &
+                                              splitting_vh,               &
+                                              direction_h,                &
+                                              direction_v,                &
+                                              split_method_null,          &
+                                              split_method_mol,           &
+                                              split_method_ffsl,          &
+                                              split_method_sl,            &
+                                              equation_form_conservative, &
+                                              equation_form_advective,    &
+                                              equation_form_consistent
   use mol_conservative_alg_mod,         only: mol_conservative_alg
   use mol_advective_alg_mod,            only: mol_advective_alg
   use mol_consistent_alg_mod,           only: mol_consistent_alg
@@ -189,16 +189,16 @@ contains
     ! -------------------------------------------------------------------------!
     case ( split_method_mol )
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
          call mol_conservative_alg(field_np1, field_n, direction, &
                                    transport_metadata)
 
-      case ( equation_advective )
+      case ( equation_form_advective )
          call mol_advective_alg(field_np1, field_n, direction, &
                                 transport_metadata)
 
-      case ( equation_consistent )
+      case ( equation_form_consistent )
          call mol_consistent_alg(field_np1, field_n, direction, &
                                  transport_metadata)
 
@@ -213,8 +213,8 @@ contains
     ! -------------------------------------------------------------------------!
     case ( split_method_ffsl )
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
         if (advective_then_flux) then
           call log_event('Advective then flux not implemented for split '// &
                          'schemes using FFSL', LOG_LEVEL_ERROR)
@@ -223,7 +223,7 @@ contains
         call ffsl_conservative_control(field_np1, field_n, direction, &
                                        step_dt, transport_metadata)
 
-      case ( equation_advective )
+      case ( equation_form_advective )
         call ffsl_advective_control(field_np1, field_n, direction, &
                                     step_dt, transport_metadata)
 
@@ -243,10 +243,10 @@ contains
       end if
 
       ! Choose form of transport equation
-      select case ( transport_metadata%get_equation() )
-      case ( equation_conservative )
+      select case ( transport_metadata%get_equation_form() )
+      case ( equation_form_conservative )
         call vertical_sl_conservative_alg( field_np1, field_n, step_dt, transport_metadata )
-      case ( equation_advective )
+      case ( equation_form_advective )
         call vertical_sl_advective_alg( field_np1, field_n, step_dt, transport_metadata )
       case default
         call log_event('Trying to solve unrecognised form of transport equation', &

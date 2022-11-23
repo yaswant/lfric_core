@@ -225,9 +225,9 @@ stretching_method='linear',
 &transport
   advective_then_flux = .true.
   broken_w2_projection = .false.
-  moisture_eqn='advective'
   profile_size = 3
   field_names = 'density', 'potential_temperature', 'wind'
+  equation_form = 1, 2, 2
   scheme = 1, 1, 1
   splitting = 1, 1, 1
   horizontal_method = 1, 1, 1

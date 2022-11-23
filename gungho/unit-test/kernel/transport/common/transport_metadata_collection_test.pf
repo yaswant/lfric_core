@@ -9,17 +9,17 @@
 module transport_metadata_collection_test
 
   use constants_mod,                  only : r_def, l_def, str_def
-  use transport_enumerated_types_mod, only : equation_advective,    &
-                                             equation_conservative, &
-                                             splitting_none,        &
-                                             splitting_strang_vhv,  &
-                                             splitting_strang_hvh,  &
-                                             scheme_mol_3d,         &
-                                             scheme_split,          &
-                                             split_method_mol,      &
-                                             split_method_sl,       &
-                                             horizontal_monotone_none,      &
-                                             vertical_monotone_none,        &
+  use transport_enumerated_types_mod, only : equation_form_advective,    &
+                                             equation_form_conservative, &
+                                             splitting_none,             &
+                                             splitting_strang_vhv,       &
+                                             splitting_strang_hvh,       &
+                                             scheme_mol_3d,              &
+                                             scheme_split,               &
+                                             split_method_mol,           &
+                                             split_method_sl,            &
+                                             horizontal_monotone_none,   &
+                                             vertical_monotone_none,     &
                                              vertical_monotone_order_linear
   use transport_metadata_collection_mod, &
                                       only : transport_metadata_collection_type, &
@@ -57,7 +57,6 @@ contains
                                      ffsl_flux_splitting_full,      &
                                      ffsl_advective_splitting_full, &
                                      max_vert_cfl_calc_uniform,     &
-                                     moisture_eqn_advective,        &
                                      horizontal_monotone,           &
                                      vertical_monotone,             &
                                      vertical_monotone_order
@@ -73,6 +72,7 @@ contains
                                  profile_size = 3,                                    &
                                  transport_ageofair=.false.,                          &
                                  ageofair_reset_level = 10,                           &
+                                 equation_form = (/ 1, 1, 2 /),                       &
                                  scheme = (/ 1, 1, 1 /),                              &
                                  splitting = (/1, 1, 1/),                             &
                                  horizontal_method = (/ 1, 1, 1 /),                   &
@@ -104,7 +104,6 @@ contains
                                               ffsl_flux_splitting_full,               &
                                  ffsl_advective_splitting =                           &
                                               ffsl_advective_splitting_full,          &
-                                 moisture_eqn=moisture_eqn_advective,                 &
                                  max_vert_cfl_calc = max_vert_cfl_calc_uniform,       &
                                  reversible = (/ .false., .false., .false. /)         &
                                  )
@@ -155,7 +154,7 @@ contains
     ! Add two metadata objects and then get them
     fname = 'do'
     metadata = transport_metadata_type(fname,                          &
-                                       equation_advective,             &
+                                       equation_form_advective,        &
                                        splitting_none,                 &
                                        scheme_mol_3d,                  &
                                        split_method_mol,               &
@@ -173,7 +172,7 @@ contains
 
     fname = 're'
     metadata = transport_metadata_type(fname,                          &
-                                       equation_conservative,          &
+                                       equation_form_conservative,     &
                                        splitting_strang_vhv,           &
                                        scheme_split,                   &
                                        split_method_mol,               &
@@ -191,7 +190,7 @@ contains
 
     fname = 'mi'
     metadata = transport_metadata_type(fname,                          &
-                                       equation_conservative,          &
+                                       equation_form_conservative,     &
                                        splitting_strang_hvh,           &
                                        scheme_split,                   &
                                        split_method_mol,               &
@@ -211,7 +210,7 @@ contains
     fname = 'do'
     metadata_ptr => transport_metadata_collection%get_transport_metadata(fname)
     @assertEqual(fname, metadata_ptr%get_name())
-    @assertEqual(equation_advective, metadata_ptr%get_equation())
+    @assertEqual(equation_form_advective, metadata_ptr%get_equation_form())
     @assertEqual(splitting_none, metadata_ptr%get_splitting())
     @assertEqual(scheme_mol_3d, metadata_ptr%get_scheme())
     @assertEqual(no_enforce_min_value, metadata_ptr%get_enforce_min_value())
@@ -221,7 +220,7 @@ contains
     fname = 're'
     metadata_ptr => transport_metadata_collection%get_transport_metadata(fname)
     @assertEqual(fname, metadata_ptr%get_name())
-    @assertEqual(equation_conservative, metadata_ptr%get_equation())
+    @assertEqual(equation_form_conservative, metadata_ptr%get_equation_form())
     @assertEqual(splitting_strang_vhv, metadata_ptr%get_splitting())
     @assertEqual(scheme_split, metadata_ptr%get_scheme())
     @assertEqual(no_enforce_min_value, metadata_ptr%get_enforce_min_value())
@@ -231,7 +230,7 @@ contains
     fname = 'mi'
     metadata_ptr => transport_metadata_collection%get_transport_metadata(fname)
     @assertEqual(fname, metadata_ptr%get_name())
-    @assertEqual(equation_conservative, metadata_ptr%get_equation())
+    @assertEqual(equation_form_conservative, metadata_ptr%get_equation_form())
     @assertEqual(splitting_strang_hvh, metadata_ptr%get_splitting())
     @assertEqual(scheme_split, metadata_ptr%get_scheme())
     @assertEqual(enforce_min_value, metadata_ptr%get_enforce_min_value())
