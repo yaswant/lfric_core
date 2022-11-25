@@ -21,7 +21,7 @@ module helmholtz_operator_kernel_mod
   use argument_mod,      only : arg_type,                   &
                                 GH_FIELD, GH_OPERATOR,      &
                                 GH_REAL, GH_READ, GH_WRITE, &
-                                STENCIL, CROSS, CELL_COLUMN
+                                STENCIL, CROSS2D, CELL_COLUMN
   use constants_mod,     only : i_def, r_solver
   use fs_continuity_mod, only : W2, W3, Wtheta, W2v
   use kernel_mod,        only : kernel_type
@@ -36,17 +36,17 @@ module helmholtz_operator_kernel_mod
 
   type, public, extends(kernel_type) :: helmholtz_operator_kernel_type
     private
-    type(arg_type) :: meta_args(10) = (/                               &
-         arg_type(GH_FIELD*9,  GH_REAL, GH_WRITE, W3),                 & ! Helmholtz operator
-         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2, STENCIL(CROSS)), & ! hb_lumped_inv
-         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2),                 & ! u_normalisation
-         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W2,     W3),         & ! div_star
-         arg_type(GH_FIELD,    GH_REAL, GH_READ,  Wtheta),             & ! Mt_lumped_inv
-         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  Wtheta, W2),         & ! ptheta2v
-         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     W2),         & ! compound_div
-         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     W3),         & ! M3_exner
-         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     Wtheta),     & ! p3theta
-         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2)                  & ! W2 mask
+    type(arg_type) :: meta_args(10) = (/                                 &
+         arg_type(GH_FIELD*9,  GH_REAL, GH_WRITE, W3),                   & ! Helmholtz operator
+         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2, STENCIL(CROSS2D)), & ! hb_lumped_inv
+         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2),                   & ! u_normalisation
+         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W2,     W3),           & ! div_star
+         arg_type(GH_FIELD,    GH_REAL, GH_READ,  Wtheta),               & ! Mt_lumped_inv
+         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  Wtheta, W2),           & ! ptheta2v
+         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     W2),           & ! compound_div
+         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     W3),           & ! M3_exner
+         arg_type(GH_OPERATOR, GH_REAL, GH_READ,  W3,     Wtheta),       & ! p3theta
+         arg_type(GH_FIELD,    GH_REAL, GH_READ,  W2)                    & ! W2 mask
          /)
     integer :: operates_on = CELL_COLUMN
   contains
@@ -65,8 +65,6 @@ contains
 !!        or vertical level that component applies to.
 !> @param[in]     stencil_size    Number of cells in the horizontal stencil
 !> @param[in]     cell_stencil    Stencil of horizontal cell indices
-!> @param[in]     wsen_map        Index map for cells to the W,S,E and N
-!> @param[in]     wsen_map_count  Number of non-zero entries in WSEN index map
 !> @param[in]     cell_stencil    Stencil of horizontal cell indices
 !> @param[in]     nlayers         Number of layers
 !> @param[in,out] helm_c          Diagonal entry to Helmholtz matrix
@@ -80,7 +78,8 @@ contains
 !> @param[in,out] helm_dd         2nd Lower (k-2) entry to Helmholtz matrix
 !> @param[in]     hb_lumped_inv   Lumped inverse of the HB (mass matrix + buoyancy)
 !!                                term
-!> @param[in]     smap_size_w2    Number of cells in W2 stencil dofmap
+!> @param[in]     smap_w2_sizes   Number of cells in W2 stencil dofmap
+!> @param[in]     max_length      Maximum W2 stencil branch length
 !> @param[in]     smap_w2         Stencil dofmap for the W2 space
 !> @param[in]     u_normalisation Normalisation used for the velocity equation
 !> @param[in]     ncell_3d_1      Total number of cells for divergence matrix
@@ -106,31 +105,29 @@ contains
 !> @param[in]     ndf_wt          Number of degrees of freedom per cell for the temperature space
 !> @param[in]     undf_wt         Unique number of degrees of freedom  for the temperature space
 !> @param[in]     map_wt          Dofmap for the cell at the base of the column for the temperature space
-subroutine helmholtz_operator_code(stencil_size,                     &
-                                   cell_stencil,                     &
-                                   wsen_map,                         &
-                                   wsen_map_count,                   &
-                                   nlayers,                          &
-                                   helm_c,                           &
-                                   helm_n, helm_e, helm_s, helm_w,   &
-                                   helm_u, helm_uu, helm_d, helm_dd, &
-                                   hb_lumped_inv,                    &
-                                   smap_size_w2, smap_w2,            &
-                                   u_normalisation,                  &
-                                   ncell_3d_1,                       &
-                                   div_star,                         &
-                                   mt_lumped_inv,                    &
-                                   ncell_3d_2,                       &
-                                   ptheta2v,                         &
-                                   ncell_3d_3,                       &
-                                   compound_div,                     &
-                                   ncell_3d_4,                       &
-                                   m3_exner_star,                    &
-                                   ncell_3d_5,                       &
-                                   p3theta,                          &
-                                   w2_mask,                          &
-                                   ndf_w3, undf_w3, map_w3,          &
-                                   ndf_w2, undf_w2, map_w2,          &
+subroutine helmholtz_operator_code(stencil_size,                       &
+                                   cell_stencil,                       &
+                                   nlayers,                            &
+                                   helm_c,                             &
+                                   helm_n, helm_e, helm_s, helm_w,     &
+                                   helm_u, helm_uu, helm_d, helm_dd,   &
+                                   hb_lumped_inv,                      &
+                                   smap_w2_sizes, max_length, smap_w2, &
+                                   u_normalisation,                    &
+                                   ncell_3d_1,                         &
+                                   div_star,                           &
+                                   mt_lumped_inv,                      &
+                                   ncell_3d_2,                         &
+                                   ptheta2v,                           &
+                                   ncell_3d_3,                         &
+                                   compound_div,                       &
+                                   ncell_3d_4,                         &
+                                   m3_exner_star,                      &
+                                   ncell_3d_5,                         &
+                                   p3theta,                            &
+                                   w2_mask,                            &
+                                   ndf_w3, undf_w3, map_w3,            &
+                                   ndf_w2, undf_w2, map_w2,            &
                                    ndf_wt, undf_wt, map_wt)
 
   implicit none
@@ -139,19 +136,18 @@ subroutine helmholtz_operator_code(stencil_size,                     &
   integer(kind=i_def),                                  intent(in) :: nlayers
   integer(kind=i_def),                                  intent(in) :: stencil_size
   integer(kind=i_def), dimension(stencil_size),         intent(in) :: cell_stencil
-  integer(kind=i_def), dimension(4),                    intent(in) :: wsen_map
-  integer(kind=i_def),                                  intent(in) :: wsen_map_count
   integer(kind=i_def),                                  intent(in) :: ncell_3d_1, ncell_3d_2, &
                                                                       ncell_3d_3, ncell_3d_4, &
                                                                       ncell_3d_5
   integer(kind=i_def),                                  intent(in) :: undf_w2, ndf_w2
   integer(kind=i_def),                                  intent(in) :: undf_w3, ndf_w3
   integer(kind=i_def),                                  intent(in) :: undf_wt, ndf_wt
-  integer(kind=i_def),                                  intent(in) :: smap_size_w2
+  integer(kind=i_def),                                  intent(in) :: max_length
+  integer(kind=i_def), dimension(4),                    intent(in) :: smap_w2_sizes
   integer(kind=i_def), dimension(ndf_w3),               intent(in) :: map_w3
   integer(kind=i_def), dimension(ndf_w2),               intent(in) :: map_w2
   integer(kind=i_def), dimension(ndf_wt),               intent(in) :: map_wt
-  integer(kind=i_def), dimension(ndf_w2, smap_size_w2), intent(in) :: smap_w2
+  integer(kind=i_def), dimension(ndf_w2, max_length, 4), intent(in) :: smap_w2
 
   ! Fields
   real(kind=r_solver), dimension(undf_w3), intent(inout) :: helm_c,                         &
@@ -170,7 +166,7 @@ subroutine helmholtz_operator_code(stencil_size,                     &
   real(kind=r_solver), dimension(ndf_w3, ndf_w3, ncell_3d_5), intent(in) :: m3_exner_star
 
   ! Internal variables
-  integer(kind=i_def) :: k, ik, kk, df, e, stencil_ik
+  integer(kind=i_def) :: k, ik, kk, df, e, ec, stencil_ik
 
   ! Integer mappings for neighbours in W2 spaces
   ! ( x, y )
@@ -218,7 +214,7 @@ subroutine helmholtz_operator_code(stencil_size,                     &
   ! The Compass points needed to match the location
   ! of W2 DoF's in neighbouring cells
   integer(kind=i_def), dimension(4) :: adjacent_face
-  integer(kind=i_def)               :: d1, d2, dir
+  integer(kind=i_def)               :: d1, d2
 
   ! Integer mappings for neighbours in Wtheta spaces
   ! ( x, z )
@@ -300,12 +296,37 @@ subroutine helmholtz_operator_code(stencil_size,                     &
   ! (/ N, E, E, S /)
   ! Since this kernel is only valid for lowest order we can use
   ! the W2 dofmap (one DoF per face) to compute this.
+  !
+  ! We use the Cross2D stencil, which defines branches
+  ! that are ordered 1, 2, 3, 4 corresponding to W, S, E, N
+  ! and smap_w2_sizes gives the number of cells in each branch,
+  ! including the centre cell.
+  !  ---
+  ! | N |
+  !  --- ---
+  ! | C | E |
+  !  --- ---
+  ! | S |
+  !  ---
+  ! So, in this case, where the cell is on the Western boundary of the mesh
+  ! smap_w2_sizes( 1 ) = 1 and smap_w2_sizes( 2 : 4 ) = 2.
+  !
+  ! Loop(d1) over the 4 (nfaces_h) branches, and if it is not on the mesh edge
+  ! then find the value of the adjacent face for that cell.
+  ! smap_w2( d1, 1 , 1 ) is the d1 face of the centre cell (1st cell of 1st branch).
+  ! smap_w2( d2, 2, d1 ) is the d2 face of the 2nd cell on the d1 branch.
+  !
+  ! If d1 = 4 (N) then smap_w2( d1, 1, 1 ) is the N face of the C cell.
+  ! If d2 = 2 (S) smap_w2( d2, 2, d1 ) is the S face of the N cell.
+  ! This is the matching face, and so it will set adjacent_face( 4 ) = 2.
+  !
   adjacent_face(:) = -1
-  do d1 = 1, wsen_map_count
-    dir = wsen_map(d1)
-    do d2 = 1, nfaces_h
-      if ( smap_w2(d2,1+dir) == smap_w2(dir,1) ) adjacent_face(dir) = d2
-    end do
+  do d1 = 1, nfaces_h
+     if ( smap_w2_sizes(d1) > 1 ) then
+       do d2 = 1, nfaces_h
+         if ( smap_w2( d2, 2, d1 ) == smap_w2( d1, 1 , 1 ) ) adjacent_face( d1 ) = d2
+       end do
+     end if
   end do
 
   ! if the adjacent face is missing, then we arbitrarily assign this to be
@@ -338,28 +359,30 @@ subroutine helmholtz_operator_code(stencil_size,                     &
       ! |              |   A(S,1,S)   |
       ! 0--x           |--------------|
 
+      ! Initialise to zero to allow for missing neighbours
+      ! in order to fill in any missing horizontal neighbours.
+      a_op(df,:,:) = 0.0
+
       ! First the centre value
       e=1
       stencil_ik = 1 + k + (cell_stencil(e)-1)*nlayers
-      a_op(df,:,e-1) = -u_normalisation(smap_w2(df,e)+k) &
-                       *w2_mask(smap_w2(df,e)+k)         &
-                       *hb_lumped_inv(smap_w2(df,e)+k)   &
+      a_op(df,:,e-1) = -u_normalisation(smap_w2(df,e,e)+k) &
+                       *w2_mask(smap_w2(df,e,e)+k)         &
+                       *hb_lumped_inv(smap_w2(df,e,e)+k)   &
                        *div_star(df,:,stencil_ik)
 
-      ! Initialise to zero to allow for missing neighbours
-      ! in order to fill in any missing horizontal neighbours
-      do e = 1,stencil_size
-        a_op(df,:,e) = 0.0
-      end do
-
       ! Next the horizontal neighbours (where they exist)
-      do e = 2, smap_size_w2
-        dir = wsen_map(e-1)
-        stencil_ik = 1 + k + (cell_stencil(e)-1)*nlayers
-        a_op(df,:,dir) = -u_normalisation(smap_w2(df,e)+k) &
-                         *w2_mask(smap_w2(df,e)+k)         &
-                         *hb_lumped_inv(smap_w2(df,e)+k)   &
+
+      ec = 0
+      do e = 1, 4
+        if ( smap_w2_sizes(e) > 1 ) then
+          ec = ec + 1
+          stencil_ik = 1 + k + (cell_stencil(ec+1)-1)*nlayers
+          a_op(df,:,e) = -u_normalisation(smap_w2(df,2,e)+k) &
+                         *w2_mask(smap_w2(df,2,e)+k)         &
+                         *hb_lumped_inv(smap_w2(df,2,e)+k)   &
                          *div_star(df,:,stencil_ik)
+        end if
       end do
 
       ! Vertical stencil:
