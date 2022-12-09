@@ -479,7 +479,7 @@ contains
   !> @param[in] twod_mesh  The 2D mesh
 
   subroutine column_total_diagnostics_alg(rho_field, mr, theta_field_in_w3, exner_field, &
-                                          mesh, twod_mesh)
+                                          mesh, twod_mesh, temperature_correction_rate)
 
     use compute_column_integral_kernel_mod, only: compute_column_integral_kernel_type
     use geometric_constants_mod,            only: get_height
@@ -499,6 +499,7 @@ contains
     type(field_type),  intent(in)    :: exner_field
     type(mesh_type),   intent(in), pointer :: mesh
     type(mesh_type),   intent(in), pointer :: twod_mesh
+    real(kind=r_def),  intent(in)    :: temperature_correction_rate
 
     ! Set up local fields
     ! 3D fields
@@ -513,8 +514,10 @@ contains
     type( field_type ) :: tot_col_wetplusdry_mass   ! moist + dry mass column total
     type( field_type ) :: tot_col_int_energy        ! dry column internal energy per unit area
     type( field_type ) :: tot_col_pot_energy        ! dry column potential energy per unit area
+    type( field_type ) :: tot_col_encorr            ! energy correction per unit area
 
     integer(kind=i_def)  :: i_mr
+    real(kind=r_def)     :: cvTdot
 
     ! Set pointers
     type( field_type ), pointer :: height_w3 => null()
@@ -534,18 +537,23 @@ contains
     call tot_col_dry_air_mass%copy_field_properties(tot_col_wetplusdry_mass)
     call tot_col_dry_air_mass%copy_field_properties(tot_col_int_energy)
     call tot_col_dry_air_mass%copy_field_properties(tot_col_pot_energy)
+    call tot_col_dry_air_mass%copy_field_properties(tot_col_encorr)
 
     ! Make the 2D column total fields write-enabled for diagnostic purposes
     call tot_col_dry_air_mass%set_write_behaviour(write_diag_behaviour)
     call tot_col_wetplusdry_mass%set_write_behaviour(write_diag_behaviour)
     call tot_col_int_energy%set_write_behaviour(write_diag_behaviour)
     call tot_col_pot_energy%set_write_behaviour(write_diag_behaviour)
+    call tot_col_encorr%set_write_behaviour(write_diag_behaviour)
 
-    call invoke( compute_column_integral_kernel_type(rho_field, height_w3, &
-                                                height_wth, tot_col_dry_air_mass, &
-                                                radius) )
+    cvTdot = cv * temperature_correction_rate
 
-    call invoke( setval_X(tot_col_wetplusdry_mass, tot_col_dry_air_mass) )
+    call invoke( compute_column_integral_kernel_type(rho_field,             &
+                                                     height_w3, height_wth, &
+                                                     tot_col_dry_air_mass,  &
+                                                     radius),               &
+                 setval_X(tot_col_wetplusdry_mass, tot_col_dry_air_mass),   &
+                 a_times_X(tot_col_encorr, cvTdot, tot_col_dry_air_mass) )
 
     do i_mr = 1, nummr
 
@@ -601,6 +609,7 @@ contains
       call tot_col_wetplusdry_mass%write_field('processed__tot_col_wetplusdry_mass')
       call tot_col_int_energy%write_field('processed__tot_col_int_energy')
       call tot_col_pot_energy%write_field('processed__tot_col_pot_energy')
+      call tot_col_encorr%write_field('processed__tot_col_encorr')
 
     end if
 

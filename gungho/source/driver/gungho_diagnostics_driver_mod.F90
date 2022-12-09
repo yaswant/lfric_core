@@ -277,7 +277,9 @@ contains
       call prognostic_fields%get_field('theta', theta)
       call pmsl_alg(exner, derived_fields, theta, twod_mesh)
       call derived_fields%get_field('theta_in_w3', theta_in_w3)
-      call column_total_diagnostics_alg(rho, mr, theta_in_w3, exner, mesh, twod_mesh)
+      call column_total_diagnostics_alg(rho, mr, theta_in_w3, exner, &
+                                        mesh, twod_mesh,             &
+                                        model_data%temperature_correction_rate)
 
     end if
 #endif

@@ -500,8 +500,11 @@ contains
           call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
         else
           model_data%temperature_correction_rate = 0.0_r_def
+          call scalar_to_field_alg(0.0_r_def, temp_correction_field)
         end if
 
+      else
+        model_data%temperature_correction_rate = 0.0_r_def
       end if
 
     end if

@@ -73,6 +73,7 @@ horizon_angle = ['horizon_angle', 1.4, 1.6]
 horizon_aspect = ['horizon_aspect', 0, 6.3]
 sw_direct_orog_incr_rts = ['sw_direct_orog_incr_rts', -27, 27]
 lw_net_skyview_incr = ['lw_net_skyview_incr', -0.2, 0.2]
+energy_correction_rate = ['tot_col_encorr', -3.4, -2.4 ]
 
 def load_cube_by_varname(filename, var):
    variable_constraint = iris.Constraint(cube_func=(lambda c: c.var_name == var))
@@ -147,6 +148,7 @@ if __name__ == "__main__":
         ral_plots = '-ral' in opts
         slope_plots = '-slope' in opts
         horizon_plots = '-horizon' in opts
+        encorr_plots = '-encorr' in opts
     except ValueError:
         print("Usage: {0} <datapath> <plotpath>".format(sys.argv[0]))
         exit(1)
@@ -195,3 +197,5 @@ if __name__ == "__main__":
         do_plot(datapath, ls_prec,      plotpath)
     else:
         do_plot(datapath, total_prec,   plotpath)
+    if encorr_plots:
+        do_plot(datapath, energy_correction_rate, plotpath)

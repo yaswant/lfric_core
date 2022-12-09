@@ -244,7 +244,7 @@
                                                "wallclock":"00:10:00"},
                                        },
                          },
-                     plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
+                     plotstr="plot_map.py -encorr $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
                      )',
     'run_application("lfric_atm", "small_rce",
                      resolutions=[("BiP64x64-1500x1500_MG",60.0)],
@@ -385,7 +385,7 @@
                                                "wallclock":"0:40:00"},
 					       },
                          },
-                     plotstr="plot_map.py $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
+                     plotstr="plot_map.py -encorr $NODAL_DATA_DIR/lfric_diag.nc  $PLOT_DIR"
                      )',
     'run_application("lfric_atm", "nwp_gal9_hres", checkkgo=False,
                      resolutions=[("C192_MG", 720.0)],
