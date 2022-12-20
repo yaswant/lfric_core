@@ -115,10 +115,11 @@ contains
                                      map_wp )
 
     use subgrid_rho_mod,            only: second_order_coeffs
-    use cosmic_flux_mod,            only: frac_and_int_part,       &
-                                          calc_integration_limits, &
-                                          return_part_mass,        &
-                                          get_index_negative,      &
+    use cosmic_flux_mod,            only: frac_and_int_part,                &
+                                          calc_integration_limits_positive, &
+                                          calc_integration_limits_negative, &
+                                          return_part_mass,                 &
+                                          get_index_negative,               &
                                           get_index_positive
     use ffsl_cubed_sphere_edge_mod, only: get_local_rho_x
 
@@ -179,7 +180,7 @@ contains
     ! Indices
     integer(kind=i_def) :: n_cells_to_sum
     integer(kind=i_def) :: ind_lo, ind_hi
-    integer(kind=i_def) :: k, ii, jj
+    integer(kind=i_def) :: k, ii, jj, half_level
 
     ! Stencils
     integer(kind=i_def) :: stencil_half, stencil_size, lam_edge_size
@@ -222,67 +223,83 @@ contains
       field_local(1:stencil_size) = 0.0_r_def
       coeffs(1:3) = 0.0_r_def
 
-      do k = 0,nlayers-1
+      ! Loop over the y direction dofs to compute flux at each dof
+      do dof_iterator = 1,2
 
-        do dof_iterator = 1,2
-          ! Loop over the y direction dofs to compute flux at each dof
+        ! Check if fluxes are non-zero:
+        ! As fluxes are on shared dofs and have been initialized to zero,
+        ! if any flux in the column on the given dof is non-zero then the
+        ! fluxes have already been computed and don't need to be computed again. To save
+        ! time we only check 2 fluxes - the lowest level and the half domain level.
 
-          ! Get the departure distance
-          departure_dist = dep_pts( map_w2(local_dofs(dof_iterator)) + k )
+        half_level = floor( nlayers/2.0_r_def, i_def)
 
-          ! Calculates number of cells of interest and fraction of a cell to add.
-          call frac_and_int_part(departure_dist,n_cells_to_sum,fractional_distance)
+        if ( flux(map_w2(local_dofs(dof_iterator)) ) == 0.0_r_def .AND. &
+             flux(map_w2(local_dofs(dof_iterator)) + half_level) == 0.0_r_def ) then
 
-          ! Get local field values - this will depend on panel ID at cubed sphere edges
-          do jj = 1, stencil_half
-            field_y_local(jj) = field_y(stencil_map_y(1,stencil_half+1-jj) + k)
-            field_x_local(jj) = field_x(stencil_map_x(1,stencil_half+1-jj) + k)
-          end do
-          do jj = stencil_half+1, stencil_size
-            field_y_local(jj) = field_y(stencil_map_y(1,jj) + k)
-            field_x_local(jj) = field_x(stencil_map_x(1,jj) + k)
-          end do
-          call get_local_rho_x(field_local,field_x_local,field_y_local,ipanel_local,stencil_size,stencil_half)
+          ! Loop over vertical levels
+          do k = 0,nlayers-1
 
-          ! Get a0, a1, a2 in the required cell and build up whole cell part
-          mass_from_whole_cells = 0.0_r_def
-          if (departure_dist >= 0.0_r_def ) then
-            call get_index_positive(ind_lo,ind_hi,n_cells_to_sum,dof_iterator,stencil_size,stencil_half)
-            do ii = 1, n_cells_to_sum-1
-              mass_from_whole_cells = mass_from_whole_cells + field_local(stencil_half - (2-dof_iterator) - (ii-1) )
+            ! Get the departure distance
+            departure_dist = dep_pts( map_w2(local_dofs(dof_iterator)) + k )
+
+            ! Calculates number of cells of interest and fraction of a cell to add.
+            call frac_and_int_part(departure_dist,n_cells_to_sum,fractional_distance)
+
+            ! Get local field values - this will depend on panel ID at cubed sphere edges
+            do jj = 1, stencil_half
+              field_y_local(jj) = field_y(stencil_map_y(1,stencil_half+1-jj) + k)
+              field_x_local(jj) = field_x(stencil_map_x(1,stencil_half+1-jj) + k)
             end do
-          else
-            call get_index_negative(ind_lo,ind_hi,n_cells_to_sum,dof_iterator,stencil_size,stencil_half)
-            do ii = 1, n_cells_to_sum-1
-              mass_from_whole_cells = mass_from_whole_cells + field_local(stencil_half + (dof_iterator-1) + (ii-1) )
+            do jj = stencil_half+1, stencil_size
+              field_y_local(jj) = field_y(stencil_map_y(1,jj) + k)
+              field_x_local(jj) = field_x(stencil_map_x(1,jj) + k)
             end do
-          end if
-          if ( order == 0 ) then
-            ! Piecewise constant reconstruction
-            coeffs(1) = field_local(ind_lo+2)
-          else
-            ! Piecewise parabolic reconstruction
-            call second_order_coeffs( field_local(ind_lo:ind_hi), coeffs, .false., .false.)
-          end if
+            call get_local_rho_x(field_local,field_x_local,field_y_local,ipanel_local,stencil_size,stencil_half)
 
-          ! Calculates the left and right integration limits for the fractional cell.
-          call calc_integration_limits( departure_dist,         &
-                                        fractional_distance,    &
-                                        left_integration_limit, &
-                                        right_integration_limit )
+            ! Get a0, a1, a2 in the required cell and build up whole cell part
+            mass_from_whole_cells = 0.0_r_def
+            if (departure_dist >= 0.0_r_def ) then
+              call get_index_positive(ind_lo,ind_hi,n_cells_to_sum,dof_iterator,stencil_size,stencil_half)
+              do ii = 1, n_cells_to_sum-1
+                mass_from_whole_cells = mass_from_whole_cells + field_local(stencil_half - (2-dof_iterator) - (ii-1) )
+              end do
+              ! Calculate the left and right integration limits for the fractional cell
+              call calc_integration_limits_positive( fractional_distance,    &
+                                                     left_integration_limit, &
+                                                     right_integration_limit )
+            else
+              call get_index_negative(ind_lo,ind_hi,n_cells_to_sum,dof_iterator,stencil_size,stencil_half)
+              do ii = 1, n_cells_to_sum-1
+                mass_from_whole_cells = mass_from_whole_cells + field_local(stencil_half + (dof_iterator-1) + (ii-1) )
+              end do
+              ! Calculate the left and right integration limits for the fractional cell
+              call calc_integration_limits_negative( fractional_distance,    &
+                                                     left_integration_limit, &
+                                                     right_integration_limit )
+            end if
+            if ( order == 0 ) then
+              ! Piecewise constant reconstruction
+              coeffs(1) = field_local(ind_lo+2)
+            else
+              ! Piecewise parabolic reconstruction
+              call second_order_coeffs( field_local(ind_lo:ind_hi), coeffs, .false., .false.)
+            end if
 
-          ! Compute fractional flux
-          mass_frac = return_part_mass(3,coeffs,left_integration_limit,right_integration_limit)
+            ! Compute fractional flux
+            mass_frac = return_part_mass(3,coeffs,left_integration_limit,right_integration_limit)
 
-          ! Get total flux, i.e. fractional part + whole cell part
-          mass_total = mass_from_whole_cells + mass_frac
+            ! Get total flux, i.e. fractional part + whole cell part
+            mass_total = mass_from_whole_cells + mass_frac
 
-          ! Assign to flux variable and divide by dt to get the correct form
-          flux(map_w2(local_dofs(dof_iterator)) + k) =  sign(1.0_r_def,departure_dist) * mass_total / dt
+            ! Assign to flux variable and divide by dt to get the correct form
+            flux(map_w2(local_dofs(dof_iterator)) + k) =  sign(1.0_r_def,departure_dist) * mass_total / dt
 
-        end do
+          end do ! vertical levels k
 
-      end do
+        end if ! check zero flux
+
+      end do ! dof_iterator
 
     end if
 

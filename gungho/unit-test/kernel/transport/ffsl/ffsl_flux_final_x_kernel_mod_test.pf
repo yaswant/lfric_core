@@ -39,8 +39,7 @@ contains
     call feign_subgrid_config( calculate_detj = calculate_detj_upwind, &
                                dep_pt_stencil_extent = 2,              &
                                inner_order = 2,                        &
-                               outer_order = 2,                        &
-                               rho_approximation_stencil_extent=2      &
+                               outer_order = 2                         &
                                )
 
   end subroutine setUp
@@ -106,7 +105,7 @@ contains
                     1.0_r_def, 1.0_r_def, 1.0_r_def, &
                     1.0_r_def, 1.0_r_def, 1.0_r_def /)
 
-    ! Initialise data to zero
+    ! Initialise flux to zero before each test
     flux(:) = 0.0_r_def
 
     ! Test with integer departure distance on one panel
@@ -153,6 +152,7 @@ contains
     ! Test with positive distance on one panel
     dep_pts(:) = 0.6_r_def
     dt = 1.0_r_def
+    flux(:) = 0.0_r_def
     panel_id(:) = (/ 1.0_r_def, 1.0_r_def, 1.0_r_def, &
                      1.0_r_def, 1.0_r_def, 1.0_r_def, &
                      1.0_r_def, 1.0_r_def, 1.0_r_def /)
@@ -188,6 +188,7 @@ contains
     ! Test with positive distance over panel edge
     dep_pts(:) = 0.4_r_def
     dt = 1.0_r_def
+    flux(:) = 0.0_r_def
     panel_id(:) = (/ 4.0_r_def, 4.0_r_def, 4.0_r_def, &
                      4.0_r_def, 1.0_r_def, 1.0_r_def, &
                      1.0_r_def, 1.0_r_def, 1.0_r_def /)
@@ -223,6 +224,7 @@ contains
     ! Test with negative distance over panel edge
     dep_pts(:) = -0.4_r_def
     dt = 1.0_r_def
+    flux(:) = 0.0_r_def
     panel_id(:) = (/ 3.0_r_def, 3.0_r_def, 3.0_r_def, &
                      3.0_r_def, 3.0_r_def, 5.0_r_def, &
                      5.0_r_def, 5.0_r_def, 5.0_r_def /)

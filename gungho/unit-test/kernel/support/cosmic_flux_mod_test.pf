@@ -90,7 +90,8 @@ contains
   subroutine calc_integration_limits_test()
     use pFUnit_Mod
     use constants_mod, only: r_def
-    use cosmic_flux_mod, only : calc_integration_limits
+    use cosmic_flux_mod, only : calc_integration_limits_positive, &
+                                calc_integration_limits_negative
 
     implicit none
 
@@ -100,16 +101,17 @@ contains
     real(kind=r_def) :: x_right_limit
     real(kind=r_def) :: tol
 
-    departure_dist = 3.4_r_def
+    ! Set fractional distance and tolerance
     frac_x = 0.4_r_def
-    tol = 1.0e-6_r_def
-    call calc_integration_limits(departure_dist,frac_x,x_left_limit,x_right_limit)
+    tol    = 1.0e-6_r_def
+
+    ! Positive departure distance
+    call calc_integration_limits_positive(frac_x,x_left_limit,x_right_limit)
     @assertEqual(0.6_r_def, x_left_limit,tol)
     @assertEqual(1.0_r_def, x_right_limit,tol)
 
-    departure_dist = -3.4_r_def
-    frac_x = 0.4_r_def
-    call calc_integration_limits(departure_dist,frac_x,x_left_limit,x_right_limit)
+    ! Negative departure distance
+    call calc_integration_limits_negative(frac_x,x_left_limit,x_right_limit)
     @assertEqual(0.0_r_def, x_left_limit,tol)
     @assertEqual(0.4_r_def, x_right_limit,tol)
 

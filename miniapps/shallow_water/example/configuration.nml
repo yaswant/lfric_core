@@ -340,5 +340,4 @@ calculate_detj                   = 'upwind'
 dep_pt_stencil_extent            = 1
 inner_order                      = 2
 outer_order                      = 2
-rho_approximation_stencil_extent = 0
 /

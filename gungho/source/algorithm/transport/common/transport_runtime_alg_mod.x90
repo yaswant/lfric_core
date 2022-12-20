@@ -57,6 +57,12 @@ module transport_runtime_alg_mod
     type(field_type),    allocatable, dimension(:)   :: departure_points_x_w2
     type(field_type),    allocatable, dimension(:)   :: departure_points_y_w2
     type(field_type),    allocatable, dimension(:)   :: departure_points_z_w2
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_x
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_y
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_z
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_half_x
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_half_y
+    type(field_type),    allocatable, dimension(:)   :: adv_unity_half_z
     type(field_type),    allocatable, dimension(:)   :: field_n
     type(field_type),    allocatable, dimension(:,:) :: rho_d_n
     type(field_type),    allocatable, dimension(:,:) :: rho_d_np1
@@ -90,6 +96,12 @@ module transport_runtime_alg_mod
     procedure, public  :: get_departure_points_x_w2
     procedure, public  :: get_departure_points_y_w2
     procedure, public  :: get_departure_points_z_w2
+    procedure, public  :: get_adv_unity_x
+    procedure, public  :: get_adv_unity_y
+    procedure, public  :: get_adv_unity_z
+    procedure, public  :: get_adv_unity_half_x
+    procedure, public  :: get_adv_unity_half_y
+    procedure, public  :: get_adv_unity_half_z
     procedure, public  :: get_field_n
     procedure, public  :: get_rho_d_n
     procedure, public  :: get_rho_d_np1
@@ -134,6 +146,7 @@ contains
     use calc_dep_pts_alg_mod,          only: calc_vert_dep_pts, &
                                              calc_hori_dep_pts, &
                                              select_detj_at_w2
+    use ffsl_unity_transport_alg_mod,  only: ffsl_unity_transport_alg
     use split_w2_field_kernel_mod,     only: split_w2_field_kernel_type
     use transport_config_mod,          only: max_vert_cfl_calc,           &
                                              max_vert_cfl_calc_dep_point, &
@@ -224,6 +237,12 @@ contains
               self%departure_points_x_w2(self%n_meshes),     &
               self%departure_points_y_w2(self%n_meshes),     &
               self%departure_points_z_w2(self%n_meshes),     &
+              self%adv_unity_x(self%n_meshes),               &
+              self%adv_unity_y(self%n_meshes),               &
+              self%adv_unity_z(self%n_meshes),               &
+              self%adv_unity_half_x(self%n_meshes),          &
+              self%adv_unity_half_y(self%n_meshes),          &
+              self%adv_unity_half_z(self%n_meshes),          &
               self%horizontal_cfl_max(self%n_meshes),        &
               self%vertical_cfl_max(self%n_meshes),          &
               self%total_cfl_max(self%n_meshes),             &
@@ -274,6 +293,12 @@ contains
       call self%departure_points_z_w2(mesh_idx)%initialise( w2_fs )
       call self%departure_points_x_w2(mesh_idx)%initialise( w2_fs )
       call self%departure_points_y_w2(mesh_idx)%initialise( w2_fs )
+      call self%adv_unity_x(mesh_idx)%initialise( w3_fs )
+      call self%adv_unity_y(mesh_idx)%initialise( w3_fs )
+      call self%adv_unity_z(mesh_idx)%initialise( w3_fs )
+      call self%adv_unity_half_x(mesh_idx)%initialise( w3_fs )
+      call self%adv_unity_half_y(mesh_idx)%initialise( w3_fs )
+      call self%adv_unity_half_z(mesh_idx)%initialise( w3_fs )
       call self%field_n(mesh_idx)%initialise( w3_fs  )
     end do
 
@@ -400,6 +425,23 @@ contains
           'Transport: maximum total CFL ', self%total_cfl_max(mesh_idx)
       call log_event( log_scratch_space, LOG_LEVEL_INFO )
 
+      !==========================================================================!
+      ! For FFSL schemes we require the transport of a unity field to get
+      ! the advective FFSL transport
+      if (any_scheme_ffsl) then
+        call ffsl_unity_transport_alg( self%departure_points_x_w2(mesh_idx), &
+                                       self%departure_points_y_w2(mesh_idx), &
+                                       self%departure_points_z_w2(mesh_idx), &
+                                       self%detj_at_w2_transport(mesh_idx),  &
+                                       cast_dt,                              &
+                                       self%adv_unity_x(mesh_idx),           &
+                                       self%adv_unity_y(mesh_idx),           &
+                                       self%adv_unity_z(mesh_idx),           &
+                                       self%adv_unity_half_x(mesh_idx),      &
+                                       self%adv_unity_half_y(mesh_idx),      &
+                                       self%adv_unity_half_z(mesh_idx) )
+      end if
+
     end do
 
     !==========================================================================!
@@ -458,6 +500,12 @@ contains
     if ( allocated( self%departure_points_x_w2 ) )     deallocate( self%departure_points_x_w2 )
     if ( allocated( self%departure_points_y_w2 ) )     deallocate( self%departure_points_y_w2 )
     if ( allocated( self%departure_points_z_w2 ) )     deallocate( self%departure_points_z_w2 )
+    if ( allocated( self%adv_unity_x ) )               deallocate( self%adv_unity_x )
+    if ( allocated( self%adv_unity_y ) )               deallocate( self%adv_unity_y )
+    if ( allocated( self%adv_unity_z ) )               deallocate( self%adv_unity_z )
+    if ( allocated( self%adv_unity_half_x ) )          deallocate( self%adv_unity_half_x )
+    if ( allocated( self%adv_unity_half_y ) )          deallocate( self%adv_unity_half_y )
+    if ( allocated( self%adv_unity_half_z ) )          deallocate( self%adv_unity_half_z )
     if ( allocated( self%field_n ) )                   deallocate( self%field_n )
     if ( allocated( self%rho_d_n ) )                   deallocate( self%rho_d_n )
     if ( allocated( self%rho_d_np1 ) )                 deallocate( self%rho_d_np1 )
@@ -496,6 +544,12 @@ contains
     if (.not. allocated( dest%departure_points_y_w2 ) )     allocate( dest%departure_points_y_w2(dest%n_meshes) )
     if (.not. allocated( dest%departure_points_x_w2 ) )     allocate( dest%departure_points_x_w2(dest%n_meshes) )
     if (.not. allocated( dest%departure_points_z_w2 ) )     allocate( dest%departure_points_z_w2(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_x ) )               allocate( dest%adv_unity_x(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_y ) )               allocate( dest%adv_unity_y(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_z ) )               allocate( dest%adv_unity_z(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_half_x ) )          allocate( dest%adv_unity_half_x(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_half_y ) )          allocate( dest%adv_unity_half_y(dest%n_meshes) )
+    if (.not. allocated( dest%adv_unity_half_z ) )          allocate( dest%adv_unity_half_z(dest%n_meshes) )
     if (.not. allocated( dest%field_n ) )                   allocate( dest%field_n(dest%n_meshes) )
     if (.not. allocated( dest%rho_d_n ) )                   allocate( dest%rho_d_n(dest%n_meshes, dest%num_dry_steps) )
     if (.not. allocated( dest%rho_d_np1 ) )                 allocate( dest%rho_d_np1(dest%n_meshes, dest%num_dry_steps) )
@@ -515,6 +569,12 @@ contains
       call source%departure_points_x_w2(mesh_idx)%copy_field(dest%departure_points_x_w2(mesh_idx))
       call source%departure_points_y_w2(mesh_idx)%copy_field(dest%departure_points_y_w2(mesh_idx))
       call source%departure_points_z_w2(mesh_idx)%copy_field(dest%departure_points_z_w2(mesh_idx))
+      call source%adv_unity_x(mesh_idx)%copy_field(dest%adv_unity_x(mesh_idx))
+      call source%adv_unity_y(mesh_idx)%copy_field(dest%adv_unity_y(mesh_idx))
+      call source%adv_unity_z(mesh_idx)%copy_field(dest%adv_unity_z(mesh_idx))
+      call source%adv_unity_half_x(mesh_idx)%copy_field(dest%adv_unity_half_x(mesh_idx))
+      call source%adv_unity_half_y(mesh_idx)%copy_field(dest%adv_unity_half_y(mesh_idx))
+      call source%adv_unity_half_z(mesh_idx)%copy_field(dest%adv_unity_half_z(mesh_idx))
       call source%field_n(mesh_idx)%copy_field(dest%field_n(mesh_idx))
       do i = 1, source%num_dry_steps
         call source%rho_d_n(mesh_idx,i)%copy_field(dest%rho_d_n(mesh_idx,i))
@@ -1093,6 +1153,114 @@ contains
     call check_initialised_field(departure_points_z_w2, field_name, mesh_id)
 
   end function get_departure_points_z_w2
+
+  !> @brief Returns a pointer to the transport of unity in x
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of transport of unity in x
+  function get_adv_unity_x(self, mesh_id) result(adv_unity_x)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_x
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_x'
+    adv_unity_x => self%adv_unity_x(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_x, field_name, mesh_id)
+
+  end function get_adv_unity_x
+
+  !> @brief Returns a pointer to the transport of unity in y
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of transport of unity in y
+  function get_adv_unity_y(self, mesh_id) result(adv_unity_y)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_y
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_y'
+    adv_unity_y => self%adv_unity_y(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_y, field_name, mesh_id)
+
+  end function get_adv_unity_y
+
+  !> @brief Returns a pointer to the transport of unity in z
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of transport of unity in z
+  function get_adv_unity_z(self, mesh_id) result(adv_unity_z)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_z
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_z'
+    adv_unity_z => self%adv_unity_z(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_z, field_name, mesh_id)
+
+  end function get_adv_unity_z
+
+  !> @brief Returns a pointer to the half time step transport of unity in x
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of half time step transport of unity in x
+  function get_adv_unity_half_x(self, mesh_id) result(adv_unity_half_x)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_half_x
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_half_x'
+    adv_unity_half_x => self%adv_unity_half_x(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_half_x, field_name, mesh_id)
+
+  end function get_adv_unity_half_x
+
+  !> @brief Returns a pointer to the half time step transport of unity in y
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of half time step transport of unity in y
+  function get_adv_unity_half_y(self, mesh_id) result(adv_unity_half_y)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_half_y
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_half_y'
+    adv_unity_half_y => self%adv_unity_half_y(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_half_y, field_name, mesh_id)
+
+  end function get_adv_unity_half_y
+
+  !> @brief Returns a pointer to the half time step transport of unity in z
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The update of half time step transport of unity in z
+  function get_adv_unity_half_z(self, mesh_id) result(adv_unity_half_z)
+
+    implicit none
+
+    class(transport_runtime_type), target, intent(in) :: self
+    integer(kind=i_def),                   intent(in) :: mesh_id
+    type(field_type),                      pointer    :: adv_unity_half_z
+    character(str_def)                                :: field_name
+
+    field_name = 'adv_unity_half_z'
+    adv_unity_half_z => self%adv_unity_half_z(self%idx_from_mesh_id(mesh_id))
+    call check_initialised_field(adv_unity_half_z, field_name, mesh_id)
+
+  end function get_adv_unity_half_z
 
   !> @brief Returns number of split transport steps for the dry density
   !> @return The number of split transport steps for the dry density

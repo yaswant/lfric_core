@@ -283,7 +283,6 @@ calculate_detj='averaged',
 dep_pt_stencil_extent=3,
 inner_order = 2
 outer_order = 2
-rho_approximation_stencil_extent=2,
 /
 &surface
 alb_leaf_nir=0.341,0.272,0.369,0.368,0.395,

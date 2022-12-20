@@ -8,7 +8,7 @@
 module ffsl_control_alg_mod
 
   ! Constants and types
-  use constants_mod,                    only: i_def, r_def
+  use constants_mod,                    only: i_def, r_def, l_def
   use extrusion_mod,                    only: SHIFTED
   use field_mod,                        only: field_type
   use function_space_collection_mod,    only: function_space_collection
@@ -93,6 +93,7 @@ contains
                                  dep_pts_x, &
                                  dep_pts_y
     type(field_type)          :: flux
+    logical(kind=l_def)       :: hori_half_flag
     integer(kind=i_def)       :: mesh_id
     type(mesh_type),  pointer :: mesh => null()
     type(field_type), pointer :: panel_id => null()
@@ -115,29 +116,14 @@ contains
     dep_pts_y_get => transport_runtime%get_departure_points_y_w2(mesh_id)
     dep_pts_z_get => transport_runtime%get_departure_points_z_w2(mesh_id)
 
-    ! Get correct departure points based on splitting
-    call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
-    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
-
-    ! If vertical scheme for Strang splitting divide departure distance by 2
-    if ( transport_metadata%get_splitting() ==  splitting_strang_vhv .and. &
-         direction == direction_v ) then
-      call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
-    end if
-
-    ! Get correct departure points based on splitting
+    ! Copy departure points so they can be corrected if Strang splitting is used
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
     call dep_pts_y%initialise( vector_space = dep_pts_y_get%get_function_space() )
-    ! Use copy instead of setval_X as we need to preserve halo values
+    call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
+    ! Use copy instead of setval_X for horizontal as we need to preserve halo values
+    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
     call dep_pts_x_get%copy_field(dep_pts_x)
     call dep_pts_y_get%copy_field(dep_pts_y)
-
-    ! If horizontal scheme for Strang splitting divide departure distance by 2
-    if ( transport_metadata%get_splitting() ==  splitting_strang_hvh .and. &
-         direction == direction_h ) then
-      call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
-                   inc_a_times_X(0.5_r_def, dep_pts_y) )
-    end if
 
     call increment%initialise( vector_space=field_n%get_function_space() )
     call invoke( setval_c(increment, 0.0_r_def) )
@@ -146,6 +132,10 @@ contains
     select case (direction)
 
       case (direction_v)
+        ! If vertical scheme for Strang splitting divide departure distance by 2
+        if ( transport_metadata%get_splitting() ==  splitting_strang_vhv ) then
+          call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
+        end if
         ! Vertical PPM routine requires a flux output to be ready for #2997
         call flux_z%initialise( vector_space=dep_pts_z%get_function_space() )
         call invoke( setval_c(flux_z, 0.0_r_def) )
@@ -153,10 +143,18 @@ contains
                                 step_dt, flux_z, increment )
 
       case (direction_h)
+        ! If horizontal scheme for Strang splitting divide departure distance by 2
+        if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
+          call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
+                       inc_a_times_X(0.5_r_def, dep_pts_y) )
+          hori_half_flag = .true.
+        else
+          hori_half_flag = .false.
+        end if
         ! 2D FFSL
         call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
                                                detj_at_w2, panel_id, step_dt, &
-                                               increment )
+                                               hori_half_flag, increment )
 
       case (direction_3d)
         ! 3D FFSL
@@ -226,6 +224,8 @@ contains
     type(field_type)          :: dep_pts_z, &
                                  dep_pts_x, &
                                  dep_pts_y
+    logical(kind=l_def)       :: vert_half_flag
+    logical(kind=l_def)       :: hori_half_flag
     type(mesh_type),  pointer :: mesh => null()
     type(field_type), pointer :: panel_id => null()
     type(transport_runtime_type), pointer :: transport_runtime => null()
@@ -269,29 +269,14 @@ contains
     dep_pts_y_get => transport_runtime%get_departure_points_y_w2(mesh_id)
     dep_pts_z_get => transport_runtime%get_departure_points_z_w2(mesh_id)
 
-    ! Get correct departure points based on splitting
-    call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
-    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
-
-    ! If vertical scheme for Strang splitting divide departure distance by 2
-    if ( transport_metadata%get_splitting() ==  splitting_strang_vhv .and. &
-         direction == direction_v ) then
-      call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
-    end if
-
-    ! Get correct departure points based on splitting
+    ! Copy departure points so they can be corrected if Strang splitting is used
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
     call dep_pts_y%initialise( vector_space = dep_pts_y_get%get_function_space() )
-    ! Use copy instead of setval_X as we need to preserve halo values
+    call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
+    ! Use copy instead of setval_X for horizontal as we need to preserve halo values
+    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
     call dep_pts_x_get%copy_field(dep_pts_x)
     call dep_pts_y_get%copy_field(dep_pts_y)
-
-    ! If horizontal scheme for Strang splitting divide departure distance by 2
-    if ( transport_metadata%get_splitting() ==  splitting_strang_hvh .and. &
-         direction == direction_h ) then
-      call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
-                   inc_a_times_X(0.5_r_def, dep_pts_y) )
-    end if
 
     call increment%initialise( vector_space=field_to_adv%get_function_space() )
     call invoke( setval_c(increment, 0.0_r_def) )
@@ -300,14 +285,30 @@ contains
     select case (direction)
 
       case (direction_v)
+        ! If vertical scheme for Strang splitting divide departure distance by 2
+        if ( transport_metadata%get_splitting() ==  splitting_strang_vhv ) then
+          call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
+          vert_half_flag = .true.
+        else
+          vert_half_flag = .false.
+        end if
         ! Vertical PPM scheme
-        call ffsl_1d_advect_vert( field_to_adv, dep_pts_z, detj_at_w2, outer_order, step_dt, increment )
+        call ffsl_1d_advect_vert( field_to_adv, dep_pts_z, detj_at_w2, outer_order, &
+                                  step_dt, vert_half_flag, increment )
 
       case (direction_h)
+        ! If horizontal scheme for Strang splitting divide departure distance by 2
+        if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
+          call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
+                       inc_a_times_X(0.5_r_def, dep_pts_y) )
+          hori_half_flag = .true.
+        else
+          hori_half_flag = .false.
+        end if
         ! 2D FFSL
         call ffsl_advective_horizontal_alg( field_to_adv, dep_pts_x, dep_pts_y, &
                                             detj_at_w2, panel_id, step_dt,      &
-                                            increment )
+                                            hori_half_flag, increment )
 
       case (direction_3d)
         ! 3D FFSL

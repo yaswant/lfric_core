@@ -10,8 +10,9 @@ module check_configuration_mod
   use mixing_config_mod,    only: smagorinsky,            &
                                   viscosity,              &
                                   viscosity_mu
-  use subgrid_config_mod,   only: dep_pt_stencil_extent,  &
-                                  rho_approximation_stencil_extent
+  use subgrid_config_mod,   only: dep_pt_stencil_extent, &
+                                  inner_order,           &
+                                  outer_order
   use transport_config_mod, only: operators,                   &
                                   operators_fv,                &
                                   consistent_metric,           &
@@ -19,6 +20,7 @@ module check_configuration_mod
                                   fv_vertical_order,           &
                                   profile_size,                &
                                   scheme,                      &
+                                  splitting,                   &
                                   horizontal_method,           &
                                   vertical_method,             &
                                   max_vert_cfl_calc,           &
@@ -35,7 +37,9 @@ module check_configuration_mod
                                   split_method_mol,            &
                                   split_method_ffsl,           &
                                   equation_form_advective,     &
-                                  equation_form_consistent
+                                  equation_form_consistent,    &
+                                  splitting_strang_hvh,        &
+                                  splitting_strang_vhv
 
   implicit none
 
@@ -45,6 +49,8 @@ module check_configuration_mod
   public :: check_any_scheme_mol
   public :: check_any_scheme_split
   public :: check_any_scheme_ffsl
+  public :: check_any_splitting_hvh
+  public :: check_any_splitting_vhv
   public :: check_any_shifted
   public :: check_any_eqn_consistent
   public :: check_horz_dep_pts
@@ -320,7 +326,7 @@ contains
     implicit none
 
     integer(kind=i_def) :: stencil_depth
-    logical(kind=l_def) :: any_scheme_ffsl
+    logical(kind=l_def) :: any_horz_dep_pts
 
     stencil_depth = 1
 
@@ -332,12 +338,12 @@ contains
       stencil_depth  = max( stencil_depth, fv_horizontal_order/2 )
     end if
 
-    any_scheme_ffsl = check_any_scheme_ffsl()
+    any_horz_dep_pts = check_horz_dep_pts()
 
-    if ( any_scheme_ffsl ) then
-        stencil_depth = max( stencil_depth,          &
-                             dep_pt_stencil_extent + &
-                             rho_approximation_stencil_extent )
+    if ( any_horz_dep_pts ) then
+      stencil_depth = max( stencil_depth,          &
+                           dep_pt_stencil_extent + &
+                           max( inner_order, outer_order ) )
     end if
 
   end function get_required_stencil_depth
@@ -416,6 +422,56 @@ contains
     end do
 
   end function check_any_scheme_ffsl
+
+  !> @brief   Determine whether any of the split transport schemes use
+  !!          Strang HVH splitting
+  !> @details Loops through the transport splitting specified for different
+  !!          variables and determines whether any are using the Strang
+  !!          horizontal-vertical-horizontal splitting
+  !> @return  any_splitting_hvh
+  function check_any_splitting_hvh() result(any_splitting_hvh)
+
+    implicit none
+
+    logical(kind=l_def) :: any_splitting_hvh
+    integer(kind=i_def) :: i
+
+    any_splitting_hvh = .false.
+
+    do i = 1, profile_size
+      if ( scheme(i) == scheme_split .AND. &
+           splitting(i) == splitting_strang_hvh ) then
+        any_splitting_hvh = .true.
+        exit
+      end if
+    end do
+
+  end function check_any_splitting_hvh
+
+  !> @brief   Determine whether any of the split transport schemes use
+  !!          Strang VHV splitting
+  !> @details Loops through the transport splitting specified for different
+  !!          variables and determines whether any are using the Strang
+  !!          vertical-horizontal-vertical splitting
+  !> @return  any_splitting_vhv
+  function check_any_splitting_vhv() result(any_splitting_vhv)
+
+    implicit none
+
+    logical(kind=l_def) :: any_splitting_vhv
+    integer(kind=i_def) :: i
+
+    any_splitting_vhv = .false.
+
+    do i = 1, profile_size
+      if ( scheme(i) == scheme_split .AND. &
+           splitting(i) == splitting_strang_vhv ) then
+        any_splitting_vhv = .true.
+        exit
+      end if
+    end do
+
+  end function check_any_splitting_vhv
 
   !> @brief   Determine whether any of the transport schemes need shifted mesh
   !> @details Loops through the transport schemes specified for different

@@ -20,13 +20,16 @@
 
 module ffsl_1d_advect_alg_mod
 
-  use constants_mod,                    only: r_def, i_def
+  use constants_mod,                    only: r_def, i_def, l_def
   use ffsl_1d_flux_alg_mod,             only: ffsl_1d_flux_first, &
                                               ffsl_1d_flux_final, &
                                               ffsl_1d_flux_vert
   use field_mod,                        only: field_type
   use flux_direction_mod,               only: x_direction, y_direction
   use function_space_mod,               only: function_space_type
+  use mesh_mod,                         only: mesh_type
+  use transport_runtime_alg_mod,        only: transport_runtime_type
+  use transport_runtime_collection_mod, only: get_transport_runtime
 
   implicit none
 
@@ -53,6 +56,7 @@ contains
   !> @param[in]     detj_at_w2        Det(J) at W2 dofs
   !> @param[in]     dt                The model timestep length
   !> @param[in]     order             Order of the reconstruction
+  !> @param[in]     strang            Logical flag to do half step in unity transport
   !> @param[in,out] increment         Advective increment
   subroutine ffsl_1d_advect_first( direction,  &
                                    field,      &
@@ -60,6 +64,7 @@ contains
                                    detj_at_w2, &
                                    dt,         &
                                    order,      &
+                                   strang,     &
                                    increment )
 
     implicit none
@@ -71,36 +76,37 @@ contains
     type(field_type), intent(in)    :: detj_at_w2
     real(r_def),      intent(in)    :: dt
     integer(i_def),   intent(in)    :: order
+    logical(l_def),   intent(in)    :: strang
     type(field_type), intent(inout) :: increment
 
     ! Fields and increments
     type(field_type) :: inc_rho
-    type(field_type) :: inc_one
-    type(field_type) :: ini_one
     type(field_type) :: flux
     type(field_type) :: adv_rho
-    type(field_type) :: adv_one
     type(field_type) :: divide_part
     type(field_type) :: inc_part
+
+    ! Transport runtime, mesh, and unity transport pointers
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(mesh_type),              pointer :: mesh => null()
+    type(field_type),             pointer :: adv_one => null()
 
     ! Constant
     real(r_def)      :: one_over_dt
 
+    ! Get transport_runtime
+    mesh => field%get_mesh()
+    transport_runtime => get_transport_runtime(mesh)
+
     ! Initialise fields
     call inc_rho%initialise( vector_space=field%get_function_space() )
-    call inc_one%initialise( vector_space=field%get_function_space() )
-    call ini_one%initialise( vector_space=field%get_function_space() )
     call flux%initialise( vector_space=dep_pts%get_function_space() )
     call adv_rho%initialise( vector_space=field%get_function_space() )
-    call adv_one%initialise( vector_space=field%get_function_space() )
     call inc_part%initialise( vector_space=field%get_function_space() )
     call divide_part%initialise( vector_space=field%get_function_space() )
     call invoke( setval_c(inc_rho, 0.0_r_def),  &
-                 setval_c(inc_one, 0.0_r_def),  &
-                 setval_c(ini_one, 1.0_r_def),  &
                  setval_c(flux, 0.0_r_def),     &
                  setval_c(adv_rho, 0.0_r_def),  &
-                 setval_c(adv_one, 0.0_r_def),  &
                  setval_c(inc_part, 0.0_r_def), &
                  setval_c(divide_part, 0.0_r_def) )
 
@@ -118,25 +124,31 @@ contains
                              inc_rho )
     call invoke( X_minus_bY( adv_rho, field, dt, inc_rho) )
 
-    ! Compute the increment of one, F(1)
-    call ffsl_1d_flux_first( direction,  &
-                             ini_one,    &
-                             dep_pts,    &
-                             detj_at_w2, &
-                             order,      &
-                             dt,         &
-                             flux,       &
-                             inc_one )
+    ! Get unity transport
+    if ( direction == x_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_x(field%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_x(field%get_mesh_id())
+      end if
+    else if ( direction == y_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_y(field%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_y(field%get_mesh_id())
+      end if
+    end if
 
     ! Get the advective increment from these conservative increments
     ! adv_rho   = q - dt * F(q)
     ! adv_one   = 1 - dt * F(1)
     ! inc_part  = q - adv_rho / adv_one
     ! increment = inc_part / dt
-    call invoke( X_minus_bY(adv_one, ini_one, dt, inc_one),   &
-                 X_divideby_Y(divide_part, adv_rho, adv_one), &
+    call invoke( X_divideby_Y(divide_part, adv_rho, adv_one), &
                  X_minus_Y(inc_part, field, divide_part),     &
                  a_times_X(increment, one_over_dt, inc_part) )
+
+    nullify(transport_runtime, mesh, adv_one)
 
   end subroutine ffsl_1d_advect_first
 
@@ -159,6 +171,7 @@ contains
   !> @param[in]     dt                The model timestep length
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     order             Order of the reconstruction
+  !> @param[in]     strang            Logical flag to do half step in unity transport
   !> @param[in,out] increment         Advective increment
   subroutine ffsl_1d_advect_final( direction,  &
                                    field_x,    &
@@ -168,6 +181,7 @@ contains
                                    dt,         &
                                    panel_id,   &
                                    order,      &
+                                   strang,     &
                                    increment )
 
     implicit none
@@ -181,38 +195,39 @@ contains
     real(r_def),      intent(in)    :: dt
     type(field_type), intent(in)    :: panel_id
     integer(i_def),   intent(in)    :: order
+    logical(l_def),   intent(in)    :: strang
     type(field_type), intent(inout) :: increment
 
     ! Fields and increments
     type(field_type) :: inc_rho
-    type(field_type) :: inc_one
-    type(field_type) :: ini_one
     type(field_type) :: flux
     type(field_type) :: adv_rho
-    type(field_type) :: adv_one
     type(field_type) :: divide_part
     type(field_type) :: inc_part
     type(field_type) :: field_n
 
+    ! Transport runtime, mesh and unity transport pointers
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(mesh_type),              pointer :: mesh => null()
+    type(field_type),             pointer :: adv_one => null()
+
     ! Constant
     real(r_def)      :: one_over_dt
 
+    ! Get transport_runtime
+    mesh => field_x%get_mesh()
+    transport_runtime => get_transport_runtime(mesh)
+
     ! Initialise fields
     call inc_rho%initialise( vector_space=field_x%get_function_space() )
-    call inc_one%initialise( vector_space=field_x%get_function_space() )
-    call ini_one%initialise( vector_space=field_x%get_function_space() )
     call flux%initialise( vector_space=dep_pts%get_function_space() )
     call adv_rho%initialise( vector_space=field_x%get_function_space() )
-    call adv_one%initialise( vector_space=field_x%get_function_space() )
     call inc_part%initialise( vector_space=field_x%get_function_space() )
     call divide_part%initialise( vector_space=field_x%get_function_space() )
     call field_n%initialise( vector_space=field_x%get_function_space() )
     call invoke( setval_c(inc_rho, 0.0_r_def),  &
-                 setval_c(inc_one, 0.0_r_def),  &
-                 setval_c(ini_one, 1.0_r_def),  &
                  setval_c(flux, 0.0_r_def),     &
                  setval_c(adv_rho, 0.0_r_def),  &
-                 setval_c(adv_one, 0.0_r_def),  &
                  setval_c(inc_part, 0.0_r_def), &
                  setval_c(divide_part, 0.0_r_def) )
 
@@ -239,25 +254,31 @@ contains
                              inc_rho )
     call invoke( X_minus_bY( adv_rho, field_n, dt, inc_rho) )
 
-    ! Compute the increment of one, F(1)
-    call ffsl_1d_flux_first( direction,  &
-                             ini_one,    &
-                             dep_pts,    &
-                             detj_at_w2, &
-                             order,      &
-                             dt,         &
-                             flux,       &
-                             inc_one )
+    ! Get unity transport
+    if ( direction == x_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_x(field_x%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_x(field_x%get_mesh_id())
+      end if
+    else if ( direction == y_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_y(field_y%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_y(field_y%get_mesh_id())
+      end if
+    end if
 
     ! Get the advective increment from these conservative increments
     ! adv_rho   = q - dt * F(q)
     ! adv_one   = 1 - dt * F(1)
     ! inc_part  = q - adv_rho / adv_one
     ! increment = inc_part / dt
-    call invoke( X_minus_bY(adv_one, ini_one, dt, inc_one),   &
-                 X_divideby_Y(divide_part, adv_rho, adv_one), &
+    call invoke( X_divideby_Y(divide_part, adv_rho, adv_one), &
                  X_minus_Y(inc_part, field_n, divide_part),   &
                  a_times_X(increment, one_over_dt, inc_part) )
+
+    nullify(transport_runtime, mesh, adv_one)
 
   end subroutine ffsl_1d_advect_final
 
@@ -272,12 +293,14 @@ contains
   !> @param[in]     detj_at_w2        Det(J) at W2 dofs
   !> @param[in]     order             Order of the reconstruction
   !> @param[in]     dt                The model timestep length
+  !> @param[in]     strang            Logical flag to do half step in unity transport
   !> @param[in,out] increment         Advective increment
   subroutine ffsl_1d_advect_vert( field,      &
                                   dep_pts,    &
                                   detj_at_w2, &
                                   order,      &
                                   dt,         &
+                                  strang,     &
                                   increment )
 
     implicit none
@@ -288,36 +311,37 @@ contains
     type(field_type), intent(in)    :: detj_at_w2
     integer(i_def),   intent(in)    :: order
     real(r_def),      intent(in)    :: dt
+    logical(l_def),   intent(in)    :: strang
     type(field_type), intent(inout) :: increment
 
     ! Fields and increments
     type(field_type) :: inc_rho
-    type(field_type) :: inc_one
-    type(field_type) :: ini_one
     type(field_type) :: flux
     type(field_type) :: adv_rho
-    type(field_type) :: adv_one
     type(field_type) :: divide_part
     type(field_type) :: inc_part
+
+    ! Transport runtime, mesh and unity transport pointers
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(mesh_type),              pointer :: mesh => null()
+    type(field_type),             pointer :: adv_one => null()
 
     ! Constant
     real(r_def)      :: one_over_dt
 
+    ! Get transport_runtime
+    mesh => field%get_mesh()
+    transport_runtime => get_transport_runtime(mesh)
+
     ! Initialise fields
     call inc_rho%initialise( vector_space=field%get_function_space() )
-    call inc_one%initialise( vector_space=field%get_function_space() )
-    call ini_one%initialise( vector_space=field%get_function_space() )
     call flux%initialise( vector_space=dep_pts%get_function_space() )
     call adv_rho%initialise( vector_space=field%get_function_space() )
-    call adv_one%initialise( vector_space=field%get_function_space() )
     call inc_part%initialise( vector_space=field%get_function_space() )
     call divide_part%initialise( vector_space=field%get_function_space() )
     call invoke( setval_c(inc_rho, 0.0_r_def),  &
-                 setval_c(inc_one, 0.0_r_def),  &
-                 setval_c(ini_one, 1.0_r_def),  &
                  setval_c(flux, 0.0_r_def),     &
                  setval_c(adv_rho, 0.0_r_def),  &
-                 setval_c(adv_one, 0.0_r_def),  &
                  setval_c(inc_part, 0.0_r_def), &
                  setval_c(divide_part, 0.0_r_def)  )
 
@@ -329,19 +353,23 @@ contains
                             dt, flux, inc_rho )
     call invoke( X_minus_bY( adv_rho, field, dt, inc_rho ) )
 
-    ! Compute the increment of one, F(1)
-    call ffsl_1d_flux_vert( ini_one, dep_pts, detj_at_w2, order, &
-                            dt, flux, inc_one )
+    ! Get unity transport
+    if ( strang ) then
+      adv_one => transport_runtime%get_adv_unity_half_z(field%get_mesh_id())
+    else
+      adv_one => transport_runtime%get_adv_unity_z(field%get_mesh_id())
+    end if
 
     ! Get the advective increment from these conservative increments
     ! adv_rho   = q - dt * F(q)
     ! adv_one   = 1 - dt * F(1)
     ! inc_part  = q - adv_rho / adv_one
     ! increment = inc_part / dt
-    call invoke( X_minus_bY(adv_one, ini_one, dt, inc_one),   &
-                 X_divideby_Y(divide_part, adv_rho, adv_one), &
+    call invoke( X_divideby_Y(divide_part, adv_rho, adv_one), &
                  X_minus_Y(inc_part, field, divide_part),     &
                  a_times_X(increment, one_over_dt, inc_part) )
+
+    nullify(transport_runtime, mesh, adv_one)
 
   end subroutine ffsl_1d_advect_vert
 

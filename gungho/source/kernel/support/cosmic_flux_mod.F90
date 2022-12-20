@@ -26,7 +26,8 @@ private
 public :: calc_stencil_ordering
 public :: stencil_ordering_and_orientation
 public :: frac_and_int_part
-public :: calc_integration_limits
+public :: calc_integration_limits_positive
+public :: calc_integration_limits_negative
 public :: populate_array
 public :: map_cell_index
 public :: eval_integral
@@ -112,33 +113,50 @@ contains
 
   !----------------------------------------------------------------------------
   !> @brief  Returns the limits of integration of the "part" cell which comes
-  !!         from the fractional part of the departure distance.
+  !!         from the fractional part of the positive departure distance.
   !!         The values of x_left_limit and x_right_limit satisfy
   !!         0 <= x_left_limit, x_right_limit <= 1.
   !!
-  !! @param[in]   departure_dist   Departure distance
   !! @param[in]   frac_x           Fractional part of departure distance
   !! @param[out]  x_left_limit     Left limit of integral part of mass sum
   !! @param[out]  x_right_limit    Right limit of integral part of mass sum
   !----------------------------------------------------------------------------
-  subroutine calc_integration_limits(departure_dist,frac_x,x_left_limit,x_right_limit)
+  subroutine calc_integration_limits_positive(frac_x,x_left_limit,x_right_limit)
 
     implicit none
 
-    real(kind=r_def), intent(in)  :: departure_dist
     real(kind=r_def), intent(in)  :: frac_x
     real(kind=r_def), intent(out) :: x_left_limit
     real(kind=r_def), intent(out) :: x_right_limit
 
-    if (departure_dist > 0.0_r_def) then
-      x_left_limit = 1.0_r_def-frac_x
-      x_right_limit = 1.0_r_def
-    else
-      x_left_limit = 0.0_r_def
-      x_right_limit = frac_x
-    end if
+    x_left_limit = 1.0_r_def-frac_x
+    x_right_limit = 1.0_r_def
 
-  end subroutine calc_integration_limits
+  end subroutine calc_integration_limits_positive
+
+
+  !----------------------------------------------------------------------------
+  !> @brief  Returns the limits of integration of the "part" cell which comes
+  !!         from the fractional part of the negative departure distance.
+  !!         The values of x_left_limit and x_right_limit satisfy
+  !!         0 <= x_left_limit, x_right_limit <= 1.
+  !!
+  !! @param[in]   frac_x           Fractional part of departure distance
+  !! @param[out]  x_left_limit     Left limit of integral part of mass sum
+  !! @param[out]  x_right_limit    Right limit of integral part of mass sum
+  !----------------------------------------------------------------------------
+  subroutine calc_integration_limits_negative(frac_x,x_left_limit,x_right_limit)
+
+    implicit none
+
+    real(kind=r_def), intent(in)  :: frac_x
+    real(kind=r_def), intent(out) :: x_left_limit
+    real(kind=r_def), intent(out) :: x_right_limit
+
+    x_left_limit = 0.0_r_def
+    x_right_limit = frac_x
+
+  end subroutine calc_integration_limits_negative
 
 
   !----------------------------------------------------------------------------

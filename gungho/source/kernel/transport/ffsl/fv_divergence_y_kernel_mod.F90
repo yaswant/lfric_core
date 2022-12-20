@@ -1,16 +1,17 @@
 !-----------------------------------------------------------------------------
-! (C) Crown copyright 2017 Met Office. All rights reserved.
+! (c) Crown copyright 2022 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Computes the finite-volume divergence in one direction.
+!
+!> @brief Computes the finite-volume divergence in the y direction.
 !> @details The flux form semi-Lagrangian (FFSL) scheme updates the field in
 !!          the x, y and z directions separately. This code calculates the
-!!          divergence for either the x, y, or z direction. The scheme is a simple
-!!          finite difference of the fluxes at opposite cell edges and is designed to
+!!          divergence for the y direction. The scheme is a simple finite
+!!          difference of the fluxes at opposite cell edges and is designed to
 !!          work only with lowest order W2 and W3 spaces.
 
-module fv_divergence_kernel_mod
+module fv_divergence_y_kernel_mod
 
   use argument_mod,       only : arg_type,            &
                                  GH_FIELD, GH_SCALAR, &
@@ -32,22 +33,21 @@ module fv_divergence_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the
   !> Psy layer.
   !>
-  type, public, extends(kernel_type) :: fv_divergence_kernel_type
+  type, public, extends(kernel_type) :: fv_divergence_y_kernel_type
     private
-    type(arg_type) :: meta_args(3) = (/                 &
+    type(arg_type) :: meta_args(2) = (/                 &
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W3), & ! difference
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2), & ! flux
-         arg_type(GH_SCALAR, GH_INTEGER, GH_READ )      & ! direction
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2)  & ! flux
          /)
     integer :: operates_on = CELL_COLUMN
   contains
-    procedure, nopass :: fv_divergence_code
+    procedure, nopass :: fv_divergence_y_code
   end type
 
   !---------------------------------------------------------------------------
   ! Contained functions/subroutines
   !---------------------------------------------------------------------------
-  public :: fv_divergence_code
+  public :: fv_divergence_y_code
 
 contains
 
@@ -55,40 +55,36 @@ contains
   !> @param[in]     nlayers           The number of layers
   !> @param[in,out] divergence        The divergence or difference values in W3 space
   !> @param[in]     mass_flux         The flux values which are calculated
-  !> @param[in]     direction         The direction in which to calculate the fluxes
   !> @param[in]     ndf_w3            Number of degrees of freedom for W3 per cell
   !> @param[in]     undf_w3           Number of unique degrees of freedom for W3
   !> @param[in]     map_w3            Dofmap for W3
   !> @param[in]     ndf_w2            Number of degrees of freedom for W2 per cell
   !> @param[in]     undf_w2           Number of unique degrees of freedom for W2
   !> @param[in]     map_w2            Dofmap for W2
-  subroutine fv_divergence_code( nlayers,    &
-                                 divergence, &
-                                 mass_flux,  &
-                                 direction,  &
-                                 ndf_w3,     &
-                                 undf_w3,    &
-                                 map_w3,     &
-                                 ndf_w2,     &
-                                 undf_w2,    &
-                                 map_w2 )
+  subroutine fv_divergence_y_code( nlayers,    &
+                                   divergence, &
+                                   mass_flux,  &
+                                   ndf_w3,     &
+                                   undf_w3,    &
+                                   map_w3,     &
+                                   ndf_w2,     &
+                                   undf_w2,    &
+                                   map_w2 )
 
     implicit none
 
     ! Arguments
-    integer(kind=i_def), intent(in)                       :: nlayers
-    integer(kind=i_def), intent(in)                       :: ndf_w3
-    integer(kind=i_def), intent(in)                       :: undf_w3
-    integer(kind=i_def), dimension(ndf_w3), intent(in)    :: map_w3
-    real(kind=r_def), dimension(undf_w3), intent(inout)   :: divergence
-    integer(kind=i_def), intent(in)                       :: ndf_w2
-    integer(kind=i_def), intent(in)                       :: undf_w2
-    integer(kind=i_def), dimension(ndf_w2), intent(in)    :: map_w2
-    real(kind=r_def), dimension(undf_w2), intent(in)      :: mass_flux
-    integer(kind=i_def), intent(in)                       :: direction
+    integer(kind=i_def), intent(in)                     :: nlayers
+    integer(kind=i_def), intent(in)                     :: ndf_w3
+    integer(kind=i_def), intent(in)                     :: undf_w3
+    integer(kind=i_def), dimension(ndf_w3), intent(in)  :: map_w3
+    integer(kind=i_def), intent(in)                     :: ndf_w2
+    integer(kind=i_def), intent(in)                     :: undf_w2
+    integer(kind=i_def), dimension(ndf_w2), intent(in)  :: map_w2
+    real(kind=r_def), dimension(undf_w3), intent(inout) :: divergence
+    real(kind=r_def), dimension(undf_w2), intent(in)    :: mass_flux
 
     integer(kind=i_def) :: k
-    integer(kind=i_def) :: local_dofs(1:2)
 
     ! This is based on the lowest order W2 dof map
     !
@@ -104,22 +100,11 @@ contains
     !    |     |
     !    ---5---
 
-    if (direction == x_direction) then
-      local_dofs(1) = 1_i_def
-      local_dofs(2) = 3_i_def
-    else if (direction == y_direction) then
-      local_dofs(1) = 2_i_def
-      local_dofs(2) = 4_i_def
-    else if (direction == z_direction) then
-      local_dofs(1) = 5_i_def
-      local_dofs(2) = 6_i_def
-    end if
-
     do k = 0,nlayers-1
-      divergence( map_w3(1)+k ) = mass_flux(map_w2(local_dofs(2))+k) - &
-                                  mass_flux(map_w2(local_dofs(1))+k)
+      divergence( map_w3(1)+k ) = mass_flux(map_w2(4)+k) - &
+                                  mass_flux(map_w2(2)+k)
     end do
 
-  end subroutine fv_divergence_code
+  end subroutine fv_divergence_y_code
 
-end module fv_divergence_kernel_mod
+end module fv_divergence_y_kernel_mod

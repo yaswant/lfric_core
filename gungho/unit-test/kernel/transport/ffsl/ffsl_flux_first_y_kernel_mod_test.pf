@@ -39,8 +39,7 @@ contains
     call feign_subgrid_config( calculate_detj = calculate_detj_upwind, &
                                dep_pt_stencil_extent = 2,              &
                                inner_order = 2,                        &
-                               outer_order = 2,                        &
-                               rho_approximation_stencil_extent=2      &
+                               outer_order = 2                         &
                                )
 
   end subroutine setUp
@@ -101,7 +100,7 @@ contains
                   2.0_r_def,  1.0_r_def,  2.0_r_def, &
                   5.0_r_def,  10.0_r_def, 17.0_r_def /)
 
-    ! Initialise data to zero
+    ! Initialise flux to zero before each test
     flux(:) = 0.0_r_def
 
     ! Test with integer departure distance
@@ -136,6 +135,7 @@ contains
     ! Test with positive distance
     dep_pts(:) = 0.75_r_def
     dt = 1.0_r_def
+    flux(:) = 0.0_r_def
     call ffsl_flux_first_y_code( nlayers,        &
                                  flux,           &
                                  field,          &
@@ -159,6 +159,7 @@ contains
     ! Test with negative distance
     dep_pts(:) = -0.75_r_def
     dt = 1.0_r_def
+    flux(:) = 0.0_r_def
     call ffsl_flux_first_y_code( nlayers,        &
                                  flux,           &
                                  field,          &

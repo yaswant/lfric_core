@@ -34,11 +34,10 @@ module ffsl_1d_flux_alg_mod
   use ffsl_vertical_flux_kernel_mod,  only: ffsl_vertical_flux_kernel_type
   use ffsl_vert_constant_flux_kernel_mod, &
                                       only: ffsl_vert_constant_flux_kernel_type
-  use fv_divergence_kernel_mod,       only: fv_divergence_kernel_type
+  use fv_divergence_x_kernel_mod,     only: fv_divergence_x_kernel_type
+  use fv_divergence_y_kernel_mod,     only: fv_divergence_y_kernel_type
+  use fv_divergence_z_kernel_mod,     only: fv_divergence_z_kernel_type
   use vert_ppm_no_limiter_kernel_mod, only: vert_ppm_no_limiter_kernel_type
-
-  ! Configs
-  use subgrid_config_mod,             only: rho_approximation_stencil_extent
 
   implicit none
 
@@ -100,7 +99,7 @@ contains
 
     call dep_pts%field_minmax(cfl_min, cfl_max)
     stencil_extent     = int( max( abs(cfl_max), abs(cfl_min) ) ) &
-                         + 1 + rho_approximation_stencil_extent
+                         + 1 + order
     cfl_stencil_extent = int(stencil_extent)
 
     ! Get inverse mass matrix
@@ -108,23 +107,24 @@ contains
 
     call mass_flux%initialise( vector_space=dep_pts%get_function_space() )
     call difference%initialise( vector_space=field%get_function_space() )
-    call invoke( setval_c(mass_flux,  0.0_r_def),  &
-                 setval_c(difference, 0.0_r_def)  )
+    call invoke( setval_c(mass_flux,  0.0_r_def), &
+                 setval_c(difference, 0.0_r_def) )
 
-    ! Compute the flux
+    ! Compute the flux, multiply by Det(J) to get the mass flux,
+    ! take the difference and multiply by inverse mass matrix to get increment
     if (direction == x_direction) then
-      call invoke( ffsl_flux_first_x_kernel_type( flux, field, stencil_extent, &
-                                                  dep_pts, order, cfl_stencil_extent, dt ) )
+      call invoke( ffsl_flux_first_x_kernel_type( flux, field, stencil_extent,              &
+                                                  dep_pts, order, cfl_stencil_extent, dt ), &
+                   X_times_Y( mass_flux, flux, detj_at_w2 ),                                &
+                   fv_divergence_x_kernel_type( difference, mass_flux ),                    &
+                   dg_matrix_vector_kernel_type( increment, difference, m3_inv ) )
     else if (direction == y_direction) then
       call invoke( ffsl_flux_first_y_kernel_type( flux, field, stencil_extent, &
-                                                  dep_pts, order, cfl_stencil_extent, dt ) )
+                                                  dep_pts, order, cfl_stencil_extent, dt ), &
+                   X_times_Y( mass_flux, flux, detj_at_w2 ),                                &
+                   fv_divergence_y_kernel_type( difference, mass_flux ),                    &
+                   dg_matrix_vector_kernel_type( increment, difference, m3_inv ) )
     end if
-
-    ! Multiply by Det(J) to get mass flux
-    call invoke( X_times_Y(mass_flux, flux, detj_at_w2),                       &
-    ! Take difference and multiply by inverse mass matrix to get increment
-                 fv_divergence_kernel_type( difference, mass_flux, direction), &
-                 dg_matrix_vector_kernel_type(increment, difference, m3_inv) )
 
     nullify( m3_inv )
 
@@ -186,7 +186,7 @@ contains
 
     call dep_pts%field_minmax(cfl_min, cfl_max)
     stencil_extent = int( max( abs(cfl_max), abs(cfl_min) ) ) &
-                     + 1 + rho_approximation_stencil_extent
+                     + 1 + order
     cfl_stencil_extent = int(stencil_extent)
 
     ! Get inverse mass matrix
@@ -194,27 +194,28 @@ contains
 
     call mass_flux%initialise( vector_space=dep_pts%get_function_space() )
     call difference%initialise( vector_space=field_x%get_function_space() )
-    call invoke( setval_c(mass_flux,  0.0_r_def),  &
-                 setval_c(difference, 0.0_r_def)  )
+    call invoke( setval_c(mass_flux,  0.0_r_def), &
+                 setval_c(difference, 0.0_r_def) )
 
-    ! Compute the flux
+    ! Compute the flux, multiply by Det(J) to get the mass flux,
+    ! take the difference and multiply by inverse mass matrix to get increment
     if (direction == x_direction) then
-      call invoke( ffsl_flux_final_x_kernel_type( flux, field_x, stencil_extent,  &
-                                                  field_y, stencil_extent,        &
-                                                  panel_id, stencil_extent,       &
-                                                  dep_pts, order, cfl_stencil_extent, dt ) )
+      call invoke( ffsl_flux_final_x_kernel_type( flux, field_x, stencil_extent,            &
+                                                  field_y, stencil_extent,                  &
+                                                  panel_id, stencil_extent,                 &
+                                                  dep_pts, order, cfl_stencil_extent, dt ), &
+                   X_times_Y( mass_flux, flux, detj_at_w2 ),                                &
+                   fv_divergence_x_kernel_type( difference, mass_flux ),                    &
+                   dg_matrix_vector_kernel_type( increment, difference, m3_inv ) )
     else if (direction == y_direction) then
-      call invoke( ffsl_flux_final_y_kernel_type( flux, field_x, stencil_extent,  &
-                                                  field_y, stencil_extent,        &
-                                                  panel_id, stencil_extent,       &
-                                                  dep_pts, order, cfl_stencil_extent, dt ) )
+      call invoke( ffsl_flux_final_y_kernel_type( flux, field_x, stencil_extent,            &
+                                                  field_y, stencil_extent,                  &
+                                                  panel_id, stencil_extent,                 &
+                                                  dep_pts, order, cfl_stencil_extent, dt ), &
+                   X_times_Y( mass_flux, flux, detj_at_w2 ),                                &
+                   fv_divergence_y_kernel_type( difference, mass_flux ),                    &
+                   dg_matrix_vector_kernel_type( increment, difference, m3_inv ) )
     end if
-
-    ! Multiply by Det(J) to get mass flux
-    call invoke( X_times_Y(mass_flux, flux, detj_at_w2),                       &
-    ! Take difference and multiply by inverse mass matrix to get increment
-                 fv_divergence_kernel_type( difference, mass_flux, direction), &
-                 dg_matrix_vector_kernel_type(increment, difference, m3_inv) )
 
     nullify( m3_inv )
 
@@ -288,8 +289,8 @@ contains
     end if
     ! Multiply by Det(J) to get mass flux, take difference and multiply by inverse
     ! mass matrix to get increment
-    call invoke( X_times_Y(mass_flux, flux, detj_at_w2),                         &
-                 fv_divergence_kernel_type( difference, mass_flux, z_direction), &
+    call invoke( X_times_Y(mass_flux, flux, detj_at_w2),             &
+                 fv_divergence_z_kernel_type(difference, mass_flux), &
                  dg_matrix_vector_kernel_type(increment, difference, m3_inv) )
 
     nullify( m3_inv, dz_w3 )

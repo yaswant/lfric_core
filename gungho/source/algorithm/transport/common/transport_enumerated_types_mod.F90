@@ -28,7 +28,7 @@ module transport_enumerated_types_mod
   integer(kind=i_def), parameter :: scheme_split   = 3_i_def
 
   integer(kind=i_def), parameter :: split_method_null = 0_i_def
-  integer(kind=i_def), parameter :: split_method_mol = 1_i_def
+  integer(kind=i_def), parameter :: split_method_mol  = 1_i_def
   integer(kind=i_def), parameter :: split_method_ffsl = 2_i_def
   integer(kind=i_def), parameter :: split_method_sl   = 3_i_def
 

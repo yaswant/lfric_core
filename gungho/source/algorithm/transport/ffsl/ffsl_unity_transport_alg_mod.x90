@@ -1,0 +1,171 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> @brief   Computes the transport of a unity field for use in advective form
+!!          FFSL transport.
+!> @details For FFSL, the advective increment f(q) is calculated using the
+!!          flux F(q) following Putman and Lin, JCP, 2007. As
+!!          \f$q - dt f (q)  = (q - dt F(q)) / (1 - dt F(1))\f$
+!!          therefore the conservative increment of a constant, F(1), is
+!!          required. This algorithm computes such an increment and outputs
+!!          1 - dt F(1), where 1 is the unity field.
+
+module ffsl_unity_transport_alg_mod
+
+  use check_configuration_mod,          only: check_horz_dep_pts, &
+                                              check_vert_dep_pts
+  use constants_mod,                    only: r_def, i_def, l_def
+  use ffsl_1d_flux_alg_mod,             only: ffsl_1d_flux_first, &
+                                              ffsl_1d_flux_vert
+  use field_mod,                        only: field_type
+  use flux_direction_mod,               only: x_direction, y_direction
+  use function_space_mod,               only: function_space_type
+  use subgrid_config_mod,               only: outer_order
+
+  use log_mod,                          only: log_event,         &
+                                              log_scratch_space, &
+                                              LOG_LEVEL_ERROR,   &
+                                              LOG_LEVEL_INFO
+
+  implicit none
+
+  private
+
+  public :: ffsl_unity_transport_alg
+
+contains
+
+
+  !===========================================================================!
+  !> @brief   Algorithm to calculate the FFSL transport of a unity field.
+  !> @details The algorithm calculates the conservative transport of unity using
+  !!          the FFSL scheme. This is required for advective form FFSL transport.
+  !!          The unity transport is performed using half departure points if
+  !!          any of the schemes use Strang splitting.
+  !!
+  !> @param[in]     dep_pts_x         Departure points in x
+  !> @param[in]     dep_pts_y         Departure points in y
+  !> @param[in]     dep_pts_z         Departure points in z
+  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     dt                The model timestep length
+  !> @param[in,out] np1_x             Conservative transport of unity in x
+  !> @param[in,out] np1_y             Conservative transport of unity in y
+  !> @param[in,out] np1_z             Conservative transport of unity in z
+  !> @param[in,out] np1_half_x        Conservative transport of unity in x
+  !!                                  using half dt for Strang HVH splitting
+  !> @param[in,out] np1_half_y        Conservative transport of unity in y
+  !!                                  using half dt for Strang HVH splitting
+  !> @param[in,out] np1_half_z        Conservative transport of unity in z
+  !!                                  using half dt for Strang VHV splitting
+  subroutine ffsl_unity_transport_alg( dep_pts_x,  &
+                                       dep_pts_y,  &
+                                       dep_pts_z,  &
+                                       detj_at_w2, &
+                                       dt,         &
+                                       np1_x,      &
+                                       np1_y,      &
+                                       np1_z,      &
+                                       np1_half_x, &
+                                       np1_half_y, &
+                                       np1_half_z )
+
+    implicit none
+
+    ! Arguments
+    type(field_type), intent(in)    :: dep_pts_x
+    type(field_type), intent(in)    :: dep_pts_y
+    type(field_type), intent(in)    :: dep_pts_z
+    type(field_type), intent(in)    :: detj_at_w2
+    real(r_def),      intent(in)    :: dt
+    type(field_type), intent(inout) :: np1_x
+    type(field_type), intent(inout) :: np1_y
+    type(field_type), intent(inout) :: np1_z
+    type(field_type), intent(inout) :: np1_half_x
+    type(field_type), intent(inout) :: np1_half_y
+    type(field_type), intent(inout) :: np1_half_z
+
+    ! Unity fields, increments, and fluxes
+    type(field_type) :: inc_one_x
+    type(field_type) :: inc_one_y
+    type(field_type) :: inc_one_z
+    type(field_type) :: ini_one
+    type(field_type) :: flux_x
+    type(field_type) :: flux_y
+    type(field_type) :: flux_z
+
+    ! Half time step and flags for departure points
+    real(r_def)         :: half_dt
+    logical(kind=l_def) :: any_horz_dep_pts, any_vert_dep_pts
+
+    ! Check which unity transport directions are needed
+    any_horz_dep_pts = check_horz_dep_pts()
+    any_vert_dep_pts = check_vert_dep_pts()
+
+    ! Initialise fields
+    call inc_one_x%initialise( vector_space=np1_x%get_function_space() )
+    call inc_one_y%initialise( vector_space=np1_y%get_function_space() )
+    call inc_one_z%initialise( vector_space=np1_z%get_function_space() )
+    call ini_one%initialise( vector_space=np1_x%get_function_space() )
+    call flux_x%initialise( vector_space=dep_pts_x%get_function_space() )
+    call flux_y%initialise( vector_space=dep_pts_y%get_function_space() )
+    call flux_z%initialise( vector_space=dep_pts_z%get_function_space() )
+
+    ! Set values to zero (apart from initial unity field)
+    call invoke( setval_c(inc_one_x, 0.0_r_def), &
+                 setval_c(inc_one_y, 0.0_r_def), &
+                 setval_c(inc_one_z, 0.0_r_def), &
+                 setval_c(ini_one,   1.0_r_def), &
+                 setval_c(flux_x,    0.0_r_def), &
+                 setval_c(flux_y,    0.0_r_def), &
+                 setval_c(flux_z,    0.0_r_def)  )
+
+    ! Set half time step
+    half_dt = 0.5_r_def * dt
+
+    ! Check if we need increment of unity in x and y directions
+    if (any_horz_dep_pts) then
+      ! Compute the increment of unity, F(1), in x direction
+      call ffsl_1d_flux_first( x_direction, &
+                               ini_one,     &
+                               dep_pts_x,   &
+                               detj_at_w2,  &
+                               outer_order, &
+                               dt,          &
+                               flux_x,      &
+                               inc_one_x )
+      ! Compute the increment of unity, F(1), in y direction
+      call ffsl_1d_flux_first( y_direction, &
+                               ini_one,     &
+                               dep_pts_y,   &
+                               detj_at_w2,  &
+                               outer_order, &
+                               dt,          &
+                               flux_y,      &
+                               inc_one_y )
+    end if
+
+    ! Check if we need increment of unity in z directions
+    if (any_vert_dep_pts) then
+      ! Compute the increment of unity, F(1), in z direction
+      call ffsl_1d_flux_vert( ini_one,     &
+                              dep_pts_z,   &
+                              detj_at_w2,  &
+                              outer_order, &
+                              dt,          &
+                              flux_z,      &
+                              inc_one_z )
+    end if
+
+    ! Get the updated unity values: np1 = 1 - dt * F(1)
+    call invoke( X_minus_bY(np1_x, ini_one, dt, inc_one_x),           &
+                 X_minus_bY(np1_y, ini_one, dt, inc_one_y),           &
+                 X_minus_bY(np1_z, ini_one, dt, inc_one_z),           &
+                 X_minus_bY(np1_half_x, ini_one, half_dt, inc_one_x), &
+                 X_minus_bY(np1_half_y, ini_one, half_dt, inc_one_y), &
+                 X_minus_bY(np1_half_z, ini_one, half_dt, inc_one_z) )
+
+  end subroutine ffsl_unity_transport_alg
+
+end module ffsl_unity_transport_alg_mod

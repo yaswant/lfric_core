@@ -77,9 +77,10 @@ subroutine ffsl_vert_constant_flux_code( nlayers, &
                                          undf_w3, &
                                          map_w3 )
 
-  use cosmic_flux_mod,    only : frac_and_int_part,       &
-                                 calc_integration_limits, &
-                                 return_part_mass,        &
+  use cosmic_flux_mod,    only : frac_and_int_part,                &
+                                 calc_integration_limits_positive, &
+                                 calc_integration_limits_negative, &
+                                 return_part_mass,                 &
                                  calc_local_vertical_index
 
   implicit none
@@ -145,10 +146,15 @@ subroutine ffsl_vert_constant_flux_code( nlayers, &
     end do
 
     ! Calculates the left and right integration limits for the fractional cell
-    call calc_integration_limits( departure_dist,         &
-                                  fractional_distance,    &
-                                  left_integration_limit, &
-                                  right_integration_limit )
+    if (departure_dist >= 0.0_r_def) then
+      call calc_integration_limits_positive( fractional_distance,    &
+                                             left_integration_limit, &
+                                             right_integration_limit )
+    else
+      call calc_integration_limits_negative( fractional_distance,    &
+                                             left_integration_limit, &
+                                             right_integration_limit )
+    end if
 
     mass_from_whole_cells = sum(rho_local(1:n_cells_to_sum-1))
 
