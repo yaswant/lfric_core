@@ -31,7 +31,8 @@ module init_ancils_mod
   use jules_control_init_mod,         only : n_land_tile
   use jules_surface_types_mod,        only : npft
   use dust_parameters_mod,            only : ndiv
-  use initialization_config_mod,      only : ancil_option,ancil_option_updating
+  use initialization_config_mod,      only : ancil_option,ancil_option_updating,&
+                                             sst_source, sst_source_start_dump
   use aerosol_config_mod,             only : glomap_mode, glomap_mode_ukca, &
                                              glomap_mode_climatology
   use jules_surface_config_mod,       only : l_vary_z0m_soil, l_urban2t
@@ -154,12 +155,14 @@ contains
       call ancil_times_list%insert_item(sea_time_axis)
     end if
 
-    call sst_time_axis%initialise("sst_time", file_id="sst_ancil", &
-                                  interp_flag=interp_flag, pop_freq="daily")
-    call setup_ancil_field("tstar_sea", depository, ancil_fields, mesh, &
+    if (sst_source /= sst_source_start_dump) then
+      call sst_time_axis%initialise("sst_time", file_id="sst_ancil", &
+                                    interp_flag=interp_flag, pop_freq="daily")
+      call setup_ancil_field("tstar_sea", depository, ancil_fields, mesh, &
                               twod_mesh, twod=.true.,                   &
                               time_axis=sst_time_axis)
-    call ancil_times_list%insert_item(sst_time_axis)
+      call ancil_times_list%insert_item(sst_time_axis)
+    end if
 
     !=====  SEA ICE ANCILS  =====
     if (.not. l_esm_couple) then

@@ -67,7 +67,9 @@ module gungho_setup_io_mod
                                        lbc_option_gungho_file,    &
                                        lbc_option_um2lfric_file,  &
                                        ls_option,                 &
-                                       ls_option_file
+                                       ls_option_file,            &
+                                       sst_source,                &
+                                       sst_source_start_dump
   use io_config_mod,             only: use_xios_io,               &
                                        diagnostic_frequency,      &
                                        checkpoint_write,          &
@@ -205,11 +207,13 @@ module gungho_setup_io_mod
       end if
 
       ! Set sea surface temperature ancil filename from namelist
-      write(ancil_fname,'(A)') trim(ancil_directory)//'/'// &
-                               trim(sst_ancil_path)
-      call files_list%insert_item( lfric_xios_file_type( ancil_fname,         &
+      if (sst_source /= sst_source_start_dump) then
+        write(ancil_fname,'(A)') trim(ancil_directory)//'/'// &
+                                 trim(sst_ancil_path)
+        call files_list%insert_item( lfric_xios_file_type( ancil_fname,       &
                                                          xios_id="sst_ancil", &
                                                          io_mode=FILE_MODE_READ ) )
+      end if
 
       ! Set sea ice ancil filename from namelist
       if (.not. l_esm_couple) then

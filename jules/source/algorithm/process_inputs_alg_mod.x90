@@ -11,6 +11,7 @@ module process_inputs_alg_mod
   use integer_field_mod,    only : integer_field_type
   use constants_mod,        only : i_def
 
+  use initialization_config_mod,  only: sst_source, sst_source_start_dump
   use section_choice_config_mod,  only: surface, surface_jules, &
                                         radiation, radiation_socrates
   use radiation_config_mod,       only: topography, topography_flat, &
@@ -21,7 +22,6 @@ module process_inputs_alg_mod
   use process_soil_kernel_mod,    only: process_soil_kernel_type
   use process_snow_kernel_mod,    only: process_snow_kernel_type
   use process_urban_kernel_mod,   only: process_urban_kernel_type
-  use log_mod,                    only: LOG_LEVEL_INFO
   use jules_control_init_mod,     only: n_land_tile, &
                                         first_sea_tile, n_sea_tile, &
                                         first_sea_ice_tile, n_sea_ice_tile
@@ -138,7 +138,11 @@ contains
       endif
       call surface_fields%get_field('tile_fraction', tile_fraction)
 
-      call ancil_fields%get_field('tstar_sea', tstar_sea)
+      if (sst_source == sst_source_start_dump) then
+        call fd_fields%get_field('tstar_sea', tstar_sea)
+      else
+        call ancil_fields%get_field('tstar_sea', tstar_sea)
+      end if
       call fd_fields%get_field('tstar_sea_ice', tstar_sea_ice)
       call fd_fields%get_field('land_tile_temp', land_tile_temp)
       call surface_fields%get_field('tile_temperature', tile_temperature)

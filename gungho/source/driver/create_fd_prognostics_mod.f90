@@ -30,7 +30,9 @@ module create_fd_prognostics_mod
                                              ancil_option_start_dump,     &
                                              ancil_option_fixed,          &
                                              ancil_option_updating,       &
-                                             read_w2h_wind
+                                             read_w2h_wind,               &
+                                             sst_source,                  &
+                                             sst_source_start_dump
   use nlsizes_namelist_mod,           only : sm_levels
   use jules_control_init_mod,         only : n_land_tile, n_sea_ice_tile
   use jules_physics_init_mod,         only : snow_lev_tile
@@ -252,6 +254,11 @@ contains
       call setup_ancil_field("land_tile_temp", depository, &
                              fd_field_collection, mesh, twod_mesh, &
                              twod=.true., ndata=n_land_tile)
+      if (sst_source == sst_source_start_dump) then
+        call setup_ancil_field("tstar_sea", depository, &
+                               fd_field_collection, mesh, twod_mesh, &
+                               twod=.true.)
+      end if
       call setup_ancil_field("tstar_sea_ice", depository, &
                              fd_field_collection, mesh, twod_mesh, &
                              twod=.true., ndata=n_sea_ice_tile)
