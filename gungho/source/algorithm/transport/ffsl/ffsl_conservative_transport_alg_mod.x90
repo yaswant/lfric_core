@@ -28,6 +28,8 @@ module ffsl_conservative_transport_alg_mod
   use ffsl_1d_flux_alg_mod,   only: ffsl_1d_flux_first, &
                                     ffsl_1d_flux_final, &
                                     ffsl_1d_flux_vert
+  use ffsl_1d_advect_then_flux_alg_mod, &
+                              only: ffsl_1d_advect_then_flux_final
 
   ! Configuration options
   use io_config_mod,          only: subroutine_timers
@@ -79,8 +81,8 @@ contains
     type(r_tran_field_type), intent(in)    :: dep_pts_y
     type(r_tran_field_type), intent(in)    :: dep_pts_z
     type(r_tran_field_type), intent(in)    :: detj_at_w2
-    type(field_type), intent(in)    :: panel_id
-    real(kind=r_tran), intent(in)    :: dt
+    type(field_type),        intent(in)    :: panel_id
+    real(kind=r_tran),       intent(in)    :: dt
     type(r_tran_field_type), intent(inout) :: increment
 
     ! Subroutine name for timer
@@ -348,8 +350,8 @@ contains
 
       ! Use half departure points in the vertical
       vert_half_flag = .true.
-      call invoke( a_times_X(half_dep_pts_z, 0.5_r_def, dep_pts_z), &
-                   setval_c(flux_half_z, 0.0_r_def) )
+      call invoke( a_times_X(half_dep_pts_z, 0.5_r_tran, dep_pts_z), &
+                   setval_c(flux_half_z, 0.0_r_tran) )
 
       ! Advective stages to build up fluxes
 
@@ -388,7 +390,7 @@ contains
                               half_dt, flux_z, increment_z )
 
       ! Collect increments
-      call invoke( aX_plus_bY(increment, 0.5_r_def, half_increment_z, 0.5_r_def, increment_z), &
+      call invoke( aX_plus_bY(increment, 0.5_r_tran, half_increment_z, 0.5_r_tran, increment_z), &
                    inc_X_plus_Y( increment, increment_x ),                                     &
                    inc_X_plus_Y( increment, increment_y ) )
 
@@ -406,23 +408,30 @@ contains
   !!          giving increment = div(u field). One-dimensional flux differences
   !!          denoted F, G (and advective differences, f, g) are computed
   !!          and used with COSMIC splitting. The transport equation
-  !!          can be updated as field_np1 = field_n - dt*increment.
+  !!          can be updated as field_np1 = field_n - dt*increment. In addition,
+  !!          if the advective_flux flag is true, the algorithm will also return
+  !!          the advective increment, u dot grad field, used for advective_then_flux
+  !!          with the split scheme.
   !> @param[in]     field             Transported field
   !> @param[in]     dep_pts_x         Departure points in x direction
   !> @param[in]     dep_pts_y         Departure points in y direction
   !> @param[in]     detj_at_w2        Det(J) at W2 dofs
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     dt                Time step
-  !> @param[in]     strang            Logical flag to do half step
-  !> @param[in,out] increment         Conservative transport increment
-  subroutine ffsl_conservative_horizontal_alg( field,      &
-                                               dep_pts_x,  &
-                                               dep_pts_y,  &
-                                               detj_at_w2, &
-                                               panel_id,   &
-                                               dt,         &
-                                               strang,     &
-                                               increment )
+  !> @param[in]     strang            Logical flag to do half step in unity transport
+  !> @param[in]     advect_flux       Flag to also compute advective update
+  !> @param[in,out] increment_con     Conservative transport increment
+  !> @param[in,out] increment_adv     Advective increment
+  subroutine ffsl_conservative_horizontal_alg( field,         &
+                                               dep_pts_x,     &
+                                               dep_pts_y,     &
+                                               detj_at_w2,    &
+                                               panel_id,      &
+                                               dt,            &
+                                               strang,        &
+                                               advect_flux,   &
+                                               increment_con, &
+                                               increment_adv )
 
     implicit none
 
@@ -430,10 +439,12 @@ contains
     type(r_tran_field_type), intent(in)    :: dep_pts_x
     type(r_tran_field_type), intent(in)    :: dep_pts_y
     type(r_tran_field_type), intent(in)    :: detj_at_w2
-    type(field_type), intent(in)    :: panel_id
-    real(kind=r_tran), intent(in)    :: dt
-    type(r_tran_field_type), intent(inout) :: increment
-    logical(l_def),   intent(in)    :: strang
+    type(field_type),        intent(in)    :: panel_id
+    real(kind=r_tran),       intent(in)    :: dt
+    logical(l_def),          intent(in)    :: strang
+    logical(kind=l_def),     intent(in)    :: advect_flux
+    type(field_type),        intent(inout) :: increment_con
+    type(field_type),        intent(inout) :: increment_adv
 
     ! Subroutine name for timer
     character(*), parameter :: routine_name = 'ffsl_conservative_horizontal_alg'
@@ -445,6 +456,8 @@ contains
     ! Field increments in given direction
     type(r_tran_field_type) :: increment_x
     type(r_tran_field_type) :: increment_y
+    type(r_tran_field_type) :: increment_adv_x
+    type(r_tran_field_type) :: increment_adv_y
     type(r_tran_field_type) :: half_increment_x
     type(r_tran_field_type) :: half_increment_y
 
@@ -468,6 +481,8 @@ contains
 
     call increment_x%initialise( vector_space = field_fs )
     call increment_y%initialise( vector_space = field_fs )
+    call increment_adv_x%initialise( vector_space = field_fs )
+    call increment_adv_y%initialise( vector_space = field_fs )
     call half_increment_x%initialise( vector_space = field_fs )
     call half_increment_y%initialise( vector_space = field_fs )
     call field_x%initialise( vector_space = field_fs )
@@ -499,13 +514,28 @@ contains
                  X_minus_bY( field_y, field, half_dt, half_increment_y ) )
 
     ! Final conservative step
-    call ffsl_1d_flux_final( x_direction, field_x, field_y, dep_pts_x, &
-                             detj_at_w2, outer_order, dt, panel_id, flux_x, increment_x )
-    call ffsl_1d_flux_final( y_direction, field_x, field_y, dep_pts_y, &
-                             detj_at_w2, outer_order, dt, panel_id, flux_y, increment_y )
+    if (advect_flux) then
+      call ffsl_1d_advect_then_flux_final( x_direction, field_x, field_y, &
+                                           dep_pts_x, detj_at_w2, dt,     &
+                                           panel_id, outer_order, strang, &
+                                           flux_x, increment_x, increment_adv_x )
+      call ffsl_1d_advect_then_flux_final( y_direction, field_x, field_y, &
+                                           dep_pts_y, detj_at_w2, dt,     &
+                                           panel_id, outer_order, strang, &
+                                           flux_y, increment_y, increment_adv_y )
+      ! Collect the advective increments
+      call invoke( X_plus_Y( increment_adv, increment_adv_x, increment_adv_y ) )
+    else
+      call ffsl_1d_flux_final( x_direction, field_x, field_y, dep_pts_x, &
+                               detj_at_w2, outer_order, dt, panel_id, flux_x, increment_x )
+      call ffsl_1d_flux_final( y_direction, field_x, field_y, dep_pts_y, &
+                               detj_at_w2, outer_order, dt, panel_id, flux_y, increment_y )
+      ! Set advective increment to zero
+      call invoke( setval_c(increment_adv, 0.0_r_tran) )
+    end if
 
-    ! Collect the increments
-    call invoke( X_plus_Y( increment, increment_x, increment_y ) )
+    ! Collect the conservative increments
+    call invoke( X_plus_Y( increment_con, increment_x, increment_y ) )
 
     if ( subroutine_timers ) call timer(routine_name)
 

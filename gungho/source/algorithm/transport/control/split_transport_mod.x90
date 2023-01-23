@@ -12,7 +12,6 @@ module split_transport_mod
                                               ffsl_advective_control
   use r_tran_field_mod,                 only: r_tran_field_type
   use log_mod,                          only: log_event, LOG_LEVEL_ERROR
-  use transport_config_mod,             only: advective_then_flux
   use transport_metadata_mod,           only: transport_metadata_type
   use transport_enumerated_types_mod,   only: splitting_strang_vhv,       &
                                               splitting_strang_hvh,       &
@@ -215,11 +214,6 @@ contains
       ! Choose form of transport equation
       select case ( transport_metadata%get_equation_form() )
       case ( equation_form_conservative )
-        if (advective_then_flux) then
-          call log_event('Advective then flux not implemented for split '// &
-                         'schemes using FFSL', LOG_LEVEL_ERROR)
-        end if
-
         call ffsl_conservative_control(field_np1, field_n, direction, &
                                        step_dt, transport_metadata)
 

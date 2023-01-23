@@ -1,0 +1,263 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2023 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> @brief   One-dimensional operators for the FFSL advective-then-flux transport scheme.
+!> @details These routines are required for the flux-form semi-Lagrangian (FFSL) scheme
+!!          used with Strang or HV/VH splittings. They provide the calculation of
+!!          one-dimensional advective and flux differences. The advective increment
+!!          f(q) is calculated using the flux F(q) following Putman and Lin, JCP, 2007. As
+!!          \f$q - dt f (q)  = (q - dt F(q)) / (1 - dt F(1))\f$
+!!          therefore
+!!          \f$f(q) = (q - (q - dt F(q)) / (1 - dt F(1)) )/dt\f$
+!!          There are two routines: 'final'; 'vert'.
+!!          'final' is used for later steps where the direction of the previous
+!!                  step is important at the edges of cubed sphere panels.
+!!          'vert' is used for vertical differences.
+
+module ffsl_1d_advect_then_flux_alg_mod
+
+  use constants_mod,                    only: r_tran, i_def, l_def
+  use ffsl_1d_flux_alg_mod,             only: ffsl_1d_flux_final, &
+                                              ffsl_1d_flux_vert
+  use r_tran_field_mod,                 only: r_tran_field_type
+  use field_mod,                        only: field_type
+  use flux_direction_mod,               only: x_direction, y_direction
+  use function_space_mod,               only: function_space_type
+  use mesh_mod,                         only: mesh_type
+  use transport_runtime_alg_mod,        only: transport_runtime_type
+  use transport_runtime_collection_mod, only: get_transport_runtime
+
+  implicit none
+
+  private
+
+  public :: ffsl_1d_advect_then_flux_final
+  public :: ffsl_1d_advect_then_flux_vert
+
+contains
+
+
+  !===========================================================================!
+  !> @brief   Algorithm to calculate the advective and flux form FFSL increments
+  !!          in one horizontal dimension.
+  !> @details The algorithm calculates the advective and flux differences in the
+  !!          given direction. The advective difference is calculated to give the
+  !!          increment v_i * dq/dx_i, and the flux difference is calculated to
+  !!          give the increment d(v_i q)/dx_i, at the cell centre.
+  !!          This is used to compute the final advective and flux steps of the
+  !!          FFSL transport scheme when used with the split scheme. As it depends
+  !!          on previous steps it requires the field from both x and y so that
+  !!          it uses the correct values at cubed sphere panel edges.
+  !!
+  !> @param[in]     direction         Direction (x/y)
+  !> @param[in]     field_x           Input field in x
+  !> @param[in]     field_y           Input field in y
+  !> @param[in]     dep_pts           Departure points in the chosen direction
+  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     dt                The model timestep length
+  !> @param[in]     panel_id          Panel ID of the cells
+  !> @param[in]     order             Order of the reconstruction
+  !> @param[in]     strang            Logical flag to do half step in unity transport
+  !> @param[in,out] flux              Horizontal flux. Included here to be
+  !!                                  ready for #2997
+  !> @param[in,out] increment_con     Conservative transport increment
+  !> @param[in,out] increment_adv     Advective increment
+  subroutine ffsl_1d_advect_then_flux_final( direction,     &
+                                             field_x,       &
+                                             field_y,       &
+                                             dep_pts,       &
+                                             detj_at_w2,    &
+                                             dt,            &
+                                             panel_id,      &
+                                             order,         &
+                                             strang,        &
+                                             flux,          &
+                                             increment_con, &
+                                             increment_adv )
+
+    implicit none
+
+    ! Arguments
+    integer(i_def),          intent(in)    :: direction
+    type(r_tran_field_type), intent(in)    :: field_x
+    type(r_tran_field_type), intent(in)    :: field_y
+    type(r_tran_field_type), intent(in)    :: dep_pts
+    type(r_tran_field_type), intent(in)    :: detj_at_w2
+    real(r_tran),            intent(in)    :: dt
+    type(field_type),        intent(in)    :: panel_id
+    integer(i_def),          intent(in)    :: order
+    logical(l_def),          intent(in)    :: strang
+    type(r_tran_field_type), intent(inout) :: flux
+    type(r_tran_field_type), intent(inout) :: increment_con
+    type(r_tran_field_type), intent(inout) :: increment_adv
+
+    ! Fields and increments
+    type(r_tran_field_type) :: adv_rho
+    type(r_tran_field_type) :: divide_part
+    type(r_tran_field_type) :: inc_part
+    type(r_tran_field_type) :: field_n
+
+    ! Transport runtime, mesh and unity transport pointers
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(mesh_type),              pointer :: mesh => null()
+    type(r_tran_field_type),      pointer :: adv_one => null()
+
+    ! Constant
+    real(r_tran) :: one_over_dt
+
+    ! Get transport_runtime
+    mesh => field_x%get_mesh()
+    transport_runtime => get_transport_runtime(mesh)
+
+    ! Initialise fields
+    call adv_rho%initialise( vector_space=field_x%get_function_space() )
+    call inc_part%initialise( vector_space=field_x%get_function_space() )
+    call divide_part%initialise( vector_space=field_x%get_function_space() )
+    call field_n%initialise( vector_space=field_x%get_function_space() )
+    call invoke( setval_c(adv_rho, 0.0_r_tran),   &
+                 setval_c(inc_part, 0.0_r_tran),  &
+                 setval_c(divide_part, 0.0_r_tran) )
+
+    ! Set constant
+    one_over_dt = 1.0_r_tran / dt
+
+    ! Get correct field to update based on direction
+    if (direction == x_direction) then
+      call invoke( setval_X(field_n, field_y) )
+    else if (direction == y_direction) then
+      call invoke( setval_X(field_n, field_x) )
+    end if
+
+    ! Compute the conservative increment of the field, F(q)
+    call ffsl_1d_flux_final( direction,  &
+                             field_x,    &
+                             field_y,    &
+                             dep_pts,    &
+                             detj_at_w2, &
+                             order,      &
+                             dt,         &
+                             panel_id,   &
+                             flux,       &
+                             increment_con )
+    call invoke( X_minus_bY( adv_rho, field_n, dt, increment_con) )
+
+    ! Get unity transport
+    if ( direction == x_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_x(field_x%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_x(field_x%get_mesh_id())
+      end if
+    else if ( direction == y_direction ) then
+      if ( strang ) then
+        adv_one => transport_runtime%get_adv_unity_half_y(field_y%get_mesh_id())
+      else
+        adv_one => transport_runtime%get_adv_unity_y(field_y%get_mesh_id())
+      end if
+    end if
+
+    ! Get the advective increment from these conservative increments
+    ! adv_rho   = q - dt * F(q)
+    ! adv_one   = 1 - dt * F(1)
+    ! inc_part  = q - adv_rho / adv_one
+    ! increment = inc_part / dt
+    call invoke( X_divideby_Y(divide_part, adv_rho, adv_one), &
+                 X_minus_Y(inc_part, field_n, divide_part),   &
+                 a_times_X(increment_adv, one_over_dt, inc_part) )
+
+  end subroutine ffsl_1d_advect_then_flux_final
+
+
+  !===========================================================================!
+  !> @brief   Algorithm to calculate the advective and flux form FFSL increments
+  !!          in the vertical.
+  !> @details The algorithm calculates the advective and flux differences in the vertical
+  !!          to give the increments, w * dq/dz and d(wq)/dz, at the cell centre.
+  !!
+  !> @param[in]     field             Input field
+  !> @param[in]     dep_pts           Departure points in the chosen direction
+  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     order             Order of the reconstruction
+  !> @param[in]     dt                The model timestep length
+  !> @param[in]     strang            Logical flag to do half step in unity transport
+  !> @param[in,out] flux              Vertical flux. Included here to be
+  !!                                  ready for #2997
+  !> @param[in,out] increment_con     Conservative transport increment
+  !> @param[in,out] increment_adv     Advective increment
+  subroutine ffsl_1d_advect_then_flux_vert( field,         &
+                                            dep_pts,       &
+                                            detj_at_w2,    &
+                                            order,         &
+                                            dt,            &
+                                            strang,        &
+                                            flux,          &
+                                            increment_con, &
+                                            increment_adv )
+
+    implicit none
+
+    ! Arguments
+    type(r_tran_field_type), intent(in)    :: field
+    type(r_tran_field_type), intent(in)    :: dep_pts
+    type(r_tran_field_type), intent(in)    :: detj_at_w2
+    integer(i_def),          intent(in)    :: order
+    real(r_tran),            intent(in)    :: dt
+    logical(l_def),          intent(in)    :: strang
+    type(r_tran_field_type), intent(inout) :: flux
+    type(r_tran_field_type), intent(inout) :: increment_con
+    type(r_tran_field_type), intent(inout) :: increment_adv
+
+    ! Fields and increments
+    type(r_tran_field_type) :: adv_rho
+    type(r_tran_field_type) :: divide_part
+    type(r_tran_field_type) :: inc_part
+
+    ! Transport runtime, mesh and unity transport pointers
+    type(transport_runtime_type), pointer :: transport_runtime => null()
+    type(mesh_type),              pointer :: mesh => null()
+    type(r_tran_field_type),      pointer :: adv_one => null()
+
+    ! Constant
+    real(r_tran)      :: one_over_dt
+
+    ! Get transport_runtime
+    mesh => field%get_mesh()
+    transport_runtime => get_transport_runtime(mesh)
+
+    ! Initialise fields
+    call adv_rho%initialise( vector_space=field%get_function_space() )
+    call inc_part%initialise( vector_space=field%get_function_space() )
+    call divide_part%initialise( vector_space=field%get_function_space() )
+    call invoke( setval_c(adv_rho, 0.0_r_tran),   &
+                 setval_c(inc_part, 0.0_r_tran),  &
+                 setval_c(divide_part, 0.0_r_tran)  )
+
+    ! Set constant
+    one_over_dt = 1.0_r_tran / dt
+
+    ! Compute the conservative increment of the field, F(q)
+    call ffsl_1d_flux_vert( field, dep_pts, detj_at_w2, order, &
+                            dt, flux, increment_con )
+    call invoke( X_minus_bY( adv_rho, field, dt, increment_con ) )
+
+    ! Get unity transport
+    if ( strang ) then
+      adv_one => transport_runtime%get_adv_unity_half_z(field%get_mesh_id())
+    else
+      adv_one => transport_runtime%get_adv_unity_z(field%get_mesh_id())
+    end if
+
+    ! Get the advective increment from these conservative increments
+    ! adv_rho   = q - dt * F(q)
+    ! adv_one   = 1 - dt * F(1)
+    ! inc_part  = q - adv_rho / adv_one
+    ! increment = inc_part / dt
+    call invoke( X_divideby_Y(divide_part, adv_rho, adv_one), &
+                 X_minus_Y(inc_part, field, divide_part),     &
+                 a_times_X(increment_adv, one_over_dt, inc_part) )
+
+  end subroutine ffsl_1d_advect_then_flux_vert
+
+end module ffsl_1d_advect_then_flux_alg_mod

@@ -25,6 +25,7 @@ module ffsl_control_alg_mod
   ! Algorithms
   use ffsl_1d_flux_alg_mod,             only: ffsl_1d_flux_vert
   use ffsl_1d_advect_alg_mod,           only: ffsl_1d_advect_vert
+  use ffsl_1d_advect_then_flux_alg_mod, only: ffsl_1d_advect_then_flux_vert
   use ffsl_advective_transport_alg_mod, only: ffsl_advective_transport_alg, &
                                               ffsl_advective_horizontal_alg
   use ffsl_conservative_transport_alg_mod,                                     &
@@ -38,7 +39,8 @@ module ffsl_control_alg_mod
   ! Configs
   use finite_element_config_mod,        only: element_order
   use subgrid_config_mod,               only: outer_order
-  use transport_config_mod,             only: dry_field_name
+  use transport_config_mod,             only: dry_field_name, &
+                                              advective_then_flux
 
   ! Transport runtime
   use transport_metadata_mod,           only: transport_metadata_type
@@ -85,7 +87,10 @@ contains
 
     ! Internal variables
     type(r_tran_field_type)          :: increment
+    type(r_tran_field_type)          :: increment_con
+    type(r_tran_field_type)          :: increment_adv
     type(r_tran_field_type)          :: flux_z
+    type(r_tran_field_type)          :: flux_inc
     type(r_tran_field_type), pointer :: detj_at_w2 => null()
     type(r_tran_field_type), pointer :: dep_pts_x_get => null()
     type(r_tran_field_type), pointer :: dep_pts_y_get => null()
@@ -93,11 +98,14 @@ contains
     type(r_tran_field_type)          :: dep_pts_z, &
                                         dep_pts_x, &
                                         dep_pts_y
-    type(r_tran_field_type)   :: flux
-    logical(kind=l_def)       :: hori_half_flag
-    integer(kind=i_def)       :: mesh_id
-    type(mesh_type),  pointer :: mesh => null()
-    type(field_type), pointer :: panel_id => null()
+    type(r_tran_field_type)          :: flux
+    logical(kind=l_def)              :: hori_half_flag
+    integer(kind=i_def)              :: step, mesh_id
+    real(kind=r_tran)                :: minus_step_dt
+    type(r_tran_field_type), pointer :: field_start => null()
+    type(r_tran_field_type), pointer :: old_flux_inc => null()
+    type(mesh_type),         pointer :: mesh => null()
+    type(field_type),        pointer :: panel_id => null()
     type(function_space_type),    pointer :: w2_fs => null()
     type(transport_runtime_type), pointer :: transport_runtime => null()
 
@@ -127,6 +135,11 @@ contains
     call dep_pts_y_get%copy_field(dep_pts_y)
 
     call increment%initialise( vector_space=field_n%get_function_space() )
+    call increment_con%initialise( vector_space=field_n%get_function_space() )
+    call increment_adv%initialise( vector_space=field_n%get_function_space() )
+    call invoke( setval_c(increment, 0.0_r_tran),     &
+                 setval_c(increment_con, 0.0_r_tran), &
+                 setval_c(increment_adv, 0.0_r_tran) )
     call invoke( setval_c(increment, 0.0_r_tran) )
 
     ! Call routine based on direction: vertical; horizontal; or 3D.
@@ -135,27 +148,105 @@ contains
       case (direction_v)
         ! If vertical scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_vhv ) then
-          call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
+          call invoke( inc_a_times_X(0.5_r_tran, dep_pts_z) )
+          hori_half_flag = .true.
+        else
+          hori_half_flag = .false.
         end if
         ! Vertical PPM routine requires a flux output to be ready for #2997
         call flux_z%initialise( vector_space=dep_pts_z%get_function_space() )
         call invoke( setval_c(flux_z, 0.0_r_tran) )
-        call ffsl_1d_flux_vert( field_n, dep_pts_z, detj_at_w2, outer_order, &
-                                step_dt, flux_z, increment )
+
+        if (advective_then_flux) then
+          ! Set up flux_inc and -dt
+          minus_step_dt = -1.0_r_tran * step_dt
+          call flux_inc%initialise( increment%get_function_space() )
+
+          if (transport_runtime%get_tracer_step_ctr() /=  &
+              transport_runtime%get_num_dry_steps()) then
+            ! Not the last split step so do both advective and flux form
+            call ffsl_1d_advect_then_flux_vert( field_n, dep_pts_z, detj_at_w2,       &
+                                                outer_order, step_dt, hori_half_flag, &
+                                                flux_z, increment_con, increment_adv )
+            ! Save advective as field_np1 for use in next split step
+            call invoke( X_minus_bY( field_np1, field_n, step_dt, increment_adv) )
+            ! Save flux_inc for final splitting step
+            call invoke( a_times_X(flux_inc, minus_step_dt, increment_con) )
+          else
+            ! Last split step just requires flux form
+            call ffsl_1d_flux_vert( field_n, dep_pts_z, detj_at_w2, outer_order, &
+                                    step_dt, flux_z, increment )
+            call invoke( a_times_X(flux_inc, minus_step_dt, increment) )
+            ! Add all the flux increments together
+            field_start => transport_runtime%get_field_n(mesh_id)
+            call invoke( X_plus_Y(field_np1, field_start, flux_inc) )
+            do step = 1, transport_runtime%get_num_dry_steps() - 1
+              old_flux_inc => transport_runtime%get_flux_inc(mesh_id, step)
+              call invoke( inc_X_plus_Y(field_np1, old_flux_inc) )
+            end do
+          end if
+          call transport_runtime%set_flux_inc(flux_inc)
+
+        else
+          ! If not advective_then_flux just need flux increment
+          call ffsl_1d_flux_vert( field_n, dep_pts_z, detj_at_w2, outer_order, &
+                                  step_dt, flux_z, increment )
+          ! Get field_np1 from field_n and conservative increment
+          call invoke( X_minus_bY( field_np1, field_n, step_dt, increment) )
+        end if
 
       case (direction_h)
         ! If horizontal scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
-          call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
-                       inc_a_times_X(0.5_r_def, dep_pts_y) )
+          call invoke( inc_a_times_X(0.5_r_tran, dep_pts_x), &
+                       inc_a_times_X(0.5_r_tran, dep_pts_y) )
           hori_half_flag = .true.
         else
           hori_half_flag = .false.
         end if
         ! 2D FFSL
-        call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
-                                               detj_at_w2, panel_id, step_dt, &
-                                               hori_half_flag, increment )
+        if (advective_then_flux) then
+          ! Set up flux_inc and -dt
+          minus_step_dt = -1.0_r_tran * step_dt
+          call flux_inc%initialise( increment%get_function_space() )
+
+          if (transport_runtime%get_tracer_step_ctr() /=  &
+              transport_runtime%get_num_dry_steps()) then
+            ! Not the last split step so do both advective and flux form
+            call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
+                                                   detj_at_w2, panel_id, step_dt, &
+                                                   hori_half_flag, .true.,        &
+                                                   increment_con, increment_adv )
+            ! Save advective as field_np1 for use in next split step
+            call invoke( X_minus_bY( field_np1, field_n, step_dt, increment_adv) )
+            ! Save flux_inc for final splitting step
+            call invoke( a_times_X(flux_inc, minus_step_dt, increment_con) )
+          else
+            ! Last split step just requires flux form
+            call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
+                                                   detj_at_w2, panel_id, step_dt, &
+                                                   hori_half_flag, .false.,       &
+                                                   increment, increment_adv )
+            call invoke( a_times_X(flux_inc, minus_step_dt, increment) )
+            ! Add all the flux increments together
+            field_start => transport_runtime%get_field_n(mesh_id)
+            call invoke( X_plus_Y(field_np1, field_start, flux_inc) )
+            do step = 1, transport_runtime%get_num_dry_steps() - 1
+              old_flux_inc => transport_runtime%get_flux_inc(mesh_id, step)
+              call invoke( inc_X_plus_Y(field_np1, old_flux_inc) )
+            end do
+          end if
+          call transport_runtime%set_flux_inc(flux_inc)
+
+        else
+          ! If not advective_then_flux just need flux increment
+          call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
+                                                 detj_at_w2, panel_id, step_dt, &
+                                                 hori_half_flag, .false.,       &
+                                                 increment, increment_adv )
+          ! Get field_np1 from field_n and conservative increment
+          call invoke( X_minus_bY( field_np1, field_n, step_dt, increment) )
+        end if
 
       case (direction_3d)
         ! 3D FFSL
@@ -164,13 +255,13 @@ contains
                                               panel_id, step_dt,             &
                                               increment )
 
+        ! Get field_np1 from field_n and increment
+        call invoke( X_minus_bY( field_np1, field_n, step_dt, increment) )
+
       case default
         call log_event( "Gungho: Unrecognized direction for transport.", LOG_LEVEL_ERROR )
 
     end select
-
-    ! Get field_np1 from field_n and increment
-    call invoke( X_minus_bY( field_np1, field_n, step_dt, increment) )
 
     ! Store field in transport_runtime for conservative transport
     ! if this is the underlying dry field
@@ -184,6 +275,8 @@ contains
       call transport_runtime%set_dry_fields(field_n, field_np1, flux)
       nullify(w2_fs)
     end if
+
+    call transport_runtime%inc_tracer_step_ctr()
 
     nullify(transport_runtime, mesh, detj_at_w2, panel_id, &
             dep_pts_x_get, dep_pts_y_get, dep_pts_z_get)
@@ -288,7 +381,7 @@ contains
       case (direction_v)
         ! If vertical scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_vhv ) then
-          call invoke( inc_a_times_X(0.5_r_def, dep_pts_z) )
+          call invoke( inc_a_times_X(0.5_r_tran, dep_pts_z) )
           vert_half_flag = .true.
         else
           vert_half_flag = .false.
@@ -300,8 +393,8 @@ contains
       case (direction_h)
         ! If horizontal scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
-          call invoke( inc_a_times_X(0.5_r_def, dep_pts_x), &
-                       inc_a_times_X(0.5_r_def, dep_pts_y) )
+          call invoke( inc_a_times_X(0.5_r_tran, dep_pts_x), &
+                       inc_a_times_X(0.5_r_tran, dep_pts_y) )
           hori_half_flag = .true.
         else
           hori_half_flag = .false.

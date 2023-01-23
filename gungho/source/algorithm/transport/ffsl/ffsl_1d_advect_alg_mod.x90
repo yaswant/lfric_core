@@ -71,14 +71,14 @@ contains
     implicit none
 
     ! Arguments
-    integer(i_def),          intent(in) :: direction
-    type(r_tran_field_type), intent(in) :: field
-    type(r_tran_field_type), intent(in) :: dep_pts
-    type(r_tran_field_type), intent(in) :: detj_at_w2
-    real(r_tran),            intent(in) :: dt
-    integer(i_def),          intent(in) :: order
+    integer(i_def),          intent(in)    :: direction
+    type(r_tran_field_type), intent(in)    :: field
+    type(r_tran_field_type), intent(in)    :: dep_pts
+    type(r_tran_field_type), intent(in)    :: detj_at_w2
+    real(r_tran),            intent(in)    :: dt
+    integer(i_def),          intent(in)    :: order
+    logical(l_def),          intent(in)    :: strang
     type(r_tran_field_type), intent(inout) :: increment
-    logical(l_def),   intent(in)    :: strang
 
     ! Fields and increments
     type(r_tran_field_type) :: inc_rho
@@ -188,15 +188,15 @@ contains
     implicit none
 
     ! Arguments
-    integer(i_def),   intent(in)    :: direction
+    integer(i_def),          intent(in)    :: direction
     type(r_tran_field_type), intent(in)    :: field_x
     type(r_tran_field_type), intent(in)    :: field_y
     type(r_tran_field_type), intent(in)    :: dep_pts
     type(r_tran_field_type), intent(in)    :: detj_at_w2
-    real(r_tran),      intent(in)    :: dt
-    type(field_type), intent(in)    :: panel_id
-    integer(i_def),   intent(in)    :: order
-    logical(l_def),   intent(in)    :: strang
+    real(r_tran),            intent(in)    :: dt
+    type(field_type),        intent(in)    :: panel_id
+    integer(i_def),          intent(in)    :: order
+    logical(l_def),          intent(in)    :: strang
     type(r_tran_field_type), intent(inout) :: increment
 
     ! Fields and increments
@@ -310,10 +310,10 @@ contains
     type(r_tran_field_type), intent(in)    :: field
     type(r_tran_field_type), intent(in)    :: dep_pts
     type(r_tran_field_type), intent(in)    :: detj_at_w2
-    integer(i_def),   intent(in)    :: order
-    real(r_tran),      intent(in)    :: dt
+    integer(i_def),          intent(in)    :: order
+    real(r_tran),            intent(in)    :: dt
+    logical(l_def),          intent(in)    :: strang
     type(r_tran_field_type), intent(inout) :: increment
-    logical(l_def),   intent(in)    :: strang
 
     ! Fields and increments
     type(r_tran_field_type) :: inc_rho
