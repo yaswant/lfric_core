@@ -23,6 +23,7 @@ module check_configuration_mod
                                   splitting,                   &
                                   horizontal_method,           &
                                   vertical_method,             &
+                                  reversible,                  &
                                   max_vert_cfl_calc,           &
                                   max_vert_cfl_calc_dep_point, &
                                   equation_form,               &
@@ -40,7 +41,8 @@ module check_configuration_mod
                                   equation_form_advective,     &
                                   equation_form_consistent,    &
                                   splitting_strang_hvh,        &
-                                  splitting_strang_vhv
+                                  splitting_strang_vhv,        &
+                                  splitting_none
 
   implicit none
 
@@ -113,6 +115,7 @@ contains
     implicit none
 
       logical(kind=l_def) :: any_scheme_mol
+      integer(kind=i_def) :: i
 
       call log_event( 'Checking gungho configuration...', LOG_LEVEL_INFO )
 
@@ -272,6 +275,47 @@ contains
         write( log_scratch_space, '(A)' ) 'Density predictor requires advective_then_flux transport'
         call log_event( log_scratch_space, LOG_LEVEL_ERROR )
       end if
+      ! Check some combinations of options, variable-by-variable
+      do i = 1, profile_size
+        if ( splitting(i) /= splitting_none .AND. scheme(i) /= scheme_split ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is not being transported with a split transport scheme, so it ' // &
+            'must have its splitting option set to none'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+
+        if ( scheme(i) == scheme_mol_3d .and. vertical_method(i) /= split_method_mol ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is set to be transported with 3D MoL, so its vertical method must also be MoL'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+
+        if ( scheme(i) == scheme_mol_3d .and. horizontal_method(i) /= split_method_mol ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is set to be transported with 3D MoL, so its horizontal method must also be MoL'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+
+        if ( scheme(i) == scheme_ffsl_3d .and. vertical_method(i) /= split_method_ffsl ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is set to be transported with 3D FFSL, so its vertical method must also be FFSL'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+
+        if ( scheme(i) == scheme_ffsl_3d .and. horizontal_method(i) /= split_method_ffsl ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is set to be transported with 3D FFSL, so its horizontal method must also be FFSL'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+
+        if ( vertical_method(i) == split_method_ffsl .AND. outer_order == 2    &
+            .AND. .NOT. reversible(i) ) then
+          write( log_scratch_space, '(A)') trim(field_names(i)) // ' variable ' // &
+            'is being transported with a reversible form of the FFSL scheme, ' // &
+            'so it must also have the "reversible" option set to .true.'
+          call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+        end if
+      end do
 
       ! Check the mixing namelist
       if ( viscosity .and. geometry == geometry_spherical ) then
@@ -286,7 +330,7 @@ contains
 
       ! Check the damping layer namelist
       if ( dlayer_on .and. (dl_base < 0.0 .or. dl_base > domain_top) ) then
-        write( log_scratch_space, '(A,E16.8)' ) 'Damping layer base lies outside fo domain: ',&
+        write( log_scratch_space, '(A,E16.8)' ) 'Damping layer base lies outside of domain: ',&
           dl_base
         call log_event( log_scratch_space, LOG_LEVEL_WARNING )
       end if
