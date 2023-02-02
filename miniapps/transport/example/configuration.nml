@@ -46,6 +46,8 @@ v0=0.0,
 &io
   use_xios_io               = .false.
   write_conservation_diag   = .false.
+  diag_active_files         = 'lfric_diag'
+  diag_always_on_sampling   = .true.
   write_diag                = .true.
   write_dump                = .true.
   write_fluxes              = .false.

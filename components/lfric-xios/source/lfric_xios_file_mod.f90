@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! (C) Crown copyright 2020 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
@@ -8,7 +8,7 @@
 !>
 module lfric_xios_file_mod
 
-  use constants_mod,                 only: i_native, str_def, str_max_filename
+  use constants_mod,                 only: i_native, l_def, str_def, str_max_filename
   use field_mod,                     only: field_type
   use field_parent_mod,              only: field_parent_type
   use field_collection_mod,          only: field_collection_type
@@ -16,14 +16,22 @@ module lfric_xios_file_mod
   use file_mod,                      only: file_type, FILE_MODE_READ, FILE_MODE_WRITE
   use lfric_xios_process_output_mod, only: process_output_file
   use lfric_xios_field_mod,          only: lfric_xios_field_type
+  use lfric_xios_diag_mod,           only: file_is_tagged
   use log_mod,                       only: log_event, log_level_error, &
                                            log_level_trace, log_level_debug
   use mesh_mod,                      only: mesh_type
   use mod_wait,                      only: init_wait
+  use lfric_xios_diag_mod,           only: get_file_name
   use xios,                          only: xios_file, xios_is_valid_file,    &
                                            xios_add_child, xios_get_handle,  &
                                            xios_set_attr, xios_filegroup,    &
+                                           xios_get_file_attr,               &
+                                           xios_set_file_attr,               &
                                            xios_fieldgroup, xios_duration,   &
+                                           xios_is_valid_fieldgroup,         &
+                                           xios_is_defined_fieldgroup_attr,  &
+                                           xios_get_fieldgroup_attr,         &
+                                           xios_set_fieldgroup_attr,         &
                                            xios_date, xios_get_current_date, &
                                            xios_get_start_date,              &
                                            xios_get_timestep, operator(+),   &
@@ -32,6 +40,12 @@ module lfric_xios_file_mod
   implicit none
 
 private
+
+integer, parameter :: undef_freq = -999 ! uninitialised frequency value
+integer, parameter :: no_freq = 0       ! do not override the frequency
+character(20), parameter :: undef_group = "unset"
+character(20), parameter :: diag_main_file = "lfric_diag"
+character(20), parameter :: diag_field_group = "diagnostic_fields"
 
 !> @brief Container for file properties need by XIOS
 !>
@@ -53,15 +67,19 @@ type, public, extends(file_type) :: lfric_xios_file_type
   !> How the contents of the file evolve with time
   integer(i_native)           :: operation
   !> The file frequency in timesteps
-  integer(i_native)           :: freq_ts = -999
+  integer(i_native)           :: freq_ts = undef_freq
   !> @todo field_group is slated for removal, it is a leftover placeholder
   !!       needed to make checkpointing work for lfric_atm/gungho, but once
   !!       they are upgraded to use the "fields_in_file" API this can be removed.
-  character(str_def)          :: field_group = "unset"
+  character(str_def)          :: field_group = undef_group
   !> The XIOS ID of the field group contained within the file
   character(str_def)          :: field_group_id
   !> Flag denoting if the file has been closed
   logical :: is_closed = .false.
+  !> Flag denoting if it is a diagnostics file
+  logical :: is_diag = .false.
+  !> Flag denoting if the always-on sampling mode is selected
+  logical :: diag_always_on_sampling = .true.
 
   !> XIOS representations
   !> Internal XIOS representation of the file
@@ -95,6 +113,53 @@ integer(i_native), public, parameter :: OPERATION_TIMESERIES = 3406
 
 contains
 
+!> @brief Registration of diagnostics file
+!> @param[in] xios_id                  XIOS ID of the file
+!> @param[in] freq_ts                  Output frequency for main diagnostics file in timesteps
+!> @param[in] is_main                  Is this the main diagnostics file (lfric_diag)?
+!> @param[in] always_on_sampling       Is the always-on sampling mode selected?
+subroutine register_diagnostics_file(xios_id, freq_ts, is_main, always_on_sampling)
+  implicit none
+  character(len=*),  intent(in) :: xios_id
+  integer(i_native), intent(in) :: freq_ts
+  logical(l_def),    intent(in) :: is_main
+  logical(l_def),    intent(in) :: always_on_sampling
+  type(xios_duration) :: ts
+  type(xios_duration) :: freq
+  logical(l_def), save :: first_time = .true.
+
+  ! Create CF-compliant time description
+  call xios_set_file_attr(xios_id, time_counter="exclusive", &
+                                   time_counter_name="time")
+  if (is_main) then
+    ! Override XIOS file output frequency
+    if (freq_ts == undef_freq) then
+      call log_event("uninitialised frequency for file "//trim(xios_id), &
+                     log_level_error)
+    end if
+    if (freq_ts <= 0) then
+      ! freq_ts == 0 to be allowed and ignored in a future release
+      call log_event("non-positive frequency for file "//trim(xios_id), &
+                      log_level_error)
+    end if
+    if (freq_ts /= no_freq) then
+      call xios_get_timestep(ts)
+      freq = freq_ts * ts
+      call xios_set_file_attr(xios_id, output_freq=freq)
+    end if
+  end if
+  ! set check_if_active for the diagnostic group, but only once
+  if (first_time) then
+    first_time = .false.
+    if (.not. always_on_sampling) then
+      if (xios_is_valid_fieldgroup(diag_field_group)) then
+        call xios_set_fieldgroup_attr(diag_field_group, &
+                                      check_if_active=.true.)
+      end if
+    end if
+  end if
+end subroutine register_diagnostics_file
+
 !> Constructs an LFRic-XIOS file type object
 !>
 !> @param[in] file_name      The name/path of the file
@@ -105,9 +170,12 @@ contains
 !> @param[in] operation      Enum denoting the kind of I/O done by the file
 !> @param[in] field_group_id XIOS ID of the field group contained in the file
 !> @param[in] fields_in_file Array of fields contained in the file
+!> @param[in] is_diag        Is it a diagnostics file?
+!> @param[in] diag_always_on_sampling Is the always-on sampling mode selected?
 function lfric_xios_file_constructor( file_name, xios_id, io_mode, freq, &
                                       operation, field_group_id,         &
-                                      fields_in_file ) result(self)
+                                      fields_in_file, is_diag,           &
+                                      diag_always_on_sampling ) result(self)
 
   implicit none
 
@@ -120,6 +188,8 @@ function lfric_xios_file_constructor( file_name, xios_id, io_mode, freq, &
   character(len=*),  optional, intent(in) :: field_group_id
   type(field_collection_type), &
                      optional, intent(in) :: fields_in_file
+  logical(l_def),    optional, intent(in) :: is_diag
+  logical(l_def),    optional, intent(in) :: diag_always_on_sampling
 
   type(field_collection_iterator_type) :: iter
   class(field_parent_type), pointer    :: fld => null()
@@ -135,7 +205,7 @@ function lfric_xios_file_constructor( file_name, xios_id, io_mode, freq, &
   if (present(operation)) self%operation = operation
 
   if (present(freq)) then
-    if (freq < 1) then
+    if (freq < 0) then ! we are going to allow freq = 0 (= no_freq)
       call log_event( "XIOS files cannot have negative frequency", &
                       log_level_error )
     end if
@@ -159,6 +229,9 @@ function lfric_xios_file_constructor( file_name, xios_id, io_mode, freq, &
     end do
   end if
 
+  if (present(is_diag)) self%is_diag = is_diag
+  if (present(diag_always_on_sampling)) &
+    self%diag_always_on_sampling = diag_always_on_sampling
   return
 
 end function lfric_xios_file_constructor
@@ -227,6 +300,15 @@ subroutine register_with_context(self)
   call log_event( "Registering XIOS file ["//trim(self%xios_id)//"]", &
                   log_level_trace )
 
+  if (self%is_diag) then
+    if (xios_is_valid_file(self%xios_id)) then
+      self%path = get_file_name(self%xios_id) ! if there is a name specified, we use it
+      call register_diagnostics_file(self%xios_id, self%freq_ts, &
+        self%xios_id == diag_main_file, self%diag_always_on_sampling)
+      return
+    end if
+  end if
+
   ! Register or get handle of file from XIOS
   if (xios_is_valid_file(trim(self%xios_id))) then
     call xios_get_handle( trim(self%xios_id), self%handle )
@@ -256,7 +338,7 @@ subroutine register_with_context(self)
 
   ! Set XIOS duration object second value equal to file output frequency
   call xios_get_timestep(timestep_duration)
-  if (.not. self%freq_ts == -999) then
+  if (.not. self%freq_ts == undef_freq) then
     self%frequency = self%freq_ts * timestep_duration
     call xios_set_attr( self%handle, output_freq=self%frequency )
   end if
@@ -294,7 +376,7 @@ subroutine register_with_context(self)
 
   ! LEGACY
   ! If there is an associated field group, enable it
-  if ( .not. trim(self%field_group) == "unset" ) then
+  if ( .not. trim(self%field_group) == undef_group ) then
     call xios_get_handle( trim(self%field_group), field_group_hdl )
     call xios_set_attr( field_group_hdl, enabled=.true. )
   end if

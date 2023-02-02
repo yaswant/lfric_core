@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! (C) Crown copyright 2021 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
@@ -24,6 +24,7 @@ module lfric_xios_mock_mod
             xios_get_domain_attr, &
             xios_get_axis_attr,   &
             xios_get_field_attr,  &
+            xios_field_is_active, &
             xios_is_valid_file,                   &
             xios_is_defined_file_attr,            &
             xios_get_file_attr,                   &
@@ -189,6 +190,24 @@ type(xios_mock_data_type), public :: mock_xios_data
 
   end subroutine xios_get_field_attr
 
+  !> @brief Sets hard coded values for activation status based on the field ID
+  !> @param[in]              unique_id       XIOS id of the field
+  !> @param[in]              at_current_step Status at current timestep?
+  !> @return                    Boolean representing active/inactive status
+  function xios_field_is_active(unique_id, at_current_timestep) result(active)
+    implicit none
+    character(*), intent(in) :: unique_id
+    logical(l_def), intent(in) :: at_current_timestep
+    logical(l_def) :: active
+    if (unique_id == 'diag_field_disabled') then
+      active = .false.
+    else if (at_current_timestep) then
+      active = unique_id /= 'diag_field_inactive_at_current_step'
+    else
+      active = .true.
+    end if
+  end function xios_field_is_active
+
   !> Obtains the most recent data added to the mock XIOS data object
   !> @param[in] latest_data Array of the latest data from the XIOS mock data
   !>                        object
@@ -232,11 +251,17 @@ type(xios_mock_data_type), public :: mock_xios_data
   !> Sets hard coded values for existence of enabled flag based on file ID
   !> @param[in]    file_id The ID of the file to be tested
   !> @param[inout] enabled Existence status of enabled flag of the test file
-  subroutine xios_is_defined_file_attr(file_id, enabled)
+  !> @param[inout] comment Existence status of comment field of the test file
+  !> @param[inout] comment Existence status of name field of the test file
+  subroutine xios_is_defined_file_attr(file_id, enabled, comment, name)
     implicit none
     character(len=*),       intent(in)    :: file_id
-    logical(l_def),         intent(inout) :: enabled
-    enabled = file_id /= 'lfric_diag_no_flag'
+    logical(l_def),         optional, intent(inout) :: enabled
+    logical(l_def),         optional, intent(inout) :: comment
+    logical(l_def),         optional, intent(inout) :: name
+    if (present(enabled)) enabled = file_id /= 'lfric_diag_no_flag'
+    if (present(comment)) comment = .true.
+    if (present(name)) name = (file_id == 'lfric_diag')
   end subroutine xios_is_defined_file_attr
 
   !> Returns hard coded values for validity based on field ID
@@ -256,19 +281,30 @@ type(xios_mock_data_type), public :: mock_xios_data
   !> Sets hard coded values for enabled flag based on file ID
   !> @param[in]    file_id The ID of the file to be tested
   !> @param[inout] enabled The enabled flag of the test file
-  subroutine xios_get_file_attr(file_id, enabled)
+  !> @param[inout] comment The comment describing the test file
+  !> @param[inout] name The name of test file
+  subroutine xios_get_file_attr(file_id, enabled, comment, name)
     implicit none
     character(len=*),       intent(in)    :: file_id
-    logical(l_def),         intent(inout) :: enabled
+    logical(l_def),         optional, intent(inout) :: enabled
+    character(str_def),     optional, intent(inout) :: comment
+    character(len=*),       optional, intent(inout) :: name
     select case (file_id)
     case ('lfric_diag')
-      enabled = .true.
+      if (present(enabled)) enabled = .true.
+      if (present(comment)) comment = '[[diag]]'
+      if (present(name)) name = file_id
     case ('lfric_diag_enabled')
-      enabled = .true.
+      if (present(enabled)) enabled = .true.
+      if (present(comment)) comment = ''
     case ('lfric_diag_disabled')
-      enabled = .false.
+      if (present(enabled)) enabled = .false.
+      if (present(comment)) comment = ''
     case ('lfric_diag_no_flag')
-      call log_event('no enabled flag in file: ' // file_id, log_level_error)
+      if (present(enabled)) then
+        call log_event('no enabled flag in file: ' // file_id, log_level_error)
+      end if
+      if (present(name)) name = 'lfric_diag'
     case default
       call log_event('unexpected file: ' // file_id, log_level_error)
     end select

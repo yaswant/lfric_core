@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------
-! (C) Crown copyright 2020 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-------------------------------------------------------------------------------
@@ -74,7 +74,9 @@ module gungho_setup_io_mod
                                        diagnostic_frequency,      &
                                        checkpoint_write,          &
                                        checkpoint_read,           &
-                                       write_diag, write_dump
+                                       write_dump, write_diag,    &
+                                       diag_active_files,         &
+                                       diag_always_on_sampling
   use orography_config_mod,      only: orog_init_option,          &
                                        orog_init_option_ancil
   use time_config_mod,           only: timestep_start,            &
@@ -113,6 +115,7 @@ module gungho_setup_io_mod
                                        ls_fname
     integer(i_def)                  :: ts_start, ts_end
     integer(i_native)               :: rc
+    integer(i_def)                  :: i
 
     ! Only proceed if XIOS is being used for I/O
     if (.not. use_xios_io) return
@@ -129,19 +132,18 @@ module gungho_setup_io_mod
     end if
 
     ! Setup diagnostic output file
-    if ( write_diag ) then
-      ! These file types are a placeholder before the LFRic diagnostics system
-      ! is deployed. Once that system is in place diagnostic files will be
-      ! handled via an XML configuration, not this module.
-      call files_list%insert_item( lfric_xios_file_type( "lfric_diag",             &
-                                                         xios_id="lfric_diag",     &
-                                                         io_mode=FILE_MODE_WRITE,  &
-                                                         freq=diagnostic_frequency ) )
-      call files_list%insert_item( lfric_xios_file_type( "lfric_averages",         &
-                                                         xios_id="lfric_averages", &
-                                                         io_mode=FILE_MODE_WRITE,  &
-                                                         freq=ts_end ) )
-    end if
+    do i=1, size(diag_active_files)
+      call files_list%insert_item(                                                &
+            lfric_xios_file_type(                                                 &
+              diag_active_files(i),                                               &
+              xios_id=diag_active_files(i),                                       &
+              io_mode=FILE_MODE_WRITE,                                            &
+              freq=diagnostic_frequency,                                          &
+              is_diag=.true.,                                                     &
+              diag_always_on_sampling=diag_always_on_sampling                     &
+            )                                                                     &
+      )
+    end do
 
     ! Setup dump-writing context information
     if ( write_dump ) then

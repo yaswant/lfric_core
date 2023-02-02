@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! (C) Crown copyright 2020 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
@@ -51,8 +51,11 @@ contains
 
     use lfric_xios_diag_mod,     only:                                        &
                                   file_is_enabled,                            &
+                                  file_is_tagged,                             &
+                                  get_file_name,                              &
                                   field_is_valid,                             &
                                   field_is_enabled,                           &
+                                  field_is_active,                            &
                                   get_field_order,                            &
                                   get_field_grid_ref,                         &
                                   get_field_domain_ref,                       &
@@ -69,12 +72,29 @@ contains
     @assertTrue(file_is_enabled('lfric_diag_enabled'))
     @assertFalse(file_is_enabled('lfric_diag_disabled'))
 
+    @assertTrue(file_is_tagged('lfric_diag', 'diag'))
+    @assertFalse(file_is_tagged('lfric_diag', 'shmiag'))
+    @assertFalse(file_is_tagged('lfric_diag_enabled', 'diag'))
+    @assertFalse(file_is_tagged('lfric_diag_disabled', 'diag'))
+
+    @assertEqual(get_file_name('lfric_diag'), 'lfric_diag')
+    @assertEqual(get_file_name('lfric_diag_enabled'), 'lfric_diag_enabled')
+
     @assertTrue(field_is_valid('diag_field'))
     @assertFalse(field_is_valid('diag_no_field'))
 
     @assertTrue(field_is_enabled('diag_field_no_flag'))
     @assertTrue(field_is_enabled('diag_field_enabled'))
     @assertFalse(field_is_enabled('diag_field_disabled'))
+
+    @assertTrue(field_is_active('diag_field_no_flag', .false.))
+    @assertTrue(field_is_active('diag_field_no_flag', .true.))
+    @assertTrue(field_is_active('diag_field_enabled', .false.))
+    @assertTrue(field_is_active('diag_field_enabled', .true.))
+    @assertFalse(field_is_active('diag_field_disabled', .false.))
+    @assertFalse(field_is_active('diag_field_disabled', .true.))
+    @assertTrue(field_is_active('diag_field_inactive_at_current_step', .false.))
+    @assertFalse(field_is_active('diag_field_inactive_at_current_step', .true.))
 
     @assertEqual(get_field_order('diag_field'), 0)
 

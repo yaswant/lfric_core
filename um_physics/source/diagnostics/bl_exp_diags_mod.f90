@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------
-! (c) Crown copyright 2021 Met Office. All rights reserved.
+! (c) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-------------------------------------------------------------------------------
@@ -12,6 +12,7 @@ module bl_exp_diags_mod
   use integer_field_mod,   only: integer_field_type
   use io_config_mod,       only: subroutine_timers
   use timer_mod,           only: timer
+  use initialise_diagnostics_mod,     only : init_diag => init_diagnostic_field
 
   implicit none
 
@@ -47,16 +48,11 @@ contains
 
     if ( subroutine_timers ) call timer("bl_exp_diags")
 
-    zht_flag = .true.
-    call zh%copy_field_properties(zht)
-    z0h_eff_flag = .true.
-    call zh%copy_field_properties(z0h_eff)
-    gross_prim_prod_flag = .true.
-    call zh%copy_field_properties(gross_prim_prod)
-    oblen_flag = .true.
-    call zh%copy_field_properties(oblen)
-    soil_respiration_flag = .true.
-    call zh%copy_field_properties(soil_respiration)
+    zht_flag = init_diag(zht, 'turbulence__zht')
+    z0h_eff_flag = init_diag(z0h_eff, 'surface__z0h_eff')
+    oblen_flag = init_diag(oblen, 'turbulence__oblen')
+    gross_prim_prod_flag = init_diag(gross_prim_prod, 'surface__gross_prim_prod')
+    soil_respiration_flag = init_diag(soil_respiration, 'surface__soil_respiration')
 
     if ( subroutine_timers ) call timer("bl_exp_diags")
 
@@ -162,14 +158,14 @@ contains
 
     ! Diagnostics computed in the kernel
     if (zht_flag) &
-         call zht%write_field('turbulence__zht')
-    if (oblen_flag) call oblen%write_field('turbulence__oblen')
+         call zht%write_field(zht%get_name())
+    if (oblen_flag) call oblen%write_field(oblen%get_name())
     if (z0h_eff_flag) &
-         call z0h_eff%write_field('surface__z0h_eff')
+         call z0h_eff%write_field(z0h_eff%get_name())
     if (gross_prim_prod_flag) &
-         call gross_prim_prod%write_field('surface__gross_prim_prod')
+         call gross_prim_prod%write_field(gross_prim_prod%get_name())
     if (soil_respiration_flag) &
-         call soil_respiration%write_field('surface__soil_respiration')
+         call soil_respiration%write_field(soil_respiration%get_name())
 
     if ( subroutine_timers ) call timer("bl_exp_diags")
 

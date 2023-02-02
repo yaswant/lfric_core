@@ -27,6 +27,8 @@ planar_domain_max_y =  0.5
 
 &io
 use_xios_io               = .false.
+diag_active_files         = 'lfric_diag'
+diag_always_on_sampling   = .true.
 write_diag                = .true.
 write_dump                = .false.
 file_convention           = 'UGRID'

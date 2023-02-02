@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------
-! (C) Crown copyright 2021 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-------------------------------------------------------------------------------
@@ -17,6 +17,7 @@ module lfric_xios_diag_mod
                                         xios_is_valid_field,                  &
                                         xios_is_defined_field_attr,           &
                                         xios_get_field_attr,                  &
+                                        xios_field_is_active,                 &
                                         xios_get_axis_attr,                   &
                                         lfric_xios_mock_pull_in
 #else
@@ -28,6 +29,7 @@ module lfric_xios_diag_mod
                                         xios_is_valid_field,                  &
                                         xios_is_defined_field_attr,           &
                                         xios_get_field_attr,                  &
+                                        xios_field_is_active,                 &
                                         xios_get_axis_attr
 
 #endif
@@ -44,8 +46,11 @@ module lfric_xios_diag_mod
 
   public ::                                                                    &
     file_is_enabled,                                                           &
+    file_is_tagged,                                                            &
+    get_file_name,                                                             &
     field_is_valid,                                                            &
     field_is_enabled,                                                          &
+    field_is_active,                                                           &
     get_field_order,                                                           &
     get_field_grid_ref,                                                        &
     get_field_domain_ref,                                                      &
@@ -75,6 +80,53 @@ contains
        enabled = .true. ! enabled by default
     end if
   end function file_is_enabled
+
+  !> @brief Scan comment field of a file for (boolean) tag, e.g, [[diag]]
+  !> @param[in]    file_id      XIOS id of the field
+  !> @param[in]    tag          Tag string, e.g., "diag"
+  !> @return                    True if and only if the file is tagged
+  function file_is_tagged(file_id, tag) result(tagged)
+    implicit none
+    character(len=*), intent(in) :: file_id
+    character(len=*), intent(in) :: tag
+    logical(l_def) :: tagged
+    logical(l_def) :: def
+    character(str_def) :: comment
+    character(str_def) :: pattern
+    if (.not. xios_is_valid_file(file_id)) then
+      write(log_scratch_space, '(A, A)')                                      &
+        'Invalid XIOS file:', file_id
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    end if
+    tagged = .false.
+    call xios_is_defined_file_attr(file_id, comment=def)
+    if (def) then
+      call xios_get_file_attr(file_id, comment=comment)
+      pattern = '[[' // tag //']]'
+      tagged = (index(comment, pattern) /= 0)
+    end if
+  end function file_is_tagged
+
+  !> @brief Return the name of an XIOS file
+  !> @param[in]    file_id      XIOS id of the field
+  !> @return                    The file name
+  function get_file_name(file_id) result(name)
+    implicit none
+    character(len=*), intent(in) :: file_id
+    logical(l_def) :: def
+    character(str_def) :: name
+    if (.not. xios_is_valid_file(file_id)) then
+      write(log_scratch_space, '(A, A)')                                      &
+        'Invalid XIOS file:', file_id
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    end if
+    call xios_is_defined_file_attr(file_id, name=def)
+    if (def) then
+      call xios_get_file_attr(file_id, name=name)
+    else
+      name = file_id
+    end if
+  end function get_file_name
 
   !> @brief Return true if an only if an XIOS field id is valid.
   !> @param[in]    unique_id    XIOS id of the field
@@ -108,6 +160,24 @@ contains
       end if
     end if
   end function field_is_enabled
+
+  !> @brief Return true if and only if an XIOS field is active.
+  !> @param[in]              unique_id            XIOS id of the field
+  !> @param[in]              at_current_timestep  Active at current timestep?
+  !> @return                 Boolean representing active/inactive status
+  function field_is_active(unique_id, at_current_timestep) result(active)
+    implicit none
+    character(*), intent(in) :: unique_id
+    logical(l_def) :: at_current_timestep
+    logical(l_def) :: active
+    if (.not. xios_is_valid_field(unique_id)) then
+      write(log_scratch_space, '(A, A)')                                      &
+      'Invalid XIOS field:', unique_id
+      call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+    else
+      active = xios_field_is_active(unique_id, at_current_timestep)
+    end if
+  end function field_is_active
 
   !> @brief Return the interpolation order of a field.
   !> @param[in]    unique_id    XIOS id of the field

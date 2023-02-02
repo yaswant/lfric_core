@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
+! Copyright (c) 2023,  Met Office, on behalf of HMSO and Queen's Printer
 ! For further details please refer to the file LICENCE.original which you
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
@@ -30,7 +30,7 @@ module initialise_diagnostics_mod_test
   type(mesh_type), pointer           :: mesh => null()
 
   private
-  public :: initialise_diagnostics_test_type, basic_test, init_test
+  public :: initialise_diagnostics_test_type, init_test
 
   @TestCase
   type, extends(TestCase) :: initialise_diagnostics_test_type
@@ -38,7 +38,6 @@ module initialise_diagnostics_mod_test
   contains
     procedure setUp
     procedure tearDown
-    procedure basic_test
     procedure init_test
   end type initialise_diagnostics_test_type
 
@@ -79,21 +78,6 @@ contains
   end subroutine tearDown
 
   @Test
-  subroutine basic_test( this )
-
-    use initialise_diagnostics_mod, only: diagnostic_is_enabled
-
-    implicit none
-
-    class(initialise_diagnostics_test_type), intent(inout) :: this
-
-    @assertTrue(diagnostic_is_enabled('diag_field_no_flag'))
-    @assertTrue(diagnostic_is_enabled('diag_field_enabled'))
-    @assertFalse(diagnostic_is_enabled('diag_field_disabled'))
-
-  end subroutine basic_test
-
-  @Test
   subroutine init_test( this )
 
     use initialise_diagnostics_mod, only: init_diag => init_diagnostic_field
@@ -107,14 +91,14 @@ contains
 
     @assertTrue(init_diag(test_field, 'diag_field_half_level_face_grid'))
     @assertTrue(init_diag(test_field, 'diag_field_half_level_face_grid', activate=.true.))
-    @assertFalse(init_diag(test_field, 'diag_field_half_level_face_grid', activate=.false.))
+    @assertTrue(init_diag(test_field, 'diag_field_half_level_face_grid', activate=.false.))
 
     @assertFalse(init_diag(test_field, 'diag_field_disabled'))
-    @assertTrue(init_diag(test_field, 'diag_field_disabled', activate=.true.))
+    @assertFalse(init_diag(test_field, 'diag_field_disabled', activate=.true.))
     @assertFalse(init_diag(test_field, 'diag_field_disabled', activate=.false.))
 
     @assertTrue(init_diag(test_field, 'diag_field_no_flag'))
-    @assertFalse(init_diag(test_field, 'diag_field_no_flag', activate=.false.))
+    @assertTrue(init_diag(test_field, 'diag_field_no_flag', activate=.false.))
     @assertTrue(init_diag(test_field, 'diag_field_no_flag', activate=.true.))
 
     ! ! verify that there is no error in the following calls:
@@ -125,7 +109,7 @@ contains
     ignore = init_diag(test_field, 'diag_field_face_rad')
 
     ! the following call cannot be tested here as multidata dimension lookup requires
-    ! UM_PHYSICS to be defined which is not the case in gungho:
+    ! UM_PHYSICS to be defined, which is not the case in gungho:
     ! ignore = init_diag(test_field, 'diag_field_face_tile')
 
   end subroutine init_test

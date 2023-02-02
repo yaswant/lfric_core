@@ -1,5 +1,5 @@
 !-------------------------------------------------------------------------------
-! (C) Crown copyright 2021 Met Office. All rights reserved.
+! (C) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-------------------------------------------------------------------------------
@@ -28,9 +28,7 @@ module initialise_diagnostics_mod
   use lfric_xios_write_mod,            only: write_field_generic
   use lfric_xios_mock_mod,             only: lfric_xios_mock_pull_in
   use lfric_xios_diag_mod,             only:                                  &
-    file_is_enabled,                                                          &
-    field_is_valid,                                                           &
-    field_is_enabled,                                                         &
+    field_is_active,                                                          &
     get_field_order,                                                          &
     get_field_grid_ref,                                                       &
     get_field_domain_ref,                                                     &
@@ -44,6 +42,7 @@ module initialise_diagnostics_mod
        mesh_collection,                                                       &
        mesh_collection_type
   use base_mesh_config_mod,            only: prime_mesh_name
+  use io_config_mod,                   only: diag_always_on_sampling
 
   implicit none
 
@@ -63,13 +62,13 @@ module initialise_diagnostics_mod
   character(str_def), parameter :: activated                                  &
     = 'Activated'     ! needed as a dependency
   character(str_def), parameter :: inactivated                                &
-    = 'Disactivated'  ! for testing only
+    = 'Disactivated'  ! forcibly disabled
   character(str_def), parameter :: enabled                                    &
-    = 'Enabled'       ! enabled in XIOS config, requested
+    = 'Enabled'       ! dynamically enabled, will be sampled
   character(str_def), parameter :: disabled                                   &
-    = 'Disabled'      ! disabled in XIOS config
+    = 'Disabled'      ! dynamically disabledm will not be sampled
 
-  public :: init_diagnostic_field, diagnostic_is_enabled
+  public :: init_diagnostic_field, diagnostic_to_be_sampled
 
 contains
 
@@ -161,24 +160,15 @@ contains
     tile_id = axis_ref
   end function get_field_tile_id
 
-  !> @brief Return enabled/diabled status of a diagnostic field
+  !> @brief Return true if and only if XIOS will sample the field.
   !> @param[in]   unique_id   XIOS id of field
-  !> @return                  Enabled/disabled status
-  function diagnostic_is_enabled(unique_id) result(diag_flag)
+  !> @return                  Sampling on/off status of the field
+  function diagnostic_to_be_sampled(unique_id) result(sampling_on)
     implicit none
     character(*), intent(in) :: unique_id
-    logical(l_def) :: diag_flag
-    logical(l_def) :: have_local_field_name
-    character(str_def)  :: diag_field_name
-
-    diag_field_name = 'diag__' // unique_id ! prefix used lfric_diag.xml
-    have_local_field_name = field_is_valid(diag_field_name)
-    if (.not. have_local_field_name) then
-      ! upgraded modules running with legacy iodef.xml
-      diag_field_name = unique_id
-    end if
-    diag_flag = file_is_enabled(diag_file_name) .and. field_is_enabled(diag_field_name)
-  end function diagnostic_is_enabled
+    logical(l_def) :: sampling_on
+    sampling_on = field_is_active(unique_id, .true.)
+  end function diagnostic_to_be_sampled
 
   !> @brief Initialise a diagnostic field.
   !> @details If the field was requested, or if it is needed as a dependency,
@@ -186,15 +176,17 @@ contains
   !> array (to save memory).
   !> Pass activate=.true. for fields needed as dependencies. If activate
   !> is not passed, the field's status will be derived from the XIOS metadata.
+  !> Pass activate=.false. to ensure that field will be inactive. This is
+  !> for testing only.
   !> @post  The field name will be set equal to the XIOS id passed in.
   !> @param[out]          field            Field to initialise
   !> @param[in]           unique_id        XIOS id of field
   !> @param[in, optional] activate         Force-activate/disactivate field
   !> @param[in, optional] force_mesh       Override derived mesh
   !> @param[in, optional] force_rad_levels Override derived radiation levels
-  !> @return                               Activation status
+  !> @return                               Sampling status of the field
   function init_diagnostic_field(field, unique_id,                            &
-    activate, force_mesh, force_rad_levels) result (active)
+    activate, force_mesh, force_rad_levels) result (sampling_on)
 
     implicit none
 
@@ -206,6 +198,7 @@ contains
 
     character(str_def), parameter :: routine_name = 'init_diagnostic_field'
 
+    logical(kind=l_def) :: sampling_on
     logical(kind=l_def) :: active
     character(str_def)  :: field_name
     character(str_def)  :: grid_ref
@@ -227,8 +220,7 @@ contains
       diag_mesh_3d => mesh_collection%get_mesh('test mesh: planar bi-periodic')
       diag_mesh_2d => mesh_collection%get_mesh('test mesh: planar bi-periodic')
 #else
-      diag_mesh_name = prime_mesh_name
-      diag_mesh_3d => mesh_collection%get_mesh(diag_mesh_name)
+      diag_mesh_3d => mesh_collection%get_mesh(prime_mesh_name)
       diag_mesh_2d &
         => mesh_collection%get_mesh_variant(diag_mesh_3d, extrusion_id=TWOD)
 #endif
@@ -237,7 +229,13 @@ contains
     ! the field_name is used only for logging and error reporting
     field_name = unique_id
 
-    ! field status
+    ! field sampling status
+    if (diag_always_on_sampling) then
+      sampling_on = .true. ! backward compatibility option
+    else
+      sampling_on = field_is_active(unique_id, .true.) ! derived from metadata
+    end if
+    ! field activation status
     if (present(activate)) then
       active = activate
       if (active) then
@@ -246,7 +244,7 @@ contains
         status = inactivated
       end if
     else
-      active = diagnostic_is_enabled(unique_id)
+      active = sampling_on
       if (active) then
         status = enabled
       else
@@ -311,7 +309,7 @@ contains
       order,                                                                  &
       fsenum,                                                                 &
       ndata)
-
+#ifndef UNIT_TEST
     write(log_scratch_space,'(A, A, A, A, A, A, I2, A, A, A, A, A, I5)')      &
       'field: ', trim(field_name),                                            &
       ', ' // trim(status),                                                   &
@@ -321,7 +319,7 @@ contains
       ', flavour: ', trim(flavour),                                           &
       ', ndata: ', ndata
     call log_event(log_scratch_space, log_level_info)
-
+#endif
     if (active) then ! field was requested or is needed as a dependency
       call field%initialise(                                                  &
         vector_space = vector_space,                                          &

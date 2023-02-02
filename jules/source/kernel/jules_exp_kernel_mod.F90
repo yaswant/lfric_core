@@ -1,5 +1,5 @@
 !-----------------------------------------------------------------------------
-! (c) Crown copyright 2022 Met Office. All rights reserved.
+! (c) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
@@ -593,6 +593,7 @@ contains
     real(kind=r_def), intent(in) :: canopy_height(undf_pft)
 
     real(kind=r_def), intent(in) :: sea_ice_temperature(undf_sice)
+    
     real(kind=r_def), intent(in) :: sea_ice_conductivity(undf_sice)
 
     real(kind=r_def), intent(in) :: peak_to_trough_orog(undf_2d)
@@ -608,7 +609,7 @@ contains
     real(kind=r_def), intent(in) :: sw_down_surf_blue(undf_2d)
     real(kind=r_def), intent(in) :: dd_mf_cb(undf_2d)
     real(kind=r_def), intent(inout) :: net_prim_prod(undf_2d)
-    real(kind=r_def), intent(inout) :: soil_respiration(undf_2d)
+    real(kind=r_def), pointer, intent(inout) :: soil_respiration(:)
     real(kind=r_def), intent(inout) :: thermal_cond_wet_soil(undf_2d)
 
     ! Urban morphology fields (surface_fields)
@@ -1721,14 +1722,17 @@ contains
       surface_conductance(map_2d(1,ainfo%land_index(l))) = real(progs%gs_gb(l), r_def)
       thermal_cond_wet_soil(map_2d(1,ainfo%land_index(l))) = hcons_soilt(l)
     end do
-    if (dim_cs1 == 4) then
-      do l = 1, land_field
-        soil_respiration(map_2d(1,ainfo%land_index(l))) = resp_s_tot_soilt(l)
-      end do
-    else
-      do l = 1, land_field
-        soil_respiration(map_2d(1,ainfo%land_index(l))) = trifctltype%resp_s_soilt(l,1,1,1)
-      end do
+
+    if (.not. associated(soil_respiration, empty_real_data) ) then
+      if (dim_cs1 == 4) then
+        do l = 1, land_field
+          soil_respiration(map_2d(1,ainfo%land_index(l))) = resp_s_tot_soilt(l)
+        end do
+      else
+        do l = 1, land_field
+          soil_respiration(map_2d(1,ainfo%land_index(l))) = trifctltype%resp_s_soilt(l,1,1,1)
+        end do
+      end if
     end if
 
     if (.not. associated(gross_prim_prod, empty_real_data) ) then
