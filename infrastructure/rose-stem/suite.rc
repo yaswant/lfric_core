@@ -247,7 +247,7 @@
 
 {{ check_config_dump_task('TECHNICAL', SECONDARY_TARGET) }}
 
-{{ check_style_task( 'TECHNICAL', SECONDARY_TARGET, '$SOURCE_DIRECTORY/stylist.py') }}
+{{ check_style_task( 'TECHNICAL', SECONDARY_TARGET, '$SOURCE_ROOT/etc/stylist.py') }}
 
 {%- if 'unit_test_build_tools' in scheduledTasks %}
     # The build tools have to be unit tested on the build target. Not much

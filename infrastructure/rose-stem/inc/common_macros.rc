@@ -154,7 +154,7 @@ err-script = """
 {%-   endif %}
 {%- endmacro %}
 
-{%- macro check_style_task( family, target, config_file='$SOURCE_ROOT/infrastructure/stylist.py' ) %}
+{%- macro check_style_task( family, target, config_file='$SOURCE_ROOT/etc/stylist.py' ) %}
 {%-   if 'check_style' in scheduledTasks %}
   [[check_style]]
     inherit = {{family}}
