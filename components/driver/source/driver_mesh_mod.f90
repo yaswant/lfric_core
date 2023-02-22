@@ -63,17 +63,6 @@ module driver_mesh_mod
   private
   public  :: init_mesh, final_mesh
 
-  private :: set_partition_parameters,     &
-             create_all_base_meshes,       &
-             create_base_meshes,           &
-             create_mesh_maps,             &
-             load_all_local_meshes,        &
-             load_local_mesh,              &
-             load_local_mesh_maps,         &
-             create_all_3d_meshes,         &
-             create_3d_mesh,               &
-             add_mesh_maps
-
 contains
 
 !> @brief  Generates a mesh and determines the basis functions and dofmaps.
@@ -200,6 +189,7 @@ subroutine init_mesh( local_rank, total_ranks,        &
   if ( present(shifted_mesh) )      create_shifted_mesh      = .true.
   if ( present(double_level_mesh) ) create_double_level_mesh = .true.
 
+  n_chain_meshes = 0
   if ( present(use_multigrid) ) then
     create_multigrid = use_multigrid
     if ( create_multigrid ) then
@@ -307,6 +297,7 @@ subroutine init_mesh( local_rank, total_ranks,        &
                                  stencil_depth,                   &
                                  partitioner_ptr,                 &
                                  create_multigrid,                &
+                                 n_chain_meshes,                  &
                                  create_multires_coupling_meshes, &
                                  multires_coupling_mesh_tags )
 
@@ -597,6 +588,7 @@ subroutine create_all_base_meshes( input_mesh_file,                 &
                                    stencil_depth,                   &
                                    partitioner_ptr,                 &
                                    create_multigrid,                &
+                                   n_multigrid_levels,              &
                                    create_multires_coupling_meshes, &
                                    multires_coupling_mesh_tags )
 
@@ -612,6 +604,7 @@ subroutine create_all_base_meshes( input_mesh_file,                 &
   integer(kind=i_def),                       intent(in) :: stencil_depth
   procedure(partitioner_interface), pointer, intent(in) :: partitioner_ptr
   logical(kind=l_def),                       intent(in) :: create_multigrid
+  integer(kind=i_def),                       intent(in) :: n_multigrid_levels
   logical(kind=l_def),                       intent(in) :: create_multires_coupling_meshes
   character(len=str_def),          optional, intent(in) :: multires_coupling_mesh_tags(:)
 
@@ -627,6 +620,14 @@ subroutine create_all_base_meshes( input_mesh_file,                 &
                            xproc, yproc,            &
                            stencil_depth,           &
                            partitioner_ptr )
+
+  ! Check that the partitioning strategy will result in partitions that
+  ! align for all levels of multigrid
+  if( create_multigrid )then
+    call check_multigrid_partitioning(prime_mesh_name, &
+                                      xproc, yproc,    &
+                                      n_multigrid_levels)
+  end if
 
   ! 2.0 Read in any other global meshes required
   !     by other additional configured schemes
@@ -1389,6 +1390,104 @@ subroutine check_stencil_depths( mesh_bank, stencil_depth )
 
 end subroutine check_stencil_depths
 
+!> @brief  Checks that the partitioning strategy will work on the 
+!>         lowest resolution multigrid level
+!> @param[in]  mesh_name          The name of the mesh on which the
+!>                                multigrid is being applied
+!> @param[in]  xproc              The number of partitions across a 
+!>                                panel in the mesh in the x-direction
+!> @param[in]  yproc              The number of partitions across a 
+!>                                panel in the mesh in the y-direction
+!> @param[in]  n_multigrid_levels The number of levels of multigrid
+!>                                being applied to the mesh 
+!==========================================================================
+subroutine check_multigrid_partitioning( mesh_name, &
+                                         xproc, yproc,    &
+                                         n_multigrid_levels )
+  use reference_element_mod, only : W, E
+
+  implicit none
+
+  character(str_def), intent(in) :: mesh_name
+  integer(i_def), intent(in) :: xproc, yproc
+  integer(i_def), intent(in) :: n_multigrid_levels
+
+  type(global_mesh_type), pointer :: global_mesh
+  integer(i_def) :: nn  ! "C" number of input mesh (as in Cnn)
+  integer(i_def) :: xx  ! number of cells across a panel of lowest res multigrid mesh in x-direction
+  integer(i_def) :: yy  ! number of cells across a panel of lowest res multigrid mesh in y-direction
+  integer(i_def) :: void_cell    ! Cell id that marks the cell as a cell outside of the partition.
+  integer(i_def) :: w_cell       ! The id of a cell on the western edge of the domain
+  integer(i_def) :: cell_next(4) ! The cells around the cell being queried
+  integer(i_def) :: cell_next_e  ! The cell to the east of the cell being queried
+  integer(i_def) :: num_cells_x  ! number of cells across a panel of the input mesh in x-direction
+  integer(i_def) :: num_cells_y  ! number of cells across a panel of the input mesh in y-direction
+  logical(l_def) :: periodic_xy(2) ! Is mesh periodic in the x/y-axes
+
+  ! Get the global mesh object of the input mesh
+  global_mesh => global_mesh_collection%get_global_mesh(mesh_name)
+
+  if (geometry == geometry_spherical  .and. &
+      topology == topology_fully_periodic ) then  ! Panelled globe mesh such as cubedsphere
+
+    ! Generate the "C" number (as in Cnn) from global mesh data
+    ! Assume the panels on the globe are square
+    nn = int(sqrt(real(global_mesh%get_ncells()/global_mesh%get_npanels())))
+
+    ! Check that the lowest resolution mesh will line up with the partitions
+    ! (xx is the number of cells across a panel of the lowest resolution
+    ! multigrid mesh)
+    xx = nn / 2**(n_multigrid_levels-1)
+    if (mod(xx,xproc) /= 0 .or. mod(xx,yproc) /= 0) then
+      write(log_scratch_space, "(a,i0,a,i0,a)") &
+          'The level ',n_multigrid_levels, ' multigrid of a C',nn, &
+          ' mesh does not align with the partitioning strategy'
+      call log_event(log_scratch_space,LOG_LEVEL_ERROR )
+    end if
+  else  ! Planar or LAM mesh
+    ! Planar or LAM mesh mesh might be non-square - so find the dimensions
+    ! First find a cell on the west edge of the domain
+    ! If periodic, cell id 1 can be used as mesh conectivity loops round
+    w_cell = 1
+
+    void_cell = global_mesh%get_void_cell()
+    periodic_xy = global_mesh%get_mesh_periodicity()
+    if ( .not. periodic_xy(1) ) then
+      ! If not periodic in E-W direction then walk West until you reach mesh
+      ! edge defined by the void cell.
+      call global_mesh%get_cell_next(w_cell,cell_next)
+      do while (cell_next(W) /= void_cell)
+        w_cell = cell_next(W)
+        call global_mesh%get_cell_next(w_cell,cell_next)
+      end do
+    end if
+
+    ! Work out number of cells in x and y directions
+    num_cells_x = 1
+    ! Starting at the West edge of the mesh, walk East until you reach either
+    ! the cell you started at (periodic) or a void cell (LAM)
+    ! - this determines the number of cells in the x direction
+    call global_mesh%get_cell_next(w_cell,cell_next)
+    cell_next_e = cell_next(E)
+    do while (cell_next_e /= w_cell .and. cell_next_e /= void_cell)
+      num_cells_x=num_cells_x+1
+      call global_mesh%get_cell_next(cell_next_e, cell_next)
+      cell_next_e = cell_next(E)
+    end do
+    ! Infer num_cells_y from the total domin size and num_cells_x
+    num_cells_y=global_mesh%get_ncells()/num_cells_x
+
+    xx = num_cells_x / 2**(n_multigrid_levels-1)
+    yy = num_cells_y / 2**(n_multigrid_levels-1)
+    if (mod(xx,xproc) /= 0 .or. mod(yy,yproc) /= 0) then
+      write(log_scratch_space,"(a,i0,a)") &
+       'The level ',n_multigrid_levels, &
+       ' multigrid of the mesh does not align with the partitioning strategy'
+      call log_event(log_scratch_space,LOG_LEVEL_ERROR )
+    end if
+  end if
+
+end subroutine check_multigrid_partitioning
 
 !> @brief  Finalises the mesh_collection.
 subroutine final_mesh()
