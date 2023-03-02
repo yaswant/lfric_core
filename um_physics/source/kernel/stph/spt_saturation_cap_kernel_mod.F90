@@ -81,11 +81,11 @@ contains
     integer(kind=i_def), intent(in),  dimension(ndf_wth)  :: map_wth
 
     ! Fields perturbations + tendencies
-    real(kind=r_def),    intent(out), dimension(undf_wth) :: dtheta
-    real(kind=r_def),    intent(out), dimension(undf_wth) :: dmv
-    real(kind=r_def),    intent(in),  dimension(undf_wth) :: T_latest
-    real(kind=r_def),    intent(in),  dimension(undf_wth) :: mv
-    real(kind=r_def),    intent(in),  dimension(undf_wth) :: pressure
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: dtheta
+    real(kind=r_def),    intent(inout), dimension(undf_wth) :: dmv
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: T_latest
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: mv
+    real(kind=r_def),    intent(in),    dimension(undf_wth) :: pressure
 
 
     !UM definition for qsat capping
