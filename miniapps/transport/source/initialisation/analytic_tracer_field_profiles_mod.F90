@@ -37,7 +37,6 @@ use initial_tracer_field_config_mod,                                   &
 use base_mesh_config_mod,       only : geometry, &
                                        geometry_spherical
 use planet_config_mod,          only : p_zero, Rd, kappa, scaled_radius
-use domain_size_config_mod,     only : planar_domain_max_x
 use extrusion_config_mod,       only : domain_top
 
 implicit none
@@ -83,14 +82,16 @@ end function hadley_like_dcmip
 
 
 !> @brief Compute an analytic tracer field.
-!> @param[in] chi        Position in physical coordinates
-!> @param[in] choice     Integer defining which specified formula to use
+!> @param[in] chi          Position in physical coordinates
+!> @param[in] choice       Integer defining which specified formula to use
+!> @param[in] domain_max_x Max. domain extent in x-direction.
 !> @result tracer The result tracer field
-function analytic_tracer_field(chi, choice) result(tracer)
+function analytic_tracer_field(chi, choice, domain_max_x) result(tracer)
 
   implicit none
   real(kind=r_def), intent(in) :: chi(3)
   integer,          intent(in) :: choice
+  real(kind=r_def), intent(in) :: domain_max_x
   real(kind=r_def)             :: tracer
 
   real(kind=r_def), parameter  :: XC = 0.0_r_def
@@ -216,7 +217,7 @@ function analytic_tracer_field(chi, choice) result(tracer)
     end if
 
   case( test_eternal_fountain )
-    bubble_width = 0.4_r_def * planar_domain_max_x
+    bubble_width = 0.4_r_def * domain_max_x
     bubble_height = 0.1_r_def * domain_top
 
     if ( ( (chi(1) + bubble_width / 2.0_r_def) &
@@ -230,7 +231,7 @@ function analytic_tracer_field(chi, choice) result(tracer)
   case ( test_rotational, test_curl_free_reversible, &
          test_translational, test_div_free_reversible )
     bubble_zc = domain_top / 4.0_r_def
-    bubble_width = planar_domain_max_x / 5.0_r_def
+    bubble_width = domain_max_x / 5.0_r_def
     bubble_height = domain_top / 10.0_r_def
     bubble_radius = bubble_height / 2.0_r_def
 
@@ -244,7 +245,7 @@ function analytic_tracer_field(chi, choice) result(tracer)
 
   case( test_vertical_cylinder )
     bubble_zc = domain_top / 4.0_r_def
-    bubble_width = planar_domain_max_x / 2.0_r_def
+    bubble_width = domain_max_x / 2.0_r_def
     bubble_height = domain_top / 4.0_r_def
     bubble_radius = bubble_height / 2.0_r_def
 

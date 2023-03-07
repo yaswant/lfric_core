@@ -110,6 +110,7 @@ contains
     real(r_def), parameter :: dx = 2.0_r_def
     real(r_def), parameter :: dy = 2.0_r_def
     real(r_def), parameter :: dz = 0.0_r_def
+    real(r_def), parameter :: domain_x = 4.0_r_def
 
     real(r_def), parameter :: initial_time = 0.0_r_def
 
@@ -182,11 +183,11 @@ contains
     buoyancy(:) = 0.0_r_def
 
     ! Check setting thermal=.false. gives answer of 1.0
-    call initial_swe_buoyancy_code(nlayers,                 &
-                                   buoyancy,                &
-                                   chi1, chi2, chi3,        &
-                                   ndf_w3, undf_w3, map_w3, &
-                                   ndf_w0, undf_w0, map_w0, basis_w0)
+    call initial_swe_buoyancy_code( nlayers,                 &
+                                    buoyancy, domain_x,      &
+                                    chi1, chi2, chi3,        &
+                                    ndf_w3, undf_w3, map_w3, &
+                                    ndf_w0, undf_w0, map_w0, basis_w0 )
 
     answer = 1.0_r_def
     @assertEqual(answer, buoyancy(cell), tol)

@@ -23,12 +23,6 @@ limit_cfl=.false.,
 dynamics='gungho',
 external_forcing=.false.,
 /
-&domain_size
-planar_domain_max_x=1.0,
-planar_domain_max_y=1.0,
-planar_domain_min_x=-1.0,
-planar_domain_min_y=-1.0,
-/
 &extrusion
 domain_top=10000.0,
 method='uniform',
@@ -251,6 +245,4 @@ vertical_method=1,1,1,1,1
 vertical_monotone=1,1,1,1,1
 vertical_monotone_order = 1,1,1,1,1
 vertical_sl_order='cubic',
-/
-&development
 /

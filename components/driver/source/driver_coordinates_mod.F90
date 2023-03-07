@@ -13,7 +13,8 @@ module driver_coordinates_mod
                                        topology,                &
                                        topology_fully_periodic, &
                                        topology_non_periodic
-  use constants_mod,             only: r_def, i_def, i_native, l_def
+  use constants_mod,             only: r_def, i_def, i_native, l_def, &
+                                       radians_to_degrees
   use log_mod,                   only: log_event, LOG_LEVEL_ERROR
   use planet_config_mod,         only: scaled_radius
   use coord_transform_mod,       only: xyz2llr, llr2xyz, identify_panel, &
@@ -54,11 +55,11 @@ contains
   !> @param[in]     mesh     Mesh on which this field is attached
   subroutine assign_coordinate_field(chi, panel_id, mesh)
 
+    use domain_mod,            only: domain_type
     use field_mod,             only: field_type, field_proxy_type
     use reference_element_mod, only: reference_element_type
     use mesh_mod,              only: mesh_type
-    use mesh_constructor_helper_functions_mod, &
-                               only: domain_size_type
+
     implicit none
 
     type( field_type ),  intent( inout )        :: chi(3)
@@ -72,7 +73,10 @@ contains
 
     type(field_proxy_type) :: chi_proxy(3)
     type(field_proxy_type) :: panel_id_proxy
-    type(domain_size_type) :: domain_size
+    type(domain_type)      :: domain
+
+    real(kind=r_def) :: domain_max_x
+    real(kind=r_def) :: domain_min_y
 
     real(kind=r_def), allocatable :: column_coords(:,:,:)
     real(kind=r_def), allocatable :: dz(:)  ! dz(nlayers) array
@@ -117,8 +121,14 @@ contains
     allocate( column_coords(3,nverts,nlayers ) )
     dof_coords => chi_proxy(1)%vspace%get_nodes( )
 
-    domain_size =  mesh%get_domain_size()
-
+    domain = mesh%get_domain()
+    if ( domain%is_lonlat()) then
+      domain_max_x = radians_to_degrees * domain%maximum_lonlat(axis=1)
+      domain_min_y = radians_to_degrees * domain%minimum_lonlat(axis=2)
+    else
+      domain_max_x = domain%maximum_xy(axis=1)
+      domain_min_y = domain%minimum_xy(axis=2)
+    end if
 
     if ( coord_system == coord_system_xyz ) then
 
@@ -132,24 +142,24 @@ contains
                             column_coords(:,:,1),  &
                             panel_id_proxy%data    )
 
-        call assign_coordinate_xyz( nlayers,                 &
-                                    ndf,                     &
-                                    nverts,                  &
-                                    undf,                    &
-                                    map(:,cell),             &
-                                    dz,                      &
-                                    chi_proxy(1)%data,       &
-                                    chi_proxy(2)%data,       &
-                                    chi_proxy(3)%data,       &
-                                    column_coords,           &
-                                    dof_coords,              &
-                                    vertex_coords,           &
-                                    domain_size%maximum%x,   &
-                                    domain_size%minimum%y,   &
-                                    panel_id_proxy%data,     &
-                                    ndf_pid,                 &
-                                    undf_pid,                &
-                                    map_pid(:,cell)          )
+        call assign_coordinate_xyz( nlayers,             &
+                                    ndf,                 &
+                                    nverts,              &
+                                    undf,                &
+                                    map(:,cell),         &
+                                    dz,                  &
+                                    chi_proxy(1)%data,   &
+                                    chi_proxy(2)%data,   &
+                                    chi_proxy(3)%data,   &
+                                    column_coords,       &
+                                    dof_coords,          &
+                                    vertex_coords,       &
+                                    domain_max_x,        &
+                                    domain_min_y,        &
+                                    panel_id_proxy%data, &
+                                    ndf_pid,             &
+                                    undf_pid,            &
+                                    map_pid(:,cell)      )
       end do
 
     else if ( coord_system == coord_system_lonlatz ) then

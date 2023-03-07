@@ -34,10 +34,11 @@ module set_tracer_field_kernel_mod
   !>
   type, public, extends(kernel_type) :: set_tracer_field_kernel_type
     private
-    type(arg_type) :: meta_args(4) = (/                                         &
+    type(arg_type) :: meta_args(5) = (/                                         &
          arg_type(GH_FIELD,   GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1), &
          arg_type(GH_FIELD*3, GH_REAL,    GH_READ,  Wchi),                      &
          arg_type(GH_FIELD,   GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_3), &
+         arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                             &
          arg_type(GH_SCALAR,  GH_INTEGER, GH_READ)                              &
          /)
     type(func_type) :: meta_funcs(2) = (/                                       &
@@ -64,6 +65,7 @@ contains
 !> @param[in] chi_2 2nd      Coordinate field
 !> @param[in] chi_3 3rd      Coordinate field
 !> @param[in] panel_id       Field giving the ID for mesh panels
+!> @param[in] domain_max_x   Domain maximum extent in x direction.
 !> @param[in] const_flag     Flag to set field to constant value (1) or use namelist (0)
 !> @param[in] ndf_trc        Number of degrees of freedom per cell
 !> @param[in] undf_trc       Total number of degrees of freedom
@@ -86,6 +88,7 @@ contains
 subroutine set_tracer_field_code(nlayers, tracer,                        &
                                  chi_1, chi_2, chi_3,                    &
                                  panel_id,                               &
+                                 domain_max_x,                           &
                                  const_flag,                             &
                                  ndf_trc, undf_trc, map_trc, trc_basis,  &
                                  ndf_chi, undf_chi, map_chi,             &
@@ -113,6 +116,7 @@ subroutine set_tracer_field_code(nlayers, tracer,                        &
 
   real(kind=r_def), dimension(1,ndf_trc,nqp_h,nqp_v), intent(in)    :: trc_basis
   real(kind=r_def), dimension(undf_trc),              intent(inout) :: tracer
+  real(kind=r_def),                                   intent(in)    :: domain_max_x
   integer(kind=i_def),                                intent(in)    :: const_flag
 
   real(kind=r_def), dimension(undf_chi), intent(in) :: chi_1, chi_2, chi_3
@@ -170,7 +174,7 @@ subroutine set_tracer_field_code(nlayers, tracer,                        &
             tracer_ref = 1.0_r_def
           else
             ! Set tracer field based on namelist
-            tracer_ref = analytic_tracer_field(xyz, test)
+            tracer_ref = analytic_tracer_field(xyz, test, domain_max_x)
           end if
 
           integrand =  trc_basis(1,df1,qp1,qp2) * tracer_ref * dj(qp1,qp2)

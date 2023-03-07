@@ -55,7 +55,7 @@ default_app_names=( infrastructure:none            \
                     lfric-xios:none                \
                     lfric-da:none                  \
                     driver:none                    \
-                    gungho:gungho                  \
+                    gungho:none                    \
                     gungho_model:gungho_model      \
                     gungho_model:mesh              \
                     lfric_atm:lfric_atm            \
@@ -129,7 +129,7 @@ project_primary_app=(             \
   [lfric-xios]=none               \
   [lfric-da]=none                 \
   [driver]=none                   \
-  [gungho]=gungho                 \
+  [gungho]=none                   \
   [gungho_model]=gungho_model     \
   [lfric_atm]=lfric_atm           \
   [mesh_tools]=mesh               \

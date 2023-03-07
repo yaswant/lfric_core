@@ -64,8 +64,6 @@ module gencube_ps_mod
 
   ! For a cubesphere these panels are the 6 faces of the domain cube
   integer(i_def), parameter :: NPANELS = 6
-  real(r_def),    parameter :: DOMAIN_SIZE(2) = [ degrees_to_radians * 360.0_r_def, &
-                                                  degrees_to_radians * 180.0_r_def ]
   integer(i_def), parameter :: PANEL_ROTATIONS(NPANELS) = (/ 0, 0, 1, 1, -1, 0 /)
 
   ! Prefix for error messages
@@ -90,7 +88,7 @@ module gencube_ps_mod
     character(str_def) :: coord_units_x
     character(str_def) :: coord_units_y
     integer(i_def)     :: edge_cells
-    real(r_def)        :: domain_size(2) = DOMAIN_SIZE
+    real(r_def)        :: domain_extents(2,4) =rmdi
     integer(i_def)     :: npanels   = NPANELS
     real(r_def)        :: north_pole(2)
     real(r_def)        :: null_island(2)
@@ -202,6 +200,11 @@ contains
   self%nsmooth    = nsmooth
   self%nmaps      = 0
   self%coord_sys  = coord_sys
+
+  self%domain_extents(:,1) = [ -180.0, -90.0 ]
+  self%domain_extents(:,2) = [  180.0, -90.0 ]
+  self%domain_extents(:,3) = [  180.0,  90.0 ]
+  self%domain_extents(:,4) = [ -180.0,  90.0 ]
 
   ! There are a maximum of 4 faces around a node in this type of mesh
   self%max_num_faces_per_node = 4
@@ -878,6 +881,7 @@ subroutine calc_coords(gen_cube, vert_coords, coord_units_x, coord_units_y)
 
   class(gencube_ps_type),   intent(in)  :: gen_cube
   real(r_def), allocatable, intent(out) :: vert_coords(:,:)
+
   character(str_def), intent(out) :: coord_units_x
   character(str_def), intent(out) :: coord_units_y
 
@@ -1195,11 +1199,13 @@ end subroutine get_dimensions
 !>
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
 !> @param[out]  cell_coordinates  Cell centre coordinates
+!> @param[out]  domain_extents    Principal coordiantes describing domain.
 !> @param[out]  coord_units_x     Units of x-coordinate.
 !> @param[out]  coord_units_y     Units of y-coordinate.
 !-------------------------------------------------------------------------------
 subroutine get_coordinates(self, node_coordinates, &
                                  cell_coordinates, &
+                                 domain_extents,   &
                                  coord_units_x,    &
                                  coord_units_y)
 
@@ -1208,11 +1214,13 @@ subroutine get_coordinates(self, node_coordinates, &
   class(gencube_ps_type), intent(in)  :: self
   real(r_def),            intent(out) :: node_coordinates(:,:)
   real(r_def),            intent(out) :: cell_coordinates(:,:)
+  real(r_def),            intent(out) :: domain_extents(:,:)
   character(str_def),     intent(out) :: coord_units_x
   character(str_def),     intent(out) :: coord_units_y
 
   node_coordinates = self%vert_coords
   cell_coordinates = self%cell_coords
+  domain_extents   = self%domain_extents
   coord_units_x    = self%coord_units_x
   coord_units_y    = self%coord_units_y
 
@@ -1790,7 +1798,6 @@ end function get_number_of_panels
 !> @param[out]  nmaps              Optional, Number of maps to create with this mesh
 !>                                           as source mesh.
 !> @param[out]  rim_depth          Optional, Depth of LBC mesh rim (in cells)
-!> @param[out]  domain_size        Optional, Domain size in x/y-axes.
 !> @param[out]  void_cell          Optional, Cell ID for null connectivity.
 !> @param[out]  target_mesh_names  Optional, Mesh names of the target meshes that
 !>                                           this mesh has maps for.
@@ -1814,7 +1821,6 @@ subroutine get_metadata( self,               &
                          constructor_inputs, &
                          nmaps,              &
                          rim_depth,          &
-                         domain_size,        &
                          void_cell,          &
                          target_mesh_names,  &
                          maps_edge_cells_x,  &
@@ -1836,7 +1842,6 @@ subroutine get_metadata( self,               &
   integer(i_def),     optional, intent(out) :: nmaps
   integer(i_def),     optional, intent(out) :: rim_depth
   integer(i_def),     optional, intent(out) :: void_cell
-  real(r_def),        optional, intent(out) :: domain_size(2)
 
   character(str_longlong), optional, intent(out) :: constructor_inputs
 
@@ -1858,9 +1863,8 @@ subroutine get_metadata( self,               &
   if (present(rim_depth))    rim_depth      = imdi
   if (present(void_cell))    void_cell      = VOID_ID
 
-  if (present(domain_size))  domain_size    = radians_to_degrees * self%domain_size
-  if (present(north_pole))   north_pole(:)  = radians_to_degrees * self%north_pole(:)
-  if (present(null_island))  null_island(:) = radians_to_degrees * self%null_island(:)
+  if (present(north_pole))     north_pole(:)  = radians_to_degrees * self%north_pole(:)
+  if (present(null_island))    null_island(:) = radians_to_degrees * self%null_island(:)
 
   if (present(constructor_inputs)) constructor_inputs = trim(self%constructor_inputs)
 

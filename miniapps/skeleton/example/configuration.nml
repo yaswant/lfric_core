@@ -8,14 +8,6 @@ prime_mesh_name='C24',
 topology='fully_periodic',
 /
 
-
-&domain_size
-planar_domain_max_x=1.0,
-planar_domain_max_y=1.0,
-planar_domain_min_x=-1.0,
-planar_domain_min_y=-1.0,
-/
-
 &extrusion
 domain_top=1000.0,
 method='uniform',

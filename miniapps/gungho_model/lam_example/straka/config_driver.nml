@@ -24,12 +24,6 @@ vertical_method='trapezoidal',
 &section_choice
 dynamics='gungho',
 /
-&domain_size
-planar_domain_max_x=800.0,
-planar_domain_max_y=25600.0,
-planar_domain_min_x=-800.0,
-planar_domain_min_y=-25600.0,
-/
 &extrusion
 domain_top=6400.0,
 method='uniform',
@@ -233,6 +227,4 @@ runge_kutta_method = 'ssp5'
 ffsl_advective_splitting='full'
 ffsl_flux_splitting='full'
 use_density_predictor=.true.
-/
-&development
 /

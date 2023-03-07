@@ -10,6 +10,7 @@
 module orography_helper_functions_mod
 
   use constants_mod, only : r_def, i_def
+  use domain_mod,    only : domain_type
   use log_mod,       only : log_event,         &
                             log_scratch_space, &
                             LOG_LEVEL_INFO,    &
@@ -25,7 +26,7 @@ module orography_helper_functions_mod
   public :: eta2z_linear
   public :: eta2z_smooth
   public :: z2eta_linear
-  public :: calc_domain_size_horizontal
+  public :: set_horizontal_domain_size
   public :: coord_transform_cart_biperiodic
 
 contains
@@ -137,28 +138,41 @@ contains
   end function z2eta_linear
 
   !=============================================================================
-  !> @brief Calculates domain size in horizontal.
+  !> @brief Set horizontal domain.
   !>
-  !> @details Helper routine which calculates domain_length and domain_width.
+  !> @details Sets horizontal domain size for later use.
+  !>
   !>          For now this is required only for the "biperiodic transforms" of
   !>          Cartesian coordinates for analytic orography profiles (Schar and
   !>          Witch-of-Agnesi mountains).
   !>
-  !> @param[in] xmin Minimum in x (Cartesian) or long (spherical) direction
-  !> @param[in] xmax Maximum in x (Cartesian) or long (spherical) direction
-  !> @param[in] ymin Minimum in y (Cartesian) or lat (spherical) direction
-  !> @param[in] ymax Maximum in y (Cartesian) or lat (spherical) direction
+  !> @param[in] domain Global domain extents
   !=============================================================================
-  subroutine calc_domain_size_horizontal(xmin, xmax, ymin, ymax)
+  subroutine set_horizontal_domain_size( domain )
 
     implicit none
 
     ! Arguments
-    real(kind=r_def), intent(in) :: xmin, xmax, ymin, ymax
+    type(domain_type), intent(in) :: domain
+
+    real(r_def) :: min_x, min_y
+    real(r_def) :: max_x, max_y
 
     ! Calculate domain length and width
-    domain_length = xmax - xmin
-    domain_width  = ymax - ymin
+    if (domain%is_lonlat()) then
+      min_x = domain%minimum_lonlat(axis=1)
+      max_x = domain%maximum_lonlat(axis=1)
+      min_y = domain%minimum_lonlat(axis=2)
+      max_y = domain%maximum_lonlat(axis=2)
+    else
+      min_x = domain%minimum_xy(axis=1)
+      max_x = domain%maximum_xy(axis=1)
+      min_y = domain%minimum_xy(axis=2)
+      max_y = domain%maximum_xy(axis=2)
+    end if
+
+      domain_length = max_x - min_x
+      domain_width  = max_y - min_y
 
     write(log_scratch_space,'(A,A)') &
           "calc_domain_size_horizontal: Calculated horizontal domain size."
@@ -169,7 +183,8 @@ contains
     call log_event(log_scratch_space, LOG_LEVEL_DEBUG)
 
     return
-  end subroutine calc_domain_size_horizontal
+  end subroutine set_horizontal_domain_size
+
 
   !=============================================================================
   !> @brief Transforms Cartesian coordinates to biperiodic domain.

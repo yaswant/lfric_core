@@ -6,11 +6,13 @@
 
 !include look.iuml
 !include mesh/mesh_mod.iuml
+!include mesh/domain_mod.iuml
 !include mesh/reference_element_mod.iuml
 
 mesh_mod::mesh_type o-> partition_mod::partition_type
 mesh_mod::mesh_type o-> reference_element_mod::reference_element_type
-mesh_mod::mesh_type -> extrusion_mod::extrusion_type
+mesh_mod::mesh_type ->  extrusion_mod::extrusion_type
+mesh_mod::mesh_type o-> domain_mod::domain_type
 
 global_mesh_mod::global_mesh_type - ugrid_mesh_data_mod::ugrid_mesh_data_type
 global_mesh_mod::global_mesh_type - mesh_mod::mesh_type

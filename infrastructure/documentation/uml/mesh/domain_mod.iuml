@@ -1,0 +1,25 @@
+' (C) Crown copyright 2022 Met Office. All rights reserved.
+' The file LICENCE, distributed with this code, contains details of the terms
+' under which the code may be used.
+
+class domain_mod::domain_type {
+
+  -horizontal_extents: real[::] <<allocatable>>
+  -vertical_range: real[2]
+  -base_height: real
+  -logical: ll_coords
+  -axis_info: string
+
+  +<<create>>  domain_constructor(\n\t <<in>>horizontal_extents: real[::],\n\t <<in>>base_height: real,\n\t <<in>>depth: real,\n\t <<in>>ll_coords: logical) : <domain_type>
+  +<<destroy>> domain_destructor()
+  +clear()
+
+  +minimum_lonlat(<<in>>axis:integer): real
+  +maximum_lonlat(<<in>>axis:integer): real
+
+  +minimum_xy(<<in>>axis:integer): real
+  +maximum_xy(<<in>>axis:integer): real
+
+  +get_base_height(): real
+
+  }

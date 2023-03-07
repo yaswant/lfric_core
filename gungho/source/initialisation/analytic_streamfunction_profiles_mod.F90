@@ -10,7 +10,6 @@
 module analytic_streamfunction_profiles_mod
 
 use constants_mod,           only: r_def, i_def, pi
-use domain_size_config_mod,  only: planar_domain_max_x
 use extrusion_config_mod,    only: domain_top
 use initial_wind_config_mod, only: profile_sbr_streamfunction,      &
                                    profile_dcmip301_streamfunction, &
@@ -35,8 +34,11 @@ contains
 !> @param[in] num_options Number of scalar options to supply
 !> @param[in] option Array of real values used to generate the initial profile
 !> @param[in] time A real used for time-varying stream functions
+!> @param[in] domain_max_x Domain maximum x-coordinte.
 !> @return psi Result streamfunction field vector u = curl(psi)
-function analytic_streamfunction(chi, choice, num_options, option, time) result(psi)
+function analytic_streamfunction( chi, choice, num_options,    &
+                                  option, time, domain_max_x ) &
+                          result( psi )
 
   implicit none
 
@@ -44,6 +46,8 @@ function analytic_streamfunction(chi, choice, num_options, option, time) result(
   integer(kind=i_def), intent(in) :: choice, num_options
   real(kind=r_def),    intent(in) :: option(num_options)
   real(kind=r_def),    intent(in) :: time
+  real(kind=r_def),    intent(in) :: domain_max_x
+
   real(kind=r_def)                :: psi(3)
   real(kind=r_def)                :: s
   real(kind=r_def)                :: lat_pole, lon_pole
@@ -70,17 +74,17 @@ function analytic_streamfunction(chi, choice, num_options, option, time) result(
 
   case ( profile_eternal_fountain )
     ! The eternal fountain profile from Zerroukat & Allen 2020 SLIC paper
-    u0 = 0.002_r_def * planar_domain_max_x
+    u0 = 0.002_r_def * domain_max_x
 
     psi(1) = 0.0_r_def
     psi(3) = 0.0_r_def
     psi(2) = - u0 * domain_top / pi *                                             &
-              sin(2.0_r_def * pi * (chi(1) / (2.0 * planar_domain_max_x) + 0.5_r_def)) * &
+              sin(2.0_r_def * pi * (chi(1) / (2.0 * domain_max_x) + 0.5_r_def)) * &
               sin(pi * chi(3) / domain_top)
   case ( profile_div_free_reversible )
     ! A deformational divergence-free time-varying flow
     ! based upon a test in Cotter & Kuzmin 2016
-    L = 2.0_r_def * planar_domain_max_x
+    L = 2.0_r_def * domain_max_x
     time_period = L  ! Solution should be the same as initial condition at t = L
 
     psi(1) = 0.0_r_def
@@ -100,7 +104,7 @@ function analytic_streamfunction(chi, choice, num_options, option, time) result(
     lr = domain_top
     la = 10.0_r_def * lr / 25.0_r_def
     lb = 12.0_r_def * lr / 25.0_r_def
-    ld = lr * sqrt((chi(1) / (planar_domain_max_x * 2.0_r_def)) ** 2.0_r_def &
+    ld = lr * sqrt((chi(1) / (domain_max_x * 2.0_r_def)) ** 2.0_r_def &
                    + ((chi(3) - vortex_zcentre) / domain_top) ** 2.0_r_def)
 
     coeffs(1) = pi / time_period

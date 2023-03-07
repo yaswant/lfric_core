@@ -97,24 +97,25 @@ end subroutine buildadvcoeff
   !> @param[in] x0        First point (x,y,z)
   !> @param[in] x1        Second point (x,y,z)
   !> @param[in] xn        Normal vector used to define local coordinate direction
+  !> @param[in] domain_x  Domain size in x-direction.
+  !> @param[in] domain_y  Domain size in y-direction.
   !> @param[in] spherical Switch for spherical or cartesian computation
   !> @return s Distance between x0 and x1
-  function local_distance_2d(x0, x1, xn, spherical) result(s)
+  function local_distance_2d( x0, x1, xn,         &
+                              domain_x, domain_y, &
+                              spherical ) result(s)
 
     use cross_product_mod,      only: cross_product
-    use domain_size_config_mod, only: planar_domain_max_x, &
-                                      planar_domain_min_x, &
-                                      planar_domain_max_y, &
-                                      planar_domain_min_y
+
     implicit none
 
     real(kind=r_def), dimension(3), intent(in) :: x0, x1, xn
+    real(kind=r_def),               intent(in) :: domain_x, domain_y
     logical(kind=l_def),            intent(in) :: spherical
     real(kind=r_def), dimension(2)             :: s
 
     real(kind=r_def), dimension(3)             :: y0, y1, xn1, dx
     real(kind=r_def)                           :: mag, costh, sinth
-    real(kind=r_def)                           :: domain_x, domain_y
 
     if ( spherical ) then
       ! Normalise position vectors
@@ -137,8 +138,7 @@ end subroutine buildadvcoeff
       ! if  the distance is bigger than half the domain size then it has
       ! probably wrapped around so we modify the distance measure
       dx = x1 - x0
-      domain_x = (planar_domain_max_x - planar_domain_min_x)
-      domain_y = (planar_domain_max_y - planar_domain_min_y)
+
       if ( abs(dx(1)) > 0.5_r_def*domain_x ) &
         dx(1) = dx(1) - sign(1.0_r_def,dx(1))*domain_x
       if ( abs(dx(2)) > 0.5_r_def*domain_y ) &
@@ -156,24 +156,26 @@ end subroutine buildadvcoeff
   !> @param[in] x0        First point (x,y,z)
   !> @param[in] x1        Second point (x,y,z)
   !> @param[in] xn        Normal vector used to define local coordinate direction
+  !> @param[in] domain_x  Domain size in x-direction.
+  !> @param[in] domain_y  Domain size in y-direction.
   !> @param[in] spherical Switch for spherical or cartesian computation
   !> @return s Distance between x0 and x1
-  function local_distance_1d(x0, x1, xn, spherical) result(s)
+  function local_distance_1d( x0, x1, xn,         &
+                              domain_x, domain_y, &
+                              spherical ) result(s)
 
     use cross_product_mod,      only: cross_product
-    use domain_size_config_mod, only: planar_domain_max_x, &
-                                      planar_domain_min_x, &
-                                      planar_domain_max_y, &
-                                      planar_domain_min_y
+
     implicit none
 
     real(kind=r_def), dimension(3), intent(in) :: x0, x1, xn
+    real(kind=r_def),               intent(in) :: domain_x, domain_y
     logical(kind=l_def),            intent(in) :: spherical
     real(kind=r_def)                           :: s
 
     real(kind=r_def), dimension(3)             :: y0, y1, xn1, dx
     real(kind=r_def)                           :: mag, costh
-    real(kind=r_def)                           :: domain_x, domain_y
+
 
     if ( spherical ) then
       ! Normalise position vectors
@@ -194,8 +196,7 @@ end subroutine buildadvcoeff
       ! if  the distance is bigger than half the domain size then it has
       ! probably wrapped around so we modify the distance measure
       dx = x1 - x0
-      domain_x = (planar_domain_max_x - planar_domain_min_x)
-      domain_y = (planar_domain_max_y - planar_domain_min_y)
+
       if ( abs(dx(1)) > 0.5_r_def*domain_x ) &
         dx(1) = dx(1) - sign(1.0_r_def,dx(1))*domain_x
       if ( abs(dx(2)) > 0.5_r_def*domain_y ) &

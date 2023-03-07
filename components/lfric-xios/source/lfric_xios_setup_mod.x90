@@ -13,6 +13,7 @@ module lfric_xios_setup_mod
   use constants_mod,                 only: i_def, i_halo_index, i_native,     &
                                            i_timestep, r_def, l_def, str_def, &
                                            radians_to_degrees
+  use domain_mod,                    only: domain_type
   use lfric_xios_constants_mod,      only: dp_xios
   use coord_transform_mod,           only: xyz2llr
   use extrusion_mod,                 only: TWOD
@@ -36,8 +37,6 @@ module lfric_xios_setup_mod
   use log_mod,                       only: log_event, log_level_error
   use mesh_mod,                      only: mesh_type
   use mesh_collection_mod,           only: mesh_collection
-  use mesh_constructor_helper_functions_mod, &
-                                     only: domain_size_type
   use model_clock_mod,               only: model_clock_type
   use mpi_mod,                       only: get_comm_size, &
                                            get_comm_rank, &
@@ -870,7 +869,7 @@ contains
     integer(kind=i_def), allocatable :: domain_index(:)
 
     ! Mesh information for biperiodic reconstruction
-    type(domain_size_type) :: domain_size
+    type(domain_type) :: domain
     real(r_def), parameter :: vert_loc_tol = 1e-8
 
     ! Factor to convert coords from radians to degrees if needed
@@ -960,21 +959,21 @@ contains
 
     ! Sort out domain boundaries for biperiodic meshes
     if ( mesh%is_geometry_planar() .and. mesh%is_topology_periodic() ) then
-      domain_size = mesh%get_domain_size()
+      domain = mesh%get_domain()
       do i = 1, local_domain_size
-        if (abs(lon_data(i) - domain_size%minimum%x) < vert_loc_tol) then
-          lon_data(i) = domain_size%maximum%x
+        if (abs(lon_data(i) - domain%minimum_xy(axis=1)) < vert_loc_tol) then
+          lon_data(i) = domain%maximum_xy(axis=1)
         end if
-        if (abs(lat_data(i) - domain_size%minimum%y) < vert_loc_tol) then
-          lat_data(i) = domain_size%maximum%y
+        if (abs(lat_data(i) - domain%minimum_xy(axis=2)) < vert_loc_tol) then
+          lat_data(i) = domain%maximum_xy(axis=2)
         end if
 
         do j = 1, nverts
-          if (abs(lon_bounds(j,i) - domain_size%minimum%x) < vert_loc_tol) then
-            lon_bounds(j,i) = domain_size%maximum%x
+          if (abs(lon_bounds(j,i) - domain%minimum_xy(axis=1)) < vert_loc_tol) then
+            lon_bounds(j,i) = domain%maximum_xy(axis=1)
           end if
-          if (abs(lat_bounds(j,i) - domain_size%minimum%y) < vert_loc_tol) then
-            lat_bounds(j,i) = domain_size%maximum%y
+          if (abs(lat_bounds(j,i) - domain%minimum_xy(axis=2)) < vert_loc_tol) then
+            lat_bounds(j,i) = domain%maximum_xy(axis=2)
           end if
         end do
       end do

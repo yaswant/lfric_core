@@ -107,7 +107,6 @@ abstract interface
   !> @param[out]  nmaps               Optional: Number of maps to create with this mesh
   !>                                            as source mesh.
   !> @param[out]  rim_depth           Optional: Rim depth of LBC mesh (LAMs).
-  !> @param[out]  domain_size         Optional: Size of global model domain.
   !> @param[out]  void_cell           Optional: Cell ID to mark null cell connectivity.
   !> @param[out]  target_mesh_names   Optional: Mesh names of the target meshes that
   !>                                            this mesh has maps for.
@@ -125,8 +124,7 @@ abstract interface
                                       periodic_xy,                           &
                                       edge_cells_x, edge_cells_y,            &
                                       constructor_inputs, nmaps, rim_depth,  &
-                                      domain_size, void_cell,                &
-                                      target_mesh_names,                     &
+                                      void_cell, target_mesh_names,          &
                                       maps_edge_cells_x, maps_edge_cells_y,  &
                                       north_pole, null_island  )
 
@@ -156,7 +154,6 @@ abstract interface
     integer(i_def), optional, intent(out) :: edge_cells_x
     integer(i_def), optional, intent(out) :: edge_cells_y
 
-    real(r_def),    optional, intent(out) :: domain_size(2)
     integer(i_def), optional, intent(out) :: void_cell
     real(r_def),    optional, intent(out) :: north_pole(2)
     real(r_def),    optional, intent(out) :: null_island(2)
@@ -203,11 +200,14 @@ abstract interface
   !> @param[in]   self              The generator strategy object.
   !> @param[out]  node_coordinates  Node coordinates
   !> @param[out]  cell_coordinates  Cell coordinates
+  !> @param[out]  domain_extents    Principal coordinates that
+  !>                                describe the domain shape.
   !> @param[out]  coord_units_x     Units for x-coordinate
   !> @param[out]  coord_units_y     Units for y-coordinate
   !-----------------------------------------------------------------------------
   subroutine get_coordinates_interface (self, node_coordinates, &
                                               cell_coordinates, &
+                                              domain_extents,   &
                                               coord_units_x,    &
                                               coord_units_y)
 
@@ -219,6 +219,7 @@ abstract interface
 
     real(r_def), intent(out)        :: node_coordinates(:,:)
     real(r_def), intent(out)        :: cell_coordinates(:,:)
+    real(r_def), intent(out)        :: domain_extents(:,:)
     character(str_def), intent(out) :: coord_units_x
     character(str_def), intent(out) :: coord_units_y
 

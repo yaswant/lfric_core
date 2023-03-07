@@ -6,7 +6,7 @@ class mesh_mod::mesh_type {
   -mesh_name: string
   -reference_element : reference_element_type <<allocatable>>
   -local_mesh : local_mesh_type <<pointer>>
-  -domain_size : domain_size_type
+  -domain : domain_type
   -nlayers : integer
   -domain_top : real
   -domain_bottom : real
@@ -78,7 +78,7 @@ class mesh_mod::mesh_type {
   +get_face_on_cell( <<in>>iface: integer, <<in>>icell: integer ) : integer
   +get_edge_on_cell( <<in>>iedge: integer, <<in>>icell: integer ) : integer
   +get_vert_on_cell( <<in>>ivert: integer, <<in>>icell: integer ) : integer
-  +get_domain_size() : domain_size_type
+  +get_domain() : domain_type
   +get_domain_top() : real
   +get_extrusion_id() : integer
   +get_dz( <<out>>dz: real[:] )

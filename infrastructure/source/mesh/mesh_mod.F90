@@ -16,6 +16,7 @@ module mesh_mod
 
   use constants_mod,         only : i_def, i_native, r_def, l_def, str_def, &
                                     pi, imdi
+  use domain_mod,            only : domain_type
   use extrusion_mod,         only : extrusion_type
   use linked_list_mod,       only : linked_list_type, &
                                     linked_list_item_type
@@ -27,10 +28,8 @@ module mesh_mod
                                     LOG_LEVEL_INFO, LOG_LEVEL_DEBUG
   use mesh_colouring_mod,    only : set_colours
   use mesh_constructor_helper_functions_mod,                 &
-                             only : domain_size_type,        &
-                                    mesh_extruder,           &
+                             only : mesh_extruder,           &
                                     mesh_connectivity,       &
-                                    set_domain_size,         &
                                     set_dz
   use mesh_map_mod,          only : mesh_map_type
   use mesh_map_collection_mod, only : mesh_map_collection_type
@@ -64,17 +63,17 @@ module mesh_mod
 
     !> The domain limits (x,y,z) for Cartesian domains
     !>                   (long, lat, radius) for spherical
-    type(domain_size_type) :: domain_size
+    type(domain_type) :: domain
 
     !> Number of 3d-cell layers in mesh object
     integer(i_def) :: nlayers
 
     !> Top of atmosphere above surface
-    real(r_def) :: domain_top
+    real(r_def) :: domain_depth
 
     !> Base surface height
     !  (0.0 for planar meshes, scaled_radius for cubedsphere)
-    real(r_def) :: domain_bottom
+    real(r_def) :: domain_base_height
 
     !> Label for the type of extrusion the mesh has
     integer(i_def) :: extrusion_id
@@ -206,7 +205,7 @@ module mesh_mod
     procedure, public :: get_face_on_cell
     procedure, public :: get_edge_on_cell
     procedure, public :: get_vert_on_cell
-    procedure, public :: get_domain_size
+    procedure, public :: get_domain
     procedure, public :: get_domain_top
     procedure, public :: get_extrusion_id
     procedure, public :: get_dz
@@ -388,8 +387,8 @@ contains
     self%nlayers              = extrusion%get_number_of_layers()
     self%ncells               = self%ncells_2d * self%nlayers
     self%ncells_with_ghost    = self%ncells_2d_with_ghost * self%nlayers
-    self%domain_top           = extrusion%get_atmosphere_top()
-    self%domain_bottom        = extrusion%get_atmosphere_bottom()
+    self%domain_depth           = extrusion%get_atmosphere_top()
+    self%domain_base_height   = extrusion%get_atmosphere_bottom()
     self%extrusion_id         = extrusion%get_id()
     self%ncolours             = -1     ! Initialise ncolours to error status
 
@@ -404,7 +403,7 @@ contains
                  self%eta,     &
                  self%nlayers, &
                  0.0_r_def,    &
-                 self%domain_top )
+                 self%domain_depth )
 
     ! Calculate next-to cells and vertices on cells
     allocate( self%cell_next(self%reference_element%get_number_faces(), &
@@ -462,7 +461,7 @@ contains
 
 
     ! Set base surface height
-    vertex_coords_2d(3,:) = self%domain_bottom
+    vertex_coords_2d(3,:) = self%domain_base_height
 
     self%nverts = self%nverts_2d * (self%nlayers+1)
     self%nedges = self%nedges_2d * (self%nlayers+1) &
@@ -506,9 +505,9 @@ contains
                             self%vert_on_cell,         &
                             self%reference_element )
 
-    call set_domain_size( self%domain_size, self%domain_top, &
-                          self%vertex_coords, self%nverts,   &
-                          ll_coords, self%domain_bottom )
+    self%domain = domain_type( local_mesh%get_global_domain_extents(), &
+                               self%domain_base_height,                &
+                               self%domain_depth, ll_coords )
 
     deallocate (vert_on_cell_2d)
     deallocate (edge_on_cell_2d)
@@ -1093,7 +1092,7 @@ contains
     class (mesh_type), intent(in) :: self
     real  (r_def)                 :: domain_top
 
-    domain_top = self%domain_top
+    domain_top = self%domain_depth
 
   end function get_domain_top
 
@@ -1147,20 +1146,20 @@ contains
 
   end subroutine get_eta
 
-
-  !> @return  Domain size of mesh as a <domain_type>
+  !> @brief   Return global domain extents
+  !> @return  domain <domain_type> holding information on global domain.
   !============================================================================
-  function get_domain_size(self) result (domain_size)
+  function get_domain(self) result( domain )
 
-    ! Returns local mesh domain limits as a domain_size_type type
+    ! Returns local mesh domain limits as a domain_type.
 
     implicit none
     class(mesh_type), intent(in) :: self
-    type(domain_size_type)       :: domain_size
+    type(domain_type)            :: domain
 
-    domain_size = self%domain_size
+    domain = self%domain
 
-  end function get_domain_size
+  end function get_domain
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> @brief Gets the cell which owns a vertex.
@@ -2309,7 +2308,12 @@ contains
     integer(i_def), parameter :: nverts_per_2d_cell = 4
     integer(i_def), parameter :: nedges_per_2d_cell = 4
 
+    real(r_def)    :: global_domain_extents(2,4)
+    logical(l_def) :: ll_coords
+
     type(uniform_extrusion_type) :: extrusion
+
+    integer(i_def) :: extrusion_profile
 
     self%local_mesh => local_mesh
     self%nverts_per_cell = 8
@@ -2328,8 +2332,16 @@ contains
 
 
     if (mesh_cfg == PLANE) then
+      ! The unit-test mesh is similar in configuration
+      ! to a LAM. Node co-ords are held in cartesian,(xyz),
+      ! though the <domain_type> object considers the axis
+      ! to be in llr, i.e. the domain
+      ! units would be in [radians, radians, metres]
+
       self%mesh_name = 'test mesh: planar'
-      self%domain_top = 10000.0_r_def
+      self%domain_depth       = 10000.0_r_def
+      self%domain_base_height = 30000.0_r_def
+      ll_coords = .true.
 
       self%ncells_2d = 9
       self%nverts_2d = 16
@@ -2342,13 +2354,22 @@ contains
       self%nedges  = 224
 
     else if (mesh_cfg == PLANE_BI_PERIODIC) then
+      ! The unit-test mesh is on a cartesian domain as
+      ! a bi-periodic domain is not supported for
+      ! a spherical coord system.
+      ! Node co-ords are held in cartesian,(xyz),
+      ! as is <domain_type> object, i.e.the axis are xyz
+      ! with the units as in metres.
       self%mesh_name = 'test mesh: planar bi-periodic'
-      self%domain_top = 6000.0_r_def
+      self%domain_depth = 6000.0_r_def
+      self%domain_base_height = 0.0_r_def
+      ll_coords = .false.
 
       ! 3x3x3 mesh bi-periodic
       self%ncells_2d = 9
       self%nverts_2d = 9
       self%nedges_2d = 18
+
       self%nlayers = 3
       self%ncells  = 27
       self%nverts  = 36
@@ -2357,7 +2378,9 @@ contains
 
     else if ( mesh_cfg == PLANE_TWOD ) then
       self%mesh_name = 'test mesh: planar twod'
-      self%domain_top = 10000.0_r_def
+      self%domain_depth = 10000.0_r_def
+      self%domain_base_height = 30000.0_r_def
+      ll_coords = .true.
 
       self%ncells_2d = 9
       self%nverts_2d = 16
@@ -2371,7 +2394,9 @@ contains
 
     else if ( mesh_cfg == PLANE_TWOD_BI_PERIODIC ) then
       self%mesh_name = 'test mesh: planar twod bi-periodic'
-      self%domain_top = 10000.0_r_def
+      self%domain_depth = 6000.0_r_def
+      self%domain_base_height = 0.0_r_def
+      ll_coords = .false.
 
       self%ncells_2d = 9
       self%nverts_2d = 9
@@ -2411,17 +2436,17 @@ contains
     ! Calculate vertical coordinates eta[0,1] and dz in a separate subroutine
     ! for the unit tests.
     ! Hard wires for uniform vertical grid on planar mesh.
-    if ( mesh_cfg == PLANE_TWOD .or. mesh_cfg == PLANE_TWOD_BI_PERIODIC) then
-      extrusion = uniform_extrusion_type( 0.0_r_def,       &
-                                          self%domain_top, &
-                                          self%nlayers,    &
-                                          TWOD )
+    if ( mesh_cfg == PLANE_TWOD .or. &
+         mesh_cfg == PLANE_TWOD_BI_PERIODIC ) then
+      extrusion_profile = TWOD
     else
-      extrusion = uniform_extrusion_type( 0.0_r_def,       &
-                                          self%domain_top, &
-                                          self%nlayers,    &
-                                          PRIME_EXTRUSION )
+      extrusion_profile = PRIME_EXTRUSION
     end if
+
+    extrusion = uniform_extrusion_type( 0.0_r_def,         &
+                                        self%domain_depth, &
+                                        self%nlayers,      &
+                                        extrusion_profile )
     call extrusion%extrude( self%eta )
 
     self%extrusion_id = extrusion%get_id()
@@ -2876,12 +2901,15 @@ contains
 
 
       ! Domain limits
-      self%domain_size%minimum%x =  0.0_r_def
-      self%domain_size%maximum%x =  2.0_r_def*PI
-      self%domain_size%minimum%y = -0.5_r_def*PI
-      self%domain_size%maximum%y =  0.5_r_def*PI
-      self%domain_size%minimum%z =  0.0_r_def
-      self%domain_size%maximum%z =  self%domain_top
+      global_domain_extents(:,1) = [ -1.0_r_def, -0.5_r_def ]*PI
+      global_domain_extents(:,2) = [  1.0_r_def, -0.5_r_def ]*PI
+      global_domain_extents(:,3) = [  1.0_r_def,  0.5_r_def ]*PI
+      global_domain_extents(:,4) = [ -1.0_r_def,  0.5_r_def ]*PI
+
+      self%domain = domain_type( global_domain_extents,   &
+                                 self%domain_base_height, &
+                                 self%domain_depth,       &
+                                 ll_coords )
 
     else if (mesh_cfg == PLANE_BI_PERIODIC) then
       !=========================================================
@@ -3004,7 +3032,6 @@ contains
       self%edge_on_cell(:,7) = [40, 29, 42,  3, 32, 31, 10,  9, 41, 30, 43,  4]
       self%edge_on_cell(:,8) = [42, 35, 44, 13, 31, 37, 19, 10, 43, 36, 45, 14]
       self%edge_on_cell(:,9) = [44, 38, 40, 21, 37, 32,  9, 19, 45, 39, 41, 22]
-
       !=========================================================
       ! Assign face local ids on cell sides
       !
@@ -3026,9 +3053,16 @@ contains
       self%face_on_cell(:,8) = [29, 22, 32,  7, 33, 34]
       self%face_on_cell(:,9) = [32, 25, 28, 12, 35, 36]
 
-      ! Vertical domain limits
-      self%domain_size%minimum%z =  0.0_r_def
-      self%domain_size%maximum%z =  self%domain_top
+      ! Domain limits
+      global_domain_extents(:,1) = [ -15.0_r_def, -15.0_r_def ]
+      global_domain_extents(:,2) = [  15.0_r_def, -15.0_r_def ]
+      global_domain_extents(:,3) = [  15.0_r_def,  15.0_r_def ]
+      global_domain_extents(:,4) = [ -15.0_r_def,  15.0_r_def ]
+
+      self%domain = domain_type( global_domain_extents,   &
+                                 self%domain_base_height, &
+                                 self%domain_depth,       &
+                                 ll_coords )
 
     else if ( mesh_cfg == PLANE_TWOD ) then
       !=========================================================
@@ -3198,15 +3232,16 @@ contains
       self%vertex_coords (:,32) = [  5541.702066_r_def, -12108.839925_r_def, &
                                       29097.517658_r_def ]
 
-
-
       ! Domain limits
-      self%domain_size%minimum%x =  0.0_r_def
-      self%domain_size%maximum%x =  2.0_r_def*PI
-      self%domain_size%minimum%y = -0.5_r_def*PI
-      self%domain_size%maximum%y =  0.5_r_def*PI
-      self%domain_size%minimum%z =  0.0_r_def
-      self%domain_size%maximum%z =  self%domain_top
+      global_domain_extents(:,1) = [  0.0_r_def,    -0.5_r_def*PI ]
+      global_domain_extents(:,2) = [  2.0_r_def*PI, -0.5_r_def*PI ]
+      global_domain_extents(:,3) = [  2.0_r_def*PI,  0.5_r_def*PI ]
+      global_domain_extents(:,4) = [  0.0_r_def,    -0.5_r_def*PI ]
+
+      self%domain = domain_type( global_domain_extents,   &
+                                 self%domain_base_height, &
+                                 self%domain_depth,       &
+                                 ll_coords )
 
     else if ( mesh_cfg == PLANE_TWOD_BI_PERIODIC ) then
       !=========================================================
@@ -3305,17 +3340,24 @@ contains
       self%face_on_cell(:,9) = [32, 25, 28, 12, 35, 36]
 
       ! Domain limits
-      self%domain_size%minimum%z =  0.0_r_def
-      self%domain_size%maximum%z =  self%domain_top
+      global_domain_extents(:,1) = [ -15.0_r_def, -15.0_r_def ]
+      global_domain_extents(:,2) = [  15.0_r_def, -15.0_r_def ]
+      global_domain_extents(:,3) = [  15.0_r_def,  15.0_r_def ]
+      global_domain_extents(:,4) = [ -15.0_r_def,  15.0_r_def ]
+
+      self%domain = domain_type( global_domain_extents,   &
+                                 self%domain_base_height, &
+                                 self%domain_depth,       &
+                                 ll_coords )
+
     end if
 
     ! Calculate layer depth dz for flat planet surface
-    call set_dz( self%dz,                    &
-                 self%eta,                   &
-                 self%nlayers,               &
-                 self%domain_size%minimum%z, &
-                 self%domain_size%maximum%z )
-
+    call set_dz( self%dz,                            &
+                 self%eta,                           &
+                 self%nlayers,                       &
+                 self%domain%minimum_lonlat(axis=3), &
+                 self%domain%maximum_lonlat(axis=3) )
 
     if (.not. allocated(self%mesh_maps)) &
         allocate ( self%mesh_maps,       &

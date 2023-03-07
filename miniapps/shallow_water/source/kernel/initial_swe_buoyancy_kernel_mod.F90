@@ -10,10 +10,10 @@
 !!          analytic expression.
 module initial_swe_buoyancy_kernel_mod
 
-  use argument_mod,         only: arg_type, func_type,                &
-                                  GH_FIELD, GH_INC, GH_READ,          &
-                                  ANY_SPACE_9, ANY_SPACE_1, GH_BASIS, &
-                                  GH_DIFF_BASIS, GH_REAL,             &
+  use argument_mod,         only: arg_type, func_type,                  &
+                                  GH_FIELD, GH_SCALAR, GH_INC, GH_READ, &
+                                  ANY_SPACE_9, ANY_SPACE_1, GH_BASIS,   &
+                                  GH_DIFF_BASIS, GH_REAL,               &
                                   CELL_COLUMN, GH_EVALUATOR
   use constants_mod,        only: r_def, i_def
   use kernel_mod,           only: kernel_type
@@ -28,8 +28,9 @@ module initial_swe_buoyancy_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
   type, public, extends(kernel_type) :: initial_swe_buoyancy_kernel_type
       private
-      type(arg_type) :: meta_args(2) = (/                      &
+      type(arg_type) :: meta_args(3) = (/                      &
           arg_type(GH_FIELD,   GH_REAL, GH_INC,  ANY_SPACE_1), &
+          arg_type(GH_SCALAR,  GH_REAL, GH_READ),              &
           arg_type(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_9)  &
           /)
       type(func_type) :: meta_funcs(1) = (/                    &
@@ -51,6 +52,7 @@ contains
   !> @brief Compute the initial buoyancy field.
   !> @param[in]     nlayers  The number of model layers
   !> @param[in,out] buoyancy The field to compute
+  !> @param[in]     domain_x Domain size in x direction.
   !> @param[in]     chi_1    Real array, the x component of the coordinate field
   !> @param[in]     chi_2    Real array, the y component of the coordinate field
   !> @param[in]     chi_3    Real array, the z component of the coordinate field
@@ -63,6 +65,7 @@ contains
   !> @param[in]     wx_basis Real 5-dim array holding basis functions evaluated at quadrature points
   subroutine initial_swe_buoyancy_code(nlayers,                 &
                                        buoyancy,                &
+                                       domain_x,                &
                                        chi_1, chi_2, chi_3,     &
                                        ndf_wb, undf_wb, map_wb, &
                                        ndf_wx, undf_wx, map_wx, wx_basis)
@@ -76,6 +79,7 @@ contains
     integer(kind=i_def), dimension(ndf_wb), intent(in) :: map_wb
     integer(kind=i_def), dimension(ndf_wx), intent(in) :: map_wx
     real(kind=r_def), dimension(undf_wb),          intent(inout) :: buoyancy
+    real(kind=r_def),                              intent(in)    :: domain_x
     real(kind=r_def), dimension(undf_wx),          intent(in)    :: chi_1, chi_2, chi_3
     real(kind=r_def), dimension(1,ndf_wx,ndf_wb),  intent(in)    :: wx_basis
 
@@ -102,7 +106,7 @@ contains
         x(3) = x(3) + chi_3_e(df0)*wx_basis(1,df0,df)
       end do
 
-      buoyancy(map_wb(df)) = analytic_swe_buoyancy(x, swe_test)
+      buoyancy(map_wb(df)) = analytic_swe_buoyancy(x, swe_test, domain_x)
     end do
 
   end subroutine initial_swe_buoyancy_code

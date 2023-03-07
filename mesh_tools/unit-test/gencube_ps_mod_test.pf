@@ -103,6 +103,7 @@ contains
     integer(i_def) :: nodes_on_edge(2, 2*6*edge_cells*edge_cells)
     real(r_def) :: coords(2, 6*edge_cells*edge_cells+2)
     real(r_def) :: face_coords(2, 6*edge_cells*edge_cells)
+    real(r_def) :: domain_extents(2,4)
 
     csgen = gencube_ps_type( mesh_name, edge_cells, nsmooth, coord_sys=coord_sys_ll )
 
@@ -186,6 +187,7 @@ contains
     ! Retrieve mesh coordinates
     call csgen%get_coordinates( coords,             &
                                 face_coords,        &
+                                domain_extents,     &
                                 test_coord_units_x, &
                                 test_coord_units_y )
 
@@ -261,6 +263,7 @@ contains
     integer(i_def) :: nodes_on_edge(2, 2*6*edge_cells*edge_cells)
     real(r_def) :: coords(2, 6*edge_cells*edge_cells+2)
     real(r_def) :: face_coords(2, 6*edge_cells*edge_cells)
+    real(r_def) :: domain_extents(2,4)
 
     csgen = gencube_ps_type( mesh_name, edge_cells, nsmooth, coord_sys=coord_sys_ll )
 
@@ -359,6 +362,7 @@ contains
     ! Retrieve mesh coordinates
     call csgen%get_coordinates( coords,             &
                                 face_coords,        &
+                                domain_extents,     &
                                 test_coord_units_x, &
                                 test_coord_units_y )
 
@@ -417,25 +421,31 @@ contains
     real(r_def) :: face_coords(2, 6*edge_cells*edge_cells)
 
     ! Testing mesh when pole is rotated
-
     real(r_def) :: lon_north = 0.0_r_def
     real(r_def) :: lat_north = 45.0_r_def
     real(r_def) :: lon_null
     real(r_def) :: lat_null
 
+    real(r_def) :: domain_extents(2,4)
+    real(r_def) :: north_pole(2)
+    real(r_def) :: null_island(2)
+
     ! Calculate the null island
     lon_null = lon_north - 180.0_r_def
     lat_null = 90.0_r_def - lat_north
 
+    north_pole  = [lon_north, lat_north]
+    null_island = [lon_null,  lat_null ]
+
     ! Further test of the rotation of the mesh
     ! Create a new mesh as above, but with rotation of North to (0,45)
-    csgen_rot = gencube_ps_type(                             &
-                    mesh_name, edge_cells, nsmooth,          &
-                    coord_sys=coord_sys_ll,                  &
-                    rotate_mesh=.true.,                      &
-                    target_north_pole=[lon_north,lat_north], &
-                    target_null_island=[lon_null,lat_null],  &
-                    target_mesh_names=target_mesh_names,     &
+    csgen_rot = gencube_ps_type(                         &
+                    mesh_name, edge_cells, nsmooth,      &
+                    coord_sys=coord_sys_ll,              &
+                    rotate_mesh=.true.,                  &
+                    target_north_pole=north_pole,        &
+                    target_null_island=null_island,      &
+                    target_mesh_names=target_mesh_names, &
                     target_edge_cells=target_edge_cells )
 
     ! Generate the mesh and connectivity
@@ -444,6 +454,7 @@ contains
     ! Retrieve rotated mesh coordinates
     call csgen_rot%get_coordinates(coords_rot,         &
                                    face_coords,        &
+                                   domain_extents,     &
                                    test_coord_units_x, &
                                    test_coord_units_y)
 
@@ -468,15 +479,18 @@ contains
     lon_null = lon_north - 180.0_r_def
     lat_null = 90.0_r_def - lat_north
 
+    north_pole  = [lon_north, lat_north]
+    null_island = [lon_null,  lat_null ]
+
     ! Further test of the rotation of the mesh
     ! Create a new mesh as above, but with rotation about pole of 45 degrees
-    csgen_rot = gencube_ps_type(                             &
-                    mesh_name, edge_cells, nsmooth,          &
-                    coord_sys=coord_sys_ll,                  &
-                    rotate_mesh=.true.,                      &
-                    target_north_pole=[lon_north,lat_north], &
-                    target_null_island=[lon_null,lat_null],  &
-                    target_mesh_names=target_mesh_names,     &
+    csgen_rot = gencube_ps_type(                         &
+                    mesh_name, edge_cells, nsmooth,      &
+                    coord_sys=coord_sys_ll,              &
+                    rotate_mesh=.true.,                  &
+                    target_north_pole=north_pole,        &
+                    target_null_island=null_island,      &
+                    target_mesh_names=target_mesh_names, &
                     target_edge_cells=target_edge_cells )
 
     ! Generate the mesh and connectivity
@@ -485,6 +499,7 @@ contains
     ! Retrieve rotated mesh coordinates
     call csgen_rot%get_coordinates(coords_rot,         &
                                    face_coords,        &
+                                   domain_extents,     &
                                    test_coord_units_x, &
                                    test_coord_units_y)
 
@@ -530,6 +545,7 @@ contains
     real(r_def) :: coords(2, 6*edge_cells*edge_cells+2)
     real(r_def) :: face_coords(2, 6*edge_cells*edge_cells)
     real(r_def) :: stretch_factor
+    real(r_def) :: domain_extents(2,4)
 
     ! Testing a stretched mesh with 0.5 stretch factor.
     stretch_factor = 0.5_r_def
@@ -544,6 +560,7 @@ contains
     ! Retrieve mesh coordinates
     call csgen_stretch%get_coordinates( coords,             &
                                         face_coords,        &
+                                        domain_extents,     &
                                         test_coord_units_x, &
                                         test_coord_units_y )
 
@@ -575,6 +592,7 @@ contains
     ! Retrieve mesh coordinates
     call csgen_stretch%get_coordinates( coords,             &
                                         face_coords,        &
+                                        domain_extents,     &
                                         test_coord_units_x, &
                                         test_coord_units_y )
 

@@ -283,6 +283,7 @@ contains
 
     real(r_def) :: face_coords(2, this%x_size * this%y_size)
     real(r_def) :: coords(2, this%nodes)
+    real(r_def) :: domain_extents(2,4)
 
     character(str_def)      :: test_str(5)
     character(str_longlong) :: big_test_str
@@ -416,6 +417,7 @@ contains
     ! Retrieve mesh coordinates
     call mesh_gen%get_coordinates( coords,             &
                                    face_coords,        &
+                                   domain_extents,     &
                                    test_coord_units_x, &
                                    test_coord_units_y )
 

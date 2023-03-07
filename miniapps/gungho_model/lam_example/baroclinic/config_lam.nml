@@ -243,5 +243,3 @@ ffsl_advective_splitting='full'
 ffsl_flux_splitting='full'
 use_density_predictor=.true.
 /
-&development
-/

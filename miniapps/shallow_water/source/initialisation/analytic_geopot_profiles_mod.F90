@@ -23,8 +23,6 @@ module analytic_geopot_profiles_mod
   ! Configurations
   use base_mesh_config_mod,   only: geometry, &
                                     geometry_spherical
-  use domain_size_config_mod, only: planar_domain_max_x, &
-                                    planar_domain_min_x
   use planet_config_mod,      only: scaled_radius, gravity, &
                                     scaled_omega, scaling_factor
   use shallow_water_settings_config_mod,                           &
@@ -45,13 +43,17 @@ contains
 
   !> @brief Compute an analytic geopotential field for the shallow water miniapp.
   !> @param[in] chi    Position in physical coordinates
+  !> @param[in] choice
+  !> @param[in] domain_x Domain size in x-direction.
   !> @result    geopot The result geopotential field
-  function analytic_geopot(chi, choice) result(geopot)
+  function analytic_geopot(chi, choice, domain_x) result(geopot)
 
     implicit none
 
     real(kind=r_def), intent(in) :: chi(3)
     integer,          intent(in) :: choice
+    real(kind=r_def), intent(in) :: domain_x
+
     real(kind=r_def)             :: geopot
     real(kind=r_def)             :: long, lat
     real(kind=r_def)             :: fc, ubya, href, psi_dummy
@@ -101,7 +103,7 @@ contains
 
     case ( swe_test_swe_thermal_dbl_vortex )
       ! Assuming square planar domain
-      lx = planar_domain_max_x - planar_domain_min_x
+      lx = domain_x
       sx = lx * 3.0_r_def / 40.0_r_def
       sy = lx * 3.0_r_def / 40.0_r_def
       ox = 0.1_r_def

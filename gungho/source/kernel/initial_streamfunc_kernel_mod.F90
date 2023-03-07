@@ -31,10 +31,11 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: initial_streamfunc_kernel_type
   private
-  type(arg_type) :: meta_args(8) = (/                                     &
+  type(arg_type) :: meta_args(9) = (/                                     &
        arg_type(GH_FIELD,   GH_REAL, GH_INC,  W1),                        &
        arg_type(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_9),               &
        arg_type(GH_FIELD,   GH_REAL, GH_READ, ANY_DISCONTINUOUS_SPACE_3), &
+       arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
        arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
        arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
        arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
@@ -69,6 +70,7 @@ contains
 !! @param[in] chi_3 3rd coordinate field
 !! @param[in] panel_id A field giving the ID for mesh panels
 !! @param[in] time  The time to be passed to the analytic stream function
+!! @param[in] domain_max_x  Domain maximum x-coordinate.
 !! @param[in] sbr_angle_lat  SBR angle latitude
 !! @param[in] sbr_angle_lon  SBR angle longitude
 !! @param[in] u0  Initial u-wind
@@ -95,7 +97,7 @@ subroutine initial_streamfunc_code(nlayers,                         &
                                    rhs,                             &
                                    chi_1, chi_2, chi_3,             &
                                    panel_id,                        &
-                                   time,                            &
+                                   time, domain_max_x,              &
                                    sbr_angle_lat, sbr_angle_lon,    &
                                    u0, v0,                          &
                                    ndf, undf, map, basis,           &
@@ -138,6 +140,7 @@ subroutine initial_streamfunc_code(nlayers,                         &
   real(kind=r_def), dimension(nqp_h), intent(in) ::  wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in) ::  wqp_v
   real(kind=r_def),                   intent(in) ::  time
+  real(kind=r_def),                   intent(in) ::  domain_max_x
   real(kind=r_def),                   intent(in) ::  sbr_angle_lat
   real(kind=r_def),                   intent(in) ::  sbr_angle_lon
   real(kind=r_def),                   intent(in) ::  u0
@@ -195,11 +198,13 @@ subroutine initial_streamfunc_code(nlayers,                         &
           call chi2llr(coords(1), coords(2), coords(3), &
                        ipanel, llr(1), llr(2), llr(3))
 
-          psi_spherical = analytic_streamfunction(llr, profile, 3, option3, time)
-          psi_physical = sphere2cart_vector(psi_spherical,llr)
+          psi_spherical = analytic_streamfunction( llr, profile, 3, option3, &
+                                                   time, domain_max_x )
+          psi_physical = sphere2cart_vector( psi_spherical,llr )
         else if ( geometry == geometry_planar ) then
           ! Coords must be (X,Y,Z)
-          psi_physical = analytic_streamfunction(coords, profile, 2, option2, time)
+          psi_physical = analytic_streamfunction( coords, profile, 2, option2, &
+                                                  time, domain_max_x )
         else
           call log_event('initial_streamfunc_kernel is not implemented ' // &
                          'with your geometry and topology',                 &

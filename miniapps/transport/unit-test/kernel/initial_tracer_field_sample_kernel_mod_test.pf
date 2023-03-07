@@ -115,6 +115,7 @@ contains
     real(kind=r_def), parameter      :: dz = 1.0_r_def
     real(kind=r_def), parameter      :: answer1 = 0.2_r_def
     real(kind=r_def), parameter      :: answer2 = 1.0_r_def
+    real(kind=r_def), parameter      :: domain_max_x = 2.0_r_def
 
     ! Fields
     real(kind=r_def), allocatable    :: chi_1(:), chi_2(:), chi_3(:)
@@ -179,6 +180,7 @@ contains
                                                   rho,                             &
                                                   chi_1, chi_2, chi_3,             &
                                                   panel_id,                        &
+                                                  domain_max_x,                    &
                                                   const_flag,                      &
                                                   ndf_w3, undf_w3, map_w3(:,cell), &
                                                   ndf_w0, undf_w0, map_w0,         &
@@ -196,6 +198,7 @@ contains
                                                   rho,                             &
                                                   chi_1, chi_2, chi_3,             &
                                                   panel_id,                        &
+                                                  domain_max_x,                    &
                                                   const_flag,                      &
                                                   ndf_w3, undf_w3, map_w3(:,cell), &
                                                   ndf_w0, undf_w0, map_w0,         &

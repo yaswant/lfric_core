@@ -178,7 +178,8 @@ abstract interface
   !> @param[out]  face_face_connectivity Faces adjacent to each face.
   !> @param[out]  topology            Domain topology enumeration key.
   !> @param[out]  periodic_xy         Periodicity in x/y axes.
-  !> @param[out]  domain_size         Size of global mesh domain in x/y-axes.
+  !> @param[out]  domain_extents      Principal coordinates that
+  !>                                  describe the domain shape.
   !> @param[out]  npanels             Number of panels in this mesh.
   !> @param[out]  rim_depth           Depth in cells of global mesh rim
   !>                                  (LBC meshes).
@@ -225,7 +226,7 @@ abstract interface
                        face_face_connectivity, edge_node_connectivity,    &
 
                        ! Variables referring to global mesh types
-                       topology, periodic_xy, domain_size,                &
+                       topology, periodic_xy, domain_extents,             &
                        npanels, rim_depth, constructor_inputs,            &
 
                        ! Partition variables
@@ -267,7 +268,7 @@ abstract interface
     ! Variables referring to global mesh types
     character(str_def), intent(out) :: topology
     logical(l_def),     intent(out) :: periodic_xy(2)
-    real(r_def),        intent(out) :: domain_size(2)
+    real(r_def),        intent(out) :: domain_extents(2,4)
     integer(i_def),     intent(out) :: npanels
     integer(i_def),     intent(out) :: rim_depth
 
@@ -332,7 +333,8 @@ abstract interface
   !> @param[in]  edge_node_connectivity   Nodes defining each edge.
   !> @param[in]  topology                 Domain topology enumeration key.
   !> @param[in]  periodic_xy              Domain periodicity in x/y-axes.
-  !> @param[in]  domain_size              Size of global mesh domain in x/y-axes.
+  !> @param[in]  domain_extents           Principal coordinates that
+  !>                                      describe the domain shape.
   !> @param[in]  npanels                  Number of panels in global mesh.
   !> @param[in]  rim_depth                Depth in cells of global mesh rim (LBC meshes).
   !> @param[in]  constructor_inputs       Inputs used to generate global mesh.
@@ -376,7 +378,7 @@ abstract interface
                        face_face_connectivity, edge_node_connectivity,    &
 
                        ! Global mesh variables.
-                       topology, periodic_xy, domain_size,                &
+                       topology, periodic_xy, domain_extents,             &
                        npanels, rim_depth, constructor_inputs,            &
 
                        ! Partition variables.
@@ -423,7 +425,7 @@ abstract interface
     ! Global mesh only variables
     character(str_def), intent(in) :: topology
     logical(l_def),     intent(in) :: periodic_xy(2)
-    real(r_def),        intent(in) :: domain_size(2)
+    real(r_def),        intent(in) :: domain_extents(2,4)
     integer(i_def),     intent(in) :: npanels
     integer(i_def),     intent(in) :: rim_depth
 

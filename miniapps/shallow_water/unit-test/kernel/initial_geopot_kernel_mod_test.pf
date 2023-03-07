@@ -121,6 +121,7 @@ contains
     real(r_def), parameter :: dx = 2.0_r_def
     real(r_def), parameter :: dy = 2.0_r_def
     real(r_def), parameter :: dz = 2.0_r_def
+    real(r_def), parameter :: domain_x = 4.0_r_def
 
     real(r_def), parameter :: initial_time = 0.0_r_def
 
@@ -194,10 +195,10 @@ contains
     geopot(:) = 0.0_r_def
 
     ! Use geostrophic balance test
-    call initial_geopot_code(nlayers, geopot,         &
-                             chi1, chi2, chi3,        &
-                             ndf_w3, undf_w3, map_w3, &
-                             ndf_w0, undf_w0, map_w0, basis_w0)
+    call initial_geopot_code( nlayers, geopot, domain_x, &
+                              chi1, chi2, chi3,          &
+                              ndf_w3, undf_w3, map_w3,   &
+                              ndf_w0, undf_w0, map_w0, basis_w0 )
 
     answer = 0.998483873274083_r_def
     @assertEqual(answer, geopot(cell), tol)

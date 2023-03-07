@@ -7,34 +7,17 @@
 !>
 module mesh_constructor_helper_functions_mod
 
-use domain_size_config_mod, only : planar_domain_min_x, &
-                                   planar_domain_max_x, &
-                                   planar_domain_min_y, &
-                                   planar_domain_max_y
-use constants_mod,          only : i_def, i_native, r_def, pi, l_def
-use log_mod,                only : log_event, log_scratch_space, &
-                                   log_level, LOG_LEVEL_DEBUG
-
-
+use constants_mod,  only: i_def, i_native, r_def, pi, l_def
+use log_mod,        only: log_event, log_scratch_space, &
+                          log_level, LOG_LEVEL_DEBUG
 
 implicit none
 
 private
 
-public :: mesh_extruder,           &
-          mesh_connectivity,       &
-          set_domain_size,         &
+public :: mesh_extruder,     &
+          mesh_connectivity, &
           set_dz
-
-! Declare type definitions used in this module
-type, private :: coordinate_type
-  real(r_def) :: x,y,z
-end type coordinate_type
-
-type, public :: domain_size_type
-  type(coordinate_type) :: minimum, maximum
-  real(r_def) :: base_height
-end type domain_size_type
 
 contains
 
@@ -472,51 +455,6 @@ contains
     return
   end subroutine mesh_connectivity
 
-  !===========================================================================
-  !> @brief Helper function to compute the domain limits (x,y,z) for Cartesian
-  !>        domains and (lambda,phi,r) for spherical domains.
-  !>
-  !> @param[out] domain_size   Domain limits in 3d
-  !> @param[in]  domain_top    Top of 3D domain in meters.
-  !> @param[in]  vertex_coords Vertex Coordinates
-  !> @param[in]  nverts        No. of vertices in 3d mesh
-  !>
-  subroutine set_domain_size( domain_size, domain_top, &
-                              vertex_coords, nverts, &
-                              ll_coords, scaled_radius )
-
-    implicit none
-
-    type(domain_size_type), intent(out) :: domain_size
-    real(r_def),            intent(in)  :: domain_top
-    integer(i_def),         intent(in)  :: nverts
-    real(r_def),            intent(in)  :: vertex_coords(3,nverts)
-    logical(l_def),         intent(in)  :: ll_coords
-    real(r_def),            intent(in)  :: scaled_radius
-
-    if ( ll_coords ) then
-      domain_size%minimum%x   =  0.0_r_def
-      domain_size%maximum%x   =  2.0_r_def*PI
-      domain_size%minimum%y   = -0.5_r_def*PI
-      domain_size%maximum%y   =  0.5_r_def*PI
-      domain_size%minimum%z   =  0.0_r_def
-      domain_size%maximum%z   =  domain_top
-      domain_size%base_height =  scaled_radius
-    else
-      domain_size%minimum%x   =  planar_domain_min_x
-      domain_size%maximum%x   =  planar_domain_max_x
-      domain_size%minimum%y   =  planar_domain_min_y
-      domain_size%maximum%y   =  planar_domain_max_y
-      domain_size%minimum%z   =  minval( vertex_coords(3,:))
-      domain_size%maximum%z   =  maxval( vertex_coords(3,:))
-      domain_size%base_height =  0.0_r_def
-    end if
-
-    !> @todo Need to do a global reduction of maxs and mins when the
-    !> code is parallel
-
-    return
-  end subroutine set_domain_size
 
   !============================================================================
   !> @brief Helper function that calculates and stores depth of layers in

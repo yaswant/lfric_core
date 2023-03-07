@@ -19,8 +19,6 @@ module analytic_swe_wind_profiles_mod
   ! Configuration
   use base_mesh_config_mod,   only: geometry, &
                                     geometry_spherical
-  use domain_size_config_mod, only: planar_domain_max_x, &
-                                    planar_domain_min_x
   use planet_config_mod,      only: scaled_radius, scaled_omega
   use shallow_water_settings_config_mod,                           &
                               only: ref_gp,                        &
@@ -39,13 +37,16 @@ contains
 
   !> @brief Compute an analytic velocity field for the shallow water miniapp.
   !> @param[in] chi  Position in physical coordinates
+  !> @param[in] choice
+  !> @param[in] domain_x Domain size in x-direction.
   !> @result    wind The resulting velocity field
-  function analytic_swe_wind(chi, choice) result(wind)
+  function analytic_swe_wind( chi, choice, domain_x ) result(wind)
 
     implicit none
 
     real(kind=r_def), intent(in)   :: chi(3)
     integer,          intent(in)   :: choice
+    real(kind=r_def), intent(in)   :: domain_x
     real(kind=r_def), dimension(3) :: wind
 
     real(kind=r_def), parameter    :: day = 86400.0_r_def
@@ -125,7 +126,7 @@ contains
     case ( swe_test_swe_thermal_dbl_vortex )
       fc  = 2.0_r_def * scaled_omega
       ! Assuming square planar domain
-      lx = planar_domain_max_x - planar_domain_min_x
+      lx = domain_x
       sx = lx * 3.0_r_def / 40.0_r_def
       sy = lx * 3.0_r_def / 40.0_r_def
       ox = 0.1_r_def

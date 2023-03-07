@@ -10,10 +10,11 @@
 !!          analytic expression.
 module initial_geopot_kernel_mod
 
-  use argument_mod,         only: arg_type, func_type,                     &
-                                  GH_FIELD, GH_WRITE, GH_READ, GH_INTEGER, &
-                                  ANY_SPACE_9, GH_BASIS, GH_REAL,          &
-                                  GH_DIFF_BASIS, CELL_COLUMN, GH_EVALUATOR
+  use argument_mod,         only: arg_type, func_type,                    &
+                                  GH_FIELD, GH_SCALAR, GH_WRITE, GH_READ, &
+                                  GH_INTEGER, GH_REAL, ANY_SPACE_9,       &
+                                  GH_BASIS, GH_DIFF_BASIS, CELL_COLUMN,   &
+                                  GH_EVALUATOR
   use fs_continuity_mod,    only: W3
   use constants_mod,        only: r_def, i_def
   use kernel_mod,           only: kernel_type
@@ -28,8 +29,9 @@ module initial_geopot_kernel_mod
   !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
   type, public, extends(kernel_type) :: initial_geopot_kernel_type
       private
-      type(arg_type) :: meta_args(2) = (/                      &
+      type(arg_type) :: meta_args(3) = (/                      &
           arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),         &
+          arg_type(GH_SCALAR,  GH_REAL, GH_READ),              &
           arg_type(GH_FIELD*3, GH_REAL, GH_READ,  ANY_SPACE_9) &
           /)
       type(func_type) :: meta_funcs(1) = (/                    &
@@ -51,6 +53,7 @@ contains
   !> @brief Compute the initial geopotential field.
   !> @param[in]     nlayers      The number of model layers
   !> @param[in,out] geopotential The field to compute
+  !> @param[in]     domain_x     Domain size in x direction.
   !> @param[in]     chi_1        Real array, the x component of the coordinate field
   !> @param[in]     chi_2        Real array, the y component of the coordinate field
   !> @param[in]     chi_3        Real array, the z component of the coordinate field
@@ -61,7 +64,7 @@ contains
   !> @param[in]     undf_wx      The total number of degrees of freedom
   !> @param[in]     map_wx       Integer array holding the dofmap for the cell at the base of the column
   !> @param[in]     wx_basis     Real 5-dim array holding basis functions evaluated at quadrature points
-  subroutine initial_geopot_code(nlayers, geopot,               &
+  subroutine initial_geopot_code(nlayers, geopot, domain_x,     &
                                  chi_1, chi_2, chi_3,           &
                                  ndf_w3, undf_w3, map_w3,       &
                                  ndf_wx, undf_wx, map_wx, wx_basis)
@@ -75,6 +78,7 @@ contains
     integer(kind=i_def), dimension(ndf_w3), intent(in) :: map_w3
     integer(kind=i_def), dimension(ndf_wx), intent(in) :: map_wx
     real(kind=r_def), dimension(undf_w3),          intent(inout) :: geopot
+    real(kind=r_def),                              intent(in)    :: domain_x
     real(kind=r_def), dimension(undf_wx),          intent(in)    :: chi_1, chi_2, chi_3
     real(kind=r_def), dimension(1,ndf_wx,ndf_w3),  intent(in)    :: wx_basis
 
@@ -98,7 +102,7 @@ contains
         x(3) = x(3) + chi_3_e(df0)*wx_basis(1,df0,df)
       end do
 
-      geopot(map_w3(df)) = analytic_geopot(x, swe_test)
+      geopot(map_w3(df)) = analytic_geopot(x, swe_test, domain_x)
 
     end do
 

@@ -107,6 +107,7 @@ contains
 
     real(kind=r_def) :: xyz(3)
     real(kind=r_def) :: geopot_sol, answer
+    real(kind=r_def) :: domain_x = 1.0_r_def
     real(kind=r_def) :: tol
 
     tol = 1.0e-14_r_def
@@ -115,17 +116,17 @@ contains
     ! xyz are geocentric coordinates
 
     xyz = (/ 0.0_r_def, 0.0_r_def, scaled_radius /)
-    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance )
+    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance, domain_x )
     answer = 11305.645371144576_r_def
     @assertEqual(answer, geopot_sol, tol)
 
     xyz = (/ 0.0_r_def, sqrt(1.0_r_def/2.0_r_def)*scaled_radius, sqrt(1.0_r_def/2.0_r_def)*scaled_radius /)
-    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance )
+    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance, domain_x )
     answer = 20362.82268557229_r_def
     @assertEqual(answer, geopot_sol, tol)
 
     xyz = (/ 0.0_r_def, scaled_radius, 0.0_r_def /)
-    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance )
+    geopot_sol = analytic_geopot(xyz, swe_test_swe_geostr_balance, domain_x )
     answer = 29420.0_r_def
     @assertEqual(answer, geopot_sol, tol)
 

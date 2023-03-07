@@ -93,7 +93,7 @@ contains
     integer(i_def) :: npanels
     integer(i_def) :: rim_depth
     integer(i_def) :: void_cell
-    real(r_def)    :: domain_size(2)
+    real(r_def)    :: domain_extents(2,4)
     real(r_def)    :: north_pole(2)
     real(r_def)    :: null_island(2)
 
@@ -138,7 +138,7 @@ contains
                              null_island,        &
                              constructor_inputs, &
                              rim_depth,          &
-                             domain_size,        &
+                             domain_extents,     &
                              void_cell,          &
                              face_next_2d,       &
                              node_on_face_2d,    &
@@ -236,7 +236,7 @@ contains
     integer(i_def) :: ntarget_meshes
     integer(i_def) :: rim_depth
 
-    real(r_def) :: domain_size(2)
+    real(r_def) :: domain_extents(2,4)
     real(r_def) :: north_pole(2)
     real(r_def) :: null_island(2)
 
@@ -290,7 +290,8 @@ contains
     integer(i_def), parameter :: kgo_n_ghosts = 13
     real(r_def),    parameter :: kgo_north_pole(2)  = [0.0, 90.0]
     real(r_def),    parameter :: kgo_null_island(2) = [0.0,  0.0]
-    real(r_def),    parameter :: kgo_domain_size(2) = [20.0, 20.0]
+
+    real(r_def) :: kgo_domain_extents(2,4)
 
     character(str_def), parameter :: kgo_target_names(1)   = ['SQ10']
     character(str_def), parameter :: kgo_coord_units_xy(2) = ['degrees_east ',&
@@ -453,6 +454,10 @@ contains
       271,272,273,231,     273,274,275,233,     275,276,277,235,    277,278,279,237, &
       279,280,281,239 ], (/4, kgo_n_faces/) )
 
+    kgo_domain_extents(:,1)  = [ -4.0, -4.0]
+    kgo_domain_extents(:,2)  = [ 16.0, -4.0]
+    kgo_domain_extents(:,3)  = [ 16.0, 16.0]
+    kgo_domain_extents(:,4)  = [ -4.0, 16.0]
 
     mesh_name_in = 'SQ20'
     filename = 'data/dev_LAM_locals_20-24.nc'
@@ -481,7 +486,7 @@ contains
                              null_island,        &
                              constructor_inputs, &
                              rim_depth,          &
-                             domain_size,        &
+                             domain_extents,     &
                              void_cell,          &
                              face_on_face,       &
                              node_on_face,       &
@@ -515,9 +520,9 @@ contains
     @assertEqual( kgo_node_on_face, node_on_face )
 
     tol = 1.0e-14
-    @assertEqual( kgo_domain_size, domain_size, tol )
-    @assertEqual( kgo_node_coords, node_coords, tol )
-    @assertEqual( kgo_face_coords, face_coords, tol )
+    @assertEqual( kgo_domain_extents, domain_extents, tol )
+    @assertEqual( kgo_node_coords,    node_coords,    tol )
+    @assertEqual( kgo_face_coords,    face_coords,    tol )
 
     call ugrid_mesh_data%get_partition_data(    &
                              max_stencil_depth, &

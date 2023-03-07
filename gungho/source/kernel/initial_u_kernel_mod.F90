@@ -38,10 +38,12 @@ module initial_u_kernel_mod
   !>
   type, public, extends(kernel_type) :: initial_u_kernel_type
     private
-    type(arg_type) :: meta_args(4) = (/                                     &
+    type(arg_type) :: meta_args(6) = (/                                     &
          arg_type(GH_FIELD,   GH_REAL, GH_INC,  W2),                        &
          arg_type(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_9),               &
          arg_type(GH_FIELD,   GH_REAL, GH_READ, ANY_DISCONTINUOUS_SPACE_3), &
+         arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
+         arg_type(GH_SCALAR,  GH_REAL, GH_READ),                            &
          arg_type(GH_SCALAR,  GH_REAL, GH_READ)                             &
          /)
     type(func_type) :: meta_funcs(2) = (/                                   &
@@ -69,6 +71,8 @@ contains
   !! @param[in] chi_3 3rd coordinate field
   !! @param[in] panel_id A field giving the ID for mesh panels.
   !! @param[in] time Time (timestep multiplied by dt)
+  !! @param[in] domain_max_x Domain maximum x-coordinate.
+  !! @param[in] domain_max_y Domain maximum y-coordinate.
   !! @param[in] ndf Number of degrees of freedom per cell for W2
   !! @param[in] undf Total number of degrees of freedom for W2
   !! @param[in] map Dofmap for the cell at the base of the column for W2
@@ -92,6 +96,8 @@ contains
                             chi_1, chi_2, chi_3,             &
                             panel_id,                        &
                             time,                            &
+                            domain_max_x,                    &
+                            domain_max_y,                    &
                             ndf, undf, map, basis,           &
                             ndf_chi, undf_chi,               &
                             map_chi, chi_basis,              &
@@ -128,9 +134,10 @@ contains
                                                            chi_3
   real(kind=r_def), dimension(undf_pid),  intent(in)    :: panel_id
   real(kind=r_def), intent(in)                          :: time
-
-  real(kind=r_def), dimension(nqp_h), intent(in)        ::  wqp_h
-  real(kind=r_def), dimension(nqp_v), intent(in)        ::  wqp_v
+  real(kind=r_def), intent(in)                          :: domain_max_x
+  real(kind=r_def), intent(in)                          :: domain_max_y
+  real(kind=r_def), dimension(nqp_h), intent(in)        :: wqp_h
+  real(kind=r_def), dimension(nqp_v), intent(in)        :: wqp_v
 
 
   integer(kind=i_def), parameter :: n_options = 3
@@ -198,11 +205,15 @@ contains
                        ipanel, llr(1), llr(2), llr(3))
 
           ! Obtain (lon,lat,r) components of u and then transform to (X,Y,Z) components
-          u_spherical = analytic_wind(llr, time, profile, n_options, opt_args)
+          u_spherical = analytic_wind( llr, time, profile, n_options, &
+                                       domain_max_x, domain_max_y,    &
+                                       opt_args )
           u_physical  = sphere2cart_vector(u_spherical,llr)
         else
           ! For planar geometries, no transformation is needed
-          u_physical = analytic_wind(coords, time, profile, n_options, opt_args)
+          u_physical = analytic_wind( coords, time, profile, n_options, &
+                                      domain_max_x, domain_max_y,       &
+                                      opt_args )
         end if
 
         do df = 1, ndf

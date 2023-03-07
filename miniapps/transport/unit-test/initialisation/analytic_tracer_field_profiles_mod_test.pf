@@ -80,9 +80,12 @@ contains
     real(kind=r_def) :: rho
     real(kind=r_def) :: chi(3)
     real(kind=r_def) :: tol
+    real(kind=r_def), parameter :: domain_max_x = 2.0_r_def
+
 
     chi = (/ 2.0_r_def,3.25_r_def,4.5_r_def /)
-    rho = analytic_tracer_field(chi , test_yz_cosine_hill)
+    rho = analytic_tracer_field( chi , test_yz_cosine_hill, &
+                                 domain_max_x )
     if ( r_def == real64 ) then
        tol = 10.0E-12_r_def
     else

@@ -218,12 +218,12 @@ module gen_lbc_mod
     integer(i_def) :: npanels = NPANELS
     integer(i_def) :: nmaps = 1      !> LBC meshes will only map
                                      !> to parent mesh
-    real(r_def)    :: domain_size(2) !> Global domain size of LAM parent
     integer(i_def) :: outer_cells_x  !> Max number of cells in x-direction
     integer(i_def) :: outer_cells_y  !> Max number of cells in y-direction
-
     integer(i_def) :: rim_depth      !> Number of cells from LAM boundary to
                                      !> include in the LBC mesh
+
+    real(r_def)    :: domain_extents(2,4) !> Global domain extents of LAM parent
 
     character(str_longlong) :: constructor_inputs
 
@@ -369,8 +369,7 @@ function gen_lbc_constructor( lam_strategy, rim_depth ) result( self )
                           north_pole   = self%north_pole,           &
                           null_island  = self%null_island,          &
                           geometry     = geometry_key,              &
-                          coord_sys    = coord_sys_key,             &
-                          domain_size  = self%domain_size )
+                          coord_sys    = coord_sys_key)
 
   mesh_parent    = trim(self%target_mesh_names(1))
   self%mesh_name = trim(mesh_parent)//'-lbc'
@@ -554,12 +553,14 @@ end subroutine get_dimensions
 !>
 !> @param[out]  node_coordinates  Node coordinates.
 !> @param[out]  cell_coordinates  Cell centre coordinates.
+!> @param[out]  domain_extents    Principle coordinates describing domain.
 !> @param[out]  coord_units_x     Units for x-coordinates
 !> @param[out]  coord_units_y     Units for y-coordinates
 !-----------------------------------------------------------------------------
 subroutine get_coordinates( self,             &
                             node_coordinates, &
                             cell_coordinates, &
+                            domain_extents,   &
                             coord_units_x,    &
                             coord_units_y )
 
@@ -569,11 +570,13 @@ subroutine get_coordinates( self,             &
 
   real(r_def),         intent(out) :: node_coordinates(:,:)
   real(r_def),         intent(out) :: cell_coordinates(:,:)
+  real(r_def),         intent(out) :: domain_extents(:,:)
   character(str_def),  intent(out) :: coord_units_x
   character(str_def),  intent(out) :: coord_units_y
 
   node_coordinates = self%node_coords
   cell_coordinates = self%cell_coords
+  domain_extents   = self%domain_extents
   coord_units_x    = self%coord_units_x
   coord_units_y    = self%coord_units_y
 
@@ -679,10 +682,11 @@ subroutine generate(self)
   ! 1.2 LAM coordinates
   allocate( lam_node_coords( 2, lam_n_nodes) )
   allocate( lam_cell_coords( 2, lam_n_faces) )
-  call self%lam_strategy%get_coordinates(                      &
-                             node_coordinates=lam_node_coords, &
-                             cell_coordinates=lam_cell_coords, &
-                             coord_units_x=self%coord_units_x, &
+  call self%lam_strategy%get_coordinates(                         &
+                             node_coordinates=lam_node_coords,    &
+                             cell_coordinates=lam_cell_coords,    &
+                             domain_extents=self%domain_extents,  &
+                             coord_units_x=self%coord_units_x,    &
                              coord_units_y=self%coord_units_y )
 
   ! 1.3 LAM connectivity
@@ -758,7 +762,6 @@ end function get_number_of_panels
 !> @param[out] nmaps               Optional, Number of maps to create with this mesh
 !>                                           as source mesh
 !> @param[out] rim_depth           Optional, Rim depth of LBC mesh (LAMs).
-!> @param[out] domain_size         Optional, Size of global model domain.
 !> @param[out] void_cell           Optional, Cell ID used for null connectivity.
 !> @param[out] target_mesh_names   Optional, Mesh names of the target meshes that
 !>                                           this mesh has maps for.
@@ -782,7 +785,6 @@ subroutine get_metadata( self,               &
                          constructor_inputs, &
                          nmaps,              &
                          rim_depth,          &
-                         domain_size,        &
                          void_cell,          &
                          target_mesh_names,  &
                          maps_edge_cells_x,  &
@@ -805,7 +807,6 @@ subroutine get_metadata( self,               &
 
   integer(i_def), optional, intent(out) :: rim_depth
   integer(i_def), optional, intent(out) :: void_cell
-  real(r_def),    optional, intent(out) :: domain_size(2)
 
   character(str_longlong), optional, intent(out) :: constructor_inputs
 
@@ -848,7 +849,6 @@ subroutine get_metadata( self,               &
   end if
 
   ! These are inherited from LAM so should be in degrees for cf-compliance
-  if (present(domain_size)) domain_size(:) = self%domain_size(:)
   if (present(north_pole))  north_pole(:)  = self%north_pole(:)
   if (present(null_island)) null_island(:) = self%null_island(:)
 

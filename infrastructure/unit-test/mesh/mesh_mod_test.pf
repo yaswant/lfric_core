@@ -27,8 +27,7 @@ module mesh_mod_test
   use mesh_map_mod,         only: mesh_map_type
   use mesh_map_collection_mod, &
                             only: mesh_map_collection_type
-  use mesh_constructor_helper_functions_mod, &
-                            only: domain_size_type
+  use domain_mod,           only: domain_type
   use ncdf_quad_mod,        only: ncdf_quad_type
   use pFUnit_Mod
 
@@ -678,11 +677,10 @@ contains
 
     type(mesh_type)     :: mesh_1
     type(local_mesh_type), pointer :: local_mesh_ptr
-    type(domain_size_type) :: domain
+    type(domain_type)   :: domain
     real(r_def)         :: test_real
 
     local_mesh_ptr => this%get_local_mesh_ptr()
-
     mesh_1 = mesh_type( local_mesh_ptr, this%extrusion )
 
     !-------------------------------------------------------------------
@@ -690,12 +688,12 @@ contains
     ! Note: At present, it returns coords in cartesian coords [x,y,z]
     !       or in spherical coords depending on the logical l_spherical.
     !       This should be change to only output in [x,y,z]
-    domain = mesh_1%get_domain_size()
-    test_real = domain % maximum % x
-    @assertEqual ( test_real,  2.0_r_def*PI )
-    test_real = domain % minimum % y
-    @assertEqual ( test_real, -0.5_r_def*PI )
-    test_real = domain % maximum % z
+    domain = mesh_1%get_domain()
+    test_real = domain % maximum_lonlat(axis=1)
+    @assertEqual ( test_real,  2.0_r_def )
+    test_real = domain % minimum_lonlat(axis=2)
+    @assertEqual ( test_real, -2.0_r_def )
+    test_real = domain % maximum_lonlat(axis=3)
     @assertEqual ( test_real, 10000.0_r_def )
 
     !-------------------------------------------------------------------

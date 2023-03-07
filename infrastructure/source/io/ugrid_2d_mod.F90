@@ -49,7 +49,9 @@ type, public :: ugrid_2d_type
 
   character(str_longlong) :: constructor_inputs !< Inputs used to generate mesh.
 
-  character(str_def) :: coord_units_xy(2) = cmdi
+  character(str_def) :: coord_units_xy(2)   = cmdi
+  real(r_def)        :: domain_extents(2,4) = rmdi !< Principal coordinates that
+                                                   !< describe the domain shape.
 
   integer(i_def) :: edge_cells_xy(2) !< Number of cells on panel edge x/y-axes
 
@@ -66,10 +68,6 @@ type, public :: ugrid_2d_type
 
   ! Variables for LBC mesh only.
   integer(i_def) :: rim_depth = imdi         !< Depth (in cells) of rim in LBC meshes
-
-  ! Variables for Regional mesh only.
-  ! Domain size along x/y-axes.
-  real(r_def)    :: domain_size(2) = rmdi    !< Regional model domain size in x/y-axes
 
   ! Variables for Local meshes only.
   character(str_def) :: partition_of = cmdi  !< For local meshes, this is the name of
@@ -396,6 +394,8 @@ subroutine set_by_generator(self, generator_strategy)
   class(ugrid_2d_type),        intent(inout) :: self
   class(ugrid_generator_type), intent(inout) :: generator_strategy
 
+  call generator_strategy%generate()
+
   call generator_strategy%get_metadata                &
       ( mesh_name          = self%mesh_name,          &
         geometry           = self%geometry,           &
@@ -408,14 +408,10 @@ subroutine set_by_generator(self, generator_strategy)
         north_pole         = self%north_pole,         &
         null_island        = self%null_island,        &
         rim_depth          = self%rim_depth,          &
-        domain_size        = self%domain_size,        &
         nmaps              = self%nmaps,              &
         void_cell          = self%void_cell )
 
-
   self%npanels = generator_strategy%get_number_of_panels()
-
-  call generator_strategy%generate()
 
   call allocate_arrays(self, generator_strategy)
 
@@ -431,6 +427,7 @@ subroutine set_by_generator(self, generator_strategy)
   call generator_strategy%get_coordinates          &
       ( node_coordinates = self%node_coordinates,  &
         cell_coordinates = self%face_coordinates,  &
+        domain_extents   = self%domain_extents,    &
         coord_units_x    = self%coord_units_xy(1), &
         coord_units_y    = self%coord_units_xy(2) )
 
@@ -507,8 +504,7 @@ subroutine set_from_file_read(self, mesh_name, filename)
        self%void_cell,                                           &
        self%face_node_connectivity, self%face_edge_connectivity, &
        self%face_face_connectivity, self%edge_node_connectivity, &
-
-       self%topology, self%periodic_xy, self%domain_size,        &
+       self%topology, self%periodic_xy, self%domain_extents,     &
        self%npanels, self%rim_depth, self%constructor_inputs,    &
 
        self%partition_of, self%num_faces_global,                 &
@@ -574,7 +570,7 @@ subroutine write_to_file(self, filename)
        ! Global mesh variables.
        topology           = self%topology,           &
        periodic_xy        = self%periodic_xy,        &
-       domain_size        = self%domain_size,        &
+       domain_extents     = self%domain_extents,     &
        npanels            = self%npanels,            &
        rim_depth          = self%rim_depth,          &
        constructor_inputs = self%constructor_inputs, &
@@ -655,7 +651,7 @@ subroutine append_to_file(self, filename)
        ! Global mesh variables.
        topology           = self%topology,           &
        periodic_xy        = self%periodic_xy,        &
-       domain_size        = self%domain_size,        &
+       domain_extents     = self%domain_extents,     &
        npanels            = self%npanels,            &
        rim_depth          = self%rim_depth,          &
        constructor_inputs = self%constructor_inputs, &
@@ -711,7 +707,8 @@ end subroutine append_to_file
 !> @param[out] edge_cells_x       Number of panel edge cells (x-axis).
 !> @param[out] edge_cells_y       Number of panel edge cells (y-axis).
 !> @param[out] ncells_global      Number of cells in the global mesh.
-!> @param[out] domain_size        Domain size ix x/y-axes.
+!> @param[out] domain_extents     Principal coordinates that describe the
+!>                                domain shape.
 !> @param[out] rim_depth          Rim depth (in cells) for LBC meshes.
 !> @param[out] inner_depth        Number of inner halo layers.
 !> @param[out] halo_depth         Number of outer halo layers.
@@ -734,7 +731,7 @@ subroutine get_metadata( self, mesh_name,               &
                          npanels, periodic_xy,          &
                          max_stencil_depth, void_cell,  &
                          edge_cells_x, edge_cells_y,    &
-                         ncells_global, domain_size,    &
+                         ncells_global, domain_extents, &
                          rim_depth, inner_depth,        &
                          halo_depth, partition_of,      &
                          num_edge, last_edge_cell,      &
@@ -775,11 +772,11 @@ subroutine get_metadata( self, mesh_name,               &
   integer(i_def), optional, intent(out) :: num_ghost
   integer(i_def), optional, intent(out) :: last_ghost_cell
   integer(i_def), optional, intent(out) :: ncells_global
-  real(r_def),    optional, intent(out) :: domain_size(2)
+  real(r_def),    optional, intent(out) :: domain_extents(2,4)
   integer(i_def), optional, intent(out) :: rim_depth
 
   if (present(constructor_inputs)) constructor_inputs = self%constructor_inputs
-  if (present(domain_size))        domain_size        = self%domain_size
+  if (present(domain_extents))     domain_extents     = self%domain_extents
   if (present(rim_depth))          rim_depth          = self%rim_depth
   if (present(partition_of))       partition_of       = self%partition_of
   if (present(inner_depth))        inner_depth        = self%inner_depth
@@ -1409,7 +1406,8 @@ end subroutine set_partition_data
 !> @param[in]   num_ghost          Optional: Number of cells in the partition ghost layer.
 !> @param[in]   last_ghost_cell    Optional: Local ID of last cell in partition ghost layer.
 !> @param[in]   max_stencil_depth  Optional: Maximum stencil depth supported (Local meshes).
-!> @param[in]   domain_size        Optional: Domain size ix x/y-axes.
+!> @param[in]   domain_extents     Optional: Principal coordinates that describe the
+!>                                           domain shape.
 !> @param[in]   rim_depth          Optional: Rim depth (in cells) for LBC meshes.
 !> @param[in]   periodic_xy        Optional: Model domain periodicity in x/y-axes.
 !> @param[in]   edge_cells_x       Optional: Number of cells on panel edge (x-axis).
@@ -1433,7 +1431,7 @@ subroutine set_metadata ( self,                &
                           num_ghost,           &
                           last_ghost_cell,     &
                           max_stencil_depth,   &
-                          domain_size,         &
+                          domain_extents,      &
                           rim_depth,           &
                           periodic_xy,         &
                           edge_cells_x,        &
@@ -1464,8 +1462,7 @@ subroutine set_metadata ( self,                &
   integer(i_def), optional, intent(in) :: rim_depth
   integer(i_def), optional, intent(in) :: edge_cells_x
   integer(i_def), optional, intent(in) :: edge_cells_y
-
-  real(r_def),    optional, intent(in) :: domain_size(2)
+  real(r_def),    optional, intent(in) :: domain_extents(2,4)
   logical(l_def), optional, intent(in) :: periodic_xy(2)
 
   integer(i_def),     optional, intent(in) :: nmaps
@@ -1490,9 +1487,10 @@ subroutine set_metadata ( self,                &
   if (present(edge_cells_x)) self%edge_cells_xy(1) = edge_cells_x
   if (present(edge_cells_y)) self%edge_cells_xy(2) = edge_cells_y
 
-  if (present(domain_size)) then
-    self%domain_size = domain_size
+  if (present(domain_extents)) then
+    self%domain_extents(:,:) = domain_extents(:,:)
   end if
+
   if (present(rim_depth)) self%rim_depth = rim_depth
 
   if (present(max_stencil_depth))  self%max_stencil_depth = max_stencil_depth
@@ -1581,17 +1579,17 @@ subroutine clear(self)
   self%num_edges_per_face = imdi
   self%max_num_faces_per_node = imdi
 
-  self%nmaps            = 0
-  self%rim_depth        = imdi
-  self%domain_size(2)   = rmdi
-  self%partition_of     = cmdi
-  self%inner_depth      = imdi
-  self%halo_depth       = imdi
-  self%num_edge         = imdi
-  self%last_edge_cell   = imdi
-  self%num_ghost        = imdi
-  self%last_ghost_cell  = imdi
-  self%num_faces_global = imdi
+  self%nmaps               = 0
+  self%rim_depth           = imdi
+  self%domain_extents(:,:) = rmdi
+  self%partition_of        = cmdi
+  self%inner_depth         = imdi
+  self%halo_depth          = imdi
+  self%num_edge            = imdi
+  self%last_edge_cell      = imdi
+  self%num_ghost           = imdi
+  self%last_ghost_cell     = imdi
+  self%num_faces_global    = imdi
 
   self%target_global_mesh_maps => null()
 

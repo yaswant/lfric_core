@@ -18,7 +18,8 @@
 !!                      size as an integer argument.
 module wt_advective_update_alg_mod
 
-  use constants_mod,                      only: r_def, i_def, l_def, str_def, r_tran
+  use constants_mod,                      only: r_def, i_def, l_def, str_def, &
+                                                r_tran, radians_to_degrees
   use extrusion_mod,                      only: TWOD
   use geometric_constants_mod,            only: get_coordinates,                &
                                                 get_extended_coordinates,       &
@@ -150,6 +151,7 @@ contains
   !!
   subroutine wt_advective_update_alg_init( mesh )
 
+    use domain_mod,              only: domain_type
     use reference_element_mod,   only: reference_element_type
     use mesh_mod,                only: mesh_type
     use geometric_constants_mod, only: get_height
@@ -196,6 +198,10 @@ contains
     type(operator_type) :: mm_wtheta
     type(field_type), target :: mmtheta_diag
 
+    type(domain_type) :: domain
+    real(kind=r_def)  :: domain_size_x
+    real(kind=r_def)  :: domain_size_y
+
     reference_element => mesh%get_reference_element()
     mesh_index = find_mesh_index(mesh%get_id())
 
@@ -205,6 +211,19 @@ contains
     adv_2d_stencil_size = 0_i_def
     ndata_h = 0_i_def
     ndata_v = 0_i_def
+
+    domain = mesh%get_domain()
+    if ( domain%is_lonlat() ) then
+      domain_size_x = domain%maximum_lonlat(axis=1) - domain%minimum_lonlat(axis=1)
+      domain_size_y = domain%maximum_lonlat(axis=2) - domain%minimum_lonlat(axis=2)
+
+      domain_size_x = radians_to_degrees * domain_size_x
+      domain_size_y = radians_to_degrees * domain_size_y
+    else
+      domain_size_x = domain%maximum_xy(axis=1) - domain%minimum_xy(axis=1)
+      domain_size_y = domain%maximum_xy(axis=2) - domain%minimum_xy(axis=2)
+    end if
+
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
     nlayers = mesh%get_nlayers()
 
@@ -310,6 +329,7 @@ contains
                                                adv_stencil_extent,             &
                                                ndata_h, fv_horizontal_order,   &
                                                nfaces_re_h, transform_radius,  &
+                                               domain_size_x, domain_size_y,   &
                                                nlayers, qr, qre ) )
         else
           call invoke( poly2d_advective_coeffs_kernel_type(                    &
@@ -323,8 +343,9 @@ contains
                                                ndata_h, fv_horizontal_order,   &
                                                nfaces_re_h,                    &
                                                adv_2d_stencil_size,            &
-                                               transform_radius, nlayers,      &
-                                               qr, qre ) )
+                                               transform_radius,               &
+                                               domain_size_x, domain_size_y,   &
+                                               nlayers, qr, qre ) )
         end if
         ! Vertical advective coeffs
         call log_event( "Gungho: computing vertical advective coeffs", LOG_LEVEL_INFO )

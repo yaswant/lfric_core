@@ -108,12 +108,13 @@ contains
     real(kind=r_def) :: xyz(3)
     real(kind=r_def) :: wind(3), answer(3)
     real(r_def), parameter :: tol = 1.0e-14
+    real(r_def), parameter :: domain_x=1.0_r_def
 
     ! Test with Mountain test case and different latitudes
     ! xyz is (long,lat,r)
 
     xyz = (/ 0.0_r_def, pi/4.0_r_def, scaled_radius /)
-    wind = analytic_swe_wind(xyz, swe_test_swe_mountain )
+    wind = analytic_swe_wind( xyz, swe_test_swe_mountain, domain_x )
     answer(1) = 14.142135623730951_r_def
     answer(2) = 0.0_r_def
     answer(3) = 0.0_r_def
@@ -122,7 +123,7 @@ contains
     @assertEqual(answer(3), wind(3), tol)
 
     xyz = (/ 0.0_r_def, 1.0_r_def, scaled_radius /)
-    wind = analytic_swe_wind(xyz, swe_test_swe_mountain )
+    wind = analytic_swe_wind( xyz, swe_test_swe_mountain, domain_x )
     answer(1) = 10.806046117362795_r_def
     answer(2) = 0.0_r_def
     answer(3) = 0.0_r_def
@@ -131,7 +132,7 @@ contains
     @assertEqual(answer(3), wind(3), tol)
 
     xyz = (/ 0.0_r_def, -pi/8.0_r_def, scaled_radius /)
-    wind = analytic_swe_wind(xyz, swe_test_swe_mountain )
+    wind = analytic_swe_wind( xyz, swe_test_swe_mountain, domain_x )
     answer(1) = 18.477590650225736_r_def
     answer(2) = 0.0_r_def
     answer(3) = 0.0_r_def

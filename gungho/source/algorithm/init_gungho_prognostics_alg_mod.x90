@@ -10,7 +10,8 @@ module init_gungho_prognostics_alg_mod
   use log_mod,                         only: log_event,         &
                                              LOG_LEVEL_ERROR,   &
                                              LOG_LEVEL_INFO
-  use constants_mod,                   only: r_def, i_def
+  use constants_mod,                   only: r_def, i_def, radians_to_degrees
+  use domain_mod,                      only: domain_type
   use mass_matrix_solver_alg_mod,      only: mass_matrix_solver_alg
   use geometric_constants_mod,         only: get_coordinates, &
                                              get_panel_id,    &
@@ -106,7 +107,20 @@ contains
     type(field_type),           pointer :: panel_id => null()
     type(quadrature_xyoz_type), pointer :: qr => null()
 
+    type(domain_type) :: domain
+    real(kind=r_def)  :: domain_max_x
+    real(kind=r_def)  :: domain_max_y
+
     mesh => u%get_mesh()
+    domain = mesh%get_domain()
+    if ( domain%is_lonlat() ) then
+      domain_max_x = radians_to_degrees * domain%maximum_lonlat(axis=1)
+      domain_max_y = radians_to_degrees * domain%maximum_lonlat(axis=2)
+    else
+      domain_max_x = domain%maximum_xy(axis=1)
+      domain_max_y = domain%maximum_xy(axis=2)
+    end if
+
     qr => get_qr()
     chi => get_coordinates(mesh%get_id())
     panel_id => get_panel_id(mesh%get_id())
@@ -144,10 +158,11 @@ contains
         call invoke( name = "initialise_streamfunction",                       &
                      setval_c(psi, 0.0_r_def),                                 &
                      setval_c(r_psi, 0.0_r_def),                               &
-                     initial_streamfunc_kernel_type(r_psi, chi, panel_id,      &
-                                                    time, sbr_angle_lat,       &
-                                                    sbr_angle_lon,             &
-                                                    u0, v0, qr ) )
+                     initial_streamfunc_kernel_type( r_psi, chi, panel_id,     &
+                                                     time, domain_max_x,       &
+                                                     sbr_angle_lat,            &
+                                                     sbr_angle_lon,            &
+                                                     u0, v0, qr ) )
         ! We do not want to force zero stream function at boundaries
         call mass_matrix_solver_alg(psi, r_psi, bc_flag=.false.)
         call invoke( name = "get_u_from_curl_of_psi", &
@@ -167,10 +182,11 @@ contains
 
         call log_event("Initialise u with projection", LOG_LEVEL_INFO)
         call r_u%initialise( vector_space =  u%get_function_space() )
-        call invoke( name = "get_u_from_projection",  &
-                     setval_c( u,   0.0_r_def ),      &
-                     setval_c( r_u, 0.0_r_def ),      &
-                     initial_u_kernel_type( r_u, chi, panel_id, time, qr ), &
+        call invoke( name = "get_u_from_projection",                       &
+                     setval_c( u, 0.0_r_def ), setval_c( r_u, 0.0_r_def ), &
+                     initial_u_kernel_type( r_u, chi, panel_id, time,      &
+                                            domain_max_x, domain_max_y,    &
+                                            qr ),                          &
                      enforce_bc_kernel_type( r_u ) )
         call mass_matrix_solver_alg(u, r_u)
       end if

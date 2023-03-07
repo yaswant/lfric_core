@@ -128,9 +128,8 @@ contains
 
     use field_mod,                      only : field_type, field_proxy_type
     use mesh_mod,                       only : mesh_type
-    use mesh_constructor_helper_functions_mod, &
-                                        only : domain_size_type
-    use orography_helper_functions_mod, only : calc_domain_size_horizontal
+    use domain_mod,                     only : domain_type
+    use orography_helper_functions_mod, only : set_horizontal_domain_size
     use function_space_collection_mod,  only : function_space_collection
     use orography_config_mod,           only : orog_init_option, &
                                                orog_init_option_ancil
@@ -149,7 +148,7 @@ contains
     ! Local variables
     type( field_proxy_type )     :: chi_proxy(3)
     type( field_proxy_type )     :: panel_id_proxy
-    type( domain_size_type )     :: domain_size
+    type( domain_type )          :: domain
     real(kind=r_def)             :: domain_top, domain_surface
     integer(kind=i_def)          :: cell
     integer(kind=i_def)          :: undf_chi, ndf_chi, nlayers
@@ -180,15 +179,12 @@ contains
     end if
 
     ! Get domain size
-    domain_size = mesh%get_domain_size()
-    ! Calculate horizontal domain size from the domain_size object
-    call calc_domain_size_horizontal(domain_size%minimum%x, &
-                                     domain_size%maximum%x, &
-                                     domain_size%minimum%y, &
-                                     domain_size%maximum%y)
+    domain = mesh%get_domain()
+    call set_horizontal_domain_size( domain )
+
 
     ! Get physical height of flat domain surface from the domain_size object
-    domain_surface = domain_size%base_height
+    domain_surface = domain%get_base_height()
 
     ! Get domain top from the mesh object and domain_surface
     domain_top = mesh%get_domain_top() + domain_surface

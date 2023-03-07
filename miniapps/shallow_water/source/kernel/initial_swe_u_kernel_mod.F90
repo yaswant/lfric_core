@@ -12,7 +12,8 @@
 module initial_swe_u_kernel_mod
 
   use argument_mod,            only : arg_type, func_type,             &
-                                      GH_FIELD, GH_INC, GH_READ,       &
+                                      GH_FIELD, GH_SCALAR, GH_INC,     &
+                                      GH_READ,                         &
                                       ANY_SPACE_9, GH_REAL,            &
                                       GH_BASIS, GH_DIFF_BASIS,         &
                                       CELL_COLUMN, GH_QUADRATURE_XYoZ, &
@@ -37,10 +38,11 @@ module initial_swe_u_kernel_mod
   !>
   type, public, extends(kernel_type) :: initial_swe_u_kernel_type
     private
-    type(arg_type) :: meta_args(3) = (/                                   &
-        arg_type(GH_FIELD,   GH_REAL, GH_INC,  W2),                       &
-        ARG_TYPE(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_9),              &
-        arg_type(GH_FIELD,   GH_REAL, GH_READ, ANY_DISCONTINUOUS_SPACE_3) &
+    type(arg_type) :: meta_args(4) = (/                                    &
+        arg_type(GH_FIELD,   GH_REAL, GH_INC,  W2),                        &
+        ARG_TYPE(GH_FIELD*3, GH_REAL, GH_READ, ANY_SPACE_9),               &
+        arg_type(GH_FIELD,   GH_REAL, GH_READ, ANY_DISCONTINUOUS_SPACE_3), &
+        arg_type(GH_SCALAR,  GH_REAL, GH_READ)                             &
         /)
     type(func_type) :: meta_funcs(2) = (/               &
         func_type(W2, GH_BASIS),                        &
@@ -65,6 +67,8 @@ contains
 !> @param[in]     chi_1          X component of the coordinate field
 !> @param[in]     chi_2          Y component of the coordinate field
 !> @param[in]     chi_3          Z component of the coordinate field
+!> @param[in]     panel_id
+!> @param[in]     domain_x       domain_size in x direction.
 !> @param[in]     ndf            Number of degrees of freedom per cell
 !> @param[in]     undf           Total number of degrees of freedom
 !> @param[in]     map            Dofmap for the cell at the base of the column
@@ -79,7 +83,8 @@ contains
 !> @param[in]     wqp_h          Horizontal quadrature weights
 !> @param[in]     wqp_v          Vertical quadrature weights
 subroutine initial_swe_u_code( nlayers, rhs,                       &
-                               chi_1, chi_2, chi_3,panel_id,       &
+                               chi_1, chi_2, chi_3,                &
+                               panel_id, domain_x,                 &
                                ndf, undf, map, basis,              &
                                ndf_chi, undf_chi,                  &
                                map_chi, chi_basis, chi_diff_basis, &
@@ -110,7 +115,8 @@ subroutine initial_swe_u_code( nlayers, rhs,                       &
 
   real(kind=r_def), dimension(undf),     intent(inout) :: rhs
   real(kind=r_def), dimension(undf_chi), intent(in)    :: chi_1, chi_2, chi_3
-  real(kind=r_def), dimension(undf_pid),  intent(in)    :: panel_id
+  real(kind=r_def), dimension(undf_pid), intent(in)    :: panel_id
+  real(kind=r_def),                      intent(in)    :: domain_x
 
   real(kind=r_def), dimension(nqp_h), intent(in)      ::  wqp_h
   real(kind=r_def), dimension(nqp_v), intent(in)      ::  wqp_v
@@ -155,10 +161,10 @@ subroutine initial_swe_u_code( nlayers, rhs,                       &
       end do
       if ( geometry == geometry_spherical ) then
         call xyz2llr(xyz(1), xyz(2), xyz(3), llr(1), llr(2), llr(3))
-        u_spherical = analytic_swe_wind(llr, swe_test)
+        u_spherical = analytic_swe_wind(llr, swe_test, domain_x)
         u_physical = sphere2cart_vector(u_spherical,llr)
       else
-        u_physical = analytic_swe_wind(xyz, swe_test)
+        u_physical = analytic_swe_wind(xyz, swe_test, domain_x)
       end if
       do df = 1, ndf
         integrand = dot_product(matmul(jacobian(:,:,qp1,qp2),&

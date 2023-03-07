@@ -138,6 +138,8 @@ contains
     real(r_def), allocatable :: chi1(:), chi2(:), chi3(:), panel_id(:)
 
     real(kind=r_def) :: answer
+    real(kind=r_def) :: domain_max_x = 18000.00
+    real(kind=r_def) :: domain_max_y = 6000.00
 
     integer :: i, j, k, cell
 
@@ -208,6 +210,8 @@ contains
                          chi3,                            &
                          panel_id,                        &
                          initial_time,                    &
+                         domain_max_x,                    &
+                         domain_max_y,                    &
                          ndf_w2, undf_w2,                 &
                          map_w2(:, cell), basis_w2,       &
                          ndf_w0, undf_w0,                 &

@@ -34,13 +34,10 @@ contains
     use feign_config_mod,        only : feign_base_mesh_config,           &
                                         feign_planet_config,              &
                                         feign_initial_wind_config,        &
-                                        feign_domain_size_config,         &
                                         feign_shallow_water_settings_config
     use initial_wind_config_mod, only : profile_none
     use base_mesh_config_mod,    only : geometry_planar,    &
                                         topology_fully_periodic
-    use domain_size_config_mod,  only : planar_domain_max_x, &
-                                        planar_domain_min_x
     use shallow_water_settings_config_mod,                                &
                                  only : momentum_form_momentum,           &
                                         swe_test_swe_thermal_dbl_vortex,  &
@@ -77,11 +74,6 @@ contains
                                     wind_time_period=0.0_r_def, &
                                     smp_init_wind=.false. )
 
-    call feign_domain_size_config( planar_domain_max_x = 0.5_r_def, &
-                                   planar_domain_max_y = 0.5_r_def, &
-                                   planar_domain_min_x = -0.5_r_def, &
-                                   planar_domain_min_y = -0.5_r_def)
-
     call feign_shallow_water_settings_config(                 &
                   thermal_swe = .false.,                      &
                   momentum_form = momentum_form_momentum,     &
@@ -117,23 +109,24 @@ contains
     real(kind=r_def) :: xyz(3)
     real(kind=r_def) :: buoyancy, answer
     real(r_def), parameter :: tol = 1.0e-14
+    real(r_def), parameter :: domain_x = 1.0_r_def
 
     ! check thermal vortex case at difference x values
 
     xyz = (/ 0.2_r_def, 0.0_r_def, scaled_radius /)
-    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex )
+    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex, domain_x )
     answer = 1.047552825814758_r_def
     @assertEqual(answer, buoyancy, tol)
 
     xyz = (/ -0.2_r_def, 0.0_r_def, scaled_radius /)
-    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex )
+    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex, domain_x )
     answer = 0.952447174185242_r_def
     @assertEqual(answer, buoyancy, tol)
 
     ! check that changing y has no effect
 
     xyz = (/ -0.2_r_def, 0.4_r_def, scaled_radius /)
-    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex )
+    buoyancy = analytic_swe_buoyancy(xyz, swe_test_swe_thermal_dbl_vortex, domain_x )
     answer = 0.952447174185242_r_def
     @assertEqual(answer, buoyancy, tol)
 

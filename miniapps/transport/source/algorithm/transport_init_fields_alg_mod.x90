@@ -12,7 +12,8 @@
 
 module transport_init_fields_alg_mod
 
-  use constants_mod,                     only: r_def, i_def
+  use constants_mod,                     only: r_def, i_def, radians_to_degrees
+  use domain_mod,                        only: domain_type
   use divergence_alg_mod,                only: divergence_alg
   use fem_constants_mod,                 only: get_qr
   use finite_element_config_mod,         only: element_order
@@ -84,6 +85,9 @@ subroutine transport_init_fields_alg( mesh,       &
     real(kind=r_def), parameter         :: initial_time = 0.0_r_def
     integer(kind=i_def)                 :: imr, const_flag, config_flag
 
+    type(domain_type) :: domain
+    real(kind=r_def)  :: domain_max_x
+
     type(field_type),           pointer :: chi(:) => null()
     type(field_type),           pointer :: panel_id => null()
     type(function_space_type),  pointer :: w2_fs => null()
@@ -99,6 +103,13 @@ subroutine transport_init_fields_alg( mesh,       &
     chi  => get_coordinates(mesh%get_id())
     panel_id => get_panel_id(mesh%get_id())
     qr => get_qr()
+
+    domain = mesh%get_domain()
+    if ( domain%is_lonlat() ) then
+      domain_max_x = domain%maximum_lonlat(axis=1) * radians_to_degrees
+    else
+      domain_max_x = domain%maximum_xy(axis=1)
+    end if
 
     ! Set constants
     const_flag  = 1_i_def
@@ -122,15 +133,22 @@ subroutine transport_init_fields_alg( mesh,       &
 
     ! Read in rho and theta first
     if ( method == method_sampled ) then
-      call invoke( initial_rho_sample_kernel_type(          density, chi, panel_id, initial_time ),   &
-                   initial_tracer_field_sample_kernel_type( theta, chi, panel_id, config_flag ),      &
-                   initial_tracer_field_sample_kernel_type( tracer_con, chi, panel_id, config_flag ), &
-                   initial_tracer_field_sample_kernel_type( constant, chi, panel_id, const_flag )  )
+      call invoke( initial_rho_sample_kernel_type(          density,    chi, panel_id, initial_time ),              &
+                   initial_tracer_field_sample_kernel_type( theta,      chi, panel_id, domain_max_x, config_flag ), &
+                   initial_tracer_field_sample_kernel_type( tracer_con, chi, panel_id, domain_max_x, config_flag ), &
+                   initial_tracer_field_sample_kernel_type( constant,   chi, panel_id, domain_max_x, const_flag ) )
      else
-      call invoke( set_rho_kernel_type(          density, chi, panel_id, initial_time, qr ),   &
-                   set_tracer_field_kernel_type( theta, chi, panel_id, config_flag, qr ),      &
-                   set_tracer_field_kernel_type( tracer_con, chi, panel_id, config_flag, qr ), &
-                   set_tracer_field_kernel_type( constant, chi, panel_id, const_flag, qr ) )
+      call invoke( set_rho_kernel_type(          density,    chi, panel_id, &
+                                                 initial_time, qr ),        &
+                   set_tracer_field_kernel_type( theta,      chi, panel_id, &
+                                                 domain_max_x,              &
+                                                 config_flag, qr ),         &
+                   set_tracer_field_kernel_type( tracer_con, chi, panel_id, &
+                                                 domain_max_x,              &
+                                                 config_flag, qr ),         &
+                   set_tracer_field_kernel_type( constant,   chi, panel_id, &
+                                                 domain_max_x,              &
+                                                 const_flag,  qr ) )
     end if
 
     ! Duplicate these values for tracer_adv and mixing ratio

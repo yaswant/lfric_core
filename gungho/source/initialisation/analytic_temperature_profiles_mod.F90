@@ -41,7 +41,6 @@ use generate_global_gw_fields_mod, only : generate_global_gw_pert
 use initial_wind_config_mod,       only : u0, sbr_angle_lat
 use deep_baroclinic_wave_mod,      only : deep_baroclinic_wave
 use formulation_config_mod,        only : shallow
-use domain_size_config_mod,        only : planar_domain_max_x
 use extrusion_config_mod,          only : domain_top
 
 implicit none

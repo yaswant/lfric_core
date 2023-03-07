@@ -26,15 +26,10 @@ module poly_helper_functions_mod_test
 contains
 
   subroutine setUp( this )
-    use feign_config_mod, only : feign_domain_size_config
+
     implicit none
 
     class(poly_helper_functions_test_type), intent(inout) :: this
-
-    call  feign_domain_size_config(planar_domain_min_x = -10.0_r_def, &
-                                   planar_domain_max_x = 10.0_r_def, &
-                                   planar_domain_min_y = -10.0_r_def, &
-                                   planar_domain_max_y = 10.0_r_def )
 
   end subroutine setUp
 
@@ -57,6 +52,8 @@ contains
     real(r_def)               :: use_tol
     logical(l_def)            :: spherical
 
+    real(r_def), parameter :: domain_x = 20.0_r_def
+    real(r_def), parameter :: domain_y = 20.0_r_def
 
     x0 = (/ 0.0_r_def, 0.0_r_def, 0.0_r_def /)
     x1 = (/ 3.0_r_def, 4.0_r_def, 0.0_r_def /)
@@ -66,15 +63,15 @@ contains
     spherical = .false.
     if ( r_def == real64 ) then
       use_tol = tol
-      s = local_distance_2d(x0, x1, xn, spherical)
+      s = local_distance_2d(x0, x1, xn, domain_x, domain_y, spherical)
       @assertEqual(answer, s, use_tol)
-      s(1) = local_distance_1d(x0, x1, xn, spherical)
+      s(1) = local_distance_1d(x0, x1, xn, domain_x, domain_y, spherical)
       @assertEqual(answer(1), s(1), use_tol)
     else
-      s = local_distance_2d(x0, x1, xn, spherical)
+      s = local_distance_2d(x0, x1, xn, domain_x, domain_y, spherical)
       use_tol = 10.0_r_def*spacing( maxval(s) )
       @assertEqual(answer, s, use_tol)
-      s(1) = local_distance_1d(x0, x1, xn, spherical)
+      s(1) = local_distance_1d(x0, x1, xn, domain_x, domain_y, spherical)
       use_tol = 10.0_r_def*spacing( s(1) )
       @assertEqual(answer(1), s(1), use_tol)
     end if
@@ -85,15 +82,15 @@ contains
     answer = (/ asin(0.28_r_def), 0.0_r_def /)
     if ( r_def == real64 ) then
       use_tol = tol
-      s = local_distance_2d(x0, x1, xn, spherical)
+      s = local_distance_2d(x0, x1, xn, domain_x, domain_y, spherical)
       @assertEqual(answer, s, use_tol)
-      s(1) = local_distance_1d(x0, x1, xn, spherical)
+      s(1) = local_distance_1d(x0, x1, xn, domain_x, domain_y, spherical)
       @assertEqual(answer(1), s(1), use_tol)
     else
-      s = local_distance_2d(x0, x1, xn, spherical)
+      s = local_distance_2d(x0, x1, xn, domain_x, domain_y, spherical)
       use_tol = 10.0_r_def*spacing( maxval(s) )
       @assertEqual(answer, s, use_tol)
-      s(1) = local_distance_1d(x0, x1, xn, spherical)
+      s(1) = local_distance_1d(x0, x1, xn, domain_x, domain_y, spherical)
       use_tol = 10.0_r_def*spacing( s(1) )
       @assertEqual(answer(1), s(1), use_tol)
     end if

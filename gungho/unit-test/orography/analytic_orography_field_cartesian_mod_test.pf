@@ -59,7 +59,6 @@ contains
                                               coord_system_xyz
     use feign_config_mod,              only : feign_finite_element_config,   &
                                               feign_base_mesh_config,        &
-                                              feign_domain_size_config,      &
                                               feign_extrusion_config,        &
                                               feign_initial_pressure_config, &
                                               feign_orography_schar_cartesian_config
@@ -88,12 +87,6 @@ contains
                                  number_of_layers=nlayers, &
                                  stretching_height=1.0_r_def, &
                                  stretching_method=stretching_method_linear)
-
-    ! Set domain size
-    call feign_domain_size_config( planar_domain_max_x =  100.0_r_def, &
-                                   planar_domain_max_y =  100.0_r_def, &
-                                   planar_domain_min_x = -100.0_r_def, &
-                                   planar_domain_min_y = -100.0_r_def )
 
     call feign_finite_element_config( cellshape=cellshape_quadrilateral, &
                                       coord_order=0_i_def,               &
@@ -152,6 +145,7 @@ contains
   @Test
   subroutine test_analytic_orography_field_cartesian(this)
 
+    use domain_mod,                            only : domain_type
     use local_mesh_mod,                        only : local_mesh_type
     use mesh_mod,                              only : mesh_type
     use partition_mod,                         only : partition_type,        &
@@ -159,11 +153,9 @@ contains
                                                       partitioner_planar
     use extrusion_mod,                         only : uniform_extrusion_type, &
                                                       PRIME_EXTRUSION
-    use mesh_constructor_helper_functions_mod, only : domain_size_type
-    use orography_helper_functions_mod,        only : calc_domain_size_horizontal
     use assign_orography_field_mod,            only : analytic_orography_cartesian
-    use orography_helper_functions_mod,        only : eta2z_linear
-
+    use orography_helper_functions_mod,        only : eta2z_linear, &
+                                                      set_horizontal_domain_size
     implicit none
     ! Arguments
     class(analytic_orography_field_cartesian_test_type), intent(inout)  :: this
@@ -172,7 +164,7 @@ contains
     type(global_mesh_type),           pointer :: global_mesh_ptr => null()
     type(global_mesh_type),           target  :: global_mesh
     type(mesh_type)                           :: mesh
-    type(domain_size_type)                    :: domain_size
+    type(domain_type)                         :: domain
     type(partition_type)                      :: partition
     procedure(partitioner_interface), pointer :: partitioner_ptr => null()
     type(local_mesh_type),            pointer :: local_mesh_ptr
@@ -213,12 +205,8 @@ contains
     mesh = mesh_type( local_mesh_ptr, extrusion )
 
     ! Get domain size required for the biperiodic coordinate transform
-    domain_size = mesh%get_domain_size()
-    ! Calculate horizontal domain size from the domain_size object
-    call calc_domain_size_horizontal(domain_size%minimum%x, &
-                                     domain_size%maximum%x, &
-                                     domain_size%minimum%y, &
-                                     domain_size%maximum%y)
+    domain = mesh%get_domain()
+    call set_horizontal_domain_size( domain )
 
     ! Set map for chi coordinates
     map(1)  = 1

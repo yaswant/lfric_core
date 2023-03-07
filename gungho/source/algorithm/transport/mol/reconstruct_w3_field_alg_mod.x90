@@ -18,9 +18,11 @@
 !!                      size as an integer argument.
 module reconstruct_w3_field_alg_mod
 
+  use domain_mod,                     only: domain_type
   use combine_multidata_field_kernel_mod, &
                                       only: combine_multidata_field_kernel_type
-  use constants_mod,                  only: r_def, i_def, l_def, str_def
+  use constants_mod,                  only: r_def, i_def, l_def, str_def, &
+                                            radians_to_degrees
   use geometric_constants_mod,        only: get_coordinates,          &
                                             get_extended_coordinates, &
                                             get_panel_id
@@ -191,8 +193,11 @@ contains
     integer(kind=i_def)                    :: vertical_order, nlayers
     type(mesh_type),               pointer :: twod_mesh => null()
 
-    type(operator_type) :: mm_w3
+    type(domain_type)        :: domain
+    type(operator_type)      :: mm_w3
     type(field_type), target :: mm3_diag
+
+    real(kind=r_def) :: domain_size_x, domain_size_y
 
     reference_element => mesh%get_reference_element()
     mesh_index = find_mesh_index(mesh%get_id())
@@ -205,6 +210,18 @@ contains
     ndata_v = 0_i_def
     nlayers = mesh%get_nlayers()
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
+    domain = mesh%get_domain()
+
+    if ( domain%is_lonlat() ) then
+      domain_size_x = domain%maximum_lonlat(axis=1) - domain%minimum_lonlat(axis=1)
+      domain_size_y = domain%maximum_lonlat(axis=2) - domain%minimum_lonlat(axis=2)
+
+      domain_size_x = domain_size_x * radians_to_degrees
+      domain_size_y = domain_size_y * radians_to_degrees
+    else
+      domain_size_x = domain%maximum_xy(axis=1) - domain%minimum_xy(axis=1)
+      domain_size_y = domain%maximum_xy(axis=2) - domain%minimum_xy(axis=2)
+    end if
 
     if ( operators == operators_fv ) then
       ! This setup is only needed for FV methods
@@ -304,6 +321,8 @@ contains
                                                 ndata_h,                       &
                                                 fv_horizontal_order,           &
                                                 transform_radius,              &
+                                                domain_size_x,                 &
+                                                domain_size_y,                 &
                                                 nlayers,                       &
                                                 qr, qrf ) )
         else
@@ -319,6 +338,8 @@ contains
                                                 fv_horizontal_order,           &
                                                 flux_2d_stencil_size,          &
                                                 transform_radius,              &
+                                                domain_size_x,                 &
+                                                domain_size_y,                 &
                                                 nlayers,                       &
                                                 qr, qrf) )
         end if

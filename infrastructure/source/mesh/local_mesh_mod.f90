@@ -160,7 +160,7 @@ module local_mesh_mod
     integer(i_def) :: ncells_global_mesh
 
   ! Domain size of global mesh along x/y-axes
-    real(r_def)    :: domain_size(2) = rmdi
+    real(r_def)    :: domain_extents(2,4) = rmdi
 
   ! Rim depth in cells (LBC meshes)
     integer(i_def) :: rim_depth = imdi
@@ -170,54 +170,56 @@ module local_mesh_mod
 
 
   contains
-    procedure, public  :: initialise_full
-    procedure, public  :: initialise_lbc
-    procedure, public  :: initialise_from_ugrid_data
-    procedure, public  :: initialise_unit_test
-    generic            :: initialise => initialise_full,            &
-                                        initialise_lbc,             &
-                                        initialise_from_ugrid_data, &
-                                        initialise_unit_test
-    procedure, public  :: init_cell_owner
-    procedure, public  :: clear
+    procedure, public :: initialise_full
+    procedure, public :: initialise_lbc
+    procedure, public :: initialise_from_ugrid_data
+    procedure, public :: initialise_unit_test
+    generic           :: initialise => initialise_full,            &
+                                       initialise_lbc,             &
+                                       initialise_from_ugrid_data, &
+                                       initialise_unit_test
+    procedure, public :: init_cell_owner
+    procedure, public :: clear
 
-    procedure, public  :: get_mesh_name
-    procedure, public  :: get_nverts_per_cell
-    procedure, public  :: get_nverts_per_edge
-    procedure, public  :: get_nedges_per_cell
-    procedure, public  :: get_num_cells_in_layer
-    procedure, public  :: get_edge_gid_on_cell
-    procedure, public  :: get_vert_gid_on_cell
-    procedure, public  :: get_vert_coords
-    procedure, public  :: get_n_unique_vertices
-    procedure, public  :: get_n_unique_edges
-    procedure, public  :: get_edge_on_cell
-    procedure, public  :: get_vert_on_cell
-    procedure, public  :: get_vert_cell_owner
-    procedure, public  :: get_edge_cell_owner
-    procedure, public  :: get_cell_next
-    procedure, public  :: get_inner_depth
-    procedure, public  :: get_num_cells_inner
-    procedure, public  :: get_last_inner_cell
-    procedure, public  :: get_num_cells_edge
-    procedure, public  :: get_last_edge_cell
-    procedure, public  :: get_halo_depth
-    procedure, public  :: get_num_cells_halo
-    procedure, public  :: get_last_halo_cell
-    procedure, public  :: get_num_cells_ghost
-    procedure, public  :: get_cell_owner
-    procedure, public  :: get_num_panels_global_mesh
-    procedure, public  :: get_ncells_global_mesh
-    procedure, public  :: get_max_stencil_depth
-    procedure, public  :: get_gid_from_lid
-    procedure, public  :: get_lid_from_gid
-    procedure, public  :: add_local_mesh_map
-    procedure, public  :: get_local_mesh_map
-    procedure, public  :: get_target_mesh_names
-    procedure, public  :: get_mesh_maps
-    procedure, public  :: get_all_gid
-    procedure, public  :: as_ugrid_2d
-    procedure, public  :: get_void_cell
+    procedure, public :: get_mesh_name
+    procedure, public :: get_nverts_per_cell
+    procedure, public :: get_nverts_per_edge
+    procedure, public :: get_nedges_per_cell
+    procedure, public :: get_num_cells_in_layer
+    procedure, public :: get_edge_gid_on_cell
+    procedure, public :: get_vert_gid_on_cell
+    procedure, public :: get_vert_coords
+    procedure, public :: get_n_unique_vertices
+    procedure, public :: get_n_unique_edges
+    procedure, public :: get_edge_on_cell
+    procedure, public :: get_vert_on_cell
+    procedure, public :: get_vert_cell_owner
+    procedure, public :: get_edge_cell_owner
+    procedure, public :: get_cell_next
+    procedure, public :: get_inner_depth
+    procedure, public :: get_num_cells_inner
+    procedure, public :: get_last_inner_cell
+    procedure, public :: get_num_cells_edge
+    procedure, public :: get_last_edge_cell
+    procedure, public :: get_halo_depth
+    procedure, public :: get_num_cells_halo
+    procedure, public :: get_last_halo_cell
+    procedure, public :: get_num_cells_ghost
+    procedure, public :: get_cell_owner
+    procedure, public :: get_num_panels_global_mesh
+    procedure, public :: get_ncells_global_mesh
+    procedure, public :: get_max_stencil_depth
+    procedure, public :: get_gid_from_lid
+    procedure, public :: get_lid_from_gid
+    procedure, public :: add_local_mesh_map
+    procedure, public :: get_local_mesh_map
+    procedure, public :: get_target_mesh_names
+    procedure, public :: get_mesh_maps
+    procedure, public :: get_all_gid
+    procedure, public :: as_ugrid_2d
+    procedure, public :: get_void_cell
+
+    procedure, public :: get_global_domain_extents
 
     procedure, public :: is_geometry_spherical
     procedure, public :: is_geometry_planar
@@ -308,10 +310,10 @@ contains
       self%coord_sys = lon_lat_coords
     end if
 
-    self%domain_size = global_mesh%get_domain_size()
-    self%north_pole  = global_mesh%get_north_pole()
-    self%null_island = global_mesh%get_null_island()
-    self%void_cell   = global_mesh%get_void_cell()
+    self%domain_extents = global_mesh%get_domain_extents()
+    self%north_pole     = global_mesh%get_north_pole()
+    self%null_island    = global_mesh%get_null_island()
+    self%void_cell      = global_mesh%get_void_cell()
 
     ! Extract the info that makes up a local mesh from the
     ! global mesh and partition.
@@ -512,7 +514,6 @@ contains
 
     self%npanels            = partition%get_num_panels_global_mesh()
     self%ncells_global_mesh = global_mesh%get_ncells()
-
     self%ntarget_meshes     = global_mesh%get_nmaps()
     if (self%ntarget_meshes > 0) then
       call global_mesh%get_target_mesh_names(self%target_mesh_names)
@@ -698,7 +699,7 @@ contains
 
   self%ntarget_meshes     = 1_i_def
   self%coord_units_xy     = global_lbc_mesh%get_coord_units()
-  self%domain_size        = global_lam_mesh%get_domain_size()
+  self%domain_extents     = global_lam_mesh%get_domain_extents()
 
   allocate(self%target_mesh_names(1))
   self%target_mesh_names(1) = global_lam_mesh%get_mesh_name()
@@ -777,7 +778,7 @@ contains
     allocate(self%target_mesh_names(1))
     self%target_mesh_names(1) = global_lam_mesh%get_mesh_name()
 
-    self%domain_size    = global_lam_mesh%get_domain_size()
+    self%domain_extents = global_lam_mesh%get_domain_extents()
     self%north_pole     = global_lam_mesh%get_north_pole()
     self%null_island    = global_lam_mesh%get_null_island()
     self%coord_units_xy = global_lam_mesh%get_coord_units()
@@ -1127,7 +1128,7 @@ contains
              self%null_island,        &
              self%constructor_inputs, &
              self%rim_depth,          &
-             self%domain_size,        &
+             self%domain_extents,     &
              self%void_cell,          &
              self%cell_next,          &
              self%vert_on_cell,       &
@@ -1149,10 +1150,10 @@ contains
       if ( (trim(self%coord_units_xy(1)) == 'degrees_east') .and. &
            (trim(self%coord_units_xy(2)) == 'degrees_north') ) then
 
-        self%vert_coords    = degrees_to_radians * self%vert_coords
-        self%domain_size(:) = degrees_to_radians * self%domain_size(:)
-        self%north_pole(:)  = degrees_to_radians * self%north_pole(:)
-        self%null_island(:) = degrees_to_radians * self%null_island(:)
+        self%vert_coords(:,:)    = degrees_to_radians * self%vert_coords(:,:)
+        self%domain_extents(:,:) = degrees_to_radians * self%domain_extents(:,:)
+        self%north_pole(:)       = degrees_to_radians * self%north_pole(:)
+        self%null_island(:)      = degrees_to_radians * self%null_island(:)
 
         self%coord_units_xy = 'radians'
       end if
@@ -1238,7 +1239,6 @@ contains
     self%topology  = periodic_domain
     self%coord_sys = xyz_coords
     self%void_cell = -9999_i_def
-
 
     local_mesh_id_counter = local_mesh_id_counter + 1
     call self%set_id( local_mesh_id_counter )
@@ -2426,23 +2426,23 @@ contains
                                       self%vert_on_cell_gid, &
                                       self%edge_on_cell_gid )
 
-    call ugrid_2d%set_metadata(                             &
-              mesh_name          = self%mesh_name,          &
-              geometry           = geometry,                &
-              topology           = topology,                &
-              npanels            = self%npanels,            &
-              constructor_inputs = self%constructor_inputs, &
-              ncells_global_mesh = self%ncells_global_mesh, &
-              max_stencil_depth  = self%max_stencil_depth,  &
-              domain_size        = self%domain_size,        &
-              rim_depth          = self%rim_depth,          &
-              inner_depth        = self%inner_depth,        &
-              halo_depth         = self%halo_depth,         &
-              num_edge           = self%num_edge,           &
-              last_edge_cell     = self%last_edge_cell,     &
-              num_ghost          = self%num_ghost,          &
-              last_ghost_cell    = self%last_ghost_cell,    &
-              nmaps              = self%ntarget_meshes,     &
+    call ugrid_2d%set_metadata(                                &
+              mesh_name          = self%mesh_name,             &
+              geometry           = geometry,                   &
+              topology           = topology,                   &
+              npanels            = self%npanels,               &
+              constructor_inputs = self%constructor_inputs,    &
+              ncells_global_mesh = self%ncells_global_mesh,    &
+              max_stencil_depth  = self%max_stencil_depth,     &
+              domain_extents     = factor*self%domain_extents, &
+              rim_depth          = self%rim_depth,             &
+              inner_depth        = self%inner_depth,           &
+              halo_depth         = self%halo_depth,            &
+              num_edge           = self%num_edge,              &
+              last_edge_cell     = self%last_edge_cell,        &
+              num_ghost          = self%num_ghost,             &
+              last_ghost_cell    = self%last_ghost_cell,       &
+              nmaps              = self%ntarget_meshes,        &
               target_mesh_names  = self%target_mesh_names )
 
     call ugrid_2d%set_mesh_maps( self%local_mesh_maps )
@@ -2488,6 +2488,24 @@ contains
     void_cell = self%void_cell
 
   end function get_void_cell
+
+
+  !-------------------------------------------------------------------------------
+  !> @brief  Returns the domain extents of the global model.
+  !> @return global_domain_extents  Principal coordinates that describe
+  !>                                the domain shape.
+  !>
+  function get_global_domain_extents(self) result(global_domain_extents)
+
+    implicit none
+
+    class (local_mesh_type), intent(in) :: self
+
+    real(r_def) :: global_domain_extents(2,4)
+
+    global_domain_extents(:,:) = self%domain_extents(:,:)
+
+  end function get_global_domain_extents
 
 
   !-------------------------------------------------------------------------------

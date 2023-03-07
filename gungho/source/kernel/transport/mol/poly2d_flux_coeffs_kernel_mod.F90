@@ -42,7 +42,7 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: poly2d_flux_coeffs_kernel_type
   private
-  type(arg_type) :: meta_args(9) = (/                                                          &
+  type(arg_type) :: meta_args(11) = (/                                                          &
        arg_type(GH_FIELD,   GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),                  &
        arg_type(GH_FIELD,   GH_REAL,    GH_READ,  W3,                        STENCIL(REGION)), &
        arg_type(GH_FIELD*3, GH_REAL,    GH_READ,  ANY_SPACE_1,               STENCIL(REGION)), &
@@ -50,6 +50,8 @@ type, public, extends(kernel_type) :: poly2d_flux_coeffs_kernel_type
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ),                                              &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ),                                              &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ),                                              &
+       arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                              &
+       arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                              &
        arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                              &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ)                                               &
        /)
@@ -98,6 +100,8 @@ contains
 !!                             coords. For Cartesian coordinates this is zero, but
 !!                             for spherical coordinates it is the global minimum
 !!                             of the height field plus 1.
+!> @param[in] domain_x Domain size in x-direction.
+!> @param[in] domain_y Domain size in y-direction.
 !> @param[in] nlayers Number of vertical layers
 !> @param[in] ndf_c Number of degrees of freedom per cell for the coeff space
 !> @param[in] undf_c Total number of degrees of freedom for the coeff space
@@ -136,6 +140,8 @@ subroutine poly2d_flux_coeffs_code(one_layer,                  &
                                    order,                      &
                                    stencil_size,               &
                                    transform_radius,           &
+                                   domain_x,                   &
+                                   domain_y,                   &
                                    nlayers,                    &
                                    ndf_c,                      &
                                    undf_c,                     &
@@ -196,6 +202,7 @@ subroutine poly2d_flux_coeffs_code(one_layer,                  &
   real(kind=r_def), dimension(nqp_f,nfaces_qr), intent(in) ::  wqp_f
 
   real(kind=r_def), intent(in) :: transform_radius
+  real(kind=r_def), intent(in) :: domain_x, domain_y
 
   ! Local variables
   logical(kind=l_def) :: spherical
@@ -298,7 +305,7 @@ subroutine poly2d_flux_coeffs_code(one_layer,                  &
 
       ! Second: Compute the local coordinate of each quadrature point from the
       !         physical coordinate
-      xx = local_distance_2d(x0, xq, xn1, spherical)
+      xx = local_distance_2d(x0, xq, xn1, domain_x, domain_y, spherical)
 
       ! Third: Compute each needed monomial in terms of the local coordinate
       !        on each quadrature point
@@ -340,7 +347,7 @@ subroutine poly2d_flux_coeffs_code(one_layer,                  &
       call chir2xyz(chi(1), chi(2), chi(3), &
                     ipanel, xq(1), xq(2), xq(3))
 
-      xx = local_distance_2d(x0, xq, xn1, spherical)
+      xx = local_distance_2d(x0, xq, xn1, domain_x, domain_y, spherical)
 
       ! Evaluate polynomial fit
       ! Loop over monomials

@@ -62,14 +62,6 @@ n_dep_pt_iterations=1,
 vertical_limit='exponential',
 vertical_method='trapezoidal',
 /
-&development
-/
-&domain_size
-planar_domain_max_x=5000.0,
-planar_domain_max_y=5000.0,
-planar_domain_min_x=-5000.0,
-planar_domain_min_y=-5000.0,
-/
 &extrusion
 domain_top=6000.0,
 method='uniform',

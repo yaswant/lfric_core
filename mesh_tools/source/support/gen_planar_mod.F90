@@ -86,6 +86,7 @@ module gen_planar_mod
     integer(i_def)     :: edge_cells_y
     integer(i_def)     :: npanels = NPANELS
     real(r_def)        :: domain_size(2)
+    real(r_def)        :: domain_extents(2,4)
     real(r_def)        :: north_pole(2)  = TRUE_NORTH_POLE_LL
     real(r_def)        :: null_island(2) = TRUE_NULL_ISLAND_LL
 
@@ -311,7 +312,9 @@ function gen_planar_constructor( reference_element,          &
   if (domain_y <= 0.0_r_def)                                       &
       call log_event( PREFIX//" y-domain argument must be > 0.0.", &
                       LOG_LEVEL_ERROR )
-  self%domain_size  = [domain_x, domain_y]
+
+  self%domain_size         = [ domain_x, domain_y ]
+  self%domain_extents(:,:) = rmdi
 
   if (present(rotate_mesh)) then
     self%rotate_mesh = rotate_mesh
@@ -339,7 +342,8 @@ function gen_planar_constructor( reference_element,          &
   case(coord_sys_ll)
     ! The namelist inputs were in degrees, so convert
     ! and store them as radians.
-    self%domain_size = degrees_to_radians * self%domain_size
+    self%domain_size    = degrees_to_radians * self%domain_size
+
     self%dx = self%domain_size(1) / self%edge_cells_x
     self%dy = self%domain_size(2) / self%edge_cells_y
 
@@ -1354,23 +1358,22 @@ subroutine calc_coords(self)
                     LOG_LEVEL_ERROR )
   end if
 
+  self%domain_extents(:,1) = [           0.0_r_def, -1.0_r_def*self%domain_size(2) ]
+  self%domain_extents(:,2) = [ self%domain_size(1), -1.0_r_def*self%domain_size(2) ]
+  self%domain_extents(:,3) = [ self%domain_size(1),            0.0_r_def ]
+  self%domain_extents(:,4) = [           0.0_r_def,            0.0_r_def ]
+
   select case (self%coord_sys)
 
   case(coord_sys_xyz)
+
     ! Origin (0,0) is centre of mesh. Cell 1 is in top left of mesh panel.
     ! Top NW node will be present in both periodic and non-periodic meshes.
     offset_x = (-1.0_r_def*self%dx*self%edge_cells_x)/2_r_def
     offset_y = (self%dy*self%edge_cells_y)/2_r_def
 
-    if (mod( self%edge_cells_x, 2 ) == 1) then
-      offset_x = offset_x + self%dx/2_r_def
-    end if
-
-    if (mod( self%edge_cells_y, 2 ) == 1) then
-      offset_y = offset_y + self%dy/2_r_def
-    end if
-
   case(coord_sys_ll)
+
     ! Use first_lat and first_lon to determine the offset, to be consistent
     ! with ENDGame. Move the NW node from (0,0) to (offset_x, offset_y) to give
     ! the SW node at (first_lon, first_lat).
@@ -1422,8 +1425,11 @@ subroutine calc_coords(self)
     vert_coords(2, self%verts_on_cell(SE, cell)) = self%dy * self%edge_cells_y * (-1.0_r_def)
   end if
 
-  vert_coords(1,:) =  vert_coords(1,:) + offset_x
-  vert_coords(2,:) =  vert_coords(2,:) + offset_y
+  vert_coords(1,:)    = vert_coords(1,:) + offset_x
+  vert_coords(2,:)    = vert_coords(2,:) + offset_y
+
+  self%domain_extents(1,:) = self%domain_extents(1,:) + offset_x
+  self%domain_extents(2,:) = self%domain_extents(2,:) + offset_y
 
   select case (self%coord_sys)
 
@@ -1521,7 +1527,7 @@ subroutine calc_cell_centres(self)
   self%cell_coords(:,:) = 0.0_r_def
 
   if ( self%topology == topology_non_periodic)then
-    ! 2.1 for non_peridoc domains, we use the standard approach of taking the
+    ! 2.1 for non_periodic domains, we use the standard approach of taking the
     ! mean of the coordinates at the vertices. This will give a value for the
     ! centre in the target coordinates (e.g. ll or xyz).
 
@@ -1607,11 +1613,13 @@ end subroutine get_dimensions
 !>
 !> @param[out]  node_coordinates  The argument to receive the vert_coords data.
 !> @param[out]  cell_coordinates  The argument to receive cell centre coordinates.
+!> @param[out]  domain_extents    Principal coordinates describing the domain.
 !> @param[out]  coord_units_x     Units for x-coordinates.
 !> @param[out]  coord_units_y     Units for y-coordinates.
 !-------------------------------------------------------------------------------
 subroutine get_coordinates(self, node_coordinates, &
                                  cell_coordinates, &
+                                 domain_extents,   &
                                  coord_units_x,    &
                                  coord_units_y)
 
@@ -1620,11 +1628,13 @@ subroutine get_coordinates(self, node_coordinates, &
   class(gen_planar_type), intent(in)  :: self
   real(r_def),            intent(out) :: node_coordinates(:,:)
   real(r_def),            intent(out) :: cell_coordinates(:,:)
+  real(r_def),            intent(out) :: domain_extents(:,:)
   character(str_def),     intent(out) :: coord_units_x
   character(str_def),     intent(out) :: coord_units_y
 
   node_coordinates = self%vert_coords
   cell_coordinates = self%cell_coords
+  domain_extents   = self%domain_extents
   coord_units_x    = self%coord_units_x
   coord_units_y    = self%coord_units_y
 
@@ -1692,20 +1702,23 @@ subroutine generate(self)
   call calc_cell_centres(self)
 
   if (self%rotate_mesh)then
-    call rotate_mesh_coords(self%vert_coords, self%north_pole)
-    call rotate_mesh_coords(self%cell_coords, self%north_pole)
+    call rotate_mesh_coords(self%vert_coords,    self%north_pole)
+    call rotate_mesh_coords(self%cell_coords,    self%north_pole)
+    call rotate_mesh_coords(self%domain_extents, self%north_pole)
   end if
 
   ! Convert coordinate units to degrees to be CF compliant.
   if (trim(self%coord_units_x) == 'radians') then
-    self%vert_coords(1,:) = self%vert_coords(1,:) * radians_to_degrees
-    self%cell_coords(1,:) = self%cell_coords(1,:) * radians_to_degrees
+    self%vert_coords(1,:)    = self%vert_coords(1,:)    * radians_to_degrees
+    self%cell_coords(1,:)    = self%cell_coords(1,:)    * radians_to_degrees
+    self%domain_extents(1,:) = self%domain_extents(1,:) * radians_to_degrees
     self%coord_units_x = 'degrees_east'
   end if
 
   if (trim(self%coord_units_y) == 'radians') then
-    self%vert_coords(2,:) = self%vert_coords(2,:) * radians_to_degrees
-    self%cell_coords(2,:) = self%cell_coords(2,:) * radians_to_degrees
+    self%vert_coords(2,:)    = self%vert_coords(2,:)    * radians_to_degrees
+    self%cell_coords(2,:)    = self%cell_coords(2,:)    * radians_to_degrees
+    self%domain_extents(2,:) = self%domain_extents(2,:) * radians_to_degrees
     self%coord_units_y = 'degrees_north'
   end if
 
@@ -1806,7 +1819,6 @@ end function get_number_of_panels
 !> @param[out, optional]  nmaps               Number of maps to create with this mesh
 !>                                            as source mesh.
 !> @param[out, optional]  rim_depth           Rim depth of LBC mesh (LAMs).
-!> @param[out, optional]  domain_size         Size of global model domain.
 !> @param[out, optional]  target_mesh_names   Mesh names of the target meshes that
 !>                                            this mesh has maps for.
 !> @param[out, optional]  maps_edge_cells_x   Number of panel edge cells (x-axis) of
@@ -1829,7 +1841,6 @@ subroutine get_metadata( self,               &
                          constructor_inputs, &
                          nmaps,              &
                          rim_depth,          &
-                         domain_size,        &
                          void_cell,          &
                          target_mesh_names,  &
                          maps_edge_cells_x,  &
@@ -1850,7 +1861,6 @@ subroutine get_metadata( self,               &
   integer(i_def),      optional, intent(out) :: nmaps
   integer(i_def),      optional, intent(out) :: rim_depth
   integer(i_def),      optional, intent(out) :: void_cell
-  real(r_def),         optional, intent(out) :: domain_size(2)
 
   character(str_longlong), optional, intent(out) :: constructor_inputs
 
@@ -1890,7 +1900,6 @@ subroutine get_metadata( self,               &
     factor = 1.0_r_def
   end if
 
-  if (present(domain_size)) domain_size(:) = factor * self%domain_size(:)
   if (present(north_pole))  north_pole(:)  = factor * self%north_pole(:)
   if (present(null_island)) null_island(:) = factor * self%null_island(:)
 

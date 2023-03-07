@@ -253,12 +253,6 @@ partitioner='cubedsphere',
 panel_decomposition = 'auto',
 /
 
-&domain_size
-  planar_domain_min_x = -1.0
-  planar_domain_max_x =  1.0
-  planar_domain_min_y = -1.0
-  planar_domain_max_y =  1.0
-/
 
 &mixing
   viscosity = .false.

@@ -87,14 +87,13 @@ program cma_test
   real   (kind=r_def) :: dx, dz
   ! Variables for reading configuration from namelist file
   character(*), parameter ::       &
-       required_configuration(7) = &
+       required_configuration(6) = &
       (/'finite_element      ',    &
         'base_mesh           ',    &
         'formulation         ',    &
         'planet              ',    &
         'extrusion           ',    &
-        'partitioning        ',    &
-        'domain_size         '/)
+        'partitioning        '/)
   logical              :: okay
   logical, allocatable :: success_map(:)
   integer :: i

@@ -131,7 +131,7 @@ type, extends(ugrid_file_type), public :: ncdf_quad_type
   character(str_def) :: global_var     = cmdi
   integer(i_def)     :: rim_depth      = imdi
   logical(l_def)     :: periodic_xy(2) = .false.
-  real(r_def)        :: domain_size(2) = [rmdi, rmdi]
+  real(r_def)        :: domain_extents(2,4) = rmdi
 
 
   character(nf90_max_name)    :: topology
@@ -193,7 +193,7 @@ type, extends(ugrid_file_type), public :: ncdf_quad_type
   integer(i_def) :: global_cells_id
   integer(i_def) :: global_face_node_id
   integer(i_def) :: global_face_edge_id
-  integer(i_def) :: domain_size_id
+  integer(i_def) :: domain_extents_id
 
   integer(i_def) :: void_cell
 
@@ -586,7 +586,7 @@ subroutine define_variables(self)
   integer(i_def) :: global_cell_dims(MESH_FACE_RANK)
   integer(i_def) :: global_face_nodes_dims(MESH_FACE_NODES_RANK)
   integer(i_def) :: global_face_edges_dims(MESH_FACE_EDGES_RANK)
-  integer(i_def) :: domain_size_dims(1)
+  integer(i_def) :: domain_extents_dims(2)
 
   character(*), parameter :: routine = 'define_variables'
   character(str_long) :: cmess
@@ -667,6 +667,15 @@ subroutine define_variables(self)
                        self%mesh_face_y_id )
   call check_err(ierr, routine, cmess)
 
+  ! Global mesh domain extents
+  domain_extents_dims(1) = self%two_dim_id
+  domain_extents_dims(2) = self%four_dim_id
+  var_name = trim(self%mesh_name)//'_domain_extents'
+  cmess = 'Defining '//trim(var_name)
+  ierr = nf90_def_var( self%ncid, trim(var_name),        &
+                       nf90_double, domain_extents_dims, &
+                       self%domain_extents_id )
+  call check_err(ierr, routine, cmess)
 
   ! Define partition variables if this a local mesh
   if ( self%mesh_extents == LOCAL_MESH_FLAG ) then
@@ -755,15 +764,6 @@ subroutine define_variables(self)
     ierr = nf90_def_var( self%ncid, trim(var_name),  &
                          nf90_int, global_cell_dims, &
                          self%global_cells_id )
-    call check_err(ierr, routine, cmess)
-
-    ! Global mesh domain size
-    domain_size_dims(1) = self%two_dim_id
-    var_name = trim(self%mesh_name)//'_domain_size'
-    cmess = 'Defining '//trim(var_name)
-    ierr = nf90_def_var( self%ncid, trim(var_name),     &
-                         nf90_double, domain_size_dims, &
-                         self%domain_size_id )
     call check_err(ierr, routine, cmess)
 
     ! Global ids of nodes on local cells
@@ -1462,10 +1462,10 @@ subroutine assign_attributes(self)
                          self%nmesh_faces_global )
     call check_err(ierr, routine, cmess)
 
-    attname = 'domain_size'
+    attname = 'domain_extents'
     cmess   = 'Adding attribute "'//trim(attname)// &
               '" to variable "'//trim(self%mesh_name)//'_global"'
-    var_value = trim(self%mesh_name)//'_domain_size'
+    var_value = trim(self%mesh_name)//'_domain_extents'
     ierr = nf90_put_att( self%ncid, id, trim(attname), var_value )
     call check_err(ierr, routine, cmess)
 
@@ -1525,8 +1525,16 @@ subroutine assign_attributes(self)
 
   else
 
-    ! Attributes if mesh is a global mesh
+    ! Add attributes to global mesh
     id = self%mesh_id
+
+    attname = 'domain_extents'
+    cmess   = 'Adding attribute "'//trim(attname)// &
+               '" to variable "'//trim(self%mesh_name)
+    var_value = trim(self%mesh_name)//'_domain_extents'
+    ierr = nf90_put_att( self%ncid, id, trim(attname), var_value )
+    call check_err(ierr, routine, cmess)
+
     attname = 'npanels'
     cmess   = 'Adding attribute "'//trim(attname)// &
               '" to variable "'//trim(self%mesh_name)//'"'
@@ -1735,8 +1743,8 @@ subroutine inquire_ids(self, mesh_name)
     ! Get IDs of variable related to the global mesh.
     id = self%global_mesh_id
 
-    ierr = nf90_get_att(   self%ncid, id, 'domain_size', var_name )
-    ierr = nf90_inq_varid( self%ncid, trim(var_name), self%domain_size_id )
+    ierr = nf90_get_att(   self%ncid, id, 'domain_extents', var_name )
+    ierr = nf90_inq_varid( self%ncid, trim(var_name), self%domain_extents_id )
 
     ierr = nf90_get_att(   self%ncid, id, 'cells', var_name )
     ierr = nf90_inq_varid( self%ncid, trim(var_name), self%global_cells_id )
@@ -1747,6 +1755,10 @@ subroutine inquire_ids(self, mesh_name)
     ierr = nf90_get_att(   self%ncid, id, 'edges_on_cell', var_name )
     ierr = nf90_inq_varid( self%ncid, trim(var_name), self%global_face_edge_id )
 
+  else
+    id = self%mesh_id
+    ierr = nf90_get_att(   self%ncid, id, 'domain_extents', var_name )
+    ierr = nf90_inq_varid( self%ncid, trim(var_name), self%domain_extents_id )
   end if
 
   return
@@ -1939,7 +1951,8 @@ end subroutine get_dimensions
 !> @param[out]  topology            Indicates layout of mesh connectivity
 !>                                  node locations.
 !> @param[out]  periodic_xy         Periodic in x/y-axes.
-!> @param[out]  domain_size         Size of global mesh domain in x/y-axes.
+!> @param[out]  domain_extents      Principal coordinates that
+!>                                  describe the domain shape.
 !> @param[out]  npanels             Number of panels in this mesh.
 !> @param[out]  rim_depth           Depth in cells of global mesh rim
 !>                                  (LBC meshes).
@@ -1986,7 +1999,7 @@ subroutine read_mesh( self,                                              &
                       face_face_connectivity, edge_node_connectivity,    &
 
                       ! Global mesh info.
-                      topology, periodic_xy, domain_size,                &
+                      topology, periodic_xy, domain_extents,             &
                       npanels, rim_depth, constructor_inputs,            &
 
                       ! Partition info.
@@ -2023,7 +2036,7 @@ subroutine read_mesh( self,                                              &
 
   character(str_def),  intent(out) :: topology
   logical(l_def),      intent(out) :: periodic_xy(2)
-  real(r_def),         intent(out) :: domain_size(2)
+  real(r_def),         intent(out) :: domain_extents(2,4)
   integer(i_def),      intent(out) :: npanels
   integer(i_def),      intent(out) :: rim_depth
 
@@ -2412,11 +2425,10 @@ subroutine read_mesh( self,                                              &
       constructor_inputs = self%constructor_inputs
     end if
 
-    ! This should be an attribute of the global mesh info
-    ierr = nf90_get_var( self%ncid, self%domain_size_id, &
-                         self%domain_size(:) )
+    ierr = nf90_get_var( self%ncid, self%domain_extents_id, &
+                         self%domain_extents(:,:) )
     if (ierr == NF90_NOERR) then
-      domain_size = self%domain_size
+      domain_extents(:,:) = self%domain_extents(:,:)
     end if
 
     ierr = nf90_get_var( self%ncid, self%global_cells_id, &
@@ -2454,6 +2466,12 @@ subroutine read_mesh( self,                                              &
     ierr = nf90_get_att( self%ncid, self%mesh_id, trim(attname), &
                          self%constructor_inputs )
     constructor_inputs = self%constructor_inputs
+
+    ierr = nf90_get_var( self%ncid, self%domain_extents_id, &
+                         self%domain_extents(:,:) )
+    if (ierr == NF90_NOERR) then
+      domain_extents(:,:) = self%domain_extents(:,:)
+    end if
 
   end select
 
@@ -2637,7 +2655,8 @@ end subroutine read_map
 !> @param[in] edge_node_connectivity   Nodes adjoining each edge.
 !> @param[in] topology                 Indicates layout of mesh connectivity
 !> @param[in] periodic_xy              Periodic in x/y-axes.
-!> @param[in] domain_size              Size of global mesh domain in x/y-axes.
+!> @param[in] domain_extents           Principal coordinates that
+!>                                     describe the domain shape.
 !> @param[in] npanels                  Number of panels in this mesh
 !> @param[in] rim_depth                Depth in cells of global mesh rim (LBC meshes).
 !> @param[in] constructor_inputs       Inputs used to create this mesh
@@ -2680,7 +2699,7 @@ subroutine write_mesh( self,                                              &
                        face_face_connectivity, edge_node_connectivity,    &
 
                        ! Global mesh only variables.
-                       topology, periodic_xy, domain_size,                &
+                       topology, periodic_xy, domain_extents,             &
                        npanels, rim_depth, constructor_inputs,            &
 
                        ! Partition variables.
@@ -2723,7 +2742,7 @@ subroutine write_mesh( self,                                              &
   ! Global mesh variables.
   character(str_def),  intent(in) :: topology
   logical(l_def),      intent(in) :: periodic_xy(2)
-  real(r_def),         intent(in) :: domain_size(2)
+  real(r_def),         intent(in) :: domain_extents(2,4)
   integer(i_def),      intent(in) :: npanels
   integer(i_def),      intent(in) :: rim_depth
 
@@ -2770,7 +2789,7 @@ subroutine write_mesh( self,                                              &
 
   real(r_ncdf), allocatable :: node_coordinates_ncdf(:,:)
   real(r_ncdf), allocatable :: face_coordinates_ncdf(:,:)
-  real(r_ncdf)              :: domain_size_ncdf(2)
+  real(r_ncdf)              :: domain_extents_ncdf(2,4)
 
   integer(i_def) :: lower1,upper1,lower2,upper2
 
@@ -2789,15 +2808,23 @@ subroutine write_mesh( self,                                              &
   node_coordinates_ncdf(:,:) =  real( node_coordinates(:,:), kind=r_ncdf )
   face_coordinates_ncdf(:,:) =  real( face_coordinates(:,:), kind=r_ncdf )
 
+  self%geometry  = geometry
+  self%topology  = topology
+  self%coord_sys = coord_sys
+  self%npanels   = npanels
+
   ! Determine if the contents of object is a global/regional model.
-  self%domain_size = domain_size
-  if ( .not. any(self%domain_size == rmdi) ) then
-    self%model_extents  = REGION_MODEL_FLAG
-    domain_size_ncdf(:) = real( self%domain_size(:), kind=r_ncdf )
-  else
+  if ( ( trim(self%geometry)  == 'spherical' ) .and. &
+       ( trim(self%coord_sys) == 'll'        ) .and. &
+       ( trim(self%topology)  == 'periodic'  ) .and. &
+       ( self%npanels > 1 ) ) then
     self%model_extents  = GLOBAL_MODEL_FLAG
-    domain_size_ncdf(:) = real( rmdi, kind=r_ncdf )
+  else
+    self%model_extents  = REGION_MODEL_FLAG
   end if
+
+  self%domain_extents = domain_extents
+  domain_extents_ncdf(:,:) = real( self%domain_extents(:,:), kind=r_ncdf )
 
   ! Determine if the contents of object is a global/local mesh.
   self%partition_of = partition_of
@@ -2808,13 +2835,9 @@ subroutine write_mesh( self,                                              &
   end if
 
   self%mesh_name      = mesh_name
-  self%geometry       = geometry
-  self%topology       = topology
-  self%coord_sys      = coord_sys
   self%north_pole(:)  = north_pole(:)
   self%null_island(:) = null_island(:)
   self%periodic_xy(:) = periodic_xy(:)
-  self%npanels        = npanels
   self%coord_units_x  = coord_units_x
   self%coord_units_y  = coord_units_y
   self%void_cell      = void_cell
@@ -2911,7 +2934,6 @@ subroutine write_mesh( self,                                              &
                        face_edge_connectivity(:,:) )
   call check_err(ierr, routine, cmess)
 
-!print*,'Face-Face ',face_face_connectivity(:,:)
   ! Face-Face connectivity.
   cmess = 'Writing face-face connectivity for mesh, "'//trim(mesh_name)//'"'
   ierr = nf90_put_var( self%ncid, self%mesh_face_links_id, &
@@ -2960,11 +2982,6 @@ subroutine write_mesh( self,                                              &
       call check_err(ierr, routine, cmess)
     end if
 
-    ! Global mesh domain size.
-    cmess = 'Writing global mesh '// trim(self%mesh_name) // ' domain size.'
-    ierr = nf90_put_var( self%ncid, self%domain_size_id, domain_size_ncdf(:) )
-    call check_err(ierr, routine, cmess)
-
     ! Global cell ids on this partition (including those of ghost cells).
     cmess = 'Writing global mesh '// trim(self%mesh_name) // ' cell ids.'
     ierr = nf90_put_var( self%ncid, self%global_cells_id, cell_gid(:) )
@@ -2981,6 +2998,11 @@ subroutine write_mesh( self,                                              &
     call check_err(ierr, routine, cmess)
 
   end if
+
+  ! Global mesh domain extents.
+  cmess = 'Writing global mesh '// trim(self%mesh_name) // ' domain extents.'
+  ierr = nf90_put_var( self%ncid, self%domain_extents_id, domain_extents_ncdf(:,:) )
+  call check_err(ierr, routine, cmess)
 
 
   ! Mesh_Mesh connectivity (Inter-grid maps)
@@ -3166,7 +3188,8 @@ end function is_mesh_present
 !> @param[in] edge_node_connectivity   Nodes adjoining each edge.
 !> @param[in] topology                 Indicates layout of mesh connectivity
 !> @param[in] periodic_xy              Periodic in x/y-axes.
-!> @param[in] domain_size              Size of global mesh domain in x/y-axes.
+!> @param[in] domain_extents           Coordinates of principal nodes that
+!>                                     describe the domain shape.
 !> @param[in] npanels                  Number of panels in this mesh
 !> @param[in] rim_depth                Depth in cells of global mesh rim (LBC meshes).
 !> @param[in] constructor_inputs       Inputs used to create this mesh
@@ -3209,7 +3232,7 @@ subroutine append_mesh( self,                                              &
                         face_face_connectivity, edge_node_connectivity,    &
 
                         ! Global mesh variables.
-                        topology, periodic_xy, domain_size,                &
+                        topology, periodic_xy, domain_extents,             &
                         npanels, rim_depth, constructor_inputs,            &
 
                         ! Partition variables.
@@ -3253,7 +3276,7 @@ subroutine append_mesh( self,                                              &
   ! Global mesh only variables
   character(str_def),  intent(in) :: topology
   logical(l_def),      intent(in) :: periodic_xy(2)
-  real(r_def),         intent(in) :: domain_size(2)
+  real(r_def),         intent(in) :: domain_extents(2,4)
   integer(i_def),      intent(in) :: npanels
   integer(i_def),      intent(in) :: rim_depth
 
@@ -3325,7 +3348,7 @@ subroutine append_mesh( self,                                              &
        ! Global mesh info
        topology           = topology,           &
        periodic_xy        = periodic_xy,        &
-       domain_size        = domain_size,        &
+       domain_extents     = domain_extents,     &
        npanels            = npanels,            &
        rim_depth          = rim_depth,          &
        constructor_inputs = constructor_inputs, &

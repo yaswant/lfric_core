@@ -43,13 +43,15 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the PSy layer
 type, public, extends(kernel_type) :: poly1d_flux_coeffs_kernel_type
   private
-  type(arg_type) :: meta_args(8) = (/                                                         &
+  type(arg_type) :: meta_args(10) = (/                                                         &
        arg_type(GH_FIELD,   GH_REAL,    GH_WRITE, ANY_DISCONTINUOUS_SPACE_1),                 &
        arg_type(GH_FIELD,   GH_REAL,    GH_READ,  W3,                        STENCIL(CROSS)), &
        arg_type(GH_FIELD*3, GH_REAL,    GH_READ,  ANY_SPACE_1,               STENCIL(CROSS)), &
        arg_type(GH_FIELD,   GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_3, STENCIL(CROSS)), &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ),                                             &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ),                                             &
+       arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                             &
+       arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                             &
        arg_type(GH_SCALAR,  GH_REAL,    GH_READ),                                             &
        arg_type(GH_SCALAR,  GH_INTEGER, GH_READ)                                              &
        /)
@@ -91,6 +93,8 @@ contains
 !!                             coordinates. For Cartesian coordinates this is zero, but
 !!                             for spherical coordinates it is the global minimum
 !!                             of the height field plus 1.
+!> @param[in] domain_x Domain size in x-direction.
+!> @param[in] domain_y Domain size in y-direction.
 !> @param[in] nlayers Number of vertical layers
 !> @param[in] ndf_c Number of degrees of freedom per cell for the coeff space
 !> @param[in] undf_c Total number of degrees of freedom for the coeff space
@@ -129,6 +133,8 @@ subroutine poly1d_flux_coeffs_code(one_layer,                  &
                                    ndata,                      &
                                    order,                      &
                                    transform_radius,           &
+                                   domain_x,                   &
+                                   domain_y,                   &
                                    nlayers,                    &
                                    ndf_c,                      &
                                    undf_c,                     &
@@ -167,6 +173,7 @@ subroutine poly1d_flux_coeffs_code(one_layer,                  &
                                      ndf_pid, undf_pid
   integer(kind=i_def), intent(in) :: nqp_v, nqp_h, nqp_f, nfaces_qr
   integer(kind=i_def), intent(in) :: stencil_size_w3, stencil_size_wx, stencil_size_pid
+  real(kind=r_def),    intent(in) :: domain_x, domain_y
 
   integer(kind=i_def), dimension(ndf_w3, stencil_size_w3),  intent(in) :: smap_w3
   integer(kind=i_def), dimension(ndf_wx, stencil_size_wx),  intent(in) :: smap_wx
@@ -334,7 +341,7 @@ subroutine poly1d_flux_coeffs_code(one_layer,                  &
 
         ! Second: Compute the local coordinate of each quadrature point from the
         !         physical coordinate
-        xx = local_distance_1d(x0, xq, xn1, spherical)
+        xx = local_distance_1d(x0, xq, xn1, domain_x, domain_y, spherical)
         ! Third: Compute each needed monomial in terms of the local coordinate
         !        on each quadrature point
         ! Loop over monomials
@@ -365,7 +372,7 @@ subroutine poly1d_flux_coeffs_code(one_layer,                  &
                     ipanel, xq(1), xq(2), xq(3))
 
       ! Obtain local coordinates of gauss points on this face
-      xx = local_distance_1d(x0, xq, xn1, spherical)
+      xx = local_distance_1d(x0, xq, xn1, domain_x, domain_y, spherical)
 
       ! Evaluate polynomial fit
       ! Loop over monomials

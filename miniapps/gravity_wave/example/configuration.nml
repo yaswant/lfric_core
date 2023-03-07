@@ -197,6 +197,3 @@ panel_yproc = 1
 &boundaries
 limited_area = .false.
 /
-
-&development
-/

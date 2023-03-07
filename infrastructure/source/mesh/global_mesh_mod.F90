@@ -68,10 +68,9 @@ module global_mesh_mod
   ! Configuration inputs used to generate this global mesh object
     character(str_longlong) :: constructor_inputs = cmdi
 
-  ! Domain size of the mesh, units dependant on the
-  ! geometry/coordinate system. In future, may change
-  ! to domain_extents.
-    real(r_def) :: domain_size(2) = rmdi
+  ! Principal coordinates that describe the domain shape.
+  ! Units dependant on the geometry/coordinate system.
+    real(r_def) :: domain_extents(2,4) = rmdi
 
   ! Real-world location of mesh North Pole,
   ! only valid for spherical geometry on lon-lat cordinate-system.
@@ -210,7 +209,7 @@ module global_mesh_mod
     procedure, public :: is_coord_sys_ll
 
     procedure, public :: get_rim_depth
-    procedure, public :: get_domain_size
+    procedure, public :: get_domain_extents
     procedure, public :: get_north_pole
     procedure, public :: get_null_island
     procedure, public :: get_vert_on_edge
@@ -290,7 +289,7 @@ contains
                                    self%null_island, &
                                    self%constructor_inputs, &
                                    self%rim_depth, &
-                                   self%domain_size, &
+                                   self%domain_extents, &
                                    self%void_cell, &
                                    self%cell_next_2d, &
                                    self%vert_on_cell_2d, &
@@ -357,10 +356,11 @@ contains
       if (trim(self%coord_units_xy(1)) == 'degrees_east' .and. &
           trim(self%coord_units_xy(2)) == 'degrees_north') then
 
-        self%vert_coords(:,:) = degrees_to_radians * self%vert_coords(:,:)
-        self%cell_coords(:,:) = degrees_to_radians * self%cell_coords(:,:)
-        self%north_pole(:)    = degrees_to_radians * self%north_pole(:)
-        self%null_island(:)   = degrees_to_radians * self%null_island(:)
+        self%vert_coords(:,:)    = degrees_to_radians * self%vert_coords(:,:)
+        self%cell_coords(:,:)    = degrees_to_radians * self%cell_coords(:,:)
+        self%north_pole(:)       = degrees_to_radians * self%north_pole(:)
+        self%null_island(:)      = degrees_to_radians * self%null_island(:)
+        self%domain_extents(:,:) = degrees_to_radians * self%domain_extents(:,:)
 
         self%coord_units_xy(:) = 'radians'
 
@@ -460,6 +460,10 @@ contains
 
     self%void_cell = void
     self%ntarget_meshes = 0
+    self%domain_extents(:,1) = [ -2.0_r_def, -2.0_r_def ]
+    self%domain_extents(:,2) = [  2.0_r_def, -2.0_r_def ]
+    self%domain_extents(:,3) = [  2.0_r_def,  2.0_r_def ]
+    self%domain_extents(:,4) = [ -2.0_r_def,  2.0_r_def ]
 
     ! Note: These test coordinates are in [Long, Lat] in units of radians.
     self%coord_units_xy(:)   = 'radians'
@@ -1562,23 +1566,24 @@ contains
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  !> @brief   Returns the model domain size on x/y axes.
-  !> @details The model domain size is the extents of the global mesh
-  !>          (as opposed to the coverage of a local mesh). This
-  !>          variable does not locate the domain, merely the size of the domains
-  !>          extents. Units are in line with geometry/coordinate system.
-  !> @return  domain_size  Size of domain along x/y-axes.
+  !> @brief   Returns principal coordinates that describe the domain shape.
+  !> @details The model domain extents of the global model. Units are in
+  !>          line with geometry/coordinate system. This essentially defines
+  !>          the range of valid coordinates, is does not imply these are the
+  !>          range of coordinates of actual mesh nodes.
+  !> @return  domain_extents  Principal coordinates that describe
+  !>                          the domain shape.
   !>
-  function get_domain_size( self ) result( domain_size )
+  function get_domain_extents( self ) result( domain_extents )
 
     implicit none
 
     class(global_mesh_type), intent(in) :: self
-    real(r_def)                         :: domain_size(2)
+    real(r_def)                         :: domain_extents(2,4)
 
-    domain_size = self%domain_size
+    domain_extents(:,:) = self%domain_extents(:,:)
 
-  end function get_domain_size
+  end function get_domain_extents
 
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

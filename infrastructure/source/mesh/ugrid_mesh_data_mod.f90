@@ -86,8 +86,8 @@ module ugrid_mesh_data_mod
     real(r_def)    :: null_island(2) = rmdi
     ! Real world lon-lat location of north pole.
     real(r_def)    :: north_pole(2)  = rmdi
-    ! Domain size (Global mesh).
-    real(r_def)    :: domain_size(2) = rmdi
+    ! Domain extents (Global mesh).
+    real(r_def)    :: domain_extents(2,4) = rmdi
     !> ID value to mark null cell-cell connectivity,
     integer(i_def) :: void_cell
 
@@ -225,7 +225,8 @@ contains
   !> @param[out] null_island      Real world lon-lat location of mesh Null Island.
   !> @param[out] constructor_inputs  Configuration arguments for global mesh object constructor.
   !> @param[out] rim_depth        Global LBC mesh rim depth (in cells).
-  !> @param[out] domain_size      Global mesh domain size.
+  !> @param[out] domain_extents   Principal coordinates that
+  !>                              describe the domain shape.
   !> @param[out] void_cell        ID value to mark null cell-cell connectivity.
   !> @param[out] face_next_2d     Full domain cell to cell connectivities.
   !> @param[out] node_on_face_2d  Full domain vertices on a cell.
@@ -256,7 +257,7 @@ contains
                        null_island, &
                        constructor_inputs, &
                        rim_depth, &
-                       domain_size, &
+                       domain_extents, &
                        void_cell, &
                        face_next_2d, &
                        node_on_face_2d, &
@@ -294,7 +295,7 @@ contains
 
     integer(i_def), intent(out) :: npanels
     integer(i_def), intent(out) :: rim_depth
-    real(r_def),    intent(out) :: domain_size(2)
+    real(r_def),    intent(out) :: domain_extents(2,4)
     integer(i_def), intent(out) :: void_cell
     real(r_def),    intent(out) :: north_pole(2)
     real(r_def),    intent(out) :: null_island(2)
@@ -351,13 +352,12 @@ contains
       max_stencil_depth = self%max_stencil_depth
     end if
 
-    coord_units_xy     = self%coord_units_xy
-    constructor_inputs = self%constructor_inputs
-
-    rim_depth   = self%rim_depth
-    domain_size = self%domain_size
-    north_pole  = self%north_pole
-    null_island = self%null_island
+    coord_units_xy      = self%coord_units_xy
+    constructor_inputs  = self%constructor_inputs
+    rim_depth           = self%rim_depth
+    domain_extents(:,:) = self%domain_extents(:,:)
+    north_pole(:)       = self%north_pole(:)
+    null_island(:)      = self%null_island(:)
 
     if ( present(node_on_edge_2d) ) then
       if ( allocated(node_on_edge_2d) ) deallocate(node_on_edge_2d)
@@ -571,7 +571,7 @@ contains
               north_pole         = self%north_pole,         &
               null_island        = self%null_island,        &
               npanels            = self%npanels,            &
-              domain_size        = self%domain_size,        &
+              domain_extents     = self%domain_extents,     &
               void_cell          = self%void_cell,          &
               rim_depth          = self%rim_depth,          &
               nmaps              = self%ntarget_meshes,     &

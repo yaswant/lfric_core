@@ -16,14 +16,6 @@ f_lat_deg            = 90.0
         ! Choose 90.0 for planar shallow water equations with Coriolis term f u^perp
 /
 
-&domain_size
-planar_domain_min_x = -0.5
-planar_domain_max_x =  0.5
-planar_domain_min_y = -0.5
-planar_domain_max_y =  0.5
-        ! Use +/- 0.5 for all planar tests except
-        ! dimensional thermal double vortex (then 2500000)
-/
 
 &io
 use_xios_io               = .false.

@@ -12,11 +12,16 @@
 module limited_area_masks_alg_mod
 
   use field_mod,                          only: field_type
-  use constants_mod,                      only: i_def, r_def, l_def
+  use constants_mod,                      only: i_def, r_def, l_def, PI, &
+                                                degrees_to_radians,      &
+                                                radians_to_degrees
+  use domain_mod,                         only: domain_type
   use log_mod,                            only: log_event,         &
                                                 log_scratch_space, &
                                                 LOG_LEVEL_ERROR,   &
                                                 LOG_LEVEL_INFO
+  use function_space_mod,                 only: function_space_type
+  use mesh_mod,                           only: mesh_type
   use create_edge_mask_kernel_mod,        only: create_edge_mask_kernel_type
   use propagate_onion_layers_kernel_mod,  only: propagate_onion_layers_kernel_type
   use create_threshold_mask_kernel_mod,   only: create_threshold_mask_kernel_type
@@ -173,6 +178,7 @@ contains
   ! boundary_n[in] Number of cells from Northern Edge to Northern Boundary
   ! boundary_e[in] Number of cells from Eastern Edge to Eastern Boundary
   ! boundary_w[in] Number of cells from Western Edge to Western Boundary
+  ! domain[in]     Domain extents information.
   subroutine calculate_boundary_coordinates( coord_bound_s, &
                                              coord_bound_n, &
                                              coord_bound_e, &
@@ -180,7 +186,8 @@ contains
                                              boundary_s,    &
                                              boundary_n,    &
                                              boundary_e,    &
-                                             boundary_w )
+                                             boundary_w,    &
+                                             domain )
 
     use boundaries_config_mod,        only: edge_cells_ns, edge_cells_ew
     use base_mesh_config_mod,         only: geometry, geometry_spherical, &
@@ -193,23 +200,28 @@ contains
                                         coord_bound_e, coord_bound_w
     integer(i_def), intent(in)       :: boundary_s,    boundary_n,    &
                                         boundary_e,    boundary_w
+    type(domain_type), intent(in)    :: domain
 
     if (geometry == geometry_spherical &
         .and. topology /= topology_non_periodic) then
       ! The East and West boundaries are swapped over, as changing looking
       ! at the cubed-sphere panel from outside-in to inside-out.
       ! Needed when the domain is the whole sphere or a belt around the sphere
-      coord_bound_s = spherical_boundary(boundary_s, edge_cells_ns, .false.)
-      coord_bound_n = spherical_boundary(boundary_n, edge_cells_ns, .true.)
-      coord_bound_e = spherical_boundary(boundary_w, edge_cells_ew, .true.)
-      coord_bound_w = spherical_boundary(boundary_e, edge_cells_ew, .false.)
+      coord_bound_s = spherical_boundary( boundary_s, edge_cells_ns, .false. )
+      coord_bound_n = spherical_boundary( boundary_n, edge_cells_ns, .true.  )
+      coord_bound_e = spherical_boundary( boundary_w, edge_cells_ew, .true.  )
+      coord_bound_w = spherical_boundary( boundary_e, edge_cells_ew, .false. )
 
     else
       ! Use this for planar meshes or lon-lat LAMs embedded on the sphere
-      coord_bound_s = planar_boundary_ns(boundary_s, edge_cells_ns, .false.)
-      coord_bound_n = planar_boundary_ns(boundary_n, edge_cells_ns, .true.)
-      coord_bound_e = planar_boundary_ew(boundary_e, edge_cells_ew, .true.)
-      coord_bound_w = planar_boundary_ew(boundary_w, edge_cells_ew, .false.)
+      coord_bound_s = planar_boundary_ns( boundary_s, edge_cells_ns, &
+                                          domain, .false. )
+      coord_bound_n = planar_boundary_ns( boundary_n, edge_cells_ns, &
+                                          domain, .true. )
+      coord_bound_e = planar_boundary_ew( boundary_e, edge_cells_ew, &
+                                          domain, .true. )
+      coord_bound_w = planar_boundary_ew( boundary_w, edge_cells_ew, &
+                                          domain, .false. )
 
     endif
 
@@ -297,6 +309,11 @@ contains
                                         coord_rim_e,   coord_rim_w
     real(r_def) :: threshold
 
+    type(function_space_type), pointer :: function_space => null()
+    type(mesh_type),           pointer :: mesh => null()
+
+    type(domain_type) :: domain
+
     if ( lbc_method == lbc_method_onion_layer )then
 
 
@@ -329,101 +346,106 @@ contains
     !             linear-solver
     !                boundary
 
-     if ( rim_width_ns > 0 ) then
-      outer_n = boundary_n - outer_width_ns
-      outer_s = boundary_s - outer_width_ns
-      rim_n = outer_n + rim_width_ns
-      rim_s = outer_s + rim_width_ns
-    else
-      outer_n = boundary_n
-      outer_s = boundary_s
-      rim_n = boundary_n
-      rim_s = boundary_s
-    endif
+      function_space => mask%get_function_space()
+      mesh => function_space%get_mesh()
+      domain = mesh%get_domain()
 
-    if ( rim_width_ew > 0 ) then
-      outer_w = boundary_w - outer_width_ew
-      outer_e = boundary_e - outer_width_ew
-      rim_w = outer_w + rim_width_ew
-      rim_e = outer_e + rim_width_ew
-    else
-      outer_w = boundary_w
-      outer_e = boundary_e
-      rim_w = boundary_w
-      rim_e = boundary_e
-    endif
+      if ( rim_width_ns > 0 ) then
+        outer_n = boundary_n - outer_width_ns
+        outer_s = boundary_s - outer_width_ns
+        rim_n = outer_n + rim_width_ns
+        rim_s = outer_s + rim_width_ns
+      else
+        outer_n = boundary_n
+        outer_s = boundary_s
+        rim_n = boundary_n
+        rim_s = boundary_s
+      end if
 
-    fs_enum = mask%which_function_space()
+      if ( rim_width_ew > 0 ) then
+        outer_w = boundary_w - outer_width_ew
+        outer_e = boundary_e - outer_width_ew
+        rim_w = outer_w + rim_width_ew
+        rim_e = outer_e + rim_width_ew
+      else
+        outer_w = boundary_w
+        outer_e = boundary_e
+        rim_w = boundary_w
+        rim_e = boundary_e
+      end if
 
-    call calculate_boundary_coordinates( &
-      coord_outer_s, &
-      coord_outer_n, &
-      coord_outer_e, &
-      coord_outer_w, &
-      outer_s,    &
-      outer_n,    &
-      outer_e,    &
-      outer_w )
+      fs_enum = mask%which_function_space()
 
-    call calculate_boundary_coordinates( &
-      coord_rim_s, &
-      coord_rim_n, &
-      coord_rim_e, &
-      coord_rim_w, &
-      rim_s,       &
-      rim_n,       &
-      rim_e,       &
-      rim_w )
+      call calculate_boundary_coordinates( &
+        coord_outer_s, &
+        coord_outer_n, &
+        coord_outer_e, &
+        coord_outer_w, &
+        outer_s,       &
+        outer_n,       &
+        outer_e,       &
+        outer_w,       &
+        domain )
 
-    select case(fs_enum)
-      case(W3)
-        call invoke( create_w3mask_lbc_kernel_type ( &
-          coord_outer_s, &
-          coord_outer_n, &
-          coord_outer_e, &
-          coord_outer_w, &
-          coord_rim_s,   &
-          coord_rim_n,   &
-          coord_rim_e,   &
-          coord_rim_w,   &
-          mask,          &
-          chi ) )
+      call calculate_boundary_coordinates( &
+        coord_rim_s, &
+        coord_rim_n, &
+        coord_rim_e, &
+        coord_rim_w, &
+        rim_s,       &
+        rim_n,       &
+        rim_e,       &
+        rim_w,       &
+        domain )
 
-      case(W2)
-        call invoke( create_w2mask_lbc_kernel_type ( &
-          coord_outer_s, &
-          coord_outer_n, &
-          coord_outer_e, &
-          coord_outer_w, &
-          coord_rim_s,   &
-          coord_rim_n,   &
-          coord_rim_e,   &
-          coord_rim_w,   &
-          rim_width_ns,  &
-          rim_width_ew,  &
-          mask,          &
-          chi ) )
+      select case(fs_enum)
+        case(W3)
+          call invoke( create_w3mask_lbc_kernel_type ( &
+            coord_outer_s, &
+            coord_outer_n, &
+            coord_outer_e, &
+            coord_outer_w, &
+            coord_rim_s,   &
+            coord_rim_n,   &
+            coord_rim_e,   &
+            coord_rim_w,   &
+            mask,          &
+            chi ) )
 
-      case(Wtheta)
-        call invoke( create_wthetamask_lbc_kernel_type ( &
-          coord_outer_s, &
-          coord_outer_n, &
-          coord_outer_e, &
-          coord_outer_w, &
-          coord_rim_s,   &
-          coord_rim_n,   &
-          coord_rim_e,   &
-          coord_rim_w,   &
-          mask,          &
-          chi ) )
+        case(W2)
+          call invoke( create_w2mask_lbc_kernel_type ( &
+            coord_outer_s, &
+            coord_outer_n, &
+            coord_outer_e, &
+            coord_outer_w, &
+            coord_rim_s,   &
+            coord_rim_n,   &
+            coord_rim_e,   &
+            coord_rim_w,   &
+            rim_width_ns,  &
+            rim_width_ew,  &
+            mask,          &
+            chi ) )
 
-      case default
-        call log_event("No LBC mask rule for this function space", &
-          LOG_LEVEL_ERROR)
+        case(Wtheta)
+          call invoke( create_wthetamask_lbc_kernel_type ( &
+            coord_outer_s, &
+            coord_outer_n, &
+            coord_outer_e, &
+            coord_outer_w, &
+            coord_rim_s,   &
+            coord_rim_n,   &
+            coord_rim_e,   &
+            coord_rim_w,   &
+            mask,          &
+            chi ) )
 
-    end select
-  end if
+        case default
+          call log_event("No LBC mask rule for this function space", &
+            LOG_LEVEL_ERROR)
 
+      end select
+    end if
 
   end subroutine create_lbc_mask
 
@@ -438,6 +460,7 @@ contains
   !>                          interior to the edge of the domain
   !> @param[in] chi           Chi coordinates field
   subroutine create_blend_mask( mask, onion_layers, chi )
+
     use create_w3mask_blend_kernel_mod, &
                                       only: create_w3mask_blend_kernel_type
     use create_w2mask_blend_kernel_mod, &
@@ -474,6 +497,11 @@ contains
     integer(i_def) :: stencil_depth = 1
     real(r_def)    :: threshold
 
+    type(function_space_type), pointer :: function_space => null()
+    type(mesh_type),           pointer :: mesh => null()
+
+    type(domain_type) :: domain
+
     if ( lbc_method == lbc_method_onion_layer )then
 
       fs_enum = mask%which_function_space()
@@ -504,79 +532,86 @@ contains
 
     else
 
-    !     |<-------------rim_width------------>|
-    !     |            |           |           |
-    !     |<--outer--> |<--inner-->|           |
-    !     |   width    |   width   |           |
-    !     |            |           |           |
-    !   outer       boundary     blend        rim
-    !                  =
-    !             linear-solver
-    !                boundary
+      !     |<-------------rim_width------------>|
+      !     |            |           |           |
+      !     |<--outer--> |<--inner-->|           |
+      !     |   width    |   width   |           |
+      !     |            |           |           |
+      !   outer       boundary     blend        rim
+      !                  =
+      !             linear-solver
+      !                boundary
 
-    if ( rim_width_ns > 0 ) then
-      outer_n = boundary_n - outer_width_ns
-      outer_s = boundary_s - outer_width_ns
-      rim_n = outer_n + rim_width_ns
-      rim_s = outer_s + rim_width_ns
-      blend_n = boundary_n + inner_width_ns
-      blend_s = boundary_s + inner_width_ns
-    else
-      outer_n = boundary_n
-      outer_s = boundary_s
-      rim_n = boundary_n
-      rim_s = boundary_s
-      blend_n = boundary_n
-      blend_s = boundary_s
-    endif
+      function_space => mask%get_function_space()
+      mesh => function_space%get_mesh()
+      domain = mesh%get_domain()
 
-    if ( rim_width_ew > 0 ) then
-      outer_w = boundary_w - outer_width_ew
-      outer_e = boundary_e - outer_width_ew
-      rim_w = outer_w + rim_width_ew
-      rim_e = outer_e + rim_width_ew
-      blend_w = boundary_w + inner_width_ew
-      blend_e = boundary_e + inner_width_ew
-    else
-      outer_w = boundary_w
-      outer_e = boundary_e
-      rim_w = boundary_w
-      rim_e = boundary_e
-      blend_w = boundary_w
-      blend_e = boundary_e
-    endif
+      if ( rim_width_ns > 0 ) then
+        outer_n = boundary_n - outer_width_ns
+        outer_s = boundary_s - outer_width_ns
+        rim_n = outer_n + rim_width_ns
+        rim_s = outer_s + rim_width_ns
+        blend_n = boundary_n + inner_width_ns
+        blend_s = boundary_s + inner_width_ns
+      else
+        outer_n = boundary_n
+        outer_s = boundary_s
+        rim_n = boundary_n
+        rim_s = boundary_s
+        blend_n = boundary_n
+        blend_s = boundary_s
+      end if
 
-    fs_enum = mask%which_function_space()
+      if ( rim_width_ew > 0 ) then
+        outer_w = boundary_w - outer_width_ew
+        outer_e = boundary_e - outer_width_ew
+        rim_w = outer_w + rim_width_ew
+        rim_e = outer_e + rim_width_ew
+        blend_w = boundary_w + inner_width_ew
+        blend_e = boundary_e + inner_width_ew
+      else
+        outer_w = boundary_w
+        outer_e = boundary_e
+        rim_w = boundary_w
+        rim_e = boundary_e
+        blend_w = boundary_w
+        blend_e = boundary_e
+      end if
 
-    call calculate_boundary_coordinates( &
-      coord_outer_s, &
-      coord_outer_n, &
-      coord_outer_e, &
-      coord_outer_w, &
-      outer_s,       &
-      outer_n,       &
-      outer_e,       &
-      outer_w )
+      fs_enum = mask%which_function_space()
 
-    call calculate_boundary_coordinates( &
-      coord_rim_s, &
-      coord_rim_n, &
-      coord_rim_e, &
-      coord_rim_w, &
-      rim_s,       &
-      rim_n,       &
-      rim_e,       &
-      rim_w )
+      call calculate_boundary_coordinates( &
+        coord_outer_s, &
+        coord_outer_n, &
+        coord_outer_e, &
+        coord_outer_w, &
+        outer_s,       &
+        outer_n,       &
+        outer_e,       &
+        outer_w,       &
+        domain )
 
-    call calculate_boundary_coordinates( &
-      coord_blend_s, &
-      coord_blend_n, &
-      coord_blend_e, &
-      coord_blend_w, &
-      blend_s,       &
-      blend_n,       &
-      blend_e,       &
-      blend_w )
+      call calculate_boundary_coordinates( &
+        coord_rim_s, &
+        coord_rim_n, &
+        coord_rim_e, &
+        coord_rim_w, &
+        rim_s,       &
+        rim_n,       &
+        rim_e,       &
+        rim_w,       &
+        domain )
+
+      call calculate_boundary_coordinates( &
+        coord_blend_s, &
+        coord_blend_n, &
+        coord_blend_e, &
+        coord_blend_w, &
+        blend_s,       &
+        blend_n,       &
+        blend_e,       &
+        blend_w,       &
+        domain )
 
     select case(fs_enum)
       case(W3)
@@ -668,6 +703,11 @@ contains
                                         coord_rim_s,   coord_rim_n,   &
                                         coord_rim_e,   coord_rim_w
 
+    type(function_space_type), pointer :: function_space => null()
+    type(mesh_type),           pointer :: mesh => null()
+
+    type(domain_type) :: domain
+
     ! Calculate coordinates of boundary 1 cell in.
 
     rim_n = boundary_n + 1
@@ -677,6 +717,10 @@ contains
 
     fs_enum = mask%which_function_space()
 
+    function_space => mask%get_function_space()
+    mesh => function_space%get_mesh()
+    domain = mesh%get_domain()
+
     call calculate_boundary_coordinates( &
       coord_bound_s, &
       coord_bound_n, &
@@ -685,7 +729,8 @@ contains
       boundary_s,    &
       boundary_n,    &
       boundary_e,    &
-      boundary_w )
+      boundary_w,    &
+      domain )
 
     call calculate_boundary_coordinates( &
       coord_rim_s,   &
@@ -695,7 +740,8 @@ contains
       rim_s,         &
       rim_n,         &
       rim_e,         &
-      rim_w )
+      rim_w,         &
+      domain )
 
     select case(fs_enum)
       case(W2)
@@ -749,6 +795,11 @@ contains
                                         coord_bound_e, coord_bound_w
     real(r_def) :: threshold
 
+    type(function_space_type), pointer :: function_space => null()
+    type(mesh_type),           pointer :: mesh => null()
+
+    type(domain_type) :: domain
+
     if ( lbc_method == lbc_method_onion_layer )then
 
       threshold = size( blending_weights ) - solver_boundary_depth
@@ -759,6 +810,10 @@ contains
 
       fs_enum = mask%which_function_space()
 
+      function_space => mask%get_function_space()
+      mesh => function_space%get_mesh()
+      domain = mesh%get_domain()
+
       call calculate_boundary_coordinates( &
          coord_bound_s, &
          coord_bound_n, &
@@ -767,7 +822,8 @@ contains
          boundary_s,    &
          boundary_n,    &
          boundary_e,    &
-         boundary_w )
+         boundary_w,    &
+         domain )
 
       select case(fs_enum)
       case(W2)
@@ -834,6 +890,11 @@ contains
     real(r_def)                      :: inner_boundary_cell
     integer(i_def) :: stencil_depth = 1
 
+    type(function_space_type), pointer :: function_space => null()
+    type(mesh_type),           pointer :: mesh => null()
+
+    type(domain_type) :: domain
+
     if ( lbc_method == lbc_method_onion_layer )then
 
       inner_boundary_cell = real( &
@@ -846,6 +907,10 @@ contains
     else
       fs_enum = boundary_mask%which_function_space()
 
+      function_space => boundary_mask%get_function_space()
+      mesh => function_space%get_mesh()
+      domain = mesh%get_domain()
+
       call calculate_boundary_coordinates( &
          coord_bound_s, &
          coord_bound_n, &
@@ -854,7 +919,8 @@ contains
          boundary_s,    &
          boundary_n,    &
          boundary_e,    &
-         boundary_w )
+         boundary_w,    &
+         domain )
 
       select case(fs_enum)
       case(W2)
@@ -916,37 +982,44 @@ contains
   !
   ! boundary[in]     The number of cells from domain edge to boundary.
   ! edge_cells[in]   The total number of cells in N-S (y) direction.
+  ! domain           Domain extents information.
   ! minus[in]        Adding or subtracting cells from the edge, depending
   !                  on whether it is the North or South boundary.
   ! coord_bound[out] Coordinates of the boundary in metres for planar geometry
   !                  or degrees for spherical geometry.
-  function planar_boundary_ns(boundary, edge_cells, minus) result(coord_bound)
-
-    use base_mesh_config_mod,     only: geometry, geometry_spherical
-    use constants_mod,            only: PI, degrees_to_radians
-    use domain_size_config_mod,   only: planar_domain_max_y, &
-                                        planar_domain_min_y
+  function planar_boundary_ns( boundary, edge_cells, &
+                               domain, minus ) result(coord_bound)
 
     implicit none
 
-    integer(i_def), intent (in)  :: boundary
-    integer(i_def), intent (in)  :: edge_cells
-    logical(l_def), intent (in)  :: minus
-    real(r_def)                  :: coord_bound
-    real(r_def)                  :: dy
+    integer(i_def),    intent(in) :: boundary
+    integer(i_def),    intent(in) :: edge_cells
+    type(domain_type), intent(in) :: domain
+    logical(l_def),    intent(in) :: minus
 
-    dy = (planar_domain_max_y - planar_domain_min_y) / edge_cells
-    if ( minus ) then
-      coord_bound = planar_domain_max_y - dy * boundary
+    real(r_def) :: coord_bound
+    real(r_def) :: dy
+    real(r_def) :: domain_min_y, domain_max_y
+    real(r_def) :: inv_factor
+
+    if ( domain%is_lonlat() ) then
+      domain_min_y = domain%minimum_lonlat(axis=2) * radians_to_degrees
+      domain_max_y = domain%maximum_lonlat(axis=2) * radians_to_degrees
+      inv_factor = degrees_to_radians
     else
-      coord_bound = planar_domain_min_y + dy * boundary
+      domain_min_y = domain%minimum_xy(axis=2)
+      domain_max_y = domain%maximum_xy(axis=2)
+      inv_factor = 1.0_r_def
+    end if
+
+    dy = (domain_max_y - domain_min_y) / edge_cells
+    if ( minus ) then
+      coord_bound = domain_max_y - dy * boundary
+    else
+      coord_bound = domain_min_y + dy * boundary
     endif
 
-    ! NB: we expect the user here to have correctly entered the domain extents
-    ! in degrees!
-    if (geometry == geometry_spherical) then
-      coord_bound = coord_bound * degrees_to_radians
-    end if
+    coord_bound = inv_factor * coord_bound
 
   end function planar_boundary_ns
 
@@ -958,36 +1031,44 @@ contains
   !
   ! boundary[in]     The number of cells from domain edge to boundary.
   ! edge_cells[in]   The total number of cells in E-W (x) direction.
+  ! domain[in]       Domain extents information.
   ! minus[in]        Adding or subtracting cells from the edge, depending
   !                  on whether it is the East or West boundary.
   ! coord_bound[out] Coordinates of the boundary in metres for planar geometry
   !                  or degrees for spherical geometry.
-  function planar_boundary_ew(boundary, edge_cells, minus) result(coord_bound)
+  function planar_boundary_ew( boundary, edge_cells, &
+                               domain, minus ) result(coord_bound)
 
-    use base_mesh_config_mod,     only: geometry, geometry_spherical
-    use constants_mod,            only: PI, degrees_to_radians
-    use domain_size_config_mod,   only: planar_domain_max_x, &
-                                        planar_domain_min_x
     implicit none
 
-    integer(i_def), intent (in)  :: boundary
-    integer(i_def), intent (in)  :: edge_cells
-    logical(l_def), intent (in)  :: minus
-    real(r_def)                  :: coord_bound
-    real(r_def)                  :: dx
+    integer(i_def),    intent(in) :: boundary
+    integer(i_def),    intent(in) :: edge_cells
+    type(domain_type), intent(in) :: domain
+    logical(l_def),    intent(in) :: minus
 
-    dx = (planar_domain_max_x - planar_domain_min_x) / edge_cells
-    if ( minus ) then
-      coord_bound = planar_domain_max_x - dx * boundary
+    real(r_def) :: coord_bound
+    real(r_def) :: dx
+    real(r_def) :: domain_min_x, domain_max_x
+    real(r_def) :: inv_factor
+
+    if ( domain%is_lonlat() ) then
+      domain_min_x = domain%minimum_lonlat(axis=1) * radians_to_degrees
+      domain_max_x = domain%maximum_lonlat(axis=1) * radians_to_degrees
+      inv_factor = degrees_to_radians
     else
-      coord_bound = planar_domain_min_x + dx * boundary
+      domain_min_x = domain%minimum_xy(axis=1)
+      domain_max_x = domain%maximum_xy(axis=1)
+      inv_factor = 1.0_r_def
+    end if
+
+    dx = (domain_max_x - domain_min_x) / edge_cells
+    if ( minus ) then
+      coord_bound = domain_max_x - dx * boundary
+    else
+      coord_bound = domain_min_x + dx * boundary
     endif
 
-    ! NB: we expect the user here to have correctly entered the domain extents
-    ! in degrees!
-    if (geometry == geometry_spherical) then
-      coord_bound = coord_bound * degrees_to_radians
-    end if
+    coord_bound = inv_factor * coord_bound
 
   end function planar_boundary_ew
 
