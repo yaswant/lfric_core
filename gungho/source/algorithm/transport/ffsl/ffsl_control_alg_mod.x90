@@ -147,17 +147,20 @@ contains
     call dep_pts_x_get%copy_field(dep_pts_x)
     call dep_pts_y_get%copy_field(dep_pts_y)
 
-    ! Set horizontal and vertical monotone options, checking that a valid option has been selected
+    ! Set horizontal and vertical monotone options
     hori_monotone = transport_metadata%get_horizontal_monotone()
     vert_monotone = transport_metadata%get_vertical_monotone()
-    if ( hori_monotone /= horizontal_monotone_none   .and. &
-         hori_monotone /= horizontal_monotone_strict .and. &
-         hori_monotone /= horizontal_monotone_relaxed       ) then
+    ! Check that a valid monotone option has been selected based on direction
+    if ( hori_monotone /= horizontal_monotone_none    .and. &
+         hori_monotone /= horizontal_monotone_strict  .and. &
+         hori_monotone /= horizontal_monotone_relaxed .and. &
+         (direction == direction_3d .OR. direction == direction_h) ) then
       call log_event( "ffsl_control_alg: Invalid horizontal monotone option", LOG_LEVEL_ERROR )
     end if
-    if ( vert_monotone /= vertical_monotone_none   .and. &
-         vert_monotone /= vertical_monotone_strict .and. &
-         vert_monotone /= vertical_monotone_relaxed            ) then
+    if ( vert_monotone /= vertical_monotone_none    .and. &
+         vert_monotone /= vertical_monotone_strict  .and. &
+         vert_monotone /= vertical_monotone_relaxed .and. &
+         (direction == direction_3d .OR. direction == direction_v) ) then
       call log_event( "ffsl_control_alg: Invalid vertical monotone option", LOG_LEVEL_ERROR )
     end if
 
@@ -424,14 +427,16 @@ contains
     ! Set horizontal and vertical monotone options, checking that a valid option has been selected
     hori_monotone = transport_metadata%get_horizontal_monotone()
     vert_monotone = transport_metadata%get_vertical_monotone()
-    if ( hori_monotone /= horizontal_monotone_none   .and. &
-         hori_monotone /= horizontal_monotone_strict .and. &
-         hori_monotone /= horizontal_monotone_relaxed       ) then
+    if ( hori_monotone /= horizontal_monotone_none    .and. &
+         hori_monotone /= horizontal_monotone_strict  .and. &
+         hori_monotone /= horizontal_monotone_relaxed .and. &
+         (direction == direction_3d .OR. direction == direction_h) ) then
       call log_event( "ffsl_control_alg: Invalid horizontal monotone option", LOG_LEVEL_ERROR )
     end if
-    if ( vert_monotone /= vertical_monotone_none   .and. &
-         vert_monotone /= vertical_monotone_strict .and. &
-         vert_monotone /= vertical_monotone_relaxed            ) then
+    if ( vert_monotone /= vertical_monotone_none    .and. &
+         vert_monotone /= vertical_monotone_strict  .and. &
+         vert_monotone /= vertical_monotone_relaxed .and. &
+         (direction == direction_3d .OR. direction == direction_v) ) then
       call log_event( "ffsl_control_alg: Invalid vertical monotone option", LOG_LEVEL_ERROR )
     end if
 
