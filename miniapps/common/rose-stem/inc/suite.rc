@@ -471,6 +471,7 @@ echo $RELATIVE_LOG_ROOT > $DESTINATION_DIRECTORY/compile.log.path
         inherit = {{compiler_family}}, TARGET
 
 {{      unit_test_tasks( 'TESTING_WITH_'+compiler_family, PRIMARY_TARGET, compiler, precision ) }}
+{{      integration_test_tasks( 'TESTING_WITH_'+compiler_family, PRIMARY_TARGET, compiler, precision ) }}
 
 {%-     for build in build_profiles %}
 {%-       set label = compiler_label + '_' + build | lower %}

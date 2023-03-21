@@ -192,8 +192,19 @@ unit-tests: unit-tests/run
 ##############################################################################
 # Integration tests
 #
-integration-tests:
-	$(call MESSAGE,Testing,"There are no integration tests.")
+integration-tests/%: export ADDITIONAL_EXTRACTION                  \
+                        = $(ROOT_DIR)/infrastructure/source        \
+                          $(ROOT_DIR)/components/driver/source     \
+                          $(ROOT_DIR)/components/science/source    \
+                          $(ROOT_DIR)/components/lfric-da/source   \
+                          $(ROOT_DIR)/components/lfric-xios/source
+integration-tests/%: export BIN_DIR      ?= $(PROJECT_DIR)/test
+integration-tests/%: export META_FILE_DIR = rose-meta/lfric-da_dev/HEAD
+integration-tests/%: export PROJECT       = $(PROJECT_NAME)
+integration-tests/%: export SOURCE_DIR    = source
+integration-tests/%: export TEST_DIR      = integration-test
+integration-tests/%: export WORKING_DIR  := $(WORKING_DIR)/integration-tests
+integration-tests: integration-tests/run
 
 
 ##############################################################################
