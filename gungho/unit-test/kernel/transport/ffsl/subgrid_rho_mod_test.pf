@@ -1,0 +1,747 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2023 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> @brief Test the subgrid rho functions used for FFSL transport
+
+module subgrid_rho_mod_test
+
+  use constants_mod,                  only: i_def, r_tran
+  use transport_enumerated_types_mod, only: horizontal_monotone_none,    &
+                                            horizontal_monotone_strict,  &
+                                            horizontal_monotone_relaxed, &
+                                            vertical_monotone_none,      &
+                                            vertical_monotone_strict,    &
+                                            vertical_monotone_relaxed
+
+  implicit none
+
+contains
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine second_order_vertical_edge_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: second_order_vertical_edge
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:2), dz(1:2), edge_value, tol
+    real(kind=r_tran)   :: answer(1:3)
+    integer(kind=i_def) :: edge_to_do
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Test on uniform grid
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 1.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 3.0_r_tran
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = 4.0_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 2
+
+      call second_order_vertical_edge(rho,        &
+                                      dz,         &
+                                      edge_to_do, &
+                                      edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+    ! Test on non-uniform grid
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 2.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 4.0_r_tran
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = 6.0_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 2
+
+      edge_value = 0.0_r_tran
+      call second_order_vertical_edge(rho,        &
+                                      dz,         &
+                                      edge_to_do, &
+                                      edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+  end subroutine second_order_vertical_edge_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine second_order_vertical_gradient_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: second_order_vertical_gradient
+
+    implicit none
+
+    real(kind=r_tran) :: rho(1:2), dz(1:2), edge_value, tol
+    real(kind=r_tran) :: answer
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Test on uniform grid so gradient should be the difference
+    ! of the rho values
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 1.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 3.0_r_tran
+
+    answer = 2.0_r_tran
+
+    edge_value = 0.0_r_tran
+    call second_order_vertical_gradient(rho, &
+                                        dz,  &
+                                        edge_value)
+
+    @assertEqual(answer, edge_value, tol)
+
+    ! Test on non-uniform grid needs weighted difference
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 2.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 4.0_r_tran
+
+    answer = 2.0_r_tran
+
+    edge_value = 0.0_r_tran
+    call second_order_vertical_gradient(rho, &
+                                        dz,  &
+                                        edge_value)
+
+    @assertEqual(answer, edge_value, tol)
+
+  end subroutine second_order_vertical_gradient_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine fourth_order_vertical_edge_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: fourth_order_vertical_edge
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:4), dz(1:4), edge_value, tol
+    real(kind=r_tran)   :: answer(1:5)
+    integer(kind=i_def) :: edge_to_do
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Test on uniform grid with linear function
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 1.0_r_tran
+    dz(3)  = 1.0_r_tran
+    dz(4)  = 1.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 2.0_r_tran
+    rho(3) = 3.0_r_tran
+    rho(4) = 4.0_r_tran
+
+    answer(1) = 0.5_r_tran
+    answer(2) = 1.5_r_tran
+    answer(3) = 2.5_r_tran
+    answer(4) = 3.5_r_tran
+    answer(5) = 4.5_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 4
+
+      edge_value = 0.0_r_tran
+      call fourth_order_vertical_edge(rho,        &
+                                      dz,         &
+                                      edge_to_do, &
+                                      edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+    ! Test on non-uniform grid with linear function
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 2.0_r_tran
+    dz(3)  = 2.0_r_tran
+    dz(4)  = 1.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 4.0_r_tran
+    rho(3) = 8.0_r_tran
+    rho(4) = 11.0_r_tran
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = 6.0_r_tran
+    answer(4) = 10.0_r_tran
+    answer(5) = 12.0_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 4
+
+      edge_value = 0.0_r_tran
+      call fourth_order_vertical_edge(rho,        &
+                                      dz,         &
+                                      edge_to_do, &
+                                      edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+    ! Test on non-uniform grid with non-linear function
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 2.0_r_tran
+    dz(3)  = 2.0_r_tran
+    dz(4)  = 1.0_r_tran
+    rho(1) = 1.0_r_tran
+    rho(2) = 16.0_r_tran
+    rho(3) = 64.0_r_tran
+    rho(4) = 121.0_r_tran
+
+    answer(1) = 0.2_r_tran
+    answer(2) = 3.2_r_tran
+    answer(3) = 34.4_r_tran
+    answer(4) = 99.2_r_tran
+    answer(5) = 144.2_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 4
+
+      edge_value = 0.0_r_tran
+      call fourth_order_vertical_edge(rho,        &
+                                      dz,         &
+                                      edge_to_do, &
+                                      edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+  end subroutine fourth_order_vertical_edge_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine fourth_order_vertical_edge_strict_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: fourth_order_vertical_edge_strict
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:4), dz(1:4), edge_value, tol
+    real(kind=r_tran)   :: answer(1:5)
+    integer(kind=i_def) :: edge_to_do
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Unlimited fourth order edge tested above, so just test monotonicity
+    ! using a uniform grid with a non-linear function
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 1.0_r_tran
+    dz(3)  = 1.0_r_tran
+    dz(4)  = 1.0_r_tran
+    rho(1) = 0.0_r_tran
+    rho(2) = 12.0_r_tran
+    rho(3) = 7.0_r_tran
+    rho(4) = 4.0_r_tran
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 125.0_r_tran/12.0_r_tran
+    answer(3) = 10.75_r_tran
+    answer(4) = 4.0_r_tran
+    answer(5) = 7.0_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 4
+
+      edge_value = 0.0_r_tran
+      call fourth_order_vertical_edge_strict(rho,        &
+                                             dz,         &
+                                             edge_to_do, &
+                                             edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+  end subroutine fourth_order_vertical_edge_strict_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine fourth_order_vertical_edge_relaxed_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: fourth_order_vertical_edge_relaxed
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:4), dz(1:4), edge_value, tol
+    real(kind=r_tran)   :: answer(1:5)
+    integer(kind=i_def) :: edge_to_do
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Unlimited fourth order edge tested above, so just test monotonicity
+    ! using a uniform grid with a non-linear function
+    dz(1)  = 1.0_r_tran
+    dz(2)  = 1.0_r_tran
+    dz(3)  = 1.0_r_tran
+    dz(4)  = 1.0_r_tran
+    rho(1) = 0.0_r_tran
+    rho(2) = 10.0_r_tran
+    rho(3) = 8.0_r_tran
+    rho(4) = 2.0_r_tran
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 23.0_r_tran/3.0_r_tran
+    answer(3) = 31.0_r_tran/3.0_r_tran
+    answer(4) = 5.0_r_tran
+    answer(5) = 2.0_r_tran
+
+    ! Loop over all edges on the rho stencil
+    do edge_to_do = 0, 4
+
+      edge_value = 0.0_r_tran
+      call fourth_order_vertical_edge_relaxed(rho,        &
+                                              dz,         &
+                                              edge_to_do, &
+                                              edge_value)
+
+      @assertEqual(answer(edge_to_do+1), edge_value, tol)
+
+    end do
+
+  end subroutine fourth_order_vertical_edge_relaxed_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine horizontal_ppm_coeffs_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: horizontal_ppm_coeffs
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:5), coeffs(1:3), tol
+    real(kind=r_tran)   :: answer(1:3)
+    integer(kind=i_def) :: monotone
+
+    ! Set tolerance and switch monotonicity off
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+    monotone = horizontal_monotone_none
+
+    ! This function makes use of other functions within subgrid_rho_mod,
+    ! so we only test a linear function with no monotonicity
+    rho(1) = 1.0_r_tran
+    rho(2) = 2.0_r_tran
+    rho(3) = 3.0_r_tran
+    rho(4) = 4.0_r_tran
+    rho(5) = 5.0_r_tran
+
+    answer(1) = 2.5_r_tran
+    answer(2) = 1.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call horizontal_ppm_coeffs(coeffs,rho,monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+  end subroutine horizontal_ppm_coeffs_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine horizontal_nirvana_coeffs_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: horizontal_nirvana_coeffs
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:3), coeffs(1:3), tol
+    real(kind=r_tran)   :: answer(1:3)
+    integer(kind=i_def) :: monotone
+
+    ! Set tolerance and switch monotonicity off
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+    monotone = horizontal_monotone_none
+
+    ! Test a linear function
+    rho(1) = 2.0_r_tran
+    rho(2) = 4.0_r_tran
+    rho(3) = 6.0_r_tran
+
+    answer(1) = 3.0_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call horizontal_nirvana_coeffs(coeffs,rho,monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Test a non-linear function
+    rho(1) = 1.0_r_tran
+    rho(2) = 3.0_r_tran
+    rho(3) = 8.0_r_tran
+
+    answer(1) = 1.5_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = 1.5_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call horizontal_nirvana_coeffs(coeffs,rho,monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+  end subroutine horizontal_nirvana_coeffs_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine vertical_nirvana_coeffs_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: vertical_nirvana_coeffs
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:3), coeffs(1:3), dz, tol
+    real(kind=r_tran)   :: answer(1:3), grad_above, grad_below
+    integer(kind=i_def) :: monotone
+
+    ! Set tolerance and set unit grid space
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+    dz  = 1.0_r_tran
+
+    ! Test a linear function
+    rho(1)     = 1.0_r_tran
+    rho(2)     = 2.0_r_tran
+    rho(3)     = 3.0_r_tran
+    grad_below = 1.0_r_tran
+    grad_above = 1.0_r_tran
+    monotone   = vertical_monotone_none
+
+    answer(1) = 1.5_r_tran
+    answer(2) = 1.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call vertical_nirvana_coeffs(coeffs,     &
+                                 rho,        &
+                                 dz,         &
+                                 grad_below, &
+                                 grad_above, &
+                                 monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Test a non-linear function with all monotonicity options
+    rho(1)     = 0.0_r_tran
+    rho(2)     = 4.0_r_tran
+    rho(3)     = 2.0_r_tran
+    grad_below = 2.0_r_tran
+    grad_above = -1.0_r_tran
+
+    ! No monotonicity
+    monotone  = vertical_monotone_none
+    answer(1) = 3.5_r_tran
+    answer(2) = 2.0_r_tran
+    answer(3) = -1.5_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call vertical_nirvana_coeffs(coeffs,     &
+                                 rho,        &
+                                 dz,         &
+                                 grad_below, &
+                                 grad_above, &
+                                 monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Strict monotonicity
+    monotone  = vertical_monotone_strict
+    answer(1) = 4.0_r_tran
+    answer(2) = 0.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call vertical_nirvana_coeffs(coeffs,     &
+                                 rho,        &
+                                 dz,         &
+                                 grad_below, &
+                                 grad_above, &
+                                 monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Relaxed monotonicity
+    monotone  = vertical_monotone_relaxed
+    answer(1) = 4.0_r_tran
+    answer(2) = 0.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+
+    call vertical_nirvana_coeffs(coeffs,     &
+                                 rho,        &
+                                 dz,         &
+                                 grad_below, &
+                                 grad_above, &
+                                 monotone)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+
+  end subroutine vertical_nirvana_coeffs_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine calc_density_at_cell_edge_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: calc_density_at_cell_edge
+
+    implicit none
+
+    real(kind=r_tran)   :: rho(1:4), edge_value, tol
+    real(kind=r_tran)   :: answer
+    integer(kind=i_def) :: monotone
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Test a linear function with no monotonicity
+    rho(1) = 1.0_r_tran
+    rho(2) = 3.0_r_tran
+    rho(3) = 5.0_r_tran
+    rho(4) = 7.0_r_tran
+    monotone  = horizontal_monotone_none
+
+    answer = 4.0_r_tran
+
+    edge_value = calc_density_at_cell_edge(rho,monotone)
+
+    @assertEqual(answer, edge_value, tol)
+
+    ! Test a non-linear function with different monotonicity
+    rho(1) = 0.0_r_tran
+    rho(2) = 10.0_r_tran
+    rho(3) = 9.0_r_tran
+    rho(4) = 4.0_r_tran
+
+    ! No monotonicity
+    monotone = horizontal_monotone_none
+    answer = 10.75_r_tran
+
+    edge_value = calc_density_at_cell_edge(rho,monotone)
+
+    @assertEqual(answer, edge_value, tol)
+
+    ! Strict monotonicity
+    monotone = horizontal_monotone_strict
+    answer = 10.0_r_tran
+
+    edge_value = calc_density_at_cell_edge(rho,monotone)
+
+    @assertEqual(answer, edge_value, tol)
+
+    ! Relaxed monotonicity
+    monotone = horizontal_monotone_relaxed
+    answer = 10.75_r_tran
+
+    edge_value = calc_density_at_cell_edge(rho,monotone)
+
+    @assertEqual(answer, edge_value, tol)
+
+  end subroutine calc_density_at_cell_edge_test
+
+  !------------------------------------------------------------------
+
+  @test
+  subroutine ppm_output_test()
+    use pFUnit_Mod
+    use, intrinsic :: iso_fortran_env,  only: real64
+    use subgrid_rho_mod,                only: ppm_output
+
+    implicit none
+
+    real(kind=r_tran)   :: rho, rho_L, rho_R, coeffs(1:3), tol
+    real(kind=r_tran)   :: answer(1:3)
+    integer(kind=i_def) :: monotone
+
+    ! Set tolerance
+    if ( r_tran == real64 ) then
+      tol = 1.0e-12_r_tran
+    else
+      tol = 1.0e-6_r_tran
+    end if
+
+    ! Test a quadratic function without monotonicity
+    rho_L    = 0.0_r_tran
+    rho_R    = 1.0_r_tran
+    rho      = 1.0_r_tran/3.0_r_tran
+    monotone = horizontal_monotone_none
+
+    answer(1) = 0.0_r_tran
+    answer(2) = 0.0_r_tran
+    answer(3) = 1.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+    call ppm_output(rho_L,    &
+                    rho_R,    &
+                    rho,      &
+                    monotone, &
+                    coeffs)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Test a non-linear function with all monotonicity options
+    rho_L    = 1.0_r_tran
+    rho_R    = 1.0_r_tran
+    rho      = 2.0_r_tran
+
+    ! No monotonicity
+    monotone = horizontal_monotone_none
+
+    answer(1) = 1.0_r_tran
+    answer(2) = 6.0_r_tran
+    answer(3) = -6.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+    call ppm_output(rho_L,    &
+                    rho_R,    &
+                    rho,      &
+                    monotone, &
+                    coeffs)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Strict monotonicity
+    monotone = horizontal_monotone_strict
+
+    answer(1) = 2.0_r_tran
+    answer(2) = 0.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+    call ppm_output(rho_L,    &
+                    rho_R,    &
+                    rho,      &
+                    monotone, &
+                    coeffs)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+    ! Relaxed monotonicity
+    monotone = horizontal_monotone_relaxed
+
+    answer(1) = 2.0_r_tran
+    answer(2) = 0.0_r_tran
+    answer(3) = 0.0_r_tran
+
+    coeffs(1:3) = 0.0_r_tran
+    call ppm_output(rho_L,    &
+                    rho_R,    &
+                    rho,      &
+                    monotone, &
+                    coeffs)
+
+    @assertEqual(answer(1), coeffs(1), tol)
+    @assertEqual(answer(2), coeffs(2), tol)
+    @assertEqual(answer(3), coeffs(3), tol)
+
+  end subroutine ppm_output_test
+
+  !------------------------------------------------------------------
+
+end module subgrid_rho_mod_test

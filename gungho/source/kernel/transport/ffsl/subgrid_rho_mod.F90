@@ -10,7 +10,7 @@
 !------------------------------------------------------------------------------
 module subgrid_rho_mod
 
-use constants_mod,                  only: i_def, r_tran, l_def, EPS
+use constants_mod,                  only: i_def, r_tran, EPS
 use transport_enumerated_types_mod, only: horizontal_monotone_none,    &
                                           horizontal_monotone_strict,  &
                                           horizontal_monotone_relaxed, &
@@ -22,14 +22,15 @@ implicit none
 
 private
 
-public :: horizontal_ppm_coeffs
-public :: horizontal_nirvana_coeffs
-public :: vertical_nirvana_coeffs
+public :: second_order_vertical_edge
+public :: second_order_vertical_gradient
 public :: fourth_order_vertical_edge
 public :: fourth_order_vertical_edge_strict
 public :: fourth_order_vertical_edge_relaxed
-public :: second_order_vertical_edge
-public :: second_order_vertical_gradient
+public :: horizontal_ppm_coeffs
+public :: horizontal_nirvana_coeffs
+public :: vertical_nirvana_coeffs
+public :: calc_density_at_cell_edge
 public :: ppm_output
 
 contains
@@ -510,8 +511,8 @@ contains
   !!
   !! @param[in]   density            Has dof map of the form | 1 | 2 | 3 | 4 |
   !! @param[in]   monotone           Monotone option to ensures no over/undershoots
-  !! @return      density_at_edge    Coefficients for cell 3 with coeffs(1)=a0,
-  !!                                 coeffs(2)=a1, coeffs(3)=a2
+  !! @return      density_at_edge    Interpolated density value at edge between
+  !!                                 cells 2 and 3.
   !----------------------------------------------------------------------------
   function calc_density_at_cell_edge(density,monotone) result(density_at_edge)
 
