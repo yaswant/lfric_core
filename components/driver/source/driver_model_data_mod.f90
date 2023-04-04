@@ -56,8 +56,8 @@ contains
   !!        the collection will either be a copy of the original or a field
   !!        pointer object containing a pointer to a field held elsewhere.
   !!
-  !> @param [in] field The field that is to be copied into the collection or a
-  !!                   field pointer object to be stored in the collection
+  !> @param [in] field_collection The field_collection that is to be added
+  !!                              to the model_data.
   !!
   subroutine add_field_collection(self, field_collection)
 

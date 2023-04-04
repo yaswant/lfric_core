@@ -26,19 +26,19 @@ type, public :: jedi_model_type
   private
 
   !> The data map between external field data and LFRic fields
-  integer( kind = i_def )            :: date_time_duration_dt
+  integer( kind = i_def ) :: date_time_duration_dt
 
 contains
 
   !> Model initialiser.
-  procedure, public :: initialise => jedi_model_initialiser
+  procedure, public :: initialise
 
-  !> methods
+  !> Methods
   procedure, private :: model_init
   procedure, private :: model_step
   procedure, private :: model_final
 
-  !> public method
+  !> Run a forecast
   procedure, public :: forecast
 
   !> Finalizer
@@ -46,14 +46,15 @@ contains
 
 end type jedi_model_type
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Contained functions/subroutines
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 contains
 
-!> jedi_model constructor
-!> @param [in] date_time_duration_dt time step duration
-subroutine jedi_model_initialiser( self, date_time_duration_dt )
+!> @brief    Initialiser for jedi_model_type
+!>
+!> @param [in] date_time_duration_dt The time step duration
+subroutine initialise( self, date_time_duration_dt )
 
   implicit none
 
@@ -62,10 +63,12 @@ subroutine jedi_model_initialiser( self, date_time_duration_dt )
 
   self%date_time_duration_dt = date_time_duration_dt
 
-end subroutine jedi_model_initialiser
+end subroutine initialise
 
-!> Model initialise
-!> @param [in] state state object to be used in the model initialise
+
+!> @brief    Initialise the model
+!>
+!> @param [inout] state State object to be used in the model initialise
 subroutine model_init(self, state)
 
   implicit none
@@ -75,8 +78,9 @@ subroutine model_init(self, state)
 
 end subroutine model_init
 
-!> Model step
-!> @param [in] state state object to propagated by one time-step
+!> @brief    Step the model
+!>
+!> @param [inout] state State object to propagated
 subroutine model_step(self, state)
 
   use da_dev_driver_mod,  only: model_clock
@@ -92,17 +96,17 @@ subroutine model_step(self, state)
 
   ! check the clock
   clock_stopped=.not.model_clock%tick()
-  !! if the clock has finished then it will just get the
-  !! data at the end of the file - this prevents that
+  ! If the clock has finished then it will just get the
+  ! data at the end of the file - this prevents that
   if (clock_stopped) then
-    write(log_scratch_space, '(A)') "Model::model_step::The LFRic clock has stopped."
+    write(log_scratch_space, &
+      '(A)') "Model::model_step::The LFRic clock has stopped."
     call log_event( log_scratch_space, LOG_LEVEL_ERROR )
   endif
 
   call step_lfric(state%model_data)
 
-  ! Link the state fields with the model data
-  call state%setup_external()
+  ! Copy fields from model data
   call state%from_model_data()
 
   ! update the state time
@@ -110,8 +114,10 @@ subroutine model_step(self, state)
 
 end subroutine model_step
 
-!> Model finalise
-!> @param [in] state state object to be used in the model finalialise
+
+!> @brief    Finalise the model
+!>
+!> @param [inout] state State object to be used in the model finalise
 subroutine model_final(self, state)
 
   implicit none
@@ -121,7 +127,8 @@ subroutine model_final(self, state)
 
 end subroutine model_final
 
-!> Finalizer
+!> @brief    Finalize the jedi_pseudo_model_type
+!>
 subroutine jedi_model_destructor(self)
 
   implicit none
@@ -130,13 +137,14 @@ subroutine jedi_model_destructor(self)
 
 end subroutine jedi_model_destructor
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! OOPS defined forecast method
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 
-!> Model forecast
-!> @param [inout] state the state object to propagate
-!> @param [in] date_time_duration the duration of the forecast
+!> @brief    Run a forecast using the model init, step and final
+!>
+!> @param [inout] state           The state object to propagate
+!> @param [in] date_time_duration The duration of the forecast
 subroutine forecast(self, state, date_time_duration)
 
   implicit none

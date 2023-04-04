@@ -41,9 +41,9 @@ module da_dev_model_init_mod
     call model_data%depository%initialise(name = 'depository', table_len=100)
 
     ! Create fields and add them to model_data
-    call add_real_field( model_data, mesh, Wtheta, "theta" )
-    call add_real_field( model_data, mesh, W3,     "rho"   )
-    call add_real_field( model_data, mesh2d, W3,   "u10m"  )
+    call add_real_field( model_data%depository, mesh, Wtheta, "theta" )
+    call add_real_field( model_data%depository, mesh, W3,     "rho"   )
+    call add_real_field( model_data%depository, mesh2d, W3,   "u10m"  )
 
     call log_event( 'da_dev: Miniapp initialised', LOG_LEVEL_INFO )
 

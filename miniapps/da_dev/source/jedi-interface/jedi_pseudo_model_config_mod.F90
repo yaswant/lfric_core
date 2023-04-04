@@ -4,10 +4,10 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing a faux config for the mock pseudo model.
+!> @brief A module providing a configuration for the pseudo model emulator.
 !>
 !> @details A class is defined to hold the configuration data required to
-!>          construct the mock pseudo model. An initialiser is included and
+!>          construct the pseudo model emulator. An initialiser is included and
 !>          this is currently hard coded. In JEDI this information would be
 !>          stored in a yaml file and eckit is used to parse and store a
 !>          configuration object.
@@ -22,8 +22,9 @@ module jedi_pseudo_model_config_mod
 
 type, public :: jedi_pseudo_model_config_type
 
-  ! here we have date_time as an integer. It will actually be an object or string that stores time
-  ! to be read. initilly stored in the configaurtion file:
+  ! Here we have date_time as an integer. It will actually be an object or
+  ! string that stores time to be read. Initially stored in the configuration
+  ! file:
   !
   ! date: '2018-04-14T21:00:00Z'
   ! mpas define the formating for this as:
@@ -32,7 +33,7 @@ type, public :: jedi_pseudo_model_config_type
   !> List of the dates to be read
   integer( kind=i_def ), allocatable :: date_time_states(:)
 
-  !> file prefix for read
+  !> File prefix for read
   character(len=str_def)             :: read_file_prefix
 
 contains
@@ -45,12 +46,13 @@ contains
 
 end type jedi_pseudo_model_config_type
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Contained functions/subroutines
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 contains
 
-!> jedi_pseudo_model_config initialiser
+!> @brief    Initialiser for jedi_pseudo_model_config_type
+!>
 subroutine initialise( self )
 
   implicit none
@@ -68,12 +70,13 @@ subroutine initialise( self )
 
 end subroutine initialise
 
-!> jedi_pseudo_model_config finalizer
+!> @brief    Finalizer for jedi_pseudo_model_config_type
+!>
 subroutine jedi_pseudo_model_config_destructor(self)!
 
   implicit none
 
-  type(jedi_pseudo_model_config_type), intent(inout)    :: self
+  type(jedi_pseudo_model_config_type), intent(inout) :: self
 
   if ( allocated(self%date_time_states) ) deallocate(self%date_time_states)
 

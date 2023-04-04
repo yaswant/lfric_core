@@ -23,22 +23,23 @@ type, public :: jedi_run_type
 contains
 
   !> Field initialiser.
-  procedure, public :: initialise => jedi_run_initialiser
+  procedure, public :: initialise
 
   !> Finalizer
   final             :: jedi_run_destructor
 
 end type jedi_run_type
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Contained functions/subroutines
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 contains
 
-!> jedi_run constructor
+!> @brief    Initialiser for jedi_run_type
+!>
 !> @param [in] filename a character that contains the location of the namelist
 !>             file
-subroutine jedi_run_initialiser( self, program_name, filename )
+subroutine initialise( self, program_name, filename )
 
   use mpi_mod,           only : initialise_comm
   use da_dev_driver_mod, only : initialise_lfric, initialise_lfric_comm
@@ -64,9 +65,10 @@ subroutine jedi_run_initialiser( self, program_name, filename )
   ! initialise infrastructure
   call initialise_lfric( program_name, model_communicator, filename )
 
-end subroutine jedi_run_initialiser
+end subroutine initialise
 
-!> jedi_run finalizer
+!> @brief    Finalizer for jedi_run_type
+!>
 subroutine jedi_run_destructor(self)
 
   use da_dev_driver_mod, only : finalise_lfric

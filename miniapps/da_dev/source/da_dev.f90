@@ -33,7 +33,7 @@ program da_dev
 
   call run(program_name, model_data)
 
-  call finalise_model(program_name, model_data)
+  call finalise_model(program_name, model_data%depository)
 
   call finalise_lfric(program_name)
 

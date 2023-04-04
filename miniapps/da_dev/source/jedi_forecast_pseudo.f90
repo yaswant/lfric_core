@@ -4,41 +4,41 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 
-!> @page Miniapp da_dev program
+!> @page jedi_forecast_pseudo program
 
-!> @brief Main program for running da_dev independently with jedi objects.
+!> @brief Main program for running pseudo model forecast with jedi emulator
+!>        objects.
 
-!> @details Setup and run a pseudo model forecast using the mock jedi objects
-!>          The jedi objects are constructed via an initialiser call and the
-!>          forecast is handled by the model object.
-
+!> @details Setup and run a pseudo model forecast using the jedi emulator
+!>          objects. The jedi objects are constructed via an initialiser call
+!>          and the forecast is handled by the model object.
+!>
 program jedi_forecast_pseudo
 
-  !
-  use constants_mod,         only : i_def
-  !! temp data types and methods to get/store configurations for geometry, state and model
-  use jedi_state_config_mod, only : jedi_state_config_type
-  use jedi_pseudo_model_config_mod, only : jedi_pseudo_model_config_type
-  use cli_mod,               only : get_initial_filename
+  use constants_mod,     only : i_def
+  use da_dev_driver_mod, only : finalise_model
 
-  ! Mock jedi objects
+  ! Data types and methods to get/store configurations
+  use jedi_state_config_mod,        only : jedi_state_config_type
+  use jedi_pseudo_model_config_mod, only : jedi_pseudo_model_config_type
+  use cli_mod,                      only : get_initial_filename
+
+  ! Jedi emulator objects
   use jedi_run_mod,          only : jedi_run_type
   use jedi_geometry_mod,     only : jedi_geometry_type
   use jedi_state_mod,        only : jedi_state_type
   use jedi_pseudo_model_mod, only : jedi_pseudo_model_type
 
-  !
-  use da_dev_driver_mod,     only : finalise_model
 
   implicit none
 
-  ! jedi objects
+  ! Jedi objects
   type(jedi_geometry_type)     :: jedi_geometry
   type(jedi_state_type)        :: jedi_state
   type(jedi_pseudo_model_type) :: jedi_model
   type(jedi_run_type)          :: jedi_run
 
-  ! faux configs
+  ! Emulator configs
   type(jedi_state_config_type)        :: jedi_state_config
   type(jedi_pseudo_model_config_type) :: jedi_pseudo_model_config
   integer( kind=i_def )               :: date_time_duration
@@ -46,34 +46,36 @@ program jedi_forecast_pseudo
 
   character(*), parameter      :: program_name = "jedi_forecast_pseudo"
 
-  ! config for the mock jedi objects
   ! Infrastructure config
   call get_initial_filename( filename )
+
+  ! Config for the jedi emulator objects
   ! State config
-  call jedi_state_config%initialise(use_full_model=.false.)
-  ! Model Config
+  call jedi_state_config%initialise( use_nl_model = .false. )
+
+  ! Model config
   call jedi_pseudo_model_config%initialise()
+
   ! Forecast config
   date_time_duration = 5
 
   ! Run object
-  ! handles initialization and finalization of required infrastructure
+  ! Handles initialization and finalization of required infrastructure
   call jedi_run%initialise( program_name, filename )
 
   ! Geometry
-  ! possibly pass in a comm?
   call jedi_geometry%initialise()
 
   ! State
   call jedi_state%initialise( jedi_geometry, jedi_state_config )
 
   ! Model
-  call jedi_model%initialise(jedi_pseudo_model_config)
+  call jedi_model%initialise( jedi_pseudo_model_config )
 
-  ! run app via model class
-  call jedi_model%forecast(jedi_state, date_time_duration)
+  ! Run app via model class
+  call jedi_model%forecast( jedi_state, date_time_duration )
 
-  ! to provide KGO
-  call finalise_model( program_name, jedi_state%model_data )
+  ! To provide KGO
+  call finalise_model( program_name, jedi_state%io_collection )
 
 end program jedi_forecast_pseudo

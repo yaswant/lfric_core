@@ -40,11 +40,12 @@ module da_dev_driver_mod
   use da_dev_increment_alg_mod, only: da_dev_increment_alg
   use da_dev_init_files_mod,    only: init_da_dev_files
   use da_dev_config_mod,        only: write_data, test_field
+  use da_dev_extrusion_mod,     only: create_extrusion
   use lfric_da_driver_mod,      only: init_da, final_da
   use lfric_xios_read_mod,      only: read_state
   use lfric_xios_write_mod,     only: write_state
   use lfric_xios_context_mod,   only: lfric_xios_context_type, advance
-  use da_dev_extrusion_mod,     only: create_extrusion
+  use field_collection_mod,     only: field_collection_type
 
   implicit none
 
@@ -219,16 +220,16 @@ contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !> Finalise the model data after a run.
-  subroutine finalise_model( program_name, model_data )
+  subroutine finalise_model( program_name, field_collection  )
 
     implicit none
 
-    character(len=*), intent(in)         :: program_name
-    type(model_data_type), intent(inout) :: model_data
+    character(len=*), intent(in)               :: program_name
+    type(field_collection_type), intent(inout) :: field_collection
 
     type(field_type), pointer :: working_field => null()
 
-    call model_data%depository%get_field( test_field, working_field )
+    call field_collection%get_field( test_field, working_field )
 
     !---------------------------------------------------------------------------
     ! Model finalise

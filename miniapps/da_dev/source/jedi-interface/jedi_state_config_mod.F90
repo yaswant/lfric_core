@@ -4,18 +4,19 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing a faux config for the mock jedi state.
+!> @brief A module providing a configuration for the JEDI state emulator.
 !>
 !> @details A class is defined to hold the configuration data required to
-!>          construct a mock jedi state. An initialiser is included and
+!>          construct a JEDI state emulator. An initialiser is included and
 !>          this is currently hard coded. In JEDI this information would be
 !>          stored in a yaml file and eckit is used to parse and store a
 !>          configuration object.
 !>
 module jedi_state_config_mod
 
-  use constants_mod,      only : i_def, str_def, l_def
-  use fs_continuity_mod,  only : W3, Wtheta
+  use constants_mod,         only : i_def, str_def, l_def
+  use fs_continuity_mod,     only : W3, Wtheta
+  use da_dev_field_meta_mod, only : da_dev_field_meta_type
 
   implicit none
 
@@ -23,28 +24,26 @@ module jedi_state_config_mod
 
 type, public :: jedi_state_config_type
 
-  !> the name of the state variables
-  character( len=str_def ), allocatable :: state_variables(:)
-  !> function space for the variables
-  integer( kind=i_def ), allocatable :: variable_function_space(:)
-  !> logical that defines if the field is 2D
-  logical( kind=l_def ), allocatable :: variable_is_2d(:)
+  !> The field meta data
+  type( da_dev_field_meta_type )        :: field_meta_data
 
-  ! here we have date_time as an integer. It will actually be an object or string that stores time
-  ! to be read. initilly stored in the configaurtion file:
+  ! Here we have date_time as an integer. It will actually be an object or
+  ! string that stores time to be read. Initially stored in the configuration
+  ! file:
   !
   ! date: '2018-04-14T21:00:00Z'
   ! mpas define the formating for this as:
   ! dateTimeString = '$Y-$M-$D_$h:$m:$s'
   integer( kind=i_def )              :: date_time
-  !> file prefix for read
+  !> File prefix for read
   character(len=str_def)             :: read_file_prefix
-  !> Defines if the model_data is ...
-  logical( kind=l_def )              :: use_full_model
+  !> A logical that if true indicates that the state should include a
+  !> model_data instance because it will be used with the non-linear model
+  logical( kind=l_def )              :: use_nl_model
 
 contains
 
-  !> jedi_state_config initialiser.
+  !> Initialiser.
   procedure :: initialise
 
   !> jedi_state_config finalizer
@@ -57,49 +56,54 @@ end type jedi_state_config_type
 !-------------------------------------------------------------------------------
 contains
 
-!> jedi_state_config initialiser
-!> @param [in] use_full_model set true if full model is used
-subroutine initialise( self, use_full_model )
+
+!> @brief    Initialiser for jedi_state_config_type
+!>
+!> @param [in] use_nl_model  Set true if full model is going to be used
+subroutine initialise( self, use_nl_model )
 
   implicit none
 
   class( jedi_state_config_type ), intent(inout) :: self
-  logical( kind=l_def ), intent(in)              :: use_full_model
+  logical( kind=l_def ), intent(in)              :: use_nl_model
   ! Local
-  integer :: nvars
+  integer, parameter       :: nvars=3
+  character( len=str_def ) :: variable_names(nvars)
+  integer( kind=i_def )    :: variable_function_spaces(nvars)
+  logical( kind=l_def )    :: variable_is_2d(nvars)
 
-  ! configuration inputs
+  ! Configuration inputs
   self%read_file_prefix="read_"
-  nvars=3
-  allocate(self%state_variables(nvars), self%variable_function_space(nvars), self%variable_is_2d(nvars))
-  !
-  self%state_variables(1) = "theta"
-  self%state_variables(2) = "rho"
-  self%state_variables(3) = "u10m"
-  !
-  self%variable_function_space(1) = Wtheta
-  self%variable_function_space(2) = W3
-  self%variable_function_space(3) = W3
-  !
-  self%variable_is_2d(1) = .false.
-  self%variable_is_2d(2) = .false.
-  self%variable_is_2d(3) = .true.
   self%date_time = 0
+  self%use_nl_model = use_nl_model
 
-  self%use_full_model = use_full_model
+  ! Setup arrays required for field_meta_data
+  ! Variable names
+  variable_names(1) = "theta"
+  variable_names(2) = "rho"
+  variable_names(3) = "u10m"
+  ! Variable function spaces
+  variable_function_spaces(1) = Wtheta
+  variable_function_spaces(2) = W3
+  variable_function_spaces(3) = W3
+  ! Variable is_2d
+  variable_is_2d(1) = .false.
+  variable_is_2d(2) = .false.
+  variable_is_2d(3) = .true.
+
+  call self%field_meta_data%initialise( variable_names,           &
+                                        variable_function_spaces, &
+                                        variable_is_2d )
 
 end subroutine initialise
 
-!> jedi_state_config finalizer
-subroutine jedi_state_config_destructor(self)!
+!> @brief    Finalizer for jedi_state_config_type
+!>
+subroutine jedi_state_config_destructor(self)
 
   implicit none
 
   type(jedi_state_config_type), intent(inout)    :: self
-
-  if ( allocated(self%state_variables) ) deallocate(self%state_variables)
-  if ( allocated(self%variable_function_space) ) deallocate(self%variable_function_space)
-  if ( allocated(self%variable_is_2d) ) deallocate(self%variable_is_2d)
 
 end subroutine jedi_state_config_destructor
 

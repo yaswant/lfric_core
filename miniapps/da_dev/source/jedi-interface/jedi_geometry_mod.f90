@@ -4,19 +4,16 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing a mock JEDI Geometry class.
+!> @brief A module providing the JEDI Geometry emulator class.
 !>
-!> @details This module holds a mock JEDI Geometry class that includes only the
-!>          functionality that is required to support the mock JEDI interface.
+!> @details This module holds a JEDI Geometry emulator class that includes only
+!>           the functionality that is required to support interface emulation.
 !>
 module jedi_geometry_mod
 
   use, intrinsic :: iso_fortran_env, only : real64
 
-  use log_mod,                       only : log_event,          &
-                                            log_scratch_space,  &
-                                            LOG_LEVEL_ERROR
-  use constants_mod,                 only : i_def, str_def, l_def
+  use constants_mod,                 only : i_def
 
   implicit none
 
@@ -28,17 +25,17 @@ type, public :: jedi_geometry_type
   !> The data map between external field data and LFRic fields
   integer( kind = i_def ), allocatable :: horizontal_map(:)
   !> the LFRic field dimensions
-  integer( kind = i_def )              :: n_vertical
+  integer( kind = i_def )              :: n_layers
   integer( kind = i_def )              :: n_horizontal
 
 contains
 
   !> Field initialiser.
-  procedure, public :: initialise => jedi_geometry_initialiser
+  procedure, public :: initialise
 
   !> getters
   procedure, public :: get_n_horizontal
-  procedure, public :: get_n_vertical
+  procedure, public :: get_n_layers
   procedure, public :: get_horizontal_map
 
   !> Finalizer
@@ -46,13 +43,14 @@ contains
 
 end type jedi_geometry_type
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! Contained functions/subroutines
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 contains
 
-!> jedi_geometry constructor
-subroutine jedi_geometry_initialiser( self )
+!> @brief    Initialiser for jedi_geometry_type
+!>
+subroutine initialise( self )
 
   use da_dev_driver_mod, only : mesh
 
@@ -64,7 +62,7 @@ subroutine jedi_geometry_initialiser( self )
   integer :: i_horizontal
 
   ! These will be provided by calls that James is working on
-  self%n_vertical = mesh%get_nlayers()
+  self%n_layers = mesh%get_nlayers()
   self%n_horizontal = mesh%get_last_edge_cell()
 
   ! Create horizontal_map
@@ -74,9 +72,11 @@ subroutine jedi_geometry_initialiser( self )
     self%horizontal_map(i_horizontal) = i_horizontal
   enddo
 
-end subroutine jedi_geometry_initialiser
+end subroutine initialise
 
-!> Get the number of horizontal points
+!> @brief    Get the number of horizontal points
+!>
+!> @return n_horizontal The number of horizontal points
 function get_n_horizontal(self) result(n_horizontal)
 
   implicit none
@@ -88,19 +88,24 @@ function get_n_horizontal(self) result(n_horizontal)
 
 end function get_n_horizontal
 
-!> Get the number of vertical points
-function get_n_vertical(self) result(n_vertical)
+!> @brief    Get the number of model layers
+!>
+!> @return n_layers The number of model layers
+function get_n_layers(self) result(n_layers)
 
   implicit none
 
   class( jedi_geometry_type ), intent(in) :: self
-  integer(kind = i_def)              :: n_vertical
+  integer(kind = i_def)              :: n_layers
 
-  n_vertical = self%n_vertical
+  n_layers = self%n_layers
 
-end function get_n_vertical
+end function get_n_layers
 
-!> Get a pointer to the horizontal map
+!> @brief    Get a pointer to the horizontal map
+!>
+!> @return horizontal_map A pointer to the map providing the horizontal index
+!>                        of the Atlas field
 subroutine get_horizontal_map(self, horizontal_map)
 
   implicit none
@@ -112,8 +117,9 @@ subroutine get_horizontal_map(self, horizontal_map)
 
 end subroutine get_horizontal_map
 
-!> jedi_geometry finalizer
-subroutine jedi_geometry_destructor(self)!
+!> @brief    Finalizer for jedi_geometry_type
+!>
+subroutine jedi_geometry_destructor(self)
 
   implicit none
 

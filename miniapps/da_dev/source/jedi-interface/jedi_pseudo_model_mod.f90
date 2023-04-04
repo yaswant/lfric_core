@@ -4,12 +4,11 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing a class than handles the pseudo model
+!> @brief A module providing the JEDI pseudo model emulator class.
 !>
-!> @details This module includes a class that handles the pseudo model where
-!>          the time-stepping uses the read_file state method. An included
-!>          forecast application uses the model init, step and final to run a
-!>          forecast.
+!> @details This module holds a JEDI pseudo model emulator where the
+!>          time-stepping uses the read_file state method. An included forecast
+!>          application uses the model init, step and final to run a forecast.
 !>
 module jedi_pseudo_model_mod
 
@@ -27,25 +26,25 @@ type, public :: jedi_pseudo_model_type
   private
 
   !> A date_time list to read
-  integer( kind=i_def ), allocatable :: date_time_states(:)
-  !> index for the current state in date_time_states
+  integer( kind=i_def ), allocatable  :: date_time_states(:)
+  !> Index for the current state in date_time_states
   integer( kind=i_def )               :: current_state
-  !> the number of states
+  !> The number of states
   integer( kind=i_def )               :: n_states
-  !> the file prefix for reading
+  !> The file prefix for reading
   character(len=str_def)              :: file_prefix
 
 contains
 
   !> Model initialiser.
-  procedure, public :: initialise => jedi_pseudo_model_initialiser
+  procedure, public :: initialise
 
   !> Methods
   procedure, private :: model_init
   procedure, private :: model_step
   procedure, private :: model_final
 
-  !> Public method
+  !> Run a forecast
   procedure, public :: forecast
 
   !> Finalizer
@@ -58,9 +57,10 @@ end type jedi_pseudo_model_type
 !-------------------------------------------------------------------------------
 contains
 
-!> jedi_pseudo_model constructor
-!> @param [in] config configuration used to setup the model class
-subroutine jedi_pseudo_model_initialiser( self, config)
+!> @brief    Initialiser for jedi_pseudo_model_type
+!>
+!> @param [in] config Configuration used to setup the model class
+subroutine initialise( self, config )
 
   use jedi_pseudo_model_config_mod, only : jedi_pseudo_model_config_type
 
@@ -76,10 +76,11 @@ subroutine jedi_pseudo_model_initialiser( self, config)
   self%date_time_states = config%date_time_states
   self%file_prefix = config%read_file_prefix
 
-end subroutine jedi_pseudo_model_initialiser
+end subroutine initialise
 
-!> Model initialise
-!> @param [inout] state state object to be used in the model initialise
+!> @brief    Initialise the model
+!>
+!> @param [inout] state State object to be used in the model initialise
 subroutine model_init(self, state)
 
   implicit none
@@ -89,8 +90,9 @@ subroutine model_init(self, state)
 
 end subroutine model_init
 
-!> Model step
-!> @param [inout] state state object to propagated
+!> @brief    Step the model
+!>
+!> @param [inout] state State object to propagated
 subroutine model_step(self, state)
 
   implicit none
@@ -113,8 +115,9 @@ subroutine model_step(self, state)
 
 end subroutine model_step
 
-!> Model finalise
-!> @param [inout] state state object to be used in the model finalialise
+!> @brief    Finalise the model
+!>
+!> @param [inout] state State object to be used in the model finalise
 subroutine model_final(self, state)
 
   implicit none
@@ -124,7 +127,8 @@ subroutine model_final(self, state)
 
 end subroutine model_final
 
-!> Finalizer
+!> @brief    Finalize the jedi_pseudo_model_type
+!>
 subroutine jedi_pseudo_model_destructor(self)
 
   implicit none
@@ -135,13 +139,14 @@ subroutine jedi_pseudo_model_destructor(self)
 
 end subroutine jedi_pseudo_model_destructor
 
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 ! OOPS defined forecast method
-!-------------------------------------------------------------------------------
+!------------------------------------------------------------------------------
 
-!> Model forecast
-!> @param [inout] state the state object to propagate
-!> @param [in] date_time_duration the duration of the forecast
+!> @brief    Run a forecast using the model init, step and final
+!>
+!> @param [inout] state           The state object to propagate
+!> @param [in] date_time_duration The duration of the forecast
 subroutine forecast(self, state, date_time_duration)
 
   implicit none
@@ -153,7 +158,7 @@ subroutine forecast(self, state, date_time_duration)
   ! Local
   integer :: date_time_end
 
-  ! end time
+  ! End time
   date_time_end = state%valid_time() + date_time_duration
 
   call self%model_init(state)
