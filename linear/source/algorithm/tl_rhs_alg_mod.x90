@@ -249,7 +249,8 @@ subroutine tl_rhs_alg(rhs, alpha_dt, base_state, state, moist_dyn,        &
                                                      moist_dyn(gas_law), ls_exner, &
                                                      ls_rho, ls_theta,             &
                                                      ls_moist_dyn(gas_law),        &
-                                                     kappa, rd, p_zero) )
+                                                     kappa, rd, p_zero),           &
+                       setval_X(rhs(igh_p), rhs_eos) )
         case(eos_method_projected)
           call invoke( name = "project_rhs_eos",                                             &
                        tl_rhs_project_eos_kernel_type(rhs_eos, exner, rho, theta,            &

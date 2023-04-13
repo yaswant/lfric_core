@@ -78,7 +78,7 @@ module linear_data_algorithm_mod
       name = trim( 'ls_' // adjustl(mr_names(imr)) )
 
       call ls_fields%get_field(name, ls_field)
-      call ls_field%copy_field_properties(ls_mr(imr))
+      call ls_field%copy_field(ls_mr(imr))
 
     end do
 

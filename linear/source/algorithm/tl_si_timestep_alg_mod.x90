@@ -221,10 +221,10 @@ contains
     ! Initialise internal state field objects
     !--------------------------------------------------------------------
 
-    call u%copy_field_properties( state(igh_u) )
-    call theta%copy_field_properties( state(igh_t) )
-    call rho%copy_field_properties( state(igh_d) )
-    call exner%copy_field_properties( state(igh_p) )
+    call u%copy_field( state(igh_u) )
+    call theta%copy_field( state(igh_t) )
+    call rho%copy_field( state(igh_d) )
+    call exner%copy_field( state(igh_p) )
 
     call clone_bundle(state, state_n,          bundle_size)
     call clone_bundle(state, state_after_slow, bundle_size)
@@ -562,7 +562,7 @@ contains
             end if
 
             !--------------------------------------------------------------------
-            ! Solve semi-implicit system: A*inc = rhs, and incement state by inc
+            ! Solve semi-implicit system: A*inc = rhs, and increment state by inc
             !--------------------------------------------------------------------
 
             ! First copy the intermediate ls_state values to the next iteration
@@ -769,7 +769,7 @@ contains
           end if
 
           !--------------------------------------------------------------------
-          ! Solve semi-implicit system: A*inc = rhs, and incement state by inc
+          ! Solve semi-implicit system: A*inc = rhs, and increment state by inc
           !--------------------------------------------------------------------
           call semi_implicit_solver_alg_step( state, rhs_np1,       &
                                               moist_dyn(gas_law),   &
