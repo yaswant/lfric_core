@@ -3,13 +3,18 @@
 ! For further details please refer to the file LICENCE.original which you
 ! should have received as part of this distribution.
 !-----------------------------------------------------------------------------
-!> @brief Computes cell integrated energy.
+!> @brief Computes cell integrated energy components (horizontal kinetic,
+!>        vertical kinetic, potential, internal and moist internal).
 !>
-!> @details The kernel computes the cell integrated energy,
-!> \f[ \int( \rho * [ 1/2*u.u + \Phi + Cv*T - Lv*(m_{cl} + m_r)
-!>                    - (Lv + Lf)*(m_{ci} + m_s + m_g) ])dV \f]
+!> @details The kernel computes the cell integrated energy components of:
+!> Horizontal kinetic: \f[ \int( 1/2*\rho*uv.uv)dV \f]
+!> Vertical kinetic: \f[ \int( 1/2*\rho*w.w)dV \f]
+!> Potential: \f[ \int( \rho*\Phi)dV \f]
+!> Internal: \f[ \int( \rho*Cv*T)dV \f]
+!> Moist internal: \f[ \int( -\rho*( Lv*(m_{cl} + m_r)
+!>                           + (Lv + Lf)*(m_{ci} + m_s + m_g) ) )dV \f]
 !>
-module compute_total_energy_kernel_mod
+module compute_energetics_kernel_mod
 
   use argument_mod,      only : arg_type, func_type,         &
                                 GH_FIELD, GH_WRITE, GH_READ, &
@@ -35,9 +40,13 @@ module compute_total_energy_kernel_mod
 !> The type declaration for the kernel. Contains the metadata needed by the
 !> Psy layer.
 !>
-type, public, extends(kernel_type) :: compute_total_energy_kernel_type
+type, public, extends(kernel_type) :: compute_energetics_kernel_type
   private
-  type(arg_type) :: meta_args(10) = (/                                     &
+  type(arg_type) :: meta_args(14) = (/                                     &
+       arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),                        &
+       arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),                        &
+       arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),                        &
+       arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),                        &
        arg_type(GH_FIELD,   GH_REAL, GH_WRITE, W3),                        &
        arg_type(GH_FIELD,   GH_REAL, GH_READ,  W2),                        &
        arg_type(GH_FIELD,   GH_REAL, GH_READ,  W3),                        &
@@ -58,18 +67,22 @@ type, public, extends(kernel_type) :: compute_total_energy_kernel_type
   integer :: operates_on = CELL_COLUMN
   integer :: gh_shape = GH_QUADRATURE_XYoZ
 contains
-  procedure, nopass :: compute_total_energy_code
+  procedure, nopass :: compute_energetics_code
 end type
 
 !---------------------------------------------------------------------------
 ! Contained functions/subroutines
 !---------------------------------------------------------------------------
-public :: compute_total_energy_code
+public :: compute_energetics_code
 contains
 
 !> @brief Compute the cell integrated total energy
 !! @param[in] nlayers The number of layers
-!! @param[in,out] energy The cell integrated energy
+!! @param[in,out] The kinetic energy (horizontal component)
+!! @param[in,out] The kinetic energy (vertical component)
+!! @param[in,out] The potential energy
+!! @param[in,out] The internal energy
+!! @param[in,out] The moist internal energy
 !! @param[in] u The velocity array
 !! @param[in] rho The density
 !! @param[in] exner The Exner Pressure
@@ -110,22 +123,23 @@ contains
 !! @param[in] nqp_v Number of quadrature points in the vertical
 !! @param[in] wqp_h Horizontal quadrature weights
 !! @param[in] wqp_v Vertical quadrature weights
-subroutine compute_total_energy_code(                                            &
-                                     nlayers,                                    &
-                                     energy,                                     &
-                                     u, rho, exner, theta,                       &
-                                     mr_v, mr_cl, mr_r, mr_ci, mr_s, mr_g, phi,  &
-                                     chi_1, chi_2, chi_3, panel_id,              &
-                                     cv,                                         &
-                                     ndf_w3, undf_w3, map_w3, w3_basis,          &
-                                     ndf_w2, undf_w2, map_w2, w2_basis,          &
-                                     ndf_wtheta, undf_wtheta, map_wtheta,        &
-                                     wtheta_basis,                               &
-                                     ndf_chi, undf_chi, map_chi,                 &
-                                     chi_basis, chi_diff_basis,                  &
-                                     ndf_pid, undf_pid, map_pid,                 &
-                                     nqp_h, nqp_v, wqp_h, wqp_v                  &
-                                     )
+subroutine compute_energetics_code(                                           &
+                                   nlayers,                                   &
+                                   kinetic_uv, kinetic_w, potential,          &
+                                   internal, moist_int,                       &
+                                   u, rho, exner, theta,                      &
+                                   mr_v, mr_cl, mr_r, mr_ci, mr_s, mr_g, phi, &
+                                   chi_1, chi_2, chi_3, panel_id,             &
+                                   cv,                                        &
+                                   ndf_w3, undf_w3, map_w3, w3_basis,         &
+                                   ndf_w2, undf_w2, map_w2, w2_basis,         &
+                                   ndf_wtheta, undf_wtheta, map_wtheta,       &
+                                   wtheta_basis,                              &
+                                   ndf_chi, undf_chi, map_chi,                &
+                                   chi_basis, chi_diff_basis,                 &
+                                   ndf_pid, undf_pid, map_pid,                &
+                                   nqp_h, nqp_v, wqp_h, wqp_v                 &
+                                   )
   use coordinate_jacobian_mod,  only: coordinate_jacobian
 
   implicit none
@@ -148,7 +162,10 @@ subroutine compute_total_energy_code(                                           
   real(kind=r_def), dimension(1,ndf_chi,nqp_h,nqp_v),    intent(in) :: chi_basis
   real(kind=r_def), dimension(3,ndf_chi,nqp_h,nqp_v),    intent(in) :: chi_diff_basis
 
-  real(kind=r_def), dimension(undf_w3),     intent(inout) :: energy
+  real(kind=r_def), dimension(undf_w3),     intent(inout) :: kinetic_uv,          &
+                                                             kinetic_w,           &
+                                                             potential, internal, &
+                                                             moist_int
   real(kind=r_def), dimension(undf_w2),     intent(in)    :: u
   real(kind=r_def), dimension(undf_w3),     intent(in)    :: rho, exner
   real(kind=r_def), dimension(undf_wtheta), intent(in)    :: theta
@@ -170,20 +187,26 @@ subroutine compute_total_energy_code(                                           
   real(kind=r_def), dimension(ndf_chi)         :: chi_1_e, chi_2_e, chi_3_e
   real(kind=r_def), dimension(nqp_h,nqp_v)     :: dj
   real(kind=r_def), dimension(3,3,nqp_h,nqp_v) :: jac
-  real(kind=r_def), dimension(ndf_w3)          :: rho_e, energy_e, exner_e
+  real(kind=r_def), dimension(ndf_w3)          :: rho_e, kinetic_e, potential_e, &
+                                                  internal_e, exner_e,           &
+                                                  kinetic_uv_e, kinetic_w_e,     &
+                                                  moist_e
   real(kind=r_def), dimension(ndf_w2)          :: u_e
   real(kind=r_def), dimension(ndf_wtheta)      :: theta_e
   real(kind=r_def), dimension(ndf_wtheta)      :: mr_cl_e, mr_r_e
   real(kind=r_def), dimension(ndf_wtheta)      :: mr_ci_e, mr_s_e, mr_g_e
   real(kind=r_def), dimension(ndf_w3)          :: phi_e
 
-  real(kind=r_def) :: u_at_quad(3), &
-                      phi_at_quad
+  real(kind=r_def) :: u_at_quad(3), phi_at_quad,  &
+                      uv_at_quad(3), w_at_quad(3)
   real(kind=r_def) :: exner_at_quad, rho_at_quad, theta_at_quad, &
                       mr_l_at_quad, mr_i_at_quad
-  real(kind=r_def) :: ke_term, temperature_term, moisture_term
+  real(kind=r_def) :: temperature_term, weight,            &
+                      ke_uv_term, ke_w_term, moisture_term
 
   ipanel = int(panel_id(map_pid(1)), i_def)
+  uv_at_quad(:) = 0.0_r_def
+  w_at_quad(:) = 0.0_r_def
 
   do k = 0, nlayers-1
     ! Extract element arrays of chi
@@ -201,8 +224,6 @@ subroutine compute_total_energy_code(                                           
     end do
     do df = 1, ndf_wtheta
       theta_e(df) = theta( map_wtheta(df) + k )
-    end do
-    do df = 1, ndf_wtheta
       mr_cl_e(df) = mr_cl( map_wtheta(df) + k )
       mr_r_e(df)  = mr_r( map_wtheta(df) + k )
       mr_ci_e(df) = mr_ci( map_wtheta(df) + k )
@@ -210,9 +231,14 @@ subroutine compute_total_energy_code(                                           
       mr_g_e(df)  = mr_g( map_wtheta(df) + k )
     end do
     do df = 1, ndf_w3
-      rho_e(df)   = rho( map_w3(df) + k )
-      exner_e(df) = exner( map_w3(df) + k )
-      energy_e(df) = 0.0_r_def
+      rho_e(df)        = rho( map_w3(df) + k )
+      exner_e(df)      = exner( map_w3(df) + k )
+      kinetic_e(df)    = 0.0_r_def
+      kinetic_uv_e(df) = 0.0_r_def
+      kinetic_w_e(df)  = 0.0_r_def
+      potential_e(df)  = 0.0_r_def
+      internal_e(df)   = 0.0_r_def
+      moist_e(df)      = 0.0_r_def
     end do
     do df = 1, ndf_w2
       u_e(df) = u( map_w2(df) + k )
@@ -220,7 +246,7 @@ subroutine compute_total_energy_code(                                           
     ! Compute the energy integrated over one cell
     do qp2 = 1, nqp_v
       do qp1 = 1, nqp_h
-        rho_at_quad = 0.0_r_def
+        rho_at_quad   = 0.0_r_def
         exner_at_quad = 0.0_r_def
         do df = 1, ndf_w3
           rho_at_quad    = rho_at_quad   + rho_e(df)  *w3_basis(1,df,qp1,qp2)
@@ -234,8 +260,8 @@ subroutine compute_total_energy_code(                                           
           phi_at_quad = phi_at_quad + phi_e(df)*w3_basis(1,df,qp1,qp2)
         end do
         do df = 1, ndf_wtheta
-          theta_at_quad = theta_at_quad                                &
-                          + theta_e(df) * wtheta_basis(1,df,qp1,qp2)
+          theta_at_quad   = theta_at_quad                              &
+                          + theta_e(df)*wtheta_basis(1,df,qp1,qp2)
           mr_l_at_quad = mr_l_at_quad + ( mr_cl_e(df) + mr_r_e(df) ) * &
                                         wtheta_basis(1,df,qp1,qp2)
           mr_i_at_quad = mr_i_at_quad                                  &
@@ -252,20 +278,32 @@ subroutine compute_total_energy_code(                                           
           u_at_quad(:) = u_at_quad(:) &
                        + u_e(df)*w2_basis(:,df,qp1,qp2)
         end do
-        ke_term = 0.5_r_def*dot_product(matmul(jac(:,:,qp1,qp2),u_at_quad), &
-                                        matmul(jac(:,:,qp1,qp2),u_at_quad))/(dj(qp1,qp2)**2)
+        uv_at_quad(1) = u_at_quad(1)
+        uv_at_quad(2) = u_at_quad(2)
+        w_at_quad(3)  = u_at_quad(3)
+        ke_uv_term = 0.5_r_def*dot_product(matmul(jac(:,:,qp1,qp2),uv_at_quad), &
+                                           matmul(jac(:,:,qp1,qp2),uv_at_quad))/(dj(qp1,qp2)**2)
+        ke_w_term = 0.5_r_def*dot_product(matmul(jac(:,:,qp1,qp2),w_at_quad), &
+                                           matmul(jac(:,:,qp1,qp2),w_at_quad))/(dj(qp1,qp2)**2)
         do df = 1, ndf_w3
-          energy_e(df) = energy_e(df) + wqp_h(qp1) * wqp_v(qp2) * rho_at_quad        &
-                                        * (ke_term + phi_at_quad + temperature_term  &
-                                           + moisture_term) * dj(qp1,qp2)
+          weight = wqp_h(qp1)*wqp_v(qp2)*rho_at_quad*dj(qp1,qp2)
+          kinetic_uv_e(df) = kinetic_uv_e(df) + weight*ke_uv_term
+          kinetic_w_e(df)  = kinetic_w_e(df) + weight*ke_w_term
+          potential_e(df)  = potential_e(df) + weight*phi_at_quad
+          internal_e(df)   = internal_e(df) + weight*temperature_term
+          moist_e(df)      = moist_e(df) + weight*moisture_term
         end do
       end do
     end do
     do df = 1, ndf_w3
-      energy( map_w3(df) + k ) = energy_e(df)
+      kinetic_uv( map_w3(df) + k ) = kinetic_uv_e(df)
+      kinetic_w( map_w3(df) + k )  = kinetic_w_e(df)
+      potential( map_w3(df) + k )  = potential_e(df)
+      internal( map_w3(df) + k )   = internal_e(df)
+      moist_int( map_w3(df) + k )  = moist_e(df)
     end do
   end do
 
-end subroutine compute_total_energy_code
+end subroutine compute_energetics_code
 
-end module compute_total_energy_kernel_mod
+end module compute_energetics_kernel_mod

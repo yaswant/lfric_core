@@ -10,8 +10,8 @@
 module conservation_algorithm_mod
 
   use compute_total_aam_kernel_mod,    only: compute_total_aam_kernel_type
-  use compute_total_energy_kernel_mod, only: compute_total_energy_kernel_type
   use compute_total_mass_kernel_mod,   only: compute_total_mass_kernel_type
+  use compute_energetics_kernel_mod,   only: compute_energetics_kernel_type
 
   use constants_mod,                   only: r_def, i_def, i_timestep
   use function_space_collection_mod,   only: function_space_collection
@@ -71,9 +71,13 @@ contains
 
     type(function_space_type), pointer :: w3_fs => null()
 
-    type( field_type ) :: mass, aam, energy
+    type( field_type ) :: mass, aam, kinetic_uv, kinetic_w, &
+                          potential, internal, moist_int
 
-    real(kind=r_def) :: total_mass, total_aam, total_energy
+    real(kind=r_def) :: total_mass, total_aam, total_energy, &
+                        total_kinetic_uv, total_kinetic_w,   &
+                        total_potential, total_internal,     &
+                        total_moist_int
     type(mesh_type), pointer :: mesh => null()
 
     if ( subroutine_timers ) call timer('conservation_alg')
@@ -89,7 +93,11 @@ contains
 
     ! Initialise Mass, Energy and Axial Angular Momentum fields
     call mass%initialise( vector_space = w3_fs )
-    call energy%initialise( vector_space = w3_fs )
+    call kinetic_uv%initialise( vector_space = w3_fs )
+    call kinetic_w%initialise( vector_space = w3_fs )
+    call potential%initialise( vector_space = w3_fs )
+    call internal%initialise( vector_space = w3_fs )
+    call moist_int%initialise( vector_space = w3_fs )
     call aam%initialise( vector_space = w3_fs )
 
     ! Compute conserved quantities
@@ -98,17 +106,26 @@ contains
                  compute_total_mass_kernel_type(mass, rho, chi,           &
                                                 panel_id, qr),            &
                  sum_X(total_mass, mass),                                 &
-    ! Compute Total Energy
-                 compute_total_energy_kernel_type(energy,                 &
-                                                  u, rho, exner, theta,   &
-                                                  mr, geopotential, chi,  &
-                                                  panel_id, cv, qr),      &
-                 sum_X(total_energy, energy),                             &
+    ! Compute Energy components
+                 compute_energetics_kernel_type(kinetic_uv, kinetic_w,    &
+                                                potential, internal,      &
+                                                moist_int,                &
+                                                u, rho, exner, theta, mr, &
+                                                geopotential, chi,        &
+                                                panel_id, cv, qr),        &
+                 sum_X(total_kinetic_uv, kinetic_uv),                     &
+                 sum_X(total_kinetic_w, kinetic_w),                       &
+                 sum_X(total_potential, potential),                       &
+                 sum_X(total_internal, internal),                         &
+                 sum_X(total_moist_int, moist_int),                       &
     ! Compute Total Axial Angular Momentum
                  compute_total_aam_kernel_type(aam, u, rho, chi,          &
                                                panel_id, scaled_omega,    &
                                                qr),                       &
                  sum_X(total_aam, aam) )
+
+    total_energy = total_kinetic_uv + total_kinetic_w + total_potential &
+                 + total_internal
 
     write( log_scratch_space, '(A, E32.24)') &
           'Conservation: dry mass ', total_mass
@@ -117,9 +134,23 @@ contains
           'Conservation: total energy ', total_energy
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
     write( log_scratch_space, '(A, E32.24)') &
+          'Conservation: horizontal kinetic energy ', total_kinetic_uv
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A, E32.24)') &
+          'Conservation: vertical kinetic energy ', total_kinetic_w
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A, E32.24)') &
+          'Conservation: potential energy ', total_potential
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A, E32.24)') &
+          'Conservation: dry internal energy ', total_internal
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A, E32.24)') &
+          'Conservation: moist internal energy ', total_moist_int
+    call log_event( log_scratch_space, LOG_LEVEL_INFO )
+    write( log_scratch_space, '(A, E32.24)') &
           'Conservation: dry aam ', total_aam
     call log_event( log_scratch_space, LOG_LEVEL_INFO )
-
 
     nullify( geopotential )
     nullify( chi, panel_id, w3_fs, mesh )
