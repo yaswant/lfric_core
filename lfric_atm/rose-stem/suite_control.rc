@@ -287,6 +287,13 @@
                                                    "threads":1,
  		                                   "wallclock":"00:10:00"} } },
  		     plotstr="plot_map.py -ral $NODAL_DATA_DIR/lfric_ral_diagnostics.nc  $PLOT_DIR")',
+    'run_application("lfric_atm", "proto_ral_seuk_ffsl",
+                     resolutions=[("seuk_MG",60.0)],
+                     env={"crun":2, "nrun":60,
+                          "directives":{"default":{"mpi_parts":16,
+                                                   "threads":1,
+ 		                                   "wallclock":"00:10:00"} } },
+ 		     plotstr="plot_map.py -ral $NODAL_DATA_DIR/lfric_ral_diagnostics.nc  $PLOT_DIR")',
     'check_compilers("lfric_atm", "nwp_gal9_copy", "full-debug",
                      resolution=("C12",1800.0))',
     'canned_test("lfric_atm")'
