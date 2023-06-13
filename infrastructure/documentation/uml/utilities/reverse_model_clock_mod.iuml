@@ -1,0 +1,21 @@
+' (c) Crown copyright 2023 Met Office. All rights reserved.
+' The file LICENCE, distributed with this code, contains details of the terms
+' under which the code may be used.
+
+class reverse_model_clock_type {
+  -first_step: Integer
+  -current_step: Integer
+  -last_step: Integer
+  -seconds_per_step: Float
+  -starting: Boolean
+
+  +initialise(first: String, last: String, seconds_per_step: Float)
+  +tick(): Boolean
+  +get_first_step(): Integer
+  +get_step(): Integer
+  +get_last_step(): Integer
+  +get_seconds_per_step(): Float
+  +seconds_from_steps(period: Integer): Float
+  +is_running(): Boolean
+}
+clock_type ^- reverse_model_clock_type

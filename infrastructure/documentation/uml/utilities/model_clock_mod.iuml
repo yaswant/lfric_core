@@ -19,7 +19,7 @@ class model_clock_type {
   +get_step(): Integer
   +get_last_step(): Integer
   +get_seconds_per_step(): Float
-  +seconds_from_step(period: Integer): Float
+  +seconds_from_steps(period: Integer): Float
   +is_initialisation(): Boolean
   +is_running(): Boolean
   +get_spinup_fraction(): Float

@@ -7,9 +7,8 @@
 !>
 module model_clock_mod
 
-  use calendar_mod,  only : calendar_type
   use clock_mod,     only : clock_type
-  use constants_mod, only : i_timestep, i_native, r_def, r_second, l_def
+  use constants_mod, only : i_timestep, i_native, r_def, r_second
   use event_mod,     only : event_type, event_actor_type, event_action
   use log_mod,       only : log_event, log_level_error, log_scratch_space, &
                             log_set_timestep, log_forget_timestep
@@ -62,7 +61,6 @@ contains
 
   !> @brief Sets up the clock object before use.
   !>
-  !> @param[in] calendar Means to interpret human dates.
   !> @param[in] first First date in the current run.
   !> @param[in] last Last date in the current run.
   !> @param[in] seconds_per_step Length of a timestep in seconds.
