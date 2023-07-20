@@ -487,7 +487,36 @@ subroutine create_model_data( model_data,         &
                                      model_data%soil_fields,    &
                                      model_data%snow_fields,    &
                                      model_data%radiation_fields )
+
+            ! Free up any prognostics not required
+            call model_data%depository%remove_field("can_water_in")
+            call model_data%fd_fields%remove_field("can_water_in")
+            call model_data%depository%remove_field("land_tile_temp")
+            call model_data%fd_fields%remove_field("land_tile_temp")
+            call model_data%depository%remove_field("tstar_sea_ice")
+            call model_data%fd_fields%remove_field("tstar_sea_ice")
+            call model_data%depository%remove_field("tile_snow_mass_in")
+            call model_data%fd_fields%remove_field("tile_snow_mass_in")
+            call model_data%depository%remove_field("n_snow_layers_in")
+            call model_data%fd_fields%remove_field("n_snow_layers_in")
+            call model_data%depository%remove_field("snow_depth_in")
+            call model_data%fd_fields%remove_field("snow_depth_in")
+            call model_data%depository%remove_field("tile_snow_rgrain_in")
+            call model_data%fd_fields%remove_field("tile_snow_rgrain_in")
+            call model_data%depository%remove_field("snow_under_canopy_in")
+            call model_data%fd_fields%remove_field("snow_under_canopy_in")
+            call model_data%depository%remove_field("snowpack_density_in")
+            call model_data%fd_fields%remove_field("snowpack_density_in")
+
           end if
+
+          ! Free up any ancils which are no longer needed
+          call model_data%depository%remove_field("land_area_fraction")
+          call model_data%ancil_fields%remove_field("land_area_fraction")
+          call model_data%depository%remove_field("land_tile_fraction")
+          call model_data%ancil_fields%remove_field("land_tile_fraction")
+          call model_data%depository%remove_field("stdev_topog_index")
+          call model_data%ancil_fields%remove_field("stdev_topog_index")
 #endif
         case default
           ! No valid ancil option selected

@@ -55,7 +55,7 @@ contains
   !> @details Setting FE prognostic fields from FD fields
   !> @param[in,out] prognostic_fields  Collection of prognostic fields
   !> @param[in,out] mr                 Array of moisture mixing ratios
-  !> @param[in]     fd_fields          Collection of input Finite Difference
+  !> @param[in,out] fd_fields          Collection of input Finite Difference
   !>                                   fields
   subroutine map_fd_to_prognostics(prognostic_fields, mr, moist_dyn,          &
                                    fd_fields)
@@ -72,7 +72,7 @@ contains
     type(field_type),            intent( inout ) :: mr(:)
     type(field_type),            intent( inout ) :: moist_dyn(num_moist_factors)
 
-    type( field_collection_type), intent( in ) :: fd_fields
+    type( field_collection_type), intent( inout ) :: fd_fields
 
     ! Local dereferenced fields
     type( field_type ), pointer :: theta                  => null()
@@ -149,6 +149,21 @@ contains
     call invoke( sort_ref_kernel_type(theta) )
     ! Initialize hydrostatically balanced exner field
     call hydrostatic_balance( exner, rho, theta, u, moist_dyn )
+
+    ! Free up any prognostics not required
+    if ( read_w2h_wind ) then
+      call fd_fields%remove_field("h_wind")
+    else
+      call fd_fields%remove_field("ew_wind_in_w3")
+      call fd_fields%remove_field("ns_wind_in_w3")
+    end if
+    call fd_fields%remove_field("dry_rho_in_w3")
+    call fd_fields%remove_field("upward_wind_in_wtheta")
+    call fd_fields%remove_field("theta_in_wtheta")
+    call fd_fields%remove_field("mv_in_wtheta")
+    call fd_fields%remove_field("mcl_in_wtheta")
+    call fd_fields%remove_field("mcf_in_wtheta")
+    call fd_fields%remove_field("mr_in_wtheta")
 
     call log_event( "Gungho: Set prognostic fields from FD fields", LOG_LEVEL_INFO )
 

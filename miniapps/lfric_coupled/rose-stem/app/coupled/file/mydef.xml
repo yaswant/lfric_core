@@ -946,6 +946,8 @@
 	<field id="processed__qv" name="qv" long_name="specific_humidity" standard_name="specific_humidity" unit="kg kg-1" grid_ref="full_level_face_grid"> m_v / (1+processed__m_tot) </field>
 	<field id="processed__qcl" name="qcl" long_name="specific_cloud_liquid_water" standard_name="mass_fraction_of_cloud_liquid_water_in_air" unit="kg kg-1" grid_ref="full_level_face_grid"> m_cl / (1+processed__m_tot) </field>
 	<field id="processed__qci" name="qci" long_name="specific_cloud_ice" standard_name="mass_fraction_of_cloud_ice_in_air" unit="kg kg-1" grid_ref="full_level_face_grid"> m_ci / (1+processed__m_tot) </field>
+	<field id="processed__rh_water" name="rh_water" long_name="relative_humidity_over_water" standard_name="relative_humidity" unit="1" grid_ref="full_level_face_grid" />
+	<field id="processed__rh_ice" name="rh_ice" long_name="relative_humidity_over_ice_below_freezing" standard_name="relative_humidity" unit="1" grid_ref="full_level_face_grid" />
         <field id="processed__trop_level" name="trop_level" long_name="tropopause_level" unit="1" domain_ref="face" />
         <field id="processed__wbig" name="wbig" long_name="wbig_eq_1_where_wphysics_gt_1" unit="1" grid_ref="full_level_face_grid" />
         <field id="processed__pressure_in_w3" name="pressure_in_w3" long_name="pressure_at_cell_centres" unit="Pa" grid_ref="half_level_face_grid" />

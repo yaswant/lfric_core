@@ -51,6 +51,7 @@ module gungho_diagnostics_driver_mod
 
 #ifdef UM_PHYSICS
   use pmsl_alg_mod,              only : pmsl_alg
+  use rh_diag_alg_mod,           only : rh_diag_alg
 #endif
 
   implicit none
@@ -274,6 +275,9 @@ contains
 
       call derived_fields%get_field('exner_in_wth', exner_in_wth)
       call pressure_diag_alg(exner_in_wth)
+
+      ! RH diagnostics
+      call rh_diag_alg(exner_in_wth, theta, mr)
 
       ! Call PMSL algorithm
       call prognostic_fields%get_field('theta', theta)
