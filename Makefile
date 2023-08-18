@@ -34,6 +34,7 @@ OPERATE_ON ?= lfric_atm                                  \
               miniapps/da_dev                            \
               miniapps/diagnostics                       \
               miniapps/gravity_wave                      \
+              miniapps/simple_diffusion                  \
               miniapps/solver_miniapp                    \
               miniapps/shallow_water                     \
               miniapps/io_dev                            \

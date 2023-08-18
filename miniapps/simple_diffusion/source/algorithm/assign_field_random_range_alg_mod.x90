@@ -1,0 +1,47 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2023 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+
+!> @brief Helper subroutine to initialise a field with random values within a specified range.
+module assign_field_random_range_alg_mod
+  use assign_field_random_kernel_mod,      only: assign_field_random_kernel_type
+  use constants_mod,                       only: r_def
+  use field_mod,                           only: field_type
+  use log_mod,                             only: LOG_LEVEL_INFO
+
+  implicit none
+
+  private
+
+  public :: assign_field_random_range
+
+contains
+
+  !> @details Helper subroutine to initialise a field with random values within a specified range.
+  !> @param[inout] field The field object to be initialised
+  !> @param[in]    range_min Min value of the range.
+  !> @param[in]    range_max Max value of the range.
+  subroutine assign_field_random_range(field, range_min, range_max)
+
+    implicit none
+
+    type( field_type ), intent( inout ) :: field
+    real(kind=r_def), intent( in ) :: range_min, range_max
+    type( field_type ) :: shift
+    real(kind=r_def) :: diff
+
+    if(range_max <= range_min) then
+      return
+    end if
+
+    call field%copy_field_properties(shift)
+    diff = range_max - range_min
+    call invoke( assign_field_random_kernel_type(field, diff), &
+                 setval_c(shift,range_min), &
+                 inc_X_plus_Y(field,shift) )
+
+  end subroutine assign_field_random_range
+
+end module assign_field_random_range_alg_mod

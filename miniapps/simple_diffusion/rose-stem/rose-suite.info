@@ -1,0 +1,5 @@
+access-list=*
+owner=lfric
+project=simple_diffusion
+title=Functional testing suite for LFRic simple_diffusion project
+

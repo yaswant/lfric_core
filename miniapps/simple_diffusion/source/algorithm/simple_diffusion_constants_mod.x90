@@ -1,0 +1,157 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2022 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!
+!> @brief Provides finite element constants for use in the simple_diffusion.
+!>
+!> @details This module controls the set-up of finite element objects that
+!>          do not change during a run, such as mass matrices and differential
+!>          operators. These objects are  accessed from this module through
+!>          appropriate 'get' functions.
+!-------------------------------------------------------------------------------
+
+module simple_diffusion_constants_mod
+
+  ! Infrastructure
+  use constants_mod,                      only: i_def, r_def, &
+                                                str_def, str_short
+  use field_collection_mod,               only: field_collection_type
+  use field_mod,                          only: field_type
+  use fs_continuity_mod,                  only: W2
+  use function_space_collection_mod,      only: function_space_collection
+  use function_space_mod,                 only: function_space_type
+  use io_config_mod,                      only: subroutine_timers
+  use log_mod,                            only: log_event, LOG_LEVEL_TRACE, &
+                                                LOG_LEVEL_ERROR
+  use mesh_mod,                           only: mesh_type
+  use timer_mod,                          only: timer
+
+  ! Kernels
+  use calc_dA_at_w2_kernel_mod,           only: calc_dA_at_w2_kernel_type
+  use calc_detj_at_w2_kernel_mod,         only: calc_detj_at_w2_kernel_type
+  use multiplicity_kernel_mod,            only: multiplicity_kernel_type
+
+  implicit none
+
+  private
+
+  ! Objects for dx_at_w2 functionality
+  type(field_collection_type)      :: dx_at_w2_collection
+
+  private :: add_dx_at_w2
+
+  public :: create_simple_diffusion_constants
+  public :: get_dx_at_w2
+
+contains
+
+  !> @brief Subroutine to create the finite element constants
+  !> @param[in] mesh      The prime model mesh
+  !> @param[in] chi       Coordinate fields
+  !> @param[in] panel_id  Panel_id field
+  subroutine create_simple_diffusion_constants(mesh,    &
+                                       chi,     &
+                                       panel_id )
+
+    implicit none
+
+    ! Arguments
+    type(mesh_type),    pointer, intent(in) :: mesh
+    type(field_type),    target, intent(in) :: chi(:)
+    type(field_type),    target, intent(in) :: panel_id
+
+    if ( subroutine_timers ) call timer('simple_diffusion_constants_alg')
+    call log_event( "simple_diffusion: creating runtime constants", LOG_LEVEL_TRACE )
+
+    !============================= dx_at_w2 setup =============================!
+
+    call dx_at_w2_collection%initialise(name="dx_at_w2_collection", table_len=100)
+    call add_dx_at_w2( mesh, chi, panel_id )
+    call log_event( "simple_diffusion: runtime constants created", LOG_LEVEL_TRACE )
+
+
+    if ( subroutine_timers ) call timer('simple_diffusion_constants_alg')
+    call log_event( "simple_diffusion: created FEM constants", LOG_LEVEL_TRACE )
+
+  end subroutine create_simple_diffusion_constants
+
+  !> @brief Adds dx_at_w2 for a given mesh to the collection
+  !> @param[in] mesh
+  !> @param[in] chi
+  !> @param[in] panel_id
+  subroutine add_dx_at_w2( mesh, chi, panel_id )
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in)    :: mesh
+    type(field_type), target, intent(in)    :: chi(:)
+    type(field_type), target, intent(in)    :: panel_id
+    integer(kind=i_def)                     :: mesh_id
+    character(len=str_short)                :: mesh_number
+    character(len=str_def)                  :: field_name
+
+    type(function_space_type), pointer      :: fs
+    type(field_type)                        :: dA_at_w2, detj_at_w2, &
+                                               dx_at_w2, nodal_multiplicity_w2
+
+    call log_event( "simple_diffusion: adding field to dx_at_w2", LOG_LEVEL_TRACE )
+
+    mesh_id = mesh%get_id()
+    write(mesh_number, '(I8)') mesh_id
+    field_name = trim('dx_at_w2_') // adjustl(mesh_number)
+
+    fs => function_space_collection%get_fs( mesh, 0, W2 )
+
+    call dA_at_w2%initialise( vector_space = fs )
+    call detj_at_w2%initialise( vector_space = fs )
+    call dx_at_w2%initialise( vector_space = fs, name = field_name )
+    call nodal_multiplicity_w2%initialise( vector_space = fs )
+
+    call invoke( name = "Create dx_at_w2",                        &
+      setval_c(dA_at_w2, 0.0_r_def),                              &
+      setval_c(detj_at_w2, 0.0_r_def),                            &
+      setval_c(nodal_multiplicity_w2, 0.0_r_def),                 &
+      calc_dA_at_w2_kernel_type( dA_at_w2, chi(:), panel_id),     &
+      calc_detj_at_w2_kernel_type(detj_at_w2, chi(:), panel_id),  &
+      multiplicity_kernel_type(nodal_multiplicity_w2),            &
+      inc_X_divideby_Y(detj_at_w2, nodal_multiplicity_w2),        &
+      X_divideby_Y(dx_at_w2, detj_at_w2, dA_at_w2)                &
+    )
+
+    call dx_at_w2_collection%add_field(dx_at_w2)
+
+    call log_event( "simple_diffusion: dx_at_w2 field added", LOG_LEVEL_TRACE )
+
+  end subroutine add_dx_at_w2
+
+  !> @brief Get pointer to dx_at_w2 field from collection
+  !> @param[in] mesh
+  function get_dx_at_w2( mesh ) result(dx_at_w2)
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: mesh
+    integer(kind=i_def)                  :: mesh_id
+    character(len=str_short)             :: mesh_number
+    character(len=str_def)               :: field_name
+    type(field_type), pointer            :: dx_at_w2
+
+    call log_event( "simple_diffusion: getting field dx_at_w2", LOG_LEVEL_TRACE )
+
+    mesh_id = mesh%get_id()
+    write(mesh_number, '(I8)') mesh_id
+    field_name = trim('dx_at_w2_') // adjustl(mesh_number)
+
+    call dx_at_w2_collection%get_field(field_name, dx_at_w2)
+
+    if (.not. dx_at_w2%is_initialised()) then
+      call log_event("dx_at_w2 field not initialised", LOG_LEVEL_ERROR)
+    end if
+
+    call log_event( "simple_diffusion: dx_at_w2 field obtained", LOG_LEVEL_TRACE )
+
+  end function get_dx_at_w2
+
+end module simple_diffusion_constants_mod

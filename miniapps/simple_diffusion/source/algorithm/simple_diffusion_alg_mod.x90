@@ -1,0 +1,80 @@
+!-----------------------------------------------------------------------------
+! (c) Crown copyright 2017 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> @todo Import get_dx_at_w2 from the appropriate module if/when #2389 moves dx_at_w2 related
+!>       kernels outside of gungho.
+
+
+!>@brief Module containing simple_diffusion_alg
+module simple_diffusion_alg_mod
+  use constants_mod,                       only: i_def,r_def
+  use log_mod,                             only: log_event,         &
+                                                 LOG_LEVEL_INFO,    &
+                                                 LOG_LEVEL_TRACE
+  use mesh_mod,                            only: mesh_type
+  use field_mod,                           only: field_type
+  use finite_element_config_mod,           only: element_order
+  use fs_continuity_mod,                   only: Wtheta, W2
+  use function_space_collection_mod,       only: function_space_collection
+  use operator_mod,                        only: operator_type
+  use matrix_vector_kernel_mod,            only: matrix_vector_kernel_type
+  use simple_diffusion_constants_mod,      only: get_dx_at_w2
+  use tracer_tutorial_diff_kernel_mod,     only: tracer_tutorial_diff_kernel_type
+
+  implicit none
+
+  private
+
+  public :: simple_diffusion_alg
+
+contains
+
+  !> @details Calculates the diffusion increment for a field, and adds it to said field.
+  !> @param[inout] field_in  Input Wtheta field
+  subroutine simple_diffusion_alg( field_in )
+
+    implicit none
+
+    ! Prognostic fields
+    type( field_type ), intent( inout ) :: field_in
+
+    ! Diagnostic fields
+    type( field_type )                  :: dfield_in
+    type( field_type )                  :: visc
+
+    real(r_def), parameter              :: visc_val = 100000.0_r_def
+    type(mesh_type), pointer            :: mesh => null()
+    integer(kind=i_def), parameter      :: stencil_depth = 1_i_def
+    type( field_type ), pointer         :: dx_at_w2 => null()
+
+
+    call log_event( "simple_diffusion: Running algorithm", LOG_LEVEL_TRACE )
+    mesh => field_in%get_mesh()
+    dx_at_w2 => get_dx_at_w2(mesh)
+    call dfield_in%initialise( function_space_collection%get_fs( mesh, element_order, Wtheta))
+    call visc%initialise( function_space_collection%get_fs( mesh, element_order, Wtheta))
+    call invoke( name = "Compute diffusion", &
+                 setval_c(visc, visc_val), &
+                 setval_c(dfield_in, 0.0_r_def), &
+                 tracer_tutorial_diff_kernel_type(dfield_in, &
+                                                  field_in, &
+                                                  stencil_depth, &
+                                                  visc, &
+                                                  dx_at_w2) )
+
+    ! Printing the min/max values in field_in and dfield_in
+    call dfield_in%log_minmax(LOG_LEVEL_INFO,'dfield_in')
+    call field_in%log_minmax(LOG_LEVEL_INFO,'field_in')
+
+    ! Incrementing field
+    call invoke( inc_X_plus_Y( field_in, dfield_in ) )
+
+    nullify(mesh)
+
+    call log_event( "simple_diffusion: finished algorithm", LOG_LEVEL_TRACE )
+
+  end subroutine simple_diffusion_alg
+
+end module simple_diffusion_alg_mod
