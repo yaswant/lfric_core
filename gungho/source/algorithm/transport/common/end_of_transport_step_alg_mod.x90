@@ -374,6 +374,7 @@ contains
         w3_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, W3)
         w2_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, W2)
         rho_d_start => transport_runtime%get_rho_d_n(prime_extrusion_mesh_id, 1_i_def)
+        rho_d_np1 => transport_runtime%get_rho_d_np1(prime_extrusion_mesh_id, last_step)
         div => get_directional_im3_div_r_tran(prime_extrusion_mesh_id, direction_3d)
         ! TODO #3706: the flux limiter should use r_tran precision
         div_r_def => get_directional_im3_div(prime_extrusion_mesh_id, direction_3d)

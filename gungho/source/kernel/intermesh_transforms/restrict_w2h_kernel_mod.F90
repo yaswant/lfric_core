@@ -15,7 +15,8 @@ use argument_mod,            only: arg_type,                  &
                                    GH_FIELD, GH_REAL,         &
                                    GH_READ, GH_WRITE,         &
                                    GH_COARSE, GH_FINE,        &
-                                   ANY_SPACE_2, CELL_COLUMN
+                                   ANY_SPACE_2, CELL_COLUMN,  &
+                                   ANY_DISCONTINUOUS_SPACE_2
 use constants_mod,           only: i_def, r_def, r_single, r_double
 use fs_continuity_mod,       only: W2H
 use kernel_mod,              only: kernel_type
@@ -35,7 +36,8 @@ private
 type, public, extends(kernel_type) :: restrict_w2h_kernel_type
   private
   type(arg_type) :: meta_args(2) = (/                                          &
-       arg_type(GH_FIELD, GH_REAL, GH_WRITE, W2H,         mesh_arg=GH_COARSE), &
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_2,        &
+                                                          mesh_arg=GH_COARSE), &
        arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  )  &
        /)
   integer :: operates_on = CELL_COLUMN

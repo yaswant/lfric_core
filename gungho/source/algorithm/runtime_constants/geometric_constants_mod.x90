@@ -213,7 +213,8 @@ contains
       ! Calculate dz at W3 using the difference of the heights at vertical W2 dofs
 
       if ( label_list(i) == primary_mesh_label .or. &
-           label_list(i) == shifted_mesh_label) then
+           label_list(i) == shifted_mesh_label .or. &
+           label_list(i) == extra_mesh_label) then
         call dz_w3_inventory%add_field(dz_w3, w3_k0_fs, mesh)
         call invoke( get_dz_w3_kernel_type(dz_w3, height_w2) )
         nullify(dz_w3)

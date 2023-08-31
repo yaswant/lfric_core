@@ -20,9 +20,10 @@ module prolong_w2_kernel_mod
 
 use argument_mod,            only: arg_type,                  &
                                    GH_FIELD, GH_REAL,         &
-                                   GH_READ, GH_INC,           &
+                                   GH_READ, GH_WRITE,         &
                                    GH_COARSE, GH_FINE,        &
-                                   ANY_SPACE_2, CELL_COLUMN
+                                   ANY_SPACE_2, CELL_COLUMN,  &
+                                   ANY_DISCONTINUOUS_SPACE_2
 use constants_mod,           only: i_def, r_def
 use fs_continuity_mod,       only: W2
 use kernel_mod,              only: kernel_type
@@ -42,9 +43,11 @@ private
 type, public, extends(kernel_type) :: prolong_w2_kernel_type
   private
   type(arg_type) :: meta_args(3) = (/                                           &
-       arg_type(GH_FIELD, GH_REAL, GH_INC,   W2,          mesh_arg=GH_FINE ),   &
+       arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_2,         &
+                                                          mesh_arg=GH_FINE ),   &
        arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_COARSE ), &
-       arg_type(GH_FIELD, GH_REAL, GH_READ,  W2,          mesh_arg=GH_FINE )    &
+       arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_DISCONTINUOUS_SPACE_2,         &
+                                                          mesh_arg=GH_FINE )    &
        /)
   integer :: operates_on = CELL_COLUMN
 contains

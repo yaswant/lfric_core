@@ -774,7 +774,8 @@ contains
         nullify(nodal_rmultiplicity_w2)
       end if
 
-      if ( label_list(i) == primary_mesh_label ) then
+      if ( label_list(i) == primary_mesh_label .or. &
+           label_list(i) == extra_mesh_label ) then
         ! NB most of the time we want 1/multiplicity
         call nodal_multiplicity_w0%initialise( vector_space = w0_fs )
         call nodal_multiplicity_w1%initialise( vector_space = w1_fs )

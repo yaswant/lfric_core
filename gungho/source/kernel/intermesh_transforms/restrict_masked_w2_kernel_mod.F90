@@ -19,7 +19,7 @@ module restrict_masked_w2_kernel_mod
 
 use argument_mod,            only: arg_type,                  &
                                    GH_FIELD, GH_REAL,         &
-                                   GH_READ, GH_WRITE,           &
+                                   GH_READ, GH_WRITE,         &
                                    GH_COARSE, GH_FINE,        &
                                    ANY_SPACE_2, CELL_COLUMN
 use constants_mod,           only: i_def, r_def
@@ -42,7 +42,7 @@ public :: restrict_masked_w2_kernel_code
 type, public, extends(kernel_type) :: restrict_masked_w2_kernel_type
   private
   type(arg_type) :: meta_args(4) = (/                                       &
-    arg_type(GH_FIELD, GH_REAL, GH_WRITE,   W2,          mesh_arg=GH_COARSE), & ! coarse field
+    arg_type(GH_FIELD, GH_REAL, GH_WRITE, W2,          mesh_arg=GH_COARSE), & ! coarse field
     arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  ), & ! fine field
     arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  ), & ! rmultiplicity
     arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_SPACE_2, mesh_arg=GH_FINE  )  & ! fine mesh

@@ -27,6 +27,7 @@ module tracer_collection_transport_mod
   private
 
   public :: tracer_collection_transport_alg
+  public :: coarse_collection_transport_alg
 
 contains
 
@@ -103,5 +104,102 @@ contains
     if ( subroutine_timers ) call timer('tracer collection transport')
 
   end subroutine tracer_collection_transport_alg
+
+
+  !> @brief Transports a collection of tracers on a coarser mesh.
+  !> @details Performs a whole transport time step for a field collection of
+  !!          tracers, mapping them first to a coarser mesh.
+  !> @param[in,out] fields_out         Tracer field collection after transport
+  !> @param[in]     fields_in          Tracer field collection before transport
+  !> @param[in]     model_dt           Model timestep
+  !> @param[in]     transport_metadata Contains the configuration options for
+  !!                                   transporting these fields
+  subroutine coarse_collection_transport_alg(fields_out, fields_in, model_dt, &
+                                             transport_metadata)
+
+    use finite_element_config_mod,     only: element_order
+    use function_space_collection_mod, only: function_space_collection
+    use function_space_mod,            only: function_space_type
+    use intermesh_mappings_alg_mod,    only: map_scalar_intermesh
+    use mesh_collection_mod,           only: mesh_collection
+    use mesh_mod,                      only: mesh_type
+    use multires_coupling_config_mod,  only: aerosol_mesh_name
+
+    implicit none
+
+    ! Arguments
+    type(field_collection_type),   intent(inout) :: fields_out
+    type(field_collection_type),   intent(in)    :: fields_in
+    real(kind=r_def),              intent(in)    :: model_dt
+    type(transport_metadata_type), intent(in)    :: transport_metadata
+
+    ! Iterator for field collection
+    type(field_collection_real_iterator_type) :: iterator
+
+    ! One of the single fields out of the fields_out collection
+    type(field_type), pointer :: single_field_out => null()
+
+    ! The saved version of field after slow physics
+    type(field_type), pointer :: single_field_in => null()
+
+    ! Coarse mesh objects
+    type(mesh_type),           pointer :: coarse_mesh => null()
+    type(function_space_type), pointer :: coarse_fs => null()
+    type(field_type)                   :: coarse_field_in, coarse_field_out
+
+    if ( subroutine_timers ) call timer('tracer collection transport')
+
+    ! Choose form of transport equation
+    select case ( transport_metadata%get_equation_form() )
+
+    ! ------------------------------------------------------------------------ !
+    ! Advective form of transport equation
+    ! ------------------------------------------------------------------------ !
+  case ( equation_form_advective, equation_form_consistent )
+
+      if ( fields_in%get_length() > 0 ) then
+
+        call iterator%initialise( fields_in )
+
+        do
+          if ( .not. iterator%has_next() ) exit
+
+          single_field_in => iterator%next()
+          call fields_out%get_field( trim(single_field_in%get_name() ), &
+                                     single_field_out )
+
+          call log_event( "Advecting "//  trim(single_field_in%get_name()), &
+                           LOG_LEVEL_INFO)
+
+          coarse_mesh => mesh_collection%get_mesh(aerosol_mesh_name)
+          coarse_fs => function_space_collection%get_fs(coarse_mesh, element_order, &
+                                                        single_field_in%which_function_space())
+          call coarse_field_in%initialise(coarse_fs)
+          call coarse_field_out%initialise(coarse_fs)
+
+          ! Map to coarse mesh ----------------------------------------------- !
+          call map_scalar_intermesh(coarse_field_in, single_field_in)
+
+          ! Transport on coarse mesh ----------------------------------------- !
+          call transport_field(coarse_field_out, coarse_field_in, model_dt, &
+                               transport_metadata)
+
+          ! Map to dynamics mesh --------------------------------------------- !
+          call map_scalar_intermesh(single_field_out, coarse_field_out)
+        end do
+      end if
+
+    ! ---------------------------------------------------------------------- !
+    ! Default form of transport equation
+    ! ---------------------------------------------------------------------- !
+    case default
+      call log_event('Form of tracer collection transport equation either ' // &
+                     'not compatible or not implemented', LOG_LEVEL_ERROR)
+
+    end select
+
+    if ( subroutine_timers ) call timer('tracer collection transport')
+
+  end subroutine coarse_collection_transport_alg
 
 end module tracer_collection_transport_mod
