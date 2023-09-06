@@ -363,9 +363,6 @@ contains
                                              ! these may differ from input values
                                              ! during the spinup period
 
-    ! Predictor the wind field (u-beta*dt*rhs) to be advected
-    type( field_type ) :: advected_u
-    type( field_type ) :: ls_advected_u
     ! Don't write moisture diagnostics in linear app
     logical(kind=l_def) :: write_moisture_diag = .false.
 
@@ -451,8 +448,7 @@ contains
     if ( .not. si_momentum_equation ) then
       ! Predictor of the wind field (u-beta*dt*rhs) to be advected if using
       ! explicit advection
-      call ls_advected_u%initialise( vector_space = rhs_n(igh_u)%get_function_space() )
-      call mass_matrix_solver_alg(ls_advected_u, ls_rhs_n(igh_u))
+      call mass_matrix_solver_alg(ls_advected_state(igh_u), ls_rhs_n(igh_u))
     end if
 
     !==========================================================================
@@ -686,8 +682,7 @@ contains
     if ( .not. si_momentum_equation ) then
       ! Predictor of the wind field (u-beta*dt*rhs) to be advected if using
       ! explicit advection
-      call advected_u%initialise( vector_space = rhs_n(igh_u)%get_function_space() )
-      call mass_matrix_solver_alg(advected_u, rhs_n(igh_u))
+      call mass_matrix_solver_alg(advected_state(igh_u), rhs_n(igh_u))
       if ( use_density_predictor ) then
         call log_event('T.L. si timestep: transport with density predictor not yet implemented', &
                        LOG_LEVEL_ERROR)
