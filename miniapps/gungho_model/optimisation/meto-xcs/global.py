@@ -44,7 +44,7 @@ def trans(psy):
                     raise Exception(
                         "Expecting loop to contain 1 call but found "
                         f"'{len(loop.kernels())}'")
-                if loop.kernels()[0].name in ["setval_c", "setval_x"]:
+                if loop.kernels()[0].name in ["setval_c"]:
                     setval_count += 1
                     rtrans.apply(loop, options={"depth": 1})
 

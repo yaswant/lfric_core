@@ -1,4 +1,4 @@
-Inner product checksum rho = 4107590CB7A0C97C
+Inner product checksum rho = 4107590CB7A0C97B
 Inner product checksum u = 452FC8CA8DD79CC6
 Inner product checksum theta = 40E39803ACE8D6C3
 Inner product checksum tracer = 40E289884FDEF66E

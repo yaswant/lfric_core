@@ -140,10 +140,9 @@ contains
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
     call dep_pts_y%initialise( vector_space = dep_pts_y_get%get_function_space() )
     call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
-    ! Use copy instead of setval_X for horizontal as we need to preserve halo values
-    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
-    call dep_pts_x_get%copy_field_serial(dep_pts_x)
-    call dep_pts_y_get%copy_field_serial(dep_pts_y)
+    call invoke( setval_X(dep_pts_z, dep_pts_z_get), &
+                 setval_X(dep_pts_x, dep_pts_x_get), &
+                 setval_X(dep_pts_y, dep_pts_y_get) )
 
     ! Set horizontal and vertical monotone options
     hori_monotone = transport_metadata%get_horizontal_monotone()
@@ -367,10 +366,9 @@ contains
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
     call dep_pts_y%initialise( vector_space = dep_pts_y_get%get_function_space() )
     call dep_pts_z%initialise( vector_space = dep_pts_z_get%get_function_space() )
-    ! Use copy instead of setval_X for horizontal as we need to preserve halo values
-    call invoke( setval_X(dep_pts_z, dep_pts_z_get) )
-    call dep_pts_x_get%copy_field_serial(dep_pts_x)
-    call dep_pts_y_get%copy_field_serial(dep_pts_y)
+    call invoke( setval_X(dep_pts_z, dep_pts_z_get), &
+                 setval_X(dep_pts_x, dep_pts_x_get), &
+                 setval_X(dep_pts_y, dep_pts_y_get) )
 
     ! Set horizontal and vertical monotone options, checking that a valid option has been selected
     hori_monotone = transport_metadata%get_horizontal_monotone()
