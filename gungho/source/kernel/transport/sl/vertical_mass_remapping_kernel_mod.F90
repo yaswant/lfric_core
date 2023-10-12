@@ -16,7 +16,7 @@ use argument_mod,         only : arg_type,              &
                                  GH_REAL, GH_INTEGER,   &
                                  GH_READWRITE, GH_READ, &
                                  GH_WRITE, CELL_COLUMN, GH_LOGICAL
-use fs_continuity_mod,    only : W2, W3, W2v
+use fs_continuity_mod,    only : W3, W2v
 use constants_mod,        only : r_tran, i_def, EPS_R_TRAN, l_def
 use kernel_mod,           only : kernel_type
 ! TODO #3011: these config options should be passed through as arguments
@@ -41,7 +41,7 @@ private
 type, public, extends(kernel_type) :: vertical_mass_remapping_kernel_type
   private
   type(arg_type) :: meta_args(7) = (/                      &
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W2),  & ! departure points
+       arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W2v), & ! departure points
        arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, W3),  & ! mass
        arg_type(GH_FIELD,  GH_REAL,    GH_WRITE,     W2v), & ! mass flux
        arg_type(GH_SCALAR, GH_INTEGER, GH_READ),           & ! order of construction
@@ -79,23 +79,18 @@ contains
   !> @param[in] vertical_monotone        The monotone scheme to be used
   !> @param[in] vertical_monotone_order  The order of monotone reconstruction option
   !> @param[in] enforce_min_value        Option to enforce a minimum value
-  !> @param[in]     ndf_w2       The number of degrees of freedom per cell
-  !!                             on W2 space
-  !> @param[in]     undf_w2      The number of unique degrees of freedom
-  !!                             on W2 space
-  !> @param[in]     map_w2       The dofmap for the cell at the base of the column
-  !!                             on W2 space
+  !> @param[in]     ndf_w2v      The number of degrees of freedom per cell
+  !!                             on W2v space
+  !> @param[in]     undf_w2v     The number of unique degrees of freedom
+  !!                             on W2v space for this partition
+  !> @param[in]     map_w2v      The dofmap for the cell at the base of the column
+  !!                             on W2v space
   !> @param[in]     ndf_w3       The number of degrees of freedom per cell
   !!                             on w3 space
   !> @param[in]     undf_w3      The number of unique degrees of freedom
   !!                             on w3 space
   !> @param[in]     map_w3       The dofmap for the cell at the base of the column
   !!                             on w3 space
-  !> @param[in]     ndf_w2v      The number of degrees of freedom per cell
-  !!                             on W2v space
-  !> @param[in]     undf_w2v     The number of unique degrees of freedom
-  !!                             on W2v space for this partition
-  !> @param[in]     map_w2v      The dofmap for the cell at the base of the column
   !-------------------------------------------------------------------------------
 
   subroutine vertical_mass_remapping_code( nlayers,                     &
@@ -106,17 +101,13 @@ contains
                                            vertical_monotone,           &
                                            vertical_monotone_order,     &
                                            enforce_min_value,           &
-                                           ndf_w2, undf_w2, map_w2,     &
-                                           ndf_w3, undf_w3, map_w3,     &
-                                           ndf_w2v, undf_w2v, map_w2v   )
+                                           ndf_w2v, undf_w2v, map_w2v,  &
+                                           ndf_w3, undf_w3, map_w3 )
 
   implicit none
 
   ! Arguments
   integer(kind=i_def), intent(in)                         :: nlayers
-  integer(kind=i_def), intent(in)                         :: ndf_w2
-  integer(kind=i_def), intent(in)                         :: undf_w2
-  integer(kind=i_def), dimension(ndf_w2), intent(in)      :: map_w2
   integer(kind=i_def), intent(in)                         :: ndf_w3
   integer(kind=i_def), intent(in)                         :: undf_w3
   integer(kind=i_def), dimension(ndf_w3), intent(in)      :: map_w3
@@ -124,7 +115,7 @@ contains
   integer(kind=i_def), intent(in)                         :: undf_w2v
   integer(kind=i_def), dimension(ndf_w2v), intent(in)     :: map_w2v
 
-  real(kind=r_tran), dimension(undf_w2),  intent(in)      :: dep_pts_z
+  real(kind=r_tran), dimension(undf_w2v), intent(in)      :: dep_pts_z
   real(kind=r_tran), dimension(undf_w3),  intent(inout)   :: mass
   real(kind=r_tran), dimension(undf_w2v), intent(inout)   :: flux
   integer(kind=i_def), intent(in)                         :: order
@@ -142,7 +133,7 @@ contains
 
   ! Extract and fill local column from global data
   do k=0,nlayers
-    dist(k+1) = dep_pts_z(map_w2(5)+k)
+    dist(k+1) = dep_pts_z(map_w2v(1)+k)
   end do
   do k=0,nlayers - 1
     m0(k+1) = mass(map_w3(1)+k)

@@ -119,10 +119,9 @@ contains
     real(r_tran), parameter :: tol = 1.0e-12_r_tran
     real(r_tran)            :: use_tol
     integer(i_def), parameter :: nlayers = 5
-    integer(i_def), parameter :: ndf_w2 = 6
+    integer(i_def), parameter :: ndf_w2 = 2
     integer(i_def), parameter :: nfaces_h  = 4
-    integer(i_def), parameter :: undf_w2 = nfaces_h*nlayers & ! Horizontal dofs
-                                         + nlayers + 1        ! + vertical dofs
+    integer(i_def), parameter :: undf_w2 = nlayers + 1
     integer(i_def), parameter :: ndf_wtheta = 2
     integer(i_def), parameter :: undf_wtheta = nlayers + 1
     integer(i_def), dimension(ndf_w2)     :: map_w2
@@ -135,18 +134,10 @@ contains
     logical(l_def)  :: log_space
     integer(i_def)  :: monotone, monotone_order
     ! Create the dof map for any number of layers
-    ! Dofs are contiguous in the vertical and so each entry is
-    ! offset by nlayers
     sl_order = vertical_sl_order_cubic
-    do df = 1, nfaces_h
-      map_w2(df) = 1 + (df-1)*nlayers
-    end do
-    ! Vertical dofs are contiguous and so
-    ! map(6) needs to be 1 more than map(5)
-    map_w2(nfaces_h+1) = 1 + nfaces_h*nlayers
-    map_w2(ndf_w2)     = map_w2(nfaces_h+1) + 1
-    ! Theta has two dofs, and follows the same pattern as the vertical dofs
-    ! in the wind field
+    map_w2(1) = 1
+    map_w2(2) = 2
+    ! Theta has two dofs, and follows the same pattern as the wind field
     map_wtheta(:) = (/ 1, 2 /)
     ! Get canned information for the reference cube
     theta_in(:) = 0.0_r_tran
@@ -155,8 +146,8 @@ contains
     cubic_coeff(:) = cubic_coeff(:)/16_r_tran
     dep_pts_z = -0.5_r_tran
     ! Set top and bottom departure distance (w=0)
-    dep_pts_z(map_w2(5))= 0.0_r_tran
-    dep_pts_z(map_w2(5)+nlayers) = 0.0_r_tran
+    dep_pts_z(map_w2(1))= 0.0_r_tran
+    dep_pts_z(map_w2(1)+nlayers) = 0.0_r_tran
 
     do i = 1, nlayers + 1
       z_edges(i) = real(i-1,r_tran)/real(nlayers,r_tran)

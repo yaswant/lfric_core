@@ -99,6 +99,8 @@ contains
     type(r_tran_field_type)          :: increment_con
     type(r_tran_field_type)          :: increment_adv
     type(r_tran_field_type), pointer :: detj_at_w2 => null()
+    type(r_tran_field_type)          :: detj_at_w2h, &
+                                        detj_at_w2v
     type(r_tran_field_type), pointer :: dep_pts_x_get => null()
     type(r_tran_field_type), pointer :: dep_pts_y_get => null()
     type(r_tran_field_type), pointer :: dep_pts_z_get => null()
@@ -106,9 +108,8 @@ contains
                                         dep_pts_x, &
                                         dep_pts_y
     type(r_tran_field_type)          :: flux_3d
-    integer(kind=i_def)              :: mesh_id, w2_idx, opp_idx
+    integer(kind=i_def)              :: mesh_id
     type(r_tran_field_type)          :: mass_flux
-    type(r_tran_field_type)          :: spare_flux
     logical(kind=l_def)              :: hori_half_flag
     logical(kind=l_def)              :: log_space
     logical(kind=l_def)              :: reversibility
@@ -135,6 +136,9 @@ contains
     dep_pts_x_get => transport_runtime%get_departure_points_x_w2(mesh_id)
     dep_pts_y_get => transport_runtime%get_departure_points_y_w2(mesh_id)
     dep_pts_z_get => transport_runtime%get_departure_points_z_w2(mesh_id)
+    call detj_at_w2h%initialise( vector_space = dep_pts_x_get%get_function_space() )
+    call detj_at_w2v%initialise( vector_space = dep_pts_z_get%get_function_space() )
+    call invoke( split_w2_field_kernel_type(detj_at_w2h, detj_at_w2v, detj_at_w2) )
 
     ! Copy departure points so they can be corrected if Strang splitting is used
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
@@ -172,8 +176,9 @@ contains
     select case (direction)
 
       case (direction_v)
-        w2_idx = W2V
-        opp_idx = W2H
+        w2_fs => function_space_collection%get_fs( mesh, element_order, W2V )
+        call mass_flux%initialise( w2_fs )
+        call invoke( setval_C(mass_flux, 0.0_r_tran) )
         ! If vertical scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_vhv ) then
           call invoke( inc_a_times_X(0.5_r_tran, dep_pts_z) )
@@ -185,23 +190,24 @@ contains
         if (transport_runtime%get_tracer_step_ctr() /=  &
             transport_runtime%get_num_dry_steps()) then
           ! Not the last split step so do both advective and flux form
-          call ffsl_1d_advect_then_flux_vert( field_n, dep_pts_z, detj_at_w2,  &
+          call ffsl_1d_advect_then_flux_vert( field_n, dep_pts_z, detj_at_w2v, &
                                               outer_order, step_dt, log_space, &
                                               vert_monotone, hori_half_flag,   &
-                                              reversibility, flux_3d,          &
+                                              reversibility, mass_flux,        &
                                               increment_con, increment_adv )
           ! Save advective as field_np1 for use in next split step
           call invoke( X_minus_bY( field_np1, field_n, step_dt, increment_adv) )
         else
           ! If not advective_then_flux just need flux increment
-          call ffsl_1d_flux_vert( field_n, dep_pts_z, detj_at_w2, outer_order, &
-                                  step_dt, log_space, vert_monotone,           &
-                                  reversibility, flux_3d, increment_con )
+          call ffsl_1d_flux_vert( field_n, dep_pts_z, detj_at_w2v, outer_order, &
+                                  step_dt, log_space, vert_monotone,            &
+                                  reversibility, mass_flux, increment_con )
         end if
 
       case (direction_h)
-        w2_idx = W2H
-        opp_idx = W2V
+        w2_fs => function_space_collection%get_fs( mesh, element_order, W2H )
+        call mass_flux%initialise( w2_fs )
+        call invoke( setval_C(mass_flux, 0.0_r_tran) )
         ! If horizontal scheme for Strang splitting divide departure distance by 2
         if ( transport_metadata%get_splitting() ==  splitting_strang_hvh ) then
           call invoke( inc_a_times_X(0.5_r_tran, dep_pts_x), &
@@ -214,53 +220,37 @@ contains
         if (transport_runtime%get_tracer_step_ctr() /=  &
             transport_runtime%get_num_dry_steps()) then
           ! Not the last split step so do both advective and flux form
-          call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
-                                                 detj_at_w2, panel_id, step_dt, &
-                                                 hori_monotone, hori_half_flag, &
-                                                 .true., flux_3d,               &
+          call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y,  &
+                                                 detj_at_w2h, panel_id, step_dt, &
+                                                 hori_monotone, hori_half_flag,  &
+                                                 .true., mass_flux,              &
                                                  increment_con, increment_adv )
           ! Save advective as field_np1 for use in next split step
           call invoke( X_minus_bY( field_np1, field_n, step_dt, increment_adv) )
         else
           ! Last split step just requires flux form
-          call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y, &
-                                                 detj_at_w2, panel_id, step_dt, &
-                                                 hori_monotone, hori_half_flag, &
-                                                 .false., flux_3d,              &
+          call ffsl_conservative_horizontal_alg( field_n, dep_pts_x, dep_pts_y,  &
+                                                 detj_at_w2h, panel_id, step_dt, &
+                                                 hori_monotone, hori_half_flag,  &
+                                                 .false., mass_flux,             &
                                                  increment_con, increment_adv )
 
         end if
 
       case (direction_3d)
         ! 3D FFSL
-        w2_idx = W2
-        call ffsl_conservative_transport_alg( field_n, dep_pts_x, dep_pts_y, &
-                                              dep_pts_z, detj_at_w2,         &
-                                              panel_id, step_dt, log_space,  &
-                                              hori_monotone, vert_monotone,  &
-                                              reversibility, flux_3d,        &
-                                              increment_con )
+        w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
+        call mass_flux%initialise( w2_fs )
+        call invoke( setval_C(mass_flux, 0.0_r_tran) )
+        call ffsl_conservative_transport_alg( field_n, dep_pts_x, dep_pts_y,       &
+                                              dep_pts_z, detj_at_w2h, detj_at_w2v, &
+                                              panel_id, step_dt, log_space,        &
+                                              hori_monotone, vert_monotone,        &
+                                              reversibility, mass_flux, increment_con )
 
       case default
         call log_event( "Gungho: Unrecognized direction for transport.", LOG_LEVEL_ERROR )
 
-    end select
-
-    ! Mass fluxes are computed as W2 fields. We must separate into
-    ! W2h and W2v for split schemes
-    w2_fs => function_space_collection%get_fs( mesh, element_order, w2_idx )
-    call mass_flux%initialise( w2_fs )
-    select case (direction)
-      case (direction_v)
-        w2_fs => function_space_collection%get_fs( mesh, element_order, opp_idx )
-        call spare_flux%initialise( w2_fs )
-        call invoke( split_w2_field_kernel_type(spare_flux, mass_flux, flux_3d) )
-      case (direction_h)
-        w2_fs => function_space_collection%get_fs( mesh, element_order, opp_idx )
-        call spare_flux%initialise( w2_fs )
-        call invoke( split_w2_field_kernel_type(mass_flux, spare_flux, flux_3d) )
-      case (direction_3d)
-        call invoke( setval_X(mass_flux, flux_3d) )
     end select
 
     ! Include dt in the mass flux
@@ -306,6 +296,8 @@ contains
     type(r_tran_field_type)          :: adv_increment
     type(r_tran_field_type)          :: field_to_adv
     type(r_tran_field_type), pointer :: detj_at_w2 => null()
+    type(r_tran_field_type)          :: detj_at_w2h, &
+                                        detj_at_w2v
     type(r_tran_field_type), pointer :: dep_pts_x_get => null()
     type(r_tran_field_type), pointer :: dep_pts_y_get => null()
     type(r_tran_field_type), pointer :: dep_pts_z_get => null()
@@ -361,6 +353,9 @@ contains
     dep_pts_x_get => transport_runtime%get_departure_points_x_w2(mesh_id)
     dep_pts_y_get => transport_runtime%get_departure_points_y_w2(mesh_id)
     dep_pts_z_get => transport_runtime%get_departure_points_z_w2(mesh_id)
+    call detj_at_w2h%initialise( vector_space = dep_pts_x_get%get_function_space() )
+    call detj_at_w2v%initialise( vector_space = dep_pts_z_get%get_function_space() )
+    call invoke( split_w2_field_kernel_type(detj_at_w2h, detj_at_w2v, detj_at_w2) )
 
     ! Copy departure points so they can be corrected if Strang splitting is used
     call dep_pts_x%initialise( vector_space = dep_pts_x_get%get_function_space() )
@@ -401,7 +396,7 @@ contains
           vert_half_flag = .false.
         end if
         ! Vertical PPM scheme
-        call ffsl_1d_advect_vert( field_to_adv, dep_pts_z, detj_at_w2, outer_order,  &
+        call ffsl_1d_advect_vert( field_to_adv, dep_pts_z, detj_at_w2v, outer_order, &
                                   step_dt, log_space, vert_monotone, vert_half_flag, &
                                   reversibility, increment )
 
@@ -416,15 +411,16 @@ contains
         end if
         ! 2D FFSL
         call ffsl_advective_horizontal_alg( field_to_adv, dep_pts_x, dep_pts_y, &
-                                            detj_at_w2, panel_id, step_dt,      &
+                                            detj_at_w2h, panel_id, step_dt,     &
                                             hori_monotone, hori_half_flag, increment )
 
       case (direction_3d)
         ! 3D FFSL
-        call ffsl_advective_transport_alg( field_to_adv, dep_pts_x, dep_pts_y, &
-                                           dep_pts_z, detj_at_w2, panel_id,    &
-                                           step_dt, log_space, hori_monotone,  &
-                                           vert_monotone, reversibility, increment )
+        call ffsl_advective_transport_alg( field_to_adv, dep_pts_x, dep_pts_y,  &
+                                           dep_pts_z, detj_at_w2h, detj_at_w2v, &
+                                           panel_id, step_dt, log_space,        &
+                                           hori_monotone, vert_monotone,        &
+                                           reversibility, increment )
 
       case default
         call log_event( "Gungho: Unrecognized direction for transport.", LOG_LEVEL_ERROR )

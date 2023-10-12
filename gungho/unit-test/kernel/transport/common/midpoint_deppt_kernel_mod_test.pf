@@ -7,7 +7,7 @@
 
 module midpoint_deppt_kernel_mod_test
 
-  use constants_mod, only : i_def, r_def, r_tran
+  use constants_mod, only : i_def, r_tran
   use pFUnit_Mod
 
   implicit none
@@ -20,49 +20,10 @@ module midpoint_deppt_kernel_mod_test
   type, public, extends(TestCase) :: midpoint_deppt_test_type
     private
   contains
-    procedure setUp
-    procedure tearDown
     procedure test_all
   end type midpoint_deppt_test_type
 
 contains
- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine setUp( this )
-
-    use feign_config_mod,            only : feign_departure_points_config
-    use departure_points_config_mod, only : departure_grid_physical, &
-                                            horizontal_limit_none,   &
-                                            method_midpoint,         &
-                                            vertical_limit_boundary, &
-                                            vertical_method_midpoint
-
-    implicit none
-
-    class(midpoint_deppt_test_type), intent(inout) :: this
-
-    call feign_departure_points_config( departure_grid = departure_grid_physical,  &
-                                        horizontal_limit = horizontal_limit_none,  &
-                                        method = method_midpoint,                  &
-                                        n_dep_pt_iterations = 1,                   &
-                                        vertical_limit = vertical_limit_boundary,  &
-                                        vertical_method = vertical_method_midpoint &
-                                      )
-
-  end subroutine setUp
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  subroutine tearDown( this )
-
-    use configuration_mod, only: final_configuration
-
-    implicit none
-
-    class(midpoint_deppt_test_type), intent(inout) :: this
-
-    call final_configuration()
-
-  end subroutine tearDown
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   @Test
   subroutine test_all( this )
@@ -79,22 +40,26 @@ contains
 
     integer(kind=i_def), parameter :: nlayers = 1
     integer(kind=i_def), parameter :: ndf_w2 = 4
+    integer(kind=i_def), parameter :: ndf_w2h = 4
     integer(kind=i_def), parameter :: stencil_size = 5
     integer(kind=i_def), parameter :: undf_w2  = ndf_w2*nlayers
+    integer(kind=i_def), parameter :: undf_w2h = ndf_w2h*nlayers
     integer(kind=i_def), parameter :: undf_w2s = ndf_w2*nlayers*stencil_size
 
     integer(kind=i_def), dimension(ndf_w2)              :: map_w2
+    integer(kind=i_def), dimension(ndf_w2h)             :: map_w2h
     integer(kind=i_def), dimension(ndf_w2,stencil_size) :: stencil_map
 
-    real(kind=r_tran), dimension(undf_w2s) :: dep_pts_x
-    real(kind=r_tran), dimension(undf_w2s) :: dep_pts_y
+    real(kind=r_tran), dimension(undf_w2h) :: dep_pts_x
+    real(kind=r_tran), dimension(undf_w2h) :: dep_pts_y
     real(kind=r_tran), dimension(undf_w2s) :: wind_n
 
     real(kind=r_tran)    :: dt
     integer(kind=i_def) :: n_it
 
     ! Set up maps
-    map_w2(:) = (/ 1, 2, 3, 4 /)
+    map_w2(:)  = (/ 1, 2, 3, 4 /)
+    map_w2h(:) = (/ 1, 2, 3, 4 /)
     ! Cross stencil has form
     !       5
     !     2 1 4
@@ -120,6 +85,9 @@ contains
                               stencil_map,  &
                               n_it,         &
                               dt,           &
+                              ndf_w2h,      &
+                              undf_w2h,     &
+                              map_w2h,      &
                               ndf_w2,       &
                               undf_w2s,     &
                               map_w2 )
@@ -157,6 +125,9 @@ contains
                               stencil_map,  &
                               n_it,         &
                               dt,           &
+                              ndf_w2h,      &
+                              undf_w2h,     &
+                              map_w2h,      &
                               ndf_w2,       &
                               undf_w2s,     &
                               map_w2 )

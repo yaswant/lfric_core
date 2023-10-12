@@ -21,7 +21,7 @@ use argument_mod,      only : arg_type,            &
                               GH_READ, GH_WRITE,   &
                               GH_REAL, CELL_COLUMN
 use constants_mod,     only : r_tran, i_def
-use fs_continuity_mod, only : W2, W3
+use fs_continuity_mod, only : W2v, W3
 use kernel_mod,        only : kernel_type
 
 implicit none
@@ -34,14 +34,14 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: ffsl_vertical_flux_kernel_type
   private
-  type(arg_type) :: meta_args(7) = (/              &
-       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2), &
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2), &
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3), &
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3), &
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3), &
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3), &
-       arg_type(GH_SCALAR, GH_REAL, GH_READ)       &
+  type(arg_type) :: meta_args(7) = (/               &
+       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2v), &
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2v), &
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3),  &
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3),  &
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3),  &
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W3),  &
+       arg_type(GH_SCALAR, GH_REAL, GH_READ)        &
        /)
   integer :: operates_on = CELL_COLUMN
 contains
@@ -64,9 +64,9 @@ contains
 !> @param[in]     a1_coeffs Coefficients for the subgrid approximation of density
 !> @param[in]     a2_coeffs Coefficients for the subgrid approximation of density
 !> @param[in]     deltaT    Length of a timestep
-!> @param[in]     ndf_w2    Number of degrees of freedom per cell
-!> @param[in]     undf_w2   Number of unique degrees of freedom
-!> @param[in]     map_w2    Dofmap for the cell at the base of the column
+!> @param[in]     ndf_w2v   Number of degrees of freedom per cell
+!> @param[in]     undf_w2v  Number of unique degrees of freedom
+!> @param[in]     map_w2v   Dofmap for the cell at the base of the column
 !> @param[in]     ndf_w3    Number of degrees of freedom per cell
 !> @param[in]     undf_w3   Number of unique degrees of freedom
 !> @param[in]     map_w3    Dofmap for the cell at the base of the column
@@ -78,9 +78,9 @@ subroutine ffsl_vertical_flux_code( nlayers,             &
                                     a1_coeffs,           &
                                     a2_coeffs,           &
                                     deltaT,              &
-                                    ndf_w2,              &
-                                    undf_w2,             &
-                                    map_w2,              &
+                                    ndf_w2v,             &
+                                    undf_w2v,            &
+                                    map_w2v,             &
                                     ndf_w3,              &
                                     undf_w3,             &
                                     map_w3 )
@@ -94,20 +94,20 @@ subroutine ffsl_vertical_flux_code( nlayers,             &
   implicit none
 
   ! Arguments
-  integer(kind=i_def), intent(in)                       :: nlayers
-  integer(kind=i_def), intent(in)                       :: ndf_w3
-  integer(kind=i_def), intent(in)                       :: undf_w3
-  integer(kind=i_def), dimension(ndf_w3), intent(in)    :: map_w3
-  real(kind=r_tran), dimension(undf_w3), intent(in)     :: rho
-  real(kind=r_tran), dimension(undf_w3), intent(in)     :: a0_coeffs
-  real(kind=r_tran), dimension(undf_w3), intent(in)     :: a1_coeffs
-  real(kind=r_tran), dimension(undf_w3), intent(in)     :: a2_coeffs
-  integer(kind=i_def), intent(in)                       :: ndf_w2
-  integer(kind=i_def), intent(in)                       :: undf_w2
-  integer(kind=i_def), dimension(ndf_w2), intent(in)    :: map_w2
-  real(kind=r_tran), dimension(undf_w2), intent(inout)  :: flux
-  real(kind=r_tran), dimension(undf_w2), intent(in)     :: dep_pts
-  real(kind=r_tran),                     intent(in)     :: deltaT
+  integer(kind=i_def), intent(in)                        :: nlayers
+  integer(kind=i_def), intent(in)                        :: ndf_w3
+  integer(kind=i_def), intent(in)                        :: undf_w3
+  integer(kind=i_def), dimension(ndf_w3), intent(in)     :: map_w3
+  real(kind=r_tran), dimension(undf_w3), intent(in)      :: rho
+  real(kind=r_tran), dimension(undf_w3), intent(in)      :: a0_coeffs
+  real(kind=r_tran), dimension(undf_w3), intent(in)      :: a1_coeffs
+  real(kind=r_tran), dimension(undf_w3), intent(in)      :: a2_coeffs
+  integer(kind=i_def), intent(in)                        :: ndf_w2v
+  integer(kind=i_def), intent(in)                        :: undf_w2v
+  integer(kind=i_def), dimension(ndf_w2v), intent(in)    :: map_w2v
+  real(kind=r_tran), dimension(undf_w2v),  intent(inout) :: flux
+  real(kind=r_tran), dimension(undf_w2v),  intent(in)    :: dep_pts
+  real(kind=r_tran),                       intent(in)    :: deltaT
 
   ! Internal variables
   integer(kind=i_def) :: k
@@ -132,11 +132,11 @@ subroutine ffsl_vertical_flux_code( nlayers,             &
 
   ! Flux boundary conditions
   k = 0
-  df = 5
-  flux(map_w2(df)+k) = 0.0_r_tran ! Bottom boundary condition, zero flux.
+  df = 1
+  flux(map_w2v(df)+k) = 0.0_r_tran ! Bottom boundary condition, zero flux.
   k = nlayers-1
-  df = 6
-  flux(map_w2(df)+k) = 0.0_r_tran ! Top boundary condition, zero flux.
+  df = 2
+  flux(map_w2v(df)+k) = 0.0_r_tran ! Top boundary condition, zero flux.
 
   local_density_index = 0_i_def
   rho_local = 0.0_r_tran
@@ -145,7 +145,7 @@ subroutine ffsl_vertical_flux_code( nlayers,             &
   a2_local = 0.0_r_tran
 
   do k=0,nlayers-2
-    departure_dist = dep_pts(map_w2(df)+k)
+    departure_dist = dep_pts(map_w2v(df)+k)
 
     ! Calculates number of cells of interest and fraction of a cell to add.
     ! There is a test within this function to detect if the departure points
@@ -186,7 +186,7 @@ subroutine ffsl_vertical_flux_code( nlayers,             &
     ! departure distance, and the fractional part of the departure distance.
     mass_total = mass_from_whole_cells + mass_frac
 
-    flux(map_w2(df)+k) = sign(1.0_r_tran,departure_dist)*mass_total/deltaT
+    flux(map_w2v(df)+k) = sign(1.0_r_tran,departure_dist)*mass_total/deltaT
 
   end do
 

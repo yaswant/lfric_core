@@ -74,8 +74,8 @@ contains
   !!          This is used by the dimensionally-split swept-area approach of
   !!          the flux form semi-Lagrangian (FFSL) scheme.
   !!
-  !> @param[in,out] dep_pts_x         Departure points in x direction
-  !> @param[in,out] dep_pts_y         Departure points in y direction
+  !> @param[in,out] dep_pts_x         Departure points in x direction, a W2h field
+  !> @param[in,out] dep_pts_y         Departure points in y direction, a W2h field
   !> @param[in]     wind_n            Wind field at timestep n
   !> @param[in]     wind_np1          Wind field at timestep n+1
   !> @param[in]     detj_at_w2        Det(J) at W2 dofs
@@ -94,7 +94,7 @@ contains
     type( r_tran_field_type ), intent(in)    :: wind_n
     type( r_tran_field_type ), intent(in)    :: wind_np1
     type( r_tran_field_type ), intent(in)    :: detj_at_w2
-    real( kind=r_tran ), intent(in)    :: dt
+    real( kind=r_tran ),       intent(in)    :: dt
 
     type( r_tran_field_type ) :: wind_adv
     type( r_tran_field_type ) :: dep_wind
@@ -108,7 +108,7 @@ contains
     if ( subroutine_timers ) call timer( 'calc_hori_dep_pts' )
 
     ! Get function space and mesh
-    w2_fs => dep_pts_x%get_function_space()
+    w2_fs => wind_n%get_function_space()
     mesh  => wind_n%get_mesh()
 
     call wind_adv%initialise( vector_space = w2_fs )
@@ -184,7 +184,7 @@ contains
   !!          the flux form semi-Lagrangian (FFSL) scheme as well as the
   !!          vertical semi-Lagrangian and SLICE schemes.
   !!
-  !> @param[in,out] dep_pts_z         Departure points in z direction
+  !> @param[in,out] dep_pts_z         Departure points in z direction, a W2v field
   !> @param[in,out] cfl               Vertical CFL from departure points
   !> @param[in]     wind_n            Wind field at timestep n
   !> @param[in]     wind_np1          Wind field at timestep n+1
@@ -204,7 +204,7 @@ contains
     type( r_tran_field_type ), intent(in)    :: wind_n
     type( r_tran_field_type ), intent(in)    :: wind_np1
     type( r_tran_field_type ), intent(in)    :: detj_at_w2
-    real( kind=r_tran ), intent(in)    :: dt
+    real( kind=r_tran ),       intent(in)    :: dt
 
     type( r_tran_field_type ) :: departure_wind_n, departure_wind_np1
 
@@ -216,7 +216,7 @@ contains
 
     type( mesh_type ), pointer ::  mesh => null()
 
-    w2_fs => dep_pts_z%get_function_space()
+    w2_fs => wind_n%get_function_space()
     mesh  => wind_n%get_mesh()
     w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
 

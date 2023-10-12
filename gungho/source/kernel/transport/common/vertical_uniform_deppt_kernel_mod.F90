@@ -27,7 +27,7 @@ use argument_mod,                only : arg_type,              &
                                         GH_WRITE, GH_READ,     &
                                         GH_SCALAR, GH_INTEGER, &
                                         CELL_COLUMN
-use fs_continuity_mod,           only : W2
+use fs_continuity_mod,           only : W2, W2v
 use constants_mod,               only : r_tran, i_def
 use kernel_mod,                  only : kernel_type
 use departure_points_config_mod, only : vertical_limit,          &
@@ -44,14 +44,14 @@ private
 !> The type declaration for the kernel. Contains the metadata needed by the Psy layer
 type, public, extends(kernel_type) :: vertical_uniform_deppt_kernel_type
   private
-  type(arg_type) :: meta_args(7) = (/              &
-       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2), & ! dep_pts
-       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2), & ! cfl
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2), & ! u_n
-       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2), & ! u_np1
-       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),   & ! iterations
-       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),   & ! method
-       arg_type(GH_SCALAR, GH_REAL, GH_READ)       & ! dt
+  type(arg_type) :: meta_args(7) = (/               &
+       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2v), & ! dep_pts
+       arg_type(GH_FIELD,  GH_REAL, GH_WRITE, W2),  & ! cfl
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2),  & ! u_n
+       arg_type(GH_FIELD,  GH_REAL, GH_READ,  W2),  & ! u_np1
+       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),    & ! iterations
+       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),    & ! method
+       arg_type(GH_SCALAR, GH_REAL, GH_READ)        & ! dt
        /)
   integer :: operates_on = CELL_COLUMN
 contains
@@ -77,6 +77,9 @@ contains
 !> @param[in]     vertical_method     Enumerator for the vertical method to be
 !!                                    used for computing the departure points
 !> @param[in]     dt                  The model timestep length
+!> @param[in]     ndf_w2v             The number of degrees of freedom per W2v cell
+!> @param[in]     undf_w2v            The number of unique degrees of freedom for W2v
+!> @param[in]     map_w2v             The dofmap for the W2v cell at the base of the column
 !> @param[in]     ndf_w2              The number of degrees of freedom per cell
 !> @param[in]     undf_w2             The number of unique degrees of freedom
 !> @param[in]     map_w2              The dofmap for the cell at the base of the column
@@ -88,6 +91,9 @@ subroutine vertical_uniform_deppt_code(  nlayers,             &
                                          n_dep_pt_iterations, &
                                          vertical_method,     &
                                          dt,                  &
+                                         ndf_w2v,             &
+                                         undf_w2v,            &
+                                         map_w2v,             &
                                          ndf_w2,              &
                                          undf_w2,             &
                                          map_w2 )
@@ -98,16 +104,19 @@ subroutine vertical_uniform_deppt_code(  nlayers,             &
   implicit none
 
   ! Arguments
-  integer(kind=i_def),                     intent(in)    :: nlayers
-  integer(kind=i_def),                     intent(in)    :: ndf_w2
-  integer(kind=i_def),                     intent(in)    :: undf_w2
-  integer(kind=i_def),                     intent(in)    :: vertical_method
-  integer(kind=i_def), dimension(ndf_w2),  intent(in)    :: map_w2
-  real(kind=r_tran),   dimension(undf_w2), intent(in)    :: u_n
-  real(kind=r_tran),   dimension(undf_w2), intent(in)    :: u_np1
-  real(kind=r_tran),                       intent(in)    :: dt
-  real(kind=r_tran),   dimension(undf_w2), intent(inout) :: dep_pts_z
-  real(kind=r_tran),   dimension(undf_w2), intent(inout) :: cfl
+  integer(kind=i_def),                      intent(in)    :: nlayers
+  integer(kind=i_def),                      intent(in)    :: ndf_w2
+  integer(kind=i_def),                      intent(in)    :: undf_w2
+  integer(kind=i_def),                      intent(in)    :: ndf_w2v
+  integer(kind=i_def),                      intent(in)    :: undf_w2v
+  integer(kind=i_def),                      intent(in)    :: vertical_method
+  integer(kind=i_def), dimension(ndf_w2),   intent(in)    :: map_w2
+  integer(kind=i_def), dimension(ndf_w2v),  intent(in)    :: map_w2v
+  real(kind=r_tran),   dimension(undf_w2),  intent(in)    :: u_n
+  real(kind=r_tran),   dimension(undf_w2),  intent(in)    :: u_np1
+  real(kind=r_tran),                        intent(in)    :: dt
+  real(kind=r_tran),   dimension(undf_w2v), intent(inout) :: dep_pts_z
+  real(kind=r_tran),   dimension(undf_w2),  intent(inout) :: cfl
 
   integer(kind=i_def), intent(in) :: n_dep_pt_iterations
 
@@ -140,8 +149,8 @@ subroutine vertical_uniform_deppt_code(  nlayers,             &
   u_np1_local(nCellEdges)  = 0.0_r_tran
 
   ! Apply vertical boundary conditions to the departure points.
-  dep_pts_z( map_w2(5) ) =  0.0_r_tran
-  dep_pts_z( map_w2(6)+nlayers-1 ) =  0.0_r_tran
+  dep_pts_z( map_w2v(1) ) =  0.0_r_tran
+  dep_pts_z( map_w2v(2)+nlayers-1 ) =  0.0_r_tran
 
   ! Loop over all layers except the bottom layer.
   ! This code is hard-wired to work with 6 W2 dofs per cell where dof=5 is the
@@ -168,7 +177,7 @@ subroutine vertical_uniform_deppt_code(  nlayers,             &
 
   do k=1,nlayers-1
     xArrival = real(k,r_tran)
-    dep_pts_z( map_w2(5) + k ) =  xArrival - dep_local(k)
+    dep_pts_z( map_w2v(1) + k ) =  xArrival - dep_local(k)
   end do
 
 end subroutine vertical_uniform_deppt_code

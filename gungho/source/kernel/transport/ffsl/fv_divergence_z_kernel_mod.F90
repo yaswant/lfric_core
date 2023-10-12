@@ -20,7 +20,7 @@ module fv_divergence_z_kernel_mod
                                  CELL_COLUMN
   use constants_mod,      only : r_tran, i_def
   use flux_direction_mod, only : x_direction, y_direction, z_direction
-  use fs_continuity_mod,  only : W2, W3
+  use fs_continuity_mod,  only : W2v, W3
   use kernel_mod,         only : kernel_type
 
   implicit none
@@ -37,7 +37,7 @@ module fv_divergence_z_kernel_mod
     private
     type(arg_type) :: meta_args(2) = (/                 &
          arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W3), & ! difference
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2)  & ! flux
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2v) & ! flux
          /)
     integer :: operates_on = CELL_COLUMN
   contains
@@ -58,51 +58,45 @@ contains
   !> @param[in]     ndf_w3            Number of degrees of freedom for W3 per cell
   !> @param[in]     undf_w3           Number of unique degrees of freedom for W3
   !> @param[in]     map_w3            Dofmap for W3
-  !> @param[in]     ndf_w2            Number of degrees of freedom for W2 per cell
-  !> @param[in]     undf_w2           Number of unique degrees of freedom for W2
-  !> @param[in]     map_w2            Dofmap for W2
+  !> @param[in]     ndf_w2v           Number of degrees of freedom for W2v per cell
+  !> @param[in]     undf_w2v          Number of unique degrees of freedom for W2v
+  !> @param[in]     map_w2v           Dofmap for W2v
   subroutine fv_divergence_z_code( nlayers,    &
                                    divergence, &
                                    mass_flux,  &
                                    ndf_w3,     &
                                    undf_w3,    &
                                    map_w3,     &
-                                   ndf_w2,     &
-                                   undf_w2,    &
-                                   map_w2 )
+                                   ndf_w2v,    &
+                                   undf_w2v,   &
+                                   map_w2v )
 
     implicit none
 
     ! Arguments
-    integer(kind=i_def), intent(in)                        :: nlayers
-    integer(kind=i_def), intent(in)                        :: ndf_w3
-    integer(kind=i_def), intent(in)                        :: undf_w3
-    integer(kind=i_def), dimension(ndf_w3),  intent(in)    :: map_w3
-    integer(kind=i_def), intent(in)                        :: ndf_w2
-    integer(kind=i_def), intent(in)                        :: undf_w2
-    integer(kind=i_def), dimension(ndf_w2),  intent(in)    :: map_w2
-    real(kind=r_tran),   dimension(undf_w3), intent(inout) :: divergence
-    real(kind=r_tran),   dimension(undf_w2), intent(in)    :: mass_flux
+    integer(kind=i_def), intent(in)                         :: nlayers
+    integer(kind=i_def), intent(in)                         :: ndf_w3
+    integer(kind=i_def), intent(in)                         :: undf_w3
+    integer(kind=i_def), dimension(ndf_w3),   intent(in)    :: map_w3
+    integer(kind=i_def), intent(in)                         :: ndf_w2v
+    integer(kind=i_def), intent(in)                         :: undf_w2v
+    integer(kind=i_def), dimension(ndf_w2v),  intent(in)    :: map_w2v
+    real(kind=r_tran),   dimension(undf_w3),  intent(inout) :: divergence
+    real(kind=r_tran),   dimension(undf_w2v), intent(in)    :: mass_flux
 
     integer(kind=i_def) :: k
 
-    ! This is based on the lowest order W2 dof map
+    ! This is based on the lowest order W2v dof map
     !
-    !    ---4---
-    !    |     |
-    !    1     3  horizontal
-    !    |     |
     !    ---2---
-    !
-    !    ---6---
     !    |     |
     !    |     |  vertical
     !    |     |
-    !    ---5---
+    !    ---1---
 
     do k = 0,nlayers-1
-      divergence( map_w3(1)+k ) = mass_flux(map_w2(6)+k) - &
-                                  mass_flux(map_w2(5)+k)
+      divergence( map_w3(1)+k ) = mass_flux(map_w2v(2)+k) - &
+                                  mass_flux(map_w2v(1)+k)
     end do
 
   end subroutine fv_divergence_z_code

@@ -30,8 +30,8 @@ module ffsl_vert_constant_flux_kernel_mod_test
   end type ffsl_vert_constant_flux_test_type
 
     integer(i_def), parameter :: nlayers = 5
-    integer(i_def), parameter :: ndf_w2  = 6
-    integer(i_def), parameter :: undf_w2 = nlayers*4+nlayers+1
+    integer(i_def), parameter :: ndf_w2  = 2
+    integer(i_def), parameter :: undf_w2 = nlayers+1
     integer(i_def), parameter :: ndf_w3  = 1
     integer(i_def), parameter :: undf_w3 = nlayers
 
@@ -46,7 +46,7 @@ contains
 
     class(ffsl_vert_constant_flux_test_type), intent(inout) :: this
 
-    this%map_w2 = (/ 1,6,11,16,21,22 /)
+    this%map_w2 = (/ 1,2,3,4,5,6 /)
 
     allocate( this%dep_pts(1:undf_w2) )
     allocate( this%flux(1:undf_w2) )
@@ -88,17 +88,11 @@ contains
 
     ! Test with small cfl values
 
-    ! Since we have 5 layers there are 26 unique degrees of freedom for W2.
-    ! The unique dofs which relate to the vertical components of W2 are
-    ! 21,22,23,24,25 and 26.
+    ! The departure points are in W2v space
     ! Hence in dep_pts variable below the vertical departure points are
     ! 0.0,0.5,0.5,0.5,0.5,0.0, taking into account 0.0 departure points for the
     ! top and bottom boundaries.
-    this%dep_pts(:) = (/ 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.5_r_tran, 0.5_r_tran, 0.5_r_tran, 0.5_r_tran, &
+    this%dep_pts(:) = (/ 0.0_r_tran, 0.5_r_tran, 0.5_r_tran, 0.5_r_tran, 0.5_r_tran, &
                          0.0_r_tran /)
 
     call ffsl_vert_constant_flux_code( nlayers,      &
@@ -116,20 +110,16 @@ contains
     ! The rho values for the 5 layers are (1.0,2.0,3.0,4.0,5.0)
     ! As the departure distance is 0.5 and the reconstruction is constant,
     ! the flux should be half*rho.
-    @assertEqual(0.0_r_tran, this%flux(21), tol)
-    @assertEqual(0.5_r_tran, this%flux(22), tol)
-    @assertEqual(1.0_r_tran, this%flux(23), tol)
-    @assertEqual(1.5_r_tran, this%flux(24), tol)
-    @assertEqual(2.0_r_tran, this%flux(25), tol)
-    @assertEqual(0.0_r_tran, this%flux(26), tol)
+    @assertEqual(0.0_r_tran, this%flux(1), tol)
+    @assertEqual(0.5_r_tran, this%flux(2), tol)
+    @assertEqual(1.0_r_tran, this%flux(3), tol)
+    @assertEqual(1.5_r_tran, this%flux(4), tol)
+    @assertEqual(2.0_r_tran, this%flux(5), tol)
+    @assertEqual(0.0_r_tran, this%flux(6), tol)
 
     ! Test with large cfl and negative cfl values
 
-    this%dep_pts(:) = (/ 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, 0.0_r_tran, &
-                         0.0_r_tran, 0.8_r_tran, 1.5_r_tran, -1.2_r_tran, -0.5_r_tran, &
+    this%dep_pts(:) = (/ 0.0_r_tran, 0.8_r_tran, 1.5_r_tran, -1.2_r_tran, -0.5_r_tran, &
                          0.0_r_tran /)
 
     call ffsl_vert_constant_flux_code( nlayers,      &
@@ -148,12 +138,12 @@ contains
     ! For the integer part of the dep_pts we take the value of rho
     ! in the cell, for the fractional part it is that fraction*rho.
     ! For negative dep_pts the flux will be negative.
-    @assertEqual(0.0_r_tran, this%flux(21), tol)
-    @assertEqual(0.8_r_tran, this%flux(22), tol)
-    @assertEqual(2.5_r_tran, this%flux(23), tol)
-    @assertEqual(-5.0_r_tran, this%flux(24), tol)
-    @assertEqual(-2.5_r_tran, this%flux(25), tol)
-    @assertEqual(0.0_r_tran, this%flux(26), tol)
+    @assertEqual(0.0_r_tran,  this%flux(1), tol)
+    @assertEqual(0.8_r_tran,  this%flux(2), tol)
+    @assertEqual(2.5_r_tran,  this%flux(3), tol)
+    @assertEqual(-5.0_r_tran, this%flux(4), tol)
+    @assertEqual(-2.5_r_tran, this%flux(5), tol)
+    @assertEqual(0.0_r_tran,  this%flux(6), tol)
 
   end subroutine test_all
 

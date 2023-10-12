@@ -26,7 +26,7 @@ module ffsl_flux_final_y_kernel_mod
                                  STENCIL, Y1D, GH_INTEGER, &
                                  ANY_DISCONTINUOUS_SPACE_1
   use constants_mod,      only : r_tran, i_def, r_def
-  use fs_continuity_mod,  only : W3, W2
+  use fs_continuity_mod,  only : W3, W2h
   use kernel_mod,         only : kernel_type
 
   implicit none
@@ -40,11 +40,11 @@ module ffsl_flux_final_y_kernel_mod
   type, public, extends(kernel_type) :: ffsl_flux_final_y_kernel_type
     private
     type(arg_type) :: meta_args(9) = (/                                                      &
-         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W2),                                      & ! flux
+         arg_type(GH_FIELD,  GH_REAL,    GH_WRITE, W2h),                                     & ! flux
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3, STENCIL(Y1D)),                        & ! field_x
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W3, STENCIL(Y1D)),                        & ! field_y
          arg_type(GH_FIELD,  GH_REAL,    GH_READ,  ANY_DISCONTINUOUS_SPACE_1, STENCIL(Y1D)), & ! panel_id
-         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2),                                      & ! dep_pts
+         arg_type(GH_FIELD,  GH_REAL,    GH_READ,  W2h),                                     & ! dep_pts
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ     ),                                      & ! order
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ     ),                                      & ! monotone
          arg_type(GH_SCALAR, GH_INTEGER, GH_READ     ),                                      & ! extent_size
@@ -79,9 +79,9 @@ contains
   !> @param[in]     monotone          Horizontal monotone option for FFSL
   !> @param[in]     extent_size       Stencil extent needed for the LAM edge
   !> @param[in]     dt                Time step
-  !> @param[in]     ndf_w2            Number of degrees of freedom for W2 per cell
-  !> @param[in]     undf_w2           Number of unique degrees of freedom for W2
-  !> @param[in]     map_w2            Map for W2
+  !> @param[in]     ndf_w2h           Number of degrees of freedom for W2h per cell
+  !> @param[in]     undf_w2h          Number of unique degrees of freedom for W2h
+  !> @param[in]     map_w2h           Map for W2h
   !> @param[in]     ndf_w3            Number of degrees of freedom for W3 per cell
   !> @param[in]     undf_w3           Number of unique degrees of freedom for W3
   !> @param[in]     map_w3            Map for W3
@@ -107,9 +107,9 @@ contains
                                      monotone,       &
                                      extent_size,    &
                                      dt,             &
-                                     ndf_w2,         &
-                                     undf_w2,        &
-                                     map_w2,         &
+                                     ndf_w2h,        &
+                                     undf_w2h,       &
+                                     map_w2h,        &
                                      ndf_w3,         &
                                      undf_w3,        &
                                      map_w3,         &
@@ -133,8 +133,8 @@ contains
     integer(kind=i_def), intent(in) :: nlayers
     integer(kind=i_def), intent(in) :: undf_w3
     integer(kind=i_def), intent(in) :: ndf_w3
-    integer(kind=i_def), intent(in) :: undf_w2
-    integer(kind=i_def), intent(in) :: ndf_w2
+    integer(kind=i_def), intent(in) :: undf_w2h
+    integer(kind=i_def), intent(in) :: ndf_w2h
     integer(kind=i_def), intent(in) :: undf_wp
     integer(kind=i_def), intent(in) :: ndf_wp
     integer(kind=i_def), intent(in) :: stencil_size_x
@@ -142,23 +142,23 @@ contains
     integer(kind=i_def), intent(in) :: stencil_size_p
 
     ! Arguments: Maps
-    integer(kind=i_def), dimension(ndf_w3), intent(in) :: map_w3
-    integer(kind=i_def), dimension(ndf_w2), intent(in) :: map_w2
-    integer(kind=i_def), dimension(ndf_wp), intent(in) :: map_wp
+    integer(kind=i_def), dimension(ndf_w3),  intent(in) :: map_w3
+    integer(kind=i_def), dimension(ndf_w2h), intent(in) :: map_w2h
+    integer(kind=i_def), dimension(ndf_wp),  intent(in) :: map_wp
     integer(kind=i_def), dimension(ndf_w3,stencil_size_x), intent(in) :: stencil_map_x
     integer(kind=i_def), dimension(ndf_w3,stencil_size_y), intent(in) :: stencil_map_y
     integer(kind=i_def), dimension(ndf_wp,stencil_size_p), intent(in) :: stencil_map_p
 
     ! Arguments: Fields
-    real(kind=r_tran), dimension(undf_w2), intent(inout) :: flux
-    real(kind=r_tran), dimension(undf_w3), intent(in)    :: field_x
-    real(kind=r_tran), dimension(undf_w3), intent(in)    :: field_y
-    real(kind=r_def), dimension(undf_wp), intent(in)     :: panel_id
-    real(kind=r_tran), dimension(undf_w2), intent(in)    :: dep_pts
-    integer(kind=i_def), intent(in)                      :: order
-    integer(kind=i_def), intent(in)                      :: monotone
-    integer(kind=i_def), intent(in)                      :: extent_size
-    real(kind=r_tran), intent(in)                        :: dt
+    real(kind=r_tran), dimension(undf_w2h), intent(inout) :: flux
+    real(kind=r_tran), dimension(undf_w3),  intent(in)    :: field_x
+    real(kind=r_tran), dimension(undf_w3),  intent(in)    :: field_y
+    real(kind=r_def), dimension(undf_wp),   intent(in)    :: panel_id
+    real(kind=r_tran), dimension(undf_w2h), intent(in)    :: dep_pts
+    integer(kind=i_def), intent(in)                       :: order
+    integer(kind=i_def), intent(in)                       :: monotone
+    integer(kind=i_def), intent(in)                       :: extent_size
+    real(kind=r_tran), intent(in)                         :: dt
 
     ! Variables for flux calculation
     real(kind=r_tran) :: mass_total
@@ -209,7 +209,7 @@ contains
       ! At edge of LAM, so set output to zero
       do k = 0,nlayers-1
         do dof_iterator = 1,2
-         flux( map_w2(local_dofs(dof_iterator)) + k ) = 0.0_r_tran
+         flux( map_w2h(local_dofs(dof_iterator)) + k ) = 0.0_r_tran
         end do
       end do
 
@@ -239,14 +239,14 @@ contains
 
         half_level = floor( nlayers/2.0_r_tran, i_def)
 
-        if ( flux(map_w2(local_dofs(dof_iterator)) ) == 0.0_r_tran .AND. &
-             flux(map_w2(local_dofs(dof_iterator)) + half_level) == 0.0_r_tran ) then
+        if ( flux(map_w2h(local_dofs(dof_iterator)) ) == 0.0_r_tran .AND. &
+             flux(map_w2h(local_dofs(dof_iterator)) + half_level) == 0.0_r_tran ) then
 
           ! Loop over vertical levels
           do k = 0,nlayers-1
 
             ! Get the departure distance
-            departure_dist = dep_pts( map_w2(local_dofs(dof_iterator)) + k )
+            departure_dist = dep_pts( map_w2h(local_dofs(dof_iterator)) + k )
 
             ! Calculates number of cells of interest and fraction of a cell to add.
             call frac_and_int_part(departure_dist,n_cells_to_sum,fractional_distance)
@@ -302,7 +302,7 @@ contains
             mass_total = mass_from_whole_cells + mass_frac
 
             ! Assign to flux variable and divide by dt to get the correct form
-            flux(map_w2(local_dofs(dof_iterator)) + k) =  sign(1.0_r_tran,departure_dist) * mass_total / dt
+            flux(map_w2h(local_dofs(dof_iterator)) + k) =  sign(1.0_r_tran,departure_dist) * mass_total / dt
 
           end do ! vertical levels k
 

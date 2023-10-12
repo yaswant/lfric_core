@@ -53,7 +53,8 @@ contains
   !> @param[in]     dep_pts_x         Departure points in x direction
   !> @param[in]     dep_pts_y         Departure points in y direction
   !> @param[in]     dep_pts_z         Departure points in z direction
-  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     detj_at_w2h       Det(J) at W2h dofs
+  !> @param[in]     detj_at_w2v       Det(J) at W2v dofs
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     dt                Time step
   !> @param[in]     log_space         Switch to use natural logarithmic space
@@ -66,7 +67,8 @@ contains
                                            dep_pts_x,     &
                                            dep_pts_y,     &
                                            dep_pts_z,     &
-                                           detj_at_w2,    &
+                                           detj_at_w2h,   &
+                                           detj_at_w2v,   &
                                            panel_id,      &
                                            dt,            &
                                            log_space,     &
@@ -81,7 +83,8 @@ contains
     type(r_tran_field_type), intent(in)    :: dep_pts_x
     type(r_tran_field_type), intent(in)    :: dep_pts_y
     type(r_tran_field_type), intent(in)    :: dep_pts_z
-    type(r_tran_field_type), intent(in)    :: detj_at_w2
+    type(r_tran_field_type), intent(in)    :: detj_at_w2h
+    type(r_tran_field_type), intent(in)    :: detj_at_w2v
     type(field_type),        intent(in)    :: panel_id
     real(kind=r_tran),       intent(in)    :: dt
     logical(kind=l_def),     intent(in)    :: log_space
@@ -176,31 +179,31 @@ contains
     call field_h%initialise( field_fs )
 
     ! 1st advective step
-    call ffsl_2d_advect_first( field, dep_pts_x, dep_pts_y, detj_at_w2,  &
+    call ffsl_2d_advect_first( field, dep_pts_x, dep_pts_y, detj_at_w2h, &
                                dt, panel_id, inner_order,                &
                                hori_monotone, half_flag,                 &
                                half_increment_x, half_increment_y )
-    call ffsl_1d_advect_vert( field, dep_pts_z, detj_at_w2, inner_order, &
-                              dt, log_space, vert_monotone, half_flag,   &
+    call ffsl_1d_advect_vert( field, dep_pts_z, detj_at_w2v, inner_order, &
+                              dt, log_space, vert_monotone, half_flag,    &
                               reversible, half_increment_z )
     call invoke( X_minus_bY( field_x, field, third_dt, half_increment_x ), &
                  X_minus_bY( field_y, field, third_dt, half_increment_y ), &
                  X_minus_bY( field_z, field, third_dt, half_increment_z ) )
 
     ! 2nd advective step
-    call ffsl_2d_advect_final( field_x, field_y, dep_pts_x, dep_pts_y, &
-                               detj_at_w2, dt, panel_id, inner_order,  &
-                               hori_monotone, half_flag,               &
+    call ffsl_2d_advect_final( field_x, field_y, dep_pts_x, dep_pts_y,  &
+                               detj_at_w2h, dt, panel_id, inner_order,  &
+                               hori_monotone, half_flag,                &
                                half_increment_xy, half_increment_yx )
-    call ffsl_2d_advect_first( field_z, dep_pts_x, dep_pts_y, detj_at_w2, &
-                               dt, panel_id, inner_order,                 &
-                               hori_monotone,  half_flag,                 &
+    call ffsl_2d_advect_first( field_z, dep_pts_x, dep_pts_y, detj_at_w2h, &
+                               dt, panel_id, inner_order,                  &
+                               hori_monotone,  half_flag,                  &
                                half_increment_xz, half_increment_yz )
-    call ffsl_1d_advect_vert( field_x, dep_pts_z, detj_at_w2, inner_order, &
-                              dt, log_space, vert_monotone, half_flag,     &
+    call ffsl_1d_advect_vert( field_x, dep_pts_z, detj_at_w2v, inner_order, &
+                              dt, log_space, vert_monotone, half_flag,      &
                               reversible, half_increment_zx )
-    call ffsl_1d_advect_vert( field_y, dep_pts_z, detj_at_w2, inner_order, &
-                              dt, log_space, vert_monotone, half_flag,     &
+    call ffsl_1d_advect_vert( field_y, dep_pts_z, detj_at_w2v, inner_order, &
+                              dt, log_space, vert_monotone, half_flag,      &
                               reversible, half_increment_zy )
     call invoke( X_minus_bY( field_f, field, half_dt, half_increment_yz ), &
                  X_minus_bY( field_g, field, half_dt, half_increment_xz ), &
@@ -211,11 +214,11 @@ contains
 
     ! Final advective step
     call ffsl_2d_advect_final( field_g, field_f, dep_pts_x, dep_pts_y, &
-                               detj_at_w2, dt, panel_id, outer_order,  &
+                               detj_at_w2h, dt, panel_id, outer_order, &
                                hori_monotone, half_flag,               &
                                increment_x, increment_y )
-    call ffsl_1d_advect_vert( field_h, dep_pts_z, detj_at_w2, outer_order, &
-                              dt, log_space, vert_monotone, half_flag,     &
+    call ffsl_1d_advect_vert( field_h, dep_pts_z, detj_at_w2v, outer_order, &
+                              dt, log_space, vert_monotone, half_flag,      &
                               reversible, increment_z )
 
     ! Collect increments
@@ -238,7 +241,7 @@ contains
   !> @param[in]     field             Advected field
   !> @param[in]     dep_pts_x         Departure points in x direction
   !> @param[in]     dep_pts_y         Departure points in y direction
-  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     detj_at_w2h       Det(J) at W2h dofs
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     dt                Time step
   !> @param[in]     hori_monotone     Horizontal monotone option for FFSL
@@ -247,7 +250,7 @@ contains
   subroutine ffsl_advective_horizontal_alg( field,         &
                                             dep_pts_x,     &
                                             dep_pts_y,     &
-                                            detj_at_w2,    &
+                                            detj_at_w2h,   &
                                             panel_id,      &
                                             dt,            &
                                             hori_monotone, &
@@ -259,7 +262,7 @@ contains
     type(r_tran_field_type), intent(in)    :: field
     type(r_tran_field_type), intent(in)    :: dep_pts_x
     type(r_tran_field_type), intent(in)    :: dep_pts_y
-    type(r_tran_field_type), intent(in)    :: detj_at_w2
+    type(r_tran_field_type), intent(in)    :: detj_at_w2h
     type(field_type),        intent(in)    :: panel_id
     real(kind=r_tran),       intent(in)    :: dt
     integer(kind=i_def),     intent(in)    :: hori_monotone
@@ -309,7 +312,7 @@ contains
     ! Output: F(rho_y) + G(rho_x)
 
     ! First advective step
-    call ffsl_2d_advect_first( field, dep_pts_x, dep_pts_y, detj_at_w2,  &
+    call ffsl_2d_advect_first( field, dep_pts_x, dep_pts_y, detj_at_w2h, &
                                dt, panel_id, inner_order, hori_monotone, &
                                strang, half_increment_x, half_increment_y )
     call invoke( X_minus_bY( field_x, field, half_dt, half_increment_x ), &
@@ -317,7 +320,7 @@ contains
 
     ! Final advective step
     call ffsl_2d_advect_final( field_x, field_y, dep_pts_x, dep_pts_y, &
-                               detj_at_w2, dt, panel_id, outer_order,   &
+                               detj_at_w2h, dt, panel_id, outer_order, &
                                hori_monotone, strang,                  &
                                increment_x, increment_y )
 

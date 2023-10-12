@@ -26,7 +26,7 @@ module ffsl_unify_flux_kernel_mod
                                  GH_READ,               &
                                  ANY_DISCONTINUOUS_SPACE_1
   use constants_mod,      only : r_tran, i_def, r_def
-  use fs_continuity_mod,  only : W2, W2broken
+  use fs_continuity_mod,  only : W2h, W2broken
   use kernel_mod,         only : kernel_type
   use log_mod,            only : LOG_LEVEL_ERROR, &
                                  log_event
@@ -42,8 +42,8 @@ module ffsl_unify_flux_kernel_mod
   type, public, extends(kernel_type) :: ffsl_unify_flux_kernel_type
     private
     type(arg_type) :: meta_args(5) = (/                                       &
-         arg_type(GH_FIELD,  GH_REAL, GH_WRITE,  W2),                         &
-         arg_type(GH_FIELD,  GH_REAL, GH_WRITE,  W2),                         &
+         arg_type(GH_FIELD,  GH_REAL, GH_WRITE,  W2h),                        &
+         arg_type(GH_FIELD,  GH_REAL, GH_WRITE,  W2h),                        &
          arg_type(GH_FIELD,  GH_REAL, GH_READ,   W2broken, STENCIL(CROSS2D)), &
          arg_type(GH_FIELD,  GH_REAL, GH_READ,   W2broken, STENCIL(CROSS2D)), &
          arg_type(GH_FIELD,  GH_REAL, GH_READ,   ANY_DISCONTINUOUS_SPACE_1,   &
@@ -77,9 +77,9 @@ contains
   !> @param[in]     smap_p_size   Size of the stencil map for the panel_id field
   !> @param[in]     smap_p_max    Max depth of the stencil map for the panel_id field
   !> @param[in]     smap_p        Stencil dofmap for the panel_id field
-  !> @param[in]     ndf_w2        Number of degrees of freedom for a Cell in the W2 space
-  !> @param[in]     undf_w2       Total number of degrees of freedom for the W2 space
-  !> @param[in]     map_w2        Cell dofmap for the W2 space
+  !> @param[in]     ndf_w2h       Number of degrees of freedom for a Cell in the W2h space
+  !> @param[in]     undf_w2h      Total number of degrees of freedom for the W2h space
+  !> @param[in]     map_w2h       Cell dofmap for the W2h space
   !> @param[in]     ndf_w2b       Number of degrees of freedom for a Cell in the broken W2 space
   !> @param[in]     undf_w2b      Total number of degrees of freedom for the broken W2 space
   !> @param[in]     map_w2b       Cell dofmap for the broken W2 space
@@ -101,9 +101,9 @@ contains
                                           smap_p_size,   &
                                           smap_p_max,    &
                                           smap_p,        &
-                                          ndf_w2,        &
-                                          undf_w2,       &
-                                          map_w2,        &
+                                          ndf_w2h,       &
+                                          undf_w2h,      &
+                                          map_w2h,       &
                                           ndf_w2b,       &
                                           undf_w2b,      &
                                           map_w2b,       &
@@ -115,15 +115,15 @@ contains
 
     ! Arguments
     integer(kind=i_def), intent(in) :: nlayers
-    integer(kind=i_def), intent(in) :: undf_w2
+    integer(kind=i_def), intent(in) :: undf_w2h
     integer(kind=i_def), intent(in) :: undf_w2b
     integer(kind=i_def), intent(in) :: undf_id
-    integer(kind=i_def), intent(in) :: ndf_w2
+    integer(kind=i_def), intent(in) :: ndf_w2h
     integer(kind=i_def), intent(in) :: ndf_w2b
     integer(kind=i_def), intent(in) :: ndf_id
 
     ! Arguments: Maps
-    integer(kind=i_def), dimension(ndf_w2),  intent(in) :: map_w2
+    integer(kind=i_def), dimension(ndf_w2h), intent(in) :: map_w2h
     integer(kind=i_def), dimension(ndf_w2b), intent(in) :: map_w2b
     integer(kind=i_def), dimension(ndf_id),  intent(in) :: map_id
 
@@ -139,7 +139,7 @@ contains
     integer(kind=i_def), dimension(ndf_id,  smap_p_max, 4), intent(in) :: smap_p
 
     ! Arguments: Fields
-    real(kind=r_tran), dimension(undf_w2),  intent(inout) :: flux_x, flux_y
+    real(kind=r_tran), dimension(undf_w2h), intent(inout) :: flux_x, flux_y
     real(kind=r_tran), dimension(undf_w2b), intent(in)    :: flux_x_broken, flux_y_broken
     real(kind=r_def),  dimension(undf_id),  intent(in)    :: panel_id
 
@@ -147,7 +147,7 @@ contains
     integer(kind=i_def) :: k, df, owned, halo
 
     ! Only perform the computation if we have a full stencil (i.e. not at a Lam
-    ! boundary
+    ! boundary)
     if (minval(smap_x_size) == 1) return
 
     ! The folling code assumes a certain layout and connectivity of the cubed
@@ -192,23 +192,23 @@ contains
           select case(halo)
             case(2)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                + flux_x_broken(smap_x(1,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 + flux_x_broken(smap_x(1,2,3)+k))
               end do
             case(4)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                - flux_y_broken(smap_y(2,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 - flux_y_broken(smap_y(2,2,1)+k))
               end do
             case(5)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                + flux_y_broken(smap_x(2,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 + flux_y_broken(smap_x(2,2,4)+k))
               end do
             case(6)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                - flux_x_broken(smap_x(1,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 - flux_x_broken(smap_x(1,2,2)+k))
               end do
           end select
         end do
@@ -219,23 +219,23 @@ contains
           select case(halo)
             case(1)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                + flux_x_broken(smap_x(3,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 + flux_x_broken(smap_x(3,2,1)+k))
               end do
             case(3)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                - flux_y_broken(smap_y(4,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 - flux_y_broken(smap_y(4,2,3)+k))
               end do
             case(5)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                - flux_x_broken(smap_x(3,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 - flux_x_broken(smap_x(3,2,4)+k))
               end do
             case(6)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                + flux_y_broken(smap_y(4,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 + flux_y_broken(smap_y(4,2,2)+k))
               end do
           end select
         end do
@@ -246,23 +246,23 @@ contains
           select case(halo)
             case(2)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                - flux_x_broken(smap_x(3,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 - flux_x_broken(smap_x(3,2,4)+k))
               end do
             case(4)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                + flux_y_broken(smap_y(4,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 + flux_y_broken(smap_y(4,2,2)+k))
               end do
             case(5)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                - flux_y_broken(smap_y(4,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 - flux_y_broken(smap_y(4,2,3)+k))
               end do
             case(6)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                + flux_x_broken(smap_x(3,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 + flux_x_broken(smap_x(3,2,1)+k))
               end do
           end select
         end do
@@ -273,23 +273,23 @@ contains
           select case(halo)
             case(1)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                - flux_x_broken(smap_x(1,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 - flux_x_broken(smap_x(1,2,2)+k))
               end do
             case(3)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                + flux_y_broken(smap_y(2,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 + flux_y_broken(smap_y(2,2,4)+k))
               end do
             case(5)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                + flux_x_broken(smap_x(1,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 + flux_x_broken(smap_x(1,2,3)+k))
               end do
             case(6)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                - flux_y_broken(smap_y(2,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 - flux_y_broken(smap_y(2,2,1)+k))
               end do
           end select
         end do
@@ -300,23 +300,23 @@ contains
           select case(halo)
             case(1)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                + flux_y_broken(smap_y(4,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 + flux_y_broken(smap_y(4,2,2)+k))
               end do
             case(2)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                - flux_y_broken(smap_y(4,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 - flux_y_broken(smap_y(4,2,3)+k))
               end do
             case(3)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                - flux_x_broken(smap_x(3,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 - flux_x_broken(smap_x(3,2,4)+k))
               end do
             case(4)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                + flux_x_broken(smap_x(3,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 + flux_x_broken(smap_x(3,2,1)+k))
               end do
           end select
         end do
@@ -327,23 +327,23 @@ contains
           select case(halo)
             case(1)
               do k = 0, nlayers-1
-                flux_x(map_w2(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
-                                                - flux_y_broken(smap_y(2,2,1)+k))
+                flux_x(map_w2h(1)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(1)+k) &
+                                                 - flux_y_broken(smap_y(2,2,1)+k))
               end do
             case(2)
               do k = 0, nlayers-1
-                flux_y(map_w2(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
-                                                + flux_y_broken(smap_y(2,2,4)+k))
+                flux_y(map_w2h(4)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(4)+k) &
+                                                 + flux_y_broken(smap_y(2,2,4)+k))
               end do
             case(3)
               do k = 0, nlayers-1
-                flux_x(map_w2(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
-                                                + flux_x_broken(smap_x(1,2,3)+k))
+                flux_x(map_w2h(3)+k) = 0.5_r_tran*(flux_x_broken(map_w2b(3)+k) &
+                                                 + flux_x_broken(smap_x(1,2,3)+k))
               end do
             case(4)
               do k = 0, nlayers-1
-                flux_y(map_w2(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
-                                                - flux_x_broken(smap_x(1,2,2)+k))
+                flux_y(map_w2h(2)+k) = 0.5_r_tran*(flux_y_broken(map_w2b(2)+k) &
+                                                 - flux_x_broken(smap_x(1,2,2)+k))
               end do
           end select
         end do

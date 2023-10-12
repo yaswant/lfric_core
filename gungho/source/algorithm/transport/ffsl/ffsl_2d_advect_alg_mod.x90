@@ -53,7 +53,7 @@ contains
   !> @param[in]     field             Input field in x direction
   !> @param[in]     dep_pts_x         Departure points in the x direction
   !> @param[in]     dep_pts_y         Departure points in the y direction
-  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     detj_at_w2        Det(J) at W2h dofs
   !> @param[in]     dt                The model timestep length
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     order             Order of the reconstruction
@@ -178,7 +178,7 @@ contains
   !> @param[in]     field_y           Input field in y
   !> @param[in]     dep_pts_x         Departure points in the x direction
   !> @param[in]     dep_pts_y         Departure points in the y direction
-  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     detj_at_w2        Det(J) at W2h dofs
   !> @param[in]     dt                The model timestep length
   !> @param[in]     panel_id          Panel ID of the cells
   !> @param[in]     order             Order of the reconstruction

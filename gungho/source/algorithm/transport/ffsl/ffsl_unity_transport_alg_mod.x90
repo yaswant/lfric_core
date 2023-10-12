@@ -23,6 +23,7 @@ module ffsl_unity_transport_alg_mod
   use field_mod,                        only: field_type
   use flux_direction_mod,               only: x_direction, y_direction
   use function_space_mod,               only: function_space_type
+  use split_w2_field_kernel_mod,        only: split_w2_field_kernel_type
   use subgrid_config_mod,               only: outer_order
   use transport_enumerated_types_mod,   only: horizontal_monotone_none, &
                                               vertical_monotone_none
@@ -93,7 +94,7 @@ contains
     ! Parameters, set log_space to be false for unity transport
     logical(l_def), parameter :: log_space =.false.
 
-    ! Unity fields, increments, and fluxes
+    ! Unity fields, increments, Det(J), and fluxes
     type(r_tran_field_type) :: inc_one_x
     type(r_tran_field_type) :: inc_one_y
     type(r_tran_field_type) :: inc_one_z
@@ -101,6 +102,8 @@ contains
     type(r_tran_field_type) :: flux_x
     type(r_tran_field_type) :: flux_y
     type(r_tran_field_type) :: flux_z
+    type(r_tran_field_type) :: detj_at_w2h
+    type(r_tran_field_type) :: detj_at_w2v
 
     ! Half time step and flags for departure points
     real(kind=r_tran)   :: half_dt
@@ -121,6 +124,8 @@ contains
     call flux_x%initialise( vector_space=dep_pts_x%get_function_space() )
     call flux_y%initialise( vector_space=dep_pts_y%get_function_space() )
     call flux_z%initialise( vector_space=dep_pts_z%get_function_space() )
+    call detj_at_w2h%initialise( vector_space=dep_pts_x%get_function_space() )
+    call detj_at_w2v%initialise( vector_space=dep_pts_z%get_function_space() )
 
     ! Set values to zero (apart from initial unity field)
     call invoke( setval_c(inc_one_x, 0.0_r_tran), &
@@ -130,6 +135,9 @@ contains
                  setval_c(flux_x,    0.0_r_tran), &
                  setval_c(flux_y,    0.0_r_tran), &
                  setval_c(flux_z,    0.0_r_tran)  )
+
+    ! Split Det(J) into horizontal and vertical parts
+    call invoke( split_w2_field_kernel_type(detj_at_w2h, detj_at_w2v, detj_at_w2) )
 
     ! Set half time step, monotone flag to none, reversibility to false
     half_dt = 0.5_r_tran * dt
@@ -143,7 +151,7 @@ contains
       call ffsl_2d_flux_first( ini_one,       &
                                dep_pts_x,     &
                                dep_pts_y,     &
-                               detj_at_w2,    &
+                               detj_at_w2h,   &
                                outer_order,   &
                                dt,            &
                                panel_id,      &
@@ -160,7 +168,7 @@ contains
       ! Compute the increment of unity, F(1), in z direction
       call ffsl_1d_flux_vert( ini_one,       &
                               dep_pts_z,     &
-                              detj_at_w2,    &
+                              detj_at_w2v,   &
                               outer_order,   &
                               dt,            &
                               log_space,     &

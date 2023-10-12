@@ -111,14 +111,20 @@ contains
     integer(kind=i_def)           :: ndf_w2
     integer(kind=i_def)           :: undf_w2
     integer(kind=i_def)           :: map_w2(6)
+    integer(kind=i_def)           :: ndf_w2v
+    integer(kind=i_def)           :: undf_w2v
+    integer(kind=i_def)           :: map_w2v(6)
 
     nlayers = 5
     undf_w2 = 26
     ndf_w2 = 6
     map_w2 = (/ 1,6,11,16,21,22 /)
+    undf_w2v = 6
+    ndf_w2v = 2
+    map_w2v = (/ 1,2,3,4,5,6 /)
 
     allocate(u_field(1:undf_w2))
-    allocate(dep_pts(1:undf_w2))
+    allocate(dep_pts(1:undf_w2v))
     allocate(cfl(1:undf_w2))
 
     ! Assume a constant wind field with departure distances less than one.
@@ -141,17 +147,20 @@ contains
                                        u_field,              &
                                        n_dep_pt_iterations,  &
                                        vertical_method,      &
-                                       real(dt, r_tran),      &
+                                       real(dt, r_tran),     &
+                                       ndf_w2v,              &
+                                       undf_w2v,             &
+                                       map_w2v,              &
                                        ndf_w2,               &
                                        undf_w2,              &
                                        map_w2 )
 
-    @assertEqual( 0.0_r_tran, dep_pts(21), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(22), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(23), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(24), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(25), tol)
-    @assertEqual( 0.0_r_tran, dep_pts(26), tol)
+    @assertEqual( 0.0_r_tran, dep_pts(1), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(2), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(3), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(4), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(5), tol)
+    @assertEqual( 0.0_r_tran, dep_pts(6), tol)
 
     @assertEqual( 0.0_r_tran, cfl(21), tol)
     @assertEqual( 0.8_r_tran, cfl(22), tol)
@@ -176,17 +185,20 @@ contains
                                       u_field,              &
                                       n_dep_pt_iterations,  &
                                       vertical_method,      &
-                                      real(dt, r_tran),      &
+                                      real(dt, r_tran),     &
+                                      ndf_w2v,              &
+                                      undf_w2v,             &
+                                      map_w2v,              &
                                       ndf_w2,               &
                                       undf_w2,              &
                                       map_w2 )
 
-    @assertEqual( 0.0_r_tran, dep_pts(21), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(22), tol)
-    @assertEqual( 1.6_r_tran, dep_pts(23), tol)
-    @assertEqual( 1.6_r_tran, dep_pts(24), tol)
-    @assertEqual( 0.8_r_tran, dep_pts(25), tol)
-    @assertEqual( 0.0_r_tran, dep_pts(26), tol)
+    @assertEqual( 0.0_r_tran, dep_pts(1), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(2), tol)
+    @assertEqual( 1.6_r_tran, dep_pts(3), tol)
+    @assertEqual( 1.6_r_tran, dep_pts(4), tol)
+    @assertEqual( 0.8_r_tran, dep_pts(5), tol)
+    @assertEqual( 0.0_r_tran, dep_pts(6), tol)
 
     @assertEqual( 0.0_r_tran, cfl(21), tol)
     @assertEqual( 0.8_r_tran, cfl(22), tol)

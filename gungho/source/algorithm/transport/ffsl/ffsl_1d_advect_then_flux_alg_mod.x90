@@ -37,7 +37,7 @@ contains
   !!
   !> @param[in]     field             Input field
   !> @param[in]     dep_pts           Departure points in the chosen direction
-  !> @param[in]     detj_at_w2        Det(J) at W2 dofs
+  !> @param[in]     detj_at_w2        Det(J) at W2v dofs
   !> @param[in]     order             Order of the reconstruction
   !> @param[in]     dt                The model timestep length
   !> @param[in]     log_space         Switch to use natural logarithmic space

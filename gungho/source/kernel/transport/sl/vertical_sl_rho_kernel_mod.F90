@@ -17,7 +17,7 @@ use argument_mod,          only : arg_type,              &
                                   GH_REAL, GH_INTEGER,   &
                                   GH_READWRITE, GH_READ, &
                                   CELL_COLUMN, GH_LOGICAL
-use fs_continuity_mod,     only : W2, W3, Wtheta
+use fs_continuity_mod,     only : W2v, W3, Wtheta
 use constants_mod,         only : r_tran, i_def, l_def, EPS_R_TRAN
 use kernel_mod,            only : kernel_type
 ! TODO #3011: these config options should be passed through as arguments
@@ -46,14 +46,14 @@ private
 !>                                      by the PSy layer.
 type, public, extends(kernel_type) :: vertical_sl_rho_kernel_type
   private
-  type(arg_type) :: meta_args(7) = (/                     &
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W2), & ! departure points
-       arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, W3), & ! rho
-       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  Wtheta), & ! theta-height
-       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),          & ! sl-order
-       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),          & ! monotone scheme
-       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),          & ! monotone order
-       arg_type(GH_SCALAR, GH_LOGICAL, GH_READ)           & ! log_space
+  type(arg_type) :: meta_args(7) = (/                      &
+       arg_type(GH_FIELD,  GH_REAL,    GH_READ,      W2v), & ! departure points
+       arg_type(GH_FIELD,  GH_REAL,    GH_READWRITE, W3),  & ! rho
+       arg_type(GH_FIELD,  GH_REAL,    GH_READ,  Wtheta),  & ! theta-height
+       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),           & ! sl-order
+       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),           & ! monotone scheme
+       arg_type(GH_SCALAR, GH_INTEGER, GH_READ),           & ! monotone order
+       arg_type(GH_SCALAR, GH_LOGICAL, GH_READ)            & ! log_space
        /)
   integer :: operates_on = CELL_COLUMN
 contains
@@ -80,12 +80,12 @@ contains
 !> @param[in]     vertical_monotone_order Order of the monotone scheme
 !> @param[in]     log_space    Switch to use natural logarithmic space
 !!                             for the SL interpolation
-!> @param[in]     ndf_w2       The number of degrees of freedom per cell
-!!                             on W2 space
-!> @param[in]     undf_w2      The number of unique degrees of freedom
-!!                             on W2 space
-!> @param[in]     map_w2       The dofmap for the cell at the base of the column
-!!                             on W2 space
+!> @param[in]     ndf_w2v      The number of degrees of freedom per cell
+!!                             on W2v space
+!> @param[in]     undf_w2v     The number of unique degrees of freedom
+!!                             on W2v space
+!> @param[in]     map_w2v      The dofmap for the cell at the base of the column
+!!                             on W2v space
 !> @param[in]     ndf_w3       The number of degrees of freedom per cell
 !!                             on w3 space
 !> @param[in]     undf_w3      The number of unique degrees of freedom
@@ -102,7 +102,7 @@ subroutine vertical_sl_rho_code( nlayers,                            &
                                  vertical_monotone,                  &
                                  vertical_monotone_order,            &
                                  log_space,                          &
-                                 ndf_w2, undf_w2, map_w2,            &
+                                 ndf_w2v, undf_w2v, map_w2v,         &
                                  ndf_w3, undf_w3, map_w3,            &
                                  ndf_wtheta, undf_wtheta, map_wtheta )
 
@@ -110,16 +110,16 @@ subroutine vertical_sl_rho_code( nlayers,                            &
 
   ! Arguments
   integer(kind=i_def), intent(in)                         :: nlayers
-  integer(kind=i_def), intent(in)                         :: ndf_w2
-  integer(kind=i_def), intent(in)                         :: undf_w2
-  integer(kind=i_def), dimension(ndf_w2), intent(in)      :: map_w2
+  integer(kind=i_def), intent(in)                         :: ndf_w2v
+  integer(kind=i_def), intent(in)                         :: undf_w2v
+  integer(kind=i_def), dimension(ndf_w2v), intent(in)     :: map_w2v
   integer(kind=i_def), intent(in)                         :: ndf_w3
   integer(kind=i_def), intent(in)                         :: undf_w3
   integer(kind=i_def), dimension(ndf_w3), intent(in)      :: map_w3
   integer(kind=i_def), intent(in)                         :: ndf_wtheta
   integer(kind=i_def), intent(in)                         :: undf_wtheta
   integer(kind=i_def), dimension(ndf_wtheta), intent(in)  :: map_wtheta
-  real(kind=r_tran), dimension(undf_w2), intent(in)       :: dep_pts_z
+  real(kind=r_tran), dimension(undf_w2v), intent(in)      :: dep_pts_z
   real(kind=r_tran), dimension(undf_w3), intent(inout)    :: rho
   real(kind=r_tran), dimension(undf_wtheta),   intent(in) :: theta_height
   integer(kind=i_def), intent(in)  :: sl_order, vertical_monotone,  &
@@ -147,7 +147,7 @@ subroutine vertical_sl_rho_code( nlayers,                            &
   ! Map theta-height to 1d-zl (zl is cell-edges in the vertical)
   !
   do k = 0, nlayers
-    dist(k+1) = dep_pts_z(map_w2(5)+k)
+    dist(k+1) = dep_pts_z(map_w2v(1)+k)
       zl(k+1) = theta_height(map_wtheta(1)+k)
   end do
   !Map global field into 1d-array f0

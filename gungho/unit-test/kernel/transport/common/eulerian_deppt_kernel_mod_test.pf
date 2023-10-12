@@ -7,7 +7,7 @@
 
 module eulerian_deppt_kernel_mod_test
 
-  use constants_mod, only : i_def, r_def, r_tran
+  use constants_mod, only : i_def, r_tran
   use pFUnit_Mod
 
   implicit none
@@ -41,15 +41,19 @@ contains
     integer(kind=i_def), parameter :: nlayers = 1
     integer(kind=i_def), parameter :: ndf_w2 = 4
     integer(kind=i_def), parameter :: undf_w2 = ndf_w2*nlayers
+    integer(kind=i_def), parameter :: ndf_w2h = 4
+    integer(kind=i_def), parameter :: undf_w2h = ndf_w2h*nlayers
 
-    integer(kind=i_def), dimension(ndf_w2) :: map_w2
-    real(kind=r_tran), dimension(undf_w2)   :: dep_pts_x
-    real(kind=r_tran), dimension(undf_w2)   :: dep_pts_y
-    real(kind=r_tran), dimension(undf_w2)   :: wind
-    real(kind=r_tran)                       :: dt
+    integer(kind=i_def), dimension(ndf_w2)   :: map_w2
+    integer(kind=i_def), dimension(ndf_w2h)  :: map_w2h
+    real(kind=r_tran),   dimension(undf_w2h) :: dep_pts_x
+    real(kind=r_tran),   dimension(undf_w2h) :: dep_pts_y
+    real(kind=r_tran),   dimension(undf_w2)  :: wind
+    real(kind=r_tran)                        :: dt
 
-    ! Set up map
-    map_w2(:) = (/ 1, 2, 3, 4 /)
+    ! Set up maps
+    map_w2(:)  = (/ 1, 2, 3, 4 /)
+    map_w2h(:) = (/ 1, 2, 3, 4 /)
 
     ! Initialise output to zero
     dep_pts_x(:) = 0.0_r_tran
@@ -63,6 +67,9 @@ contains
                               dep_pts_y, &
                               wind,      &
                               dt,        &
+                              ndf_w2h,   &
+                              undf_w2h,  &
+                              map_w2h,   &
                               ndf_w2,    &
                               undf_w2,   &
                               map_w2 )
@@ -93,6 +100,9 @@ contains
                               dep_pts_y, &
                               wind,      &
                               dt,        &
+                              ndf_w2h,   &
+                              undf_w2h,  &
+                              map_w2h,   &
                               ndf_w2,    &
                               undf_w2,   &
                               map_w2 )
