@@ -31,7 +31,7 @@ jobs:
       run: |
         cd documentation
         make html
-        tar --directory html -cf "${{ runner.temp }}/artifact.tar"
+        tar --directory build/html -cf "${{ runner.temp }}/artifact.tar"
     - id: deployment
       uses: actions/upload-pages-artifact@v2
       with:
