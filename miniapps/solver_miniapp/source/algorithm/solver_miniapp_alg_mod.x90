@@ -80,10 +80,6 @@ contains
 
     qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
 
-    call chi(1)%log_dofs( LOG_LEVEL_INFO, 'chi_1_trunk' )
-    call chi(2)%log_dofs( LOG_LEVEL_INFO, 'chi_2_trunk' )
-    call chi(3)%log_dofs( LOG_LEVEL_INFO, 'chi_3_trunk' )
-
     select case ( preconditioner )
     case ( preconditioner_diagonal )
        allocate( diagonal_preconditioner_type :: prec)
