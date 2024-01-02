@@ -15,7 +15,7 @@ module apply_w3_to_sh_w3_kernel_mod
                                       GH_READ, GH_WRITE,         &
                                       ANY_DISCONTINUOUS_SPACE_3, &
                                       CELL_COLUMN
-  use constants_mod,           only : r_def, i_def, r_single, r_double
+  use constants_mod,           only : i_def, r_single, r_double
   use fs_continuity_mod,       only : W3
 
   use kernel_mod,              only : kernel_type
@@ -35,7 +35,7 @@ module apply_w3_to_sh_w3_kernel_mod
     type(arg_type) :: meta_args(4) = (/                                      &
          arg_type(GH_FIELD, GH_REAL, GH_WRITE, ANY_DISCONTINUOUS_SPACE_3), & ! rhs_w3_sh
          arg_type(GH_FIELD, GH_REAL, GH_READ,  W3),                        & ! field_w3
-         arg_type(GH_FIELD, GH_REAL, GH_READ,  W3),                        & ! detj_shifted
+         arg_type(GH_FIELD, GH_REAL, GH_READ,  ANY_DISCONTINUOUS_SPACE_3), & ! detj_shifted
          arg_type(GH_FIELD, GH_REAL, GH_READ,  W3)                         & ! detj_prime
          /)
     integer :: operates_on = CELL_COLUMN
@@ -60,7 +60,7 @@ contains
 !> @param[in,out] rhs_w3_sh Right hand side vector to compute.
 !> It is a field in w3 shifted.
 !> @param[in] field_w3 The original wind in w3 from which to compute the RHS.
-!> @param[in] detj_shifted The volume of shifted mesh cells stored in W3.
+!> @param[in] detj_shifted The volume of shifted mesh cells stored in W3 shifted.
 !> @param[in] detj_prime The volume of prime mesh cells stored in W3.
 !> @param[in] ndf_w3_sh Number of degrees of freedom per cell for w3 shifted
 !> @param[in] undf_w3_sh Number of (local) unique degrees of freedom for w3 shifted
@@ -96,7 +96,7 @@ subroutine apply_w3_to_sh_w3_code_r_single(                &
 
   real(kind=r_single),    dimension(undf_w3_sh), intent(inout) :: rhs_w3_sh
   real(kind=r_single),    dimension(undf_w3),       intent(in) :: field_w3
-  real(kind=r_single),    dimension(undf_w3),       intent(in) :: detj_shifted
+  real(kind=r_single),    dimension(undf_w3_sh),    intent(in) :: detj_shifted
   real(kind=r_single),    dimension(undf_w3),       intent(in) :: detj_prime
 
   ! Internal variables
@@ -149,7 +149,7 @@ subroutine apply_w3_to_sh_w3_code_r_double(                &
 
   real(kind=r_double),    dimension(undf_w3_sh), intent(inout) :: rhs_w3_sh
   real(kind=r_double),    dimension(undf_w3),       intent(in) :: field_w3
-  real(kind=r_double),    dimension(undf_w3),       intent(in) :: detj_shifted
+  real(kind=r_double),    dimension(undf_w3_sh),    intent(in) :: detj_shifted
   real(kind=r_double),    dimension(undf_w3),       intent(in) :: detj_prime
 
   ! Internal variables
