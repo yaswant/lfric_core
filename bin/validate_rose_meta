@@ -42,6 +42,7 @@ default_project_names=( infrastructure   \
                         mesh_tools       \
                         linear           \
                         linear_model     \
+                        adjoint          \
                         simple_diffusion \
                         skeleton         \
                         jedi_lfric_tests \
@@ -63,6 +64,7 @@ default_app_names=( \
     mesh_tools:mesh                   \
     linear:none                       \
     linear_model:linear_model         \
+    adjoint:adjoint                   \
     simple_diffusion:simple_diffusion \
     skeleton:skeleton                 \
     jedi_lfric_tests:jedi_lfric_tests \
@@ -117,6 +119,7 @@ project_folder_location=(                      \
   [mesh_tools]=mesh_tools                      \
   [linear]=linear                              \
   [linear_model]=miniapps/linear_model         \
+  [adjoint]=adjoint                            \
   [simple_diffusion]=miniapps/simple_diffusion \
   [skeleton]=miniapps/skeleton                 \
   [jedi_lfric_tests]=miniapps/jedi_lfric_tests \
@@ -139,6 +142,7 @@ project_primary_app=(                 \
   [mesh_tools]=mesh                   \
   [linear]=none                       \
   [linear_model]=linear_model         \
+  [adjoint]=none                      \
   [simple_diffusion]=simple_diffusion \
   [skeleton]=skeleton                 \
   [jedi_lfric_tests]=jedi_lfric_tests \
