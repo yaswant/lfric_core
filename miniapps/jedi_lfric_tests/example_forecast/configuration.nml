@@ -10,7 +10,7 @@ file_prefix='mesh_C12',
 fplane=.false.,
 geometry='spherical',
 prepartitioned=.false.,
-prime_mesh_name='C12',
+prime_mesh_name='dynamics',
 topology='fully_periodic',
 /
 

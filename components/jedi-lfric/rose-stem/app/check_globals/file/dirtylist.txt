@@ -1,5 +1,4 @@
 # Files should only ever be removed or renamed in this file, never added.
 #
-source/driver/io/jedi_lfric_fake_nl_driver_mod.F90
 source/field/jedi_lfric_utils_mod.x90
 source/mesh/jedi_lfric_mesh_interface_mod.f90

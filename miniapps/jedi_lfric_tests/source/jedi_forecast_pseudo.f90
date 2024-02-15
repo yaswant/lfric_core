@@ -26,6 +26,7 @@ program jedi_forecast_pseudo
   ! Data types and methods to get/store configurations
   use jedi_state_config_mod,        only : jedi_state_config_type
   use jedi_pseudo_model_config_mod, only : jedi_pseudo_model_config_type
+  use jedi_geometry_config_mod,     only : jedi_geometry_config_type
   use cli_mod,                      only : get_initial_filename
 
   ! Jedi emulator objects
@@ -49,6 +50,7 @@ program jedi_forecast_pseudo
   ! Emulator object configs
   type(jedi_state_config_type)        :: jedi_state_config
   type(jedi_pseudo_model_config_type) :: jedi_pseudo_model_config
+  type( jedi_geometry_config_type )   :: jedi_geometry_config
   type(jedi_duration_type)            :: forecast_length
 
   ! Local
@@ -81,11 +83,14 @@ program jedi_forecast_pseudo
   ! Model config
   call jedi_pseudo_model_config%initialise()
 
+  ! Geometry config
+  call jedi_geometry_config%initialise( filename )
+
   ! Forecast config - duration of forecast
   call forecast_length%init('P0DT6H0M0S')
 
   ! Create geometry
-  call jedi_geometry%initialise()
+  call jedi_geometry%initialise( model_communicator, jedi_geometry_config )
 
   ! Create state
   call jedi_state%initialise( jedi_geometry, jedi_state_config )

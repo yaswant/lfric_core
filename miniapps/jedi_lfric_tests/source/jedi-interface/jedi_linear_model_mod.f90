@@ -26,6 +26,7 @@ module jedi_linear_model_mod
   use jedi_lfric_duration_mod,       only : jedi_duration_type
   use jedi_state_mod,                only : jedi_state_type
   use jedi_increment_mod,            only : jedi_increment_type
+  use jedi_geometry_mod,             only : jedi_geometry_type
   use log_mod,                       only : log_event,          &
                                             log_scratch_space,  &
                                             LOG_LEVEL_ERROR
@@ -79,13 +80,14 @@ contains
 !> @brief    Initialiser for jedi_linear_model_type
 !>
 !> @param [in] config  The linear model configuration
-subroutine initialise( self, config )
+subroutine initialise( self, jedi_geometry, config )
 
   use jedi_linear_model_config_mod,  only : jedi_linear_model_config_type
 
   implicit none
 
   class( jedi_linear_model_type ),    intent(inout) :: self
+  type( jedi_geometry_type ),            intent(in) :: jedi_geometry
   type( jedi_linear_model_config_type ), intent(in) :: config
 
   self%time_step = config%time_step
@@ -98,7 +100,6 @@ end subroutine initialise
 !> @param [in] jedi_state The state to add to the trajectory
 subroutine set_trajectory( self, jedi_state )
 
-  use jedi_lfric_fake_nl_driver_mod, only : mesh
   use jedi_lfric_linear_fields_mod,  only : variable_names, &
                                             create_linear_fields
 
@@ -108,11 +109,11 @@ subroutine set_trajectory( self, jedi_state )
   type( jedi_state_type ),           intent(inout) :: jedi_state
 
   ! Local
-  type( field_collection_type )          :: next_linear_state
+  type( field_collection_type ) :: next_linear_state
 
   ! Create field collection that contains the linear state fields
   ! without "ls_" prepended.
-  call create_linear_fields(mesh, next_linear_state)
+  call create_linear_fields(jedi_state%geometry%get_mesh(), next_linear_state)
 
   ! Copy data from the input state into next_linear_state
   call jedi_state%to_lfric_field_collection( variable_names, &

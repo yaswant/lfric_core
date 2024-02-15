@@ -31,6 +31,7 @@ program jedi_tlm_forecast_tl
   use jedi_pseudo_model_config_mod, only : jedi_pseudo_model_config_type
   use jedi_increment_config_mod,    only : jedi_increment_config_type
   use jedi_linear_model_config_mod, only : jedi_linear_model_config_type
+  use jedi_geometry_config_mod,     only : jedi_geometry_config_type
   use cli_mod,                      only : get_initial_filename
 
   ! Jedi emulator objects
@@ -60,6 +61,8 @@ program jedi_tlm_forecast_tl
   type( jedi_increment_config_type )    :: jedi_increment_config
   type( jedi_pseudo_model_config_type ) :: jedi_pseudo_model_config
   type( jedi_linear_model_config_type ) :: jedi_linear_model_config
+  type( jedi_geometry_config_type )     :: jedi_geometry_config
+
   type(jedi_duration_type)              :: forecast_length
 
   ! Local
@@ -99,11 +102,14 @@ program jedi_tlm_forecast_tl
   ! Model config
   call jedi_pseudo_model_config%initialise()
 
+  ! Geometry config
+  call jedi_geometry_config%initialise( filename )
+
   ! Forecast length
   call forecast_length%init( 'P0DT6H0M0S' )
 
   ! Create geometry
-  call jedi_geometry%initialise()
+  call jedi_geometry%initialise( model_communicator, jedi_geometry_config )
 
   ! Create state
   call jedi_state%initialise( jedi_geometry, jedi_state_config )
@@ -112,7 +118,7 @@ program jedi_tlm_forecast_tl
   call jedi_increment%initialise( jedi_geometry, jedi_increment_config )
 
   ! Create linear model
-  call jedi_linear_model%initialise( jedi_linear_model_config )
+  call jedi_linear_model%initialise( jedi_geometry, jedi_linear_model_config )
 
   ! Initialise trajectory post processor with instance of jedi_linear_model
   call pp_traj%initialise( jedi_linear_model )

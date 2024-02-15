@@ -76,9 +76,7 @@ end subroutine initialise
 !> @param [in]    model_communicator The communicator used by the model.
 subroutine initialise_infrastructure( self, filename, model_communicator )
 
-  use mpi_mod,                       only: global_mpi
   use jedi_lfric_comm_mod,           only: init_internal_comm
-  use jedi_lfric_fake_nl_driver_mod, only: initialise_toy_model => initialise
   use driver_collections_mod,        only: init_collections
   use driver_config_mod,             only: init_config
   use jedi_lfric_tests_mod,          only: jedi_lfric_tests_required_namelists
@@ -95,12 +93,12 @@ subroutine initialise_infrastructure( self, filename, model_communicator )
   ! Initialise the model communicator to setup global_mpi
   call init_internal_comm( model_communicator )
 
-  ! The global_mpi is initialized in the previous step via init_internal_comm
-  ! That is required for the following
+  ! Initialise collections
+  call init_collections()
+
+  ! Setup the config which is curently global
   call init_config( filename, jedi_lfric_tests_required_namelists, &
                     self%configuration )
-  call init_collections()
-  call initialise_toy_model( self%configuration, self%jedi_run_name, global_mpi )
 
 end subroutine initialise_infrastructure
 
@@ -117,14 +115,10 @@ subroutine jedi_run_destructor(self)
                                            final_internal_comm
   use driver_config_mod,             only: final_config
   use mpi_mod,                       only: destroy_comm
-  use jedi_lfric_fake_nl_driver_mod, only: finalise
 
   implicit none
 
   type(jedi_run_type), intent(inout) :: self
-
-  ! Finalise infrastructure
-  call finalise( self%jedi_run_name )
 
   ! Finalise collections
   call final_collections()

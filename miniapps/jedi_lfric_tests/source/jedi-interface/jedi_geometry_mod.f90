@@ -13,7 +13,11 @@ module jedi_geometry_mod
 
   use, intrinsic :: iso_fortran_env, only : real64
 
-  use constants_mod,                 only : i_def
+  use constants_mod,                 only : i_def, str_def, l_def
+  use driver_time_mod,               only : init_time
+  use extrusion_mod,                 only : extrusion_type, TWOD
+  use io_context_mod,                only : io_context_type
+  use jedi_geometry_config_mod,      only : jedi_geometry_config_type
   use jedi_lfric_mesh_interface_mod, only : set_target_mesh,           &
                                             is_mesh_cubesphere,        &
                                             get_domain_top,            &
@@ -24,7 +28,12 @@ module jedi_geometry_mod
                                             get_sigma_w3_levels,       &
                                             get_sigma_wtheta_levels,   &
                                             get_stretching_height
+  use jedi_lfric_io_setup_mod,       only : initialise_io
   use log_mod,                       only : log_event, LOG_LEVEL_ERROR
+  use mesh_mod,                      only : mesh_type
+  use mesh_collection_mod,           only : mesh_collection
+  use model_clock_mod,               only : model_clock_type
+  use mpi_mod,                       only : mpi_type
 
   implicit none
 
@@ -34,10 +43,16 @@ type, public :: jedi_geometry_type
   private
 
   !> The data map between external field data and LFRic fields
-  integer( kind = i_def ), allocatable :: horizontal_map(:)
+  integer( kind = i_def ), allocatable  :: horizontal_map(:)
   !> the LFRic field dimensions
-  integer( kind = i_def )              :: n_layers
-  integer( kind = i_def )              :: n_horizontal
+  integer( kind = i_def )               :: n_layers
+  integer( kind = i_def )               :: n_horizontal
+  !> Comm and mesh_name
+  integer( kind = i_def )               :: mpi_comm
+  character( len=str_def )              :: mesh_name
+  !> XIOS clock and context
+  type( model_clock_type ), allocatable :: xios_clock
+  class( io_context_type ), allocatable :: xios_context
 
 contains
 
@@ -45,9 +60,17 @@ contains
   procedure, public :: initialise
 
   !> getters
-  procedure, public :: get_n_horizontal
-  procedure, public :: get_n_layers
-  procedure, public :: get_horizontal_map
+  procedure, public  :: get_clock
+  procedure, public  :: get_mpi_comm
+  procedure, public  :: get_mesh_name
+  procedure, public  :: get_mesh
+  procedure, public  :: get_twod_mesh
+  procedure, public  :: get_n_horizontal
+  procedure, public  :: get_n_layers
+  procedure, public  :: get_horizontal_map
+
+  !> IO Setup
+  procedure, private :: setup_io
 
   !> Finalizer
   final             :: jedi_geometry_destructor
@@ -61,23 +84,50 @@ contains
 
 !> @brief    Initialiser for jedi_geometry_type
 !>
-subroutine initialise( self )
+subroutine initialise( self, mpi_comm, jedi_geometry_config )
   ! Access config directly until modeldb ready
-  use base_mesh_config_mod, only: prime_mesh_name
+  use driver_mesh_mod,           only: init_mesh
+  use driver_config_mod,         only: init_config
+  use jedi_lfric_mesh_setup_mod, only: initialise_mesh
+  use jedi_lfric_tests_mod,      only: jedi_lfric_tests_required_namelists
+  use namelist_collection_mod,   only: namelist_collection_type
 
   implicit none
 
   class( jedi_geometry_type ), intent(inout) :: self
+  integer( kind=i_def )                      :: mpi_comm
+  type( jedi_geometry_config_type )          :: jedi_geometry_config
 
   ! Local
-  integer :: i_horizontal
-  real(real64) :: domain_top, stretching_height
-  real(real64), allocatable :: lonlat(:,:),          &
-                               sigma_W3_levels(:),   &
-                               sigma_Wtheta_levels(:)
+  type(mpi_type)                     :: mpi_obj
+  type(namelist_collection_type)     :: configuration
+  integer                            :: i_horizontal
+  real(real64)                       :: domain_top
+  real(real64)                       :: stretching_height
+  real(real64), allocatable          :: lonlat(:,:),          &
+                                        sigma_W3_levels(:),   &
+                                        sigma_Wtheta_levels(:)
+
+  ! Save the mpi_comm
+  self%mpi_comm = mpi_comm
+
+  ! Setup mesh
+  call configuration%initialise( "geometry", table_len=10 )
+  call init_config( jedi_geometry_config%filename,       &
+                    jedi_lfric_tests_required_namelists, &
+                    configuration )
+  mpi_obj = self%get_mpi_comm()
+  call initialise_mesh( self%mesh_name, configuration, mpi_obj )
+
+  ! Setup the IO
+  call self%setup_io(jedi_geometry_config)
+
+  ! @todo: The geometry should read some fields: orog, height, ancils
+
+  ! The following is testing the mesh interface
 
   ! Set target mesh for all functions in the interface
-  call set_target_mesh( prime_mesh_name )
+  call set_target_mesh(self%mesh_name)
 
   if ( .not. is_mesh_cubesphere() ) then
     call log_event( "Working mesh is not a cubesphere", LOG_LEVEL_ERROR )
@@ -112,7 +162,7 @@ function get_n_horizontal(self) result(n_horizontal)
   implicit none
 
   class( jedi_geometry_type ), intent(in) :: self
-  integer(kind = i_def) :: n_horizontal
+  integer( kind=i_def )                   :: n_horizontal
 
   n_horizontal = self%n_horizontal
 
@@ -126,7 +176,7 @@ function get_n_layers(self) result(n_layers)
   implicit none
 
   class( jedi_geometry_type ), intent(in) :: self
-  integer(kind = i_def)              :: n_layers
+  integer( kind=i_def )                   :: n_layers
 
   n_layers = self%n_layers
 
@@ -141,11 +191,109 @@ subroutine get_horizontal_map(self, horizontal_map)
   implicit none
 
   class( jedi_geometry_type ), target, intent(in) :: self
-  integer(i_def), pointer, intent(inout)     :: horizontal_map(:)
+  integer( kind=i_def ), pointer,   intent(inout) :: horizontal_map(:)
 
   horizontal_map => self % horizontal_map
 
 end subroutine get_horizontal_map
+
+!> @brief    Get the XIOS clock
+!>
+!> @return xios_clock A pointer to the XIOS clock
+function get_clock(self) result(xios_clock)
+
+  implicit none
+
+    class( jedi_geometry_type ), target, intent(in) :: self
+    type( model_clock_type ), pointer               :: xios_clock
+
+    xios_clock => self%xios_clock
+
+end function get_clock
+
+!> @brief    Get the mpi communicator
+!>
+!> @return mpi_comm The mpi communicator
+function get_mpi_comm(self) result(mpi_obj)
+
+implicit none
+
+  class( jedi_geometry_type ), intent(in) :: self
+  type( mpi_type )                        :: mpi_obj
+
+  call mpi_obj%initialise( self%mpi_comm )
+
+end function get_mpi_comm
+
+!> @brief    Get the mesh mesh_name
+!>
+!> @return mesh_name The mesh mesh_name
+function get_mesh_name(self) result(mesh_name)
+
+  implicit none
+
+    class( jedi_geometry_type ), intent(in) :: self
+    character( len=str_def )                :: mesh_name
+
+    mesh_name = self%mesh_name
+
+end function get_mesh_name
+
+!> @brief    Get the 3D mesh object
+!>
+!> @return mesh The 3D mesh object
+function get_mesh(self) result(mesh)
+
+  implicit none
+
+    class( jedi_geometry_type ), intent(in) :: self
+    type( mesh_type ), pointer              :: mesh
+
+    mesh => mesh_collection%get_mesh(self%mesh_name)
+
+end function get_mesh
+
+!> @brief    Get the 2D mesh object
+!>
+!> @return mesh The 2D mesh object
+function get_twod_mesh(self) result(twod_mesh)
+
+  implicit none
+
+    class( jedi_geometry_type ), intent(in) :: self
+    type( mesh_type ), pointer              :: mesh
+    type( mesh_type ), pointer              :: twod_mesh
+
+    mesh => mesh_collection%get_mesh(self%mesh_name)
+    twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
+
+end function get_twod_mesh
+
+!> @brief    Private method to setup the IO for the application
+!>
+!> @param [in] config  A configuration object containing the IO options
+subroutine setup_io(self, config)
+
+  implicit none
+
+  class( jedi_geometry_type ), intent(inout)    :: self
+  type( jedi_geometry_config_type ), intent(in) :: config
+
+  call init_time( self%xios_clock )
+
+  call initialise_io( config%context_name,   &
+                      self%get_mpi_comm(),   &
+                      config%file_meta_data, &
+                      self%get_mesh_name(),  &
+                      self%xios_context,     &
+                      self%xios_clock )
+
+  ! Tick out of initialisation state
+  if ( .not. self%xios_clock%tick() ) then
+    call log_event( 'The LFRic model_clock has stopped.', LOG_LEVEL_ERROR )
+  end if
+
+end subroutine setup_io
 
 !> @brief    Finalizer for jedi_geometry_type
 !>
@@ -156,6 +304,8 @@ subroutine jedi_geometry_destructor(self)
   type(jedi_geometry_type), intent(inout)    :: self
 
   if ( allocated(self % horizontal_map) ) deallocate(self % horizontal_map)
+  if ( allocated(self % xios_clock) )     deallocate(self % xios_clock)
+  if ( allocated(self % xios_context) )   deallocate(self % xios_context)
 
 end subroutine jedi_geometry_destructor
 

@@ -1,14 +1,15 @@
 !-----------------------------------------------------------------------------
-! (c) Crown copyright 2022 Met Office. All rights reserved.
+! (c) Crown copyright 2023 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-
-!> @brief   Initialisation functionality for the fake nl DA model
+!> @brief   Initialisation and stepping of the fake nl model for testing
 !!
-!> @details Handles init of prognostic fields and through the call to
-!>          runtime_contants the coordinate fields and fem operators
-module jedi_lfric_fake_nl_init_mod
+!> @details Handles creation and init of prognostic state fields and
+!>          propagation of the fake nl model_data for JEDI-LFRIC interface
+!>          testing.
+!>
+module jedi_lfric_fake_nl_mod
 
   use constants_mod,                  only : r_def
   use driver_model_data_mod,          only : model_data_type
@@ -20,7 +21,16 @@ module jedi_lfric_fake_nl_init_mod
   use mesh_mod,                       only : mesh_type
   use jedi_lfric_utils_mod,           only : add_real_field
 
+  use jedi_lfric_increment_alg_mod,   only : jedi_lfric_increment_alg
+  !> @todo: Test code should not appear in the component
+  !> @{
+  use jedi_lfric_tests_config_mod,    only : test_field
+  !> @}
+
   implicit none
+
+  private
+  public create_fake_nl_model_data, initialise_fake_nl_model_data, step_fake_nl
 
   contains
 
@@ -30,7 +40,7 @@ module jedi_lfric_fake_nl_init_mod
   !> @param[in]    mesh2d      2D Mesh to use for field initialisation
   !> @param[inout] model_data  model_data to store the fake nl DA model
   !!                           fields in
-  subroutine create_da_model_data( mesh, mesh2d, model_data)
+  subroutine create_fake_nl_model_data( mesh, mesh2d, model_data )
 
     implicit none
 
@@ -61,27 +71,46 @@ module jedi_lfric_fake_nl_init_mod
 
     call log_event( 'jedi_lfric_tests: Miniapp initialised', LOG_LEVEL_INFO )
 
-  end subroutine create_da_model_data
+  end subroutine create_fake_nl_model_data
 
   !> @brief  Initialise the fake nl DA model model_data
   !>
   !> @param[inout] model_data  model_data to initialise
-  subroutine initialise_da_model_data( model_data )
+  subroutine initialise_fake_nl_model_data( model_data )
 
     implicit none
 
     type( model_data_type ), intent(inout)      :: model_data
 
-    call log_event( 'jedi_lfric_tests: initialise_da_model_data - start', LOG_LEVEL_INFO )
+    call log_event( 'jedi_lfric_tests: initialise_fake_nl_model_data - start', LOG_LEVEL_INFO )
 
     ! Initialise fields in model_data
     call initialise_real_field( model_data, "theta" )
     call initialise_real_field( model_data, "rho"   )
     call initialise_real_field( model_data, "u10m"  )
 
-    call log_event( 'jedi_lfric_tests: initialise_da_model_data - end', LOG_LEVEL_INFO )
+    call log_event( 'jedi_lfric_tests: initialise_fake_nl_model_data - end', LOG_LEVEL_INFO )
 
-  end subroutine initialise_da_model_data
+  end subroutine initialise_fake_nl_model_data
+
+  !> @brief Performs a single timestep of the fake nl model
+  !>
+  !> @param [inout] model_data  The model data instance
+  subroutine step_fake_nl( model_data )
+
+    implicit none
+
+    type(model_data_type), intent(inout) :: model_data
+
+    type(field_collection_type), pointer :: depository => null()
+    type(field_type),            pointer :: working_field => null()
+
+    depository => model_data%get_field_collection("depository")
+    call depository%get_field( test_field, working_field )
+
+    call jedi_lfric_increment_alg( working_field )
+
+  end subroutine step_fake_nl
 
   !> @brief  Initialise real-valued fields to zero
   !>
@@ -103,4 +132,4 @@ module jedi_lfric_fake_nl_init_mod
 
   end subroutine initialise_real_field
 
-end module jedi_lfric_fake_nl_init_mod
+end module jedi_lfric_fake_nl_mod

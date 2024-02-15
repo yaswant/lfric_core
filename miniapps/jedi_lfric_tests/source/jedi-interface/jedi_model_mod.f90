@@ -87,7 +87,7 @@ end subroutine model_init
 !> @param [inout] state State object to propagated
 subroutine model_step(self, state)
 
-  use jedi_lfric_fake_nl_driver_mod, only : model_clock, step
+  use jedi_lfric_fake_nl_mod, only : step_fake_nl
 
   implicit none
 
@@ -98,7 +98,7 @@ subroutine model_step(self, state)
   logical :: clock_stopped
 
   ! check the clock
-  clock_stopped = .not. model_clock%tick()
+  clock_stopped = .not. state%model_clock%tick()
   ! If the clock has finished then it will just get the
   ! data at the end of the file - this prevents that
   if ( clock_stopped ) then
@@ -107,7 +107,7 @@ subroutine model_step(self, state)
     call log_event( log_scratch_space, LOG_LEVEL_ERROR )
   endif
 
-  call step( state%model_data )
+  call step_fake_nl( state%model_data )
 
   ! Copy fields from model data
   call state%from_model_data()

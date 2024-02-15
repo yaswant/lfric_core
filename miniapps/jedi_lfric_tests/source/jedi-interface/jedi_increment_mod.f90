@@ -29,6 +29,8 @@ module jedi_increment_mod
                                             LOG_LEVEL_INFO,     &
                                             LOG_LEVEL_ERROR
   use constants_mod,                 only : i_def, l_def, str_def
+  use model_clock_mod,               only : model_clock_type
+  use driver_time_mod,               only : init_time
 
   implicit none
 
@@ -47,8 +49,12 @@ type, public :: jedi_increment_type
   !> model data (to do field copies)
   type( atlas_field_interface_type ), allocatable :: fields_to_model_data(:)
 
-  !> Model data that stores the model_data fields to propagate
+  !> Model data that stores the fields to propagate
+  !> (will be subsumed into modelDB)
   type( model_data_type ), public                 :: model_data
+
+  !> Model clock associated with the model_data (will be subsumed into modelDB)
+  type( model_clock_type ), allocatable, public   :: model_clock
 
   !> Field collection to perform IO
   type( field_collection_type ), public           :: io_collection
@@ -59,7 +65,7 @@ type, public :: jedi_increment_type
   type( jedi_datetime_type )                      :: inc_time
 
   !> The jedi_geometry object
-  type( jedi_geometry_type ), pointer             :: geometry => null()
+  type( jedi_geometry_type ), pointer, public     :: geometry => null()
 
 contains
 
@@ -236,7 +242,6 @@ end function valid_time
 subroutine read_file( self, read_time, file_prefix )
 
   use jedi_lfric_io_update_mod,      only : update_io_field_collection
-  use jedi_lfric_fake_nl_driver_mod, only : mesh, twod_mesh
   use lfric_xios_read_mod,           only : read_state
 
   implicit none
@@ -253,8 +258,10 @@ subroutine read_file( self, read_time, file_prefix )
 
   ! Ensure the io_collection contains the variables defined in the list
   ! stored in the type
-  call update_io_field_collection( self%io_collection, mesh, twod_mesh, &
-                                  self%field_meta_data )
+  call update_io_field_collection( self%io_collection,            &
+                                   self%geometry%get_mesh(),      &
+                                   self%geometry%get_twod_mesh(), &
+                                   self%field_meta_data )
 
   ! Read the increment into the io_collection
   call read_state( self%io_collection, prefix=file_prefix )
@@ -265,11 +272,6 @@ subroutine read_file( self, read_time, file_prefix )
   call self%from_lfric_field_collection( variable_names, self%io_collection )
 
 end subroutine read_file
-
-!> Write fields stored in this increment from file
-!subroutine write_file()
-! TBD ...
-!end subroutine write_file
 
 !> @brief    A method to set all internal Atlas field emulators to zero
 !>
@@ -300,14 +302,14 @@ end subroutine zero
 subroutine create_model_data( self )
 
   use jedi_lfric_fake_tlm_mod,       only : create_fake_tlm_model_data
-  use jedi_lfric_fake_nl_driver_mod, only : mesh
 
   implicit none
 
   class( jedi_increment_type ),       intent(inout) :: self
 
   ! Create model data and then link to the Atlas fields
-  call create_fake_tlm_model_data( mesh, self%model_data )
+  call create_fake_tlm_model_data( self%geometry%get_mesh(), self%model_data )
+  call init_time( self%model_clock )
   call self%setup_interface_to_model_data()
 
 end subroutine create_model_data
@@ -531,20 +533,20 @@ end subroutine update_time
 !> @param [in] new_datetime  The datetime to be used to update the LFRic clock
 subroutine set_clock( self, new_time )
 
-  use jedi_lfric_fake_nl_driver_mod, only : model_clock
-  use timestepping_config_mod,     only : dt
-
   implicit none
 
   class( jedi_increment_type ), intent(inout) :: self
   type( jedi_datetime_type ),      intent(in) :: new_time
 
-  type( jedi_duration_type ) :: time_difference
-  type( jedi_duration_type ) :: time_step
+  type( jedi_duration_type )        :: time_difference
+  type( jedi_duration_type )        :: time_step
+  type( model_clock_type ), pointer :: xios_clock
+  logical( l_def )                  :: clock_stopped
 
-  logical(l_def) :: clock_stopped
+  xios_clock => self%geometry%get_clock()
+  call time_step%init( int( xios_clock%get_seconds_per_step(), &
+                            kind=i_def ) )
 
-  call time_step%init( int( dt, kind=i_def ) )
   time_difference = new_time - self%inc_time
 
   if ( time_difference == 0_i_def ) then
@@ -565,7 +567,7 @@ subroutine set_clock( self, new_time )
   clock_stopped = .false.
 
   do while ( new_time%is_ahead( self%inc_time ) )
-    clock_stopped = .not. model_clock%tick()
+    clock_stopped = .not. xios_clock%tick()
     self%inc_time = self%inc_time + time_step
   end do
 
@@ -587,9 +589,8 @@ subroutine jedi_increment_destructor( self )
   type( jedi_increment_type ), intent(inout) :: self
 
   self%geometry => null()
-  if ( allocated(self%fields ) ) then
-    deallocate(self%fields )
-  end if
+  if ( allocated(self%fields ) ) deallocate(self%fields )
+  if ( allocated(self%model_clock ) ) deallocate(self%model_clock )
 
 end subroutine jedi_increment_destructor
 

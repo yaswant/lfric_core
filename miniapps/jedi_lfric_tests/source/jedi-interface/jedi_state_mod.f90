@@ -28,10 +28,9 @@ module jedi_state_mod
                                             log_scratch_space,  &
                                             LOG_LEVEL_INFO,     &
                                             LOG_LEVEL_ERROR
-  use jedi_lfric_fake_nl_driver_mod, only : mesh, twod_mesh
   use constants_mod,                 only : i_def, l_def, str_def
-
-  use jedi_lfric_fake_nl_driver_mod,   only : model_clock
+  use model_clock_mod,               only : model_clock_type
+  use driver_time_mod,               only : init_time
 
   implicit none
 
@@ -50,8 +49,12 @@ type, public :: jedi_state_type
   !> model data (to do field copies)
   type( atlas_field_interface_type ), allocatable :: fields_to_model_data(:)
 
-  !> Model data that stores the model_data fields to propagate
+  !> Model data that stores the fields to propagate
+  !> (will be subsumed into modelDB)
   type( model_data_type ),  public                :: model_data
+
+  !> Model clock associated with the model_data (will be subsumed into modelDB)
+  type( model_clock_type ), allocatable, public   :: model_clock
 
   !> Field collection to perform IO
   type( field_collection_type ), public           :: io_collection
@@ -62,7 +65,7 @@ type, public :: jedi_state_type
   type( jedi_datetime_type )                      :: state_time
 
   !> The jedi_geometry object
-  type( jedi_geometry_type ), pointer             :: geometry => null()
+  type( jedi_geometry_type ), pointer, public     :: geometry => null()
 
 contains
 
@@ -143,11 +146,6 @@ subroutine state_initialiser_read( self, geometry, config )
   type( jedi_state_config_type ),     intent(inout) :: config
 
   call self%state_initialiser( geometry, config )
-
-  ! Tick out of initialisation state
-  if ( .not. model_clock%tick() ) then
-    call log_event( 'The LFRic model_clock has stopped.', LOG_LEVEL_ERROR )
-  end if
 
   ! Initialise the Atlas field emulators via the model_data or the
   ! io_collection
@@ -232,6 +230,7 @@ subroutine state_initialiser( self, geometry, config )
 
   ! If running the model, create model data and link to fields .
   if ( .not. config%use_pseudo_model ) then
+    call init_time( self%model_clock )
     call self%create_model_data()
   end if
 
@@ -242,14 +241,14 @@ end subroutine state_initialiser
 !>
 subroutine initialise_model_data( self )
 
-  use jedi_lfric_fake_nl_init_mod, only : initialise_da_model_data
+  use jedi_lfric_fake_nl_mod, only : initialise_fake_nl_model_data
 
   implicit none
 
   class( jedi_state_type ), intent(inout) :: self
 
   ! Read the state into the LFRic model data
-  call initialise_da_model_data( self%model_data )
+  call initialise_fake_nl_model_data( self%model_data )
 
   ! Copy model_data fields to the Atlas field emulators
   call self%from_model_data()
@@ -276,8 +275,8 @@ end function valid_time
 !> @param [in] file_prefix Character array that specifies the file to read from
 subroutine read_file( self, read_time, file_prefix )
 
-  use jedi_lfric_io_update_mod, only : update_io_field_collection
-  use lfric_xios_read_mod,      only : read_state
+  use jedi_lfric_io_update_mod, only: update_io_field_collection
+  use lfric_xios_read_mod,      only: read_state
 
   implicit none
 
@@ -298,7 +297,9 @@ subroutine read_file( self, read_time, file_prefix )
 
   ! Ensure the io_collection contains the variables defined in the list
   ! stored in the type
-  call update_io_field_collection( self%io_collection, mesh, twod_mesh, &
+  call update_io_field_collection( self%io_collection,            &
+                                   self%geometry%get_mesh(),      &
+                                   self%geometry%get_twod_mesh(), &
                                    self%field_meta_data )
 
   ! Read the state into the io_collection
@@ -310,7 +311,6 @@ subroutine read_file( self, read_time, file_prefix )
   call self%from_lfric_field_collection(variable_names, self%io_collection)
 
 end subroutine read_file
-
 
 !> Write model fields to file
 !>
@@ -339,7 +339,9 @@ subroutine write_file( self, write_time, file_prefix )
 
   ! Ensure the io_collection contains only the required data for writing,
   ! e.g. remove redundant fields.
-  call update_io_field_collection( self%io_collection, mesh, twod_mesh, &
+  call update_io_field_collection( self%io_collection,            &
+                                   self%geometry%get_mesh(),      &
+                                   self%geometry%get_twod_mesh(), &
                                    self%field_meta_data )
   ! Copy the Atlas field emulators to the io_collection fields
   call self%field_meta_data%get_variable_names(variable_names)
@@ -357,15 +359,16 @@ end subroutine write_file
 !>
 subroutine create_model_data( self )
 
-  use jedi_lfric_fake_nl_init_mod,   only : create_da_model_data
-  use jedi_lfric_fake_nl_driver_mod, only : mesh, twod_mesh
+  use jedi_lfric_fake_nl_mod,   only : create_fake_nl_model_data
 
   implicit none
 
   class( jedi_state_type ), intent(inout) :: self
 
   ! Create model data and then link the Atlas fields to them
-  call create_da_model_data( mesh, twod_mesh, self%model_data )
+  call create_fake_nl_model_data( self%geometry%get_mesh(),      &
+                                  self%geometry%get_twod_mesh(), &
+                                  self%model_data )
   call self%setup_interface_to_model_data()
 
 end subroutine create_model_data
@@ -450,9 +453,9 @@ end subroutine from_model_data
 !> @param [inout] interface_fields  The Atlas-LFRic interafce object
 !> @param [in]    variable_names    The name of the fields to setup
 !> @param [inout] field_collection  The field collection to link the Atlas fields to
-subroutine setup_interface_to_field_collection( self, &
+subroutine setup_interface_to_field_collection( self,             &
                                                 interface_fields, &
-                                                variable_names, &
+                                                variable_names,   &
                                                 field_collection )
 
   use jedi_lfric_utils_mod,  only: get_model_field
@@ -486,6 +489,7 @@ subroutine setup_interface_to_field_collection( self, &
   call self%geometry%get_horizontal_map( horizontal_map_ptr )
   n_variables=size( variable_names )
   do ivar = 1, n_variables
+
     ! Get the required data and setup field interface
     call get_model_field( variable_names(ivar), &
                           field_collection, lfric_field_ptr )
@@ -625,19 +629,21 @@ end subroutine update_time
 !> @param [in] new_time  The time to be used to update the LFRic clock
 subroutine set_clock( self, new_time )
 
-  use timestepping_config_mod,       only : dt
-
   implicit none
 
   class( jedi_state_type ),   intent(inout) :: self
   type( jedi_datetime_type ), intent(in)    :: new_time
 
-  type( jedi_duration_type ) :: time_difference
-  type( jedi_duration_type ) :: time_step
+  ! Local
+  type( jedi_duration_type )        :: time_difference
+  type( jedi_duration_type )        :: time_step
+  type( model_clock_type ), pointer :: xios_clock => null()
+  logical( kind=l_def )             :: clock_stopped
 
-  logical(l_def) :: clock_stopped
-
-  call time_step%init( int( dt, kind=i_def ) )
+  nullify(xios_clock)
+  xios_clock => self%geometry%get_clock()
+  call time_step%init( int( xios_clock%get_seconds_per_step(), &
+                       kind=i_def ) )
 
   time_difference = new_time - self%state_time
 
@@ -659,7 +665,7 @@ subroutine set_clock( self, new_time )
   clock_stopped = .false.
 
   do while ( new_time%is_ahead( self%state_time ) )
-    clock_stopped = .not. model_clock%tick()
+    clock_stopped = .not. xios_clock%tick()
     self%state_time = self%state_time + time_step
   end do
 
@@ -681,9 +687,8 @@ subroutine jedi_state_destructor( self )
   type( jedi_state_type ), intent(inout) :: self
 
   self%geometry => null()
-  if ( allocated(self%fields ) ) then
-    deallocate(self%fields )
-  end if
+  if ( allocated(self%fields ) )      deallocate(self%fields )
+  if ( allocated(self%model_clock ) ) deallocate(self%model_clock )
 
 end subroutine jedi_state_destructor
 
