@@ -17,10 +17,11 @@
 
 module assign_field_single_column_kernel_mod
 
-use argument_mod,            only : arg_type,            &
-                                    GH_FIELD, GH_REAL,   &
-                                    GH_INC, ANY_SPACE_1, &
-                                    CELL_COLUMN
+use argument_mod,            only : arg_type,                  &
+                                    GH_FIELD, GH_REAL,         &
+                                    GH_READWRITE,              &
+                                    ANY_DISCONTINUOUS_SPACE_1, &
+                                    DOMAIN
 use constants_mod,           only : r_single, r_double, i_def
 use kernel_mod,              only : kernel_type
 
@@ -34,14 +35,11 @@ private
 
 type, public, extends(kernel_type) :: assign_field_single_column_kernel_type
   private
-  type(arg_type) :: meta_args(1) = (/                   &
-       arg_type(GH_FIELD, GH_REAL, GH_INC, ANY_SPACE_1) &
+  type(arg_type) :: meta_args(1) = (/                                       &
+       arg_type(GH_FIELD, GH_REAL, GH_READWRITE, ANY_DISCONTINUOUS_SPACE_1) &
        /)
-  integer :: operates_on = CELL_COLUMN
+  integer :: operates_on = DOMAIN
 end type
-
-! Logical which checks if the non-zero column has already been set.
-logical :: set_already = .false.
 
 !-------------------------------------------------------------------------------
 ! Contained functions/subroutines
@@ -57,9 +55,9 @@ public :: assign_field_single_column_code
 
 contains
 
-!> @brief Sets all field entries to 0, except for the values in the first encountered
-!>        column.
+!> @brief Sets the values in the first column.
 !> @param[in]     nlayers Number of vertical layers
+!> @param[in]     ncols Number of columns
 !> @param[in,out] x Output data
 !> @param[in]     ndf Number of degrees of freedom per cell for the output field
 !> @param[in]     undf Unique number of degrees of freedom  for the output field
@@ -67,34 +65,25 @@ contains
 
 ! R_SINGLE PRECISION
 ! ==================
-subroutine assign_field_single_column_code_r_single(nlayers,     &
-                                                    x,           &
+subroutine assign_field_single_column_code_r_single(nlayers, ncols, &
+                                                    x,              &
                                                     ndf, undf, map)
   implicit none
 
   ! Arguments
-  integer(kind=i_def),                      intent(in)    :: nlayers
-  integer(kind=i_def),                      intent(in)    :: undf, ndf
-  real   (kind=r_single), dimension(undf),  intent(inout) :: x
-  integer(kind=i_def),    dimension(ndf),   intent(in)    :: map
+  integer(kind=i_def),                           intent(in)    :: nlayers
+  integer(kind=i_def),                           intent(in)    :: ncols
+  integer(kind=i_def),                           intent(in)    :: undf, ndf
+  real   (kind=r_single), dimension(undf),       intent(inout) :: x
+  integer(kind=i_def),    dimension(ndf, ncols), intent(in)    :: map
 
   ! Internal variables
   integer(kind=i_def) :: df, k
-  real(kind=r_single) :: val
 
-  ! Check if one column has already been set. If yet, set value to 1, otherwise
-  ! set it to 0.
-  if (set_already) then
-     val = 0.0_r_single
-  else
-     val = 1.0_r_single
-     set_already = .true.
-  end if
-
-  ! Assign values
+  ! Assign values in column number 1
   do k = 0, nlayers-1
     do df = 1, ndf
-       x(map(df)+k) = val
+       x(map(df,1)+k) = 1.0_r_single
     end do
   end do
 
@@ -102,34 +91,25 @@ end subroutine assign_field_single_column_code_r_single
 
 ! R_DOUBLE PRECISION
 ! ==================
-subroutine assign_field_single_column_code_r_double(nlayers,     &
-                                                    x,           &
+subroutine assign_field_single_column_code_r_double(nlayers, ncols, &
+                                                    x,              &
                                                     ndf, undf, map)
   implicit none
 
   ! Arguments
-  integer(kind=i_def),                      intent(in)    :: nlayers
-  integer(kind=i_def),                      intent(in)    :: undf, ndf
-  real   (kind=r_double), dimension(undf),  intent(inout) :: x
-  integer(kind=i_def),    dimension(ndf),   intent(in)    :: map
+  integer(kind=i_def),                           intent(in)    :: nlayers
+  integer(kind=i_def),                           intent(in)    :: ncols
+  integer(kind=i_def),                           intent(in)    :: undf, ndf
+  real   (kind=r_double), dimension(undf),       intent(inout) :: x
+  integer(kind=i_def),    dimension(ndf, ncols), intent(in)    :: map
 
   ! Internal variables
   integer(kind=i_def) :: df, k
-  real(kind=r_double) :: val
 
-  ! Check if one column has already been set. If yet, set value to 1, otherwise
-  ! set it to 0.
-  if (set_already) then
-     val = 0.0_r_double
-  else
-     val = 1.0_r_double
-     set_already = .true.
-  end if
-
-  ! Assign values
+  ! Assign values in column number 1
   do k = 0, nlayers-1
     do df = 1, ndf
-       x(map(df)+k) = val
+       x(map(df,1)+k) = 1.0_r_double
     end do
   end do
 

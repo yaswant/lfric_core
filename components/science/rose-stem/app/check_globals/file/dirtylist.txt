@@ -1,3 +1,0 @@
-# Files should only ever be removed or renamed in this file, never added.
-#
-source/kernel/algebra/assign_field_single_column_kernel_mod.F90

@@ -772,10 +772,12 @@ contains
     call p_out_masked%initialise( fs_pressure )
     call p_out_masked_cma%initialise( fs_pressure )
 
-    call invoke( assign_field_single_column_kernel_type( p_in ), &
+    call invoke( setval_c( p_in,      0.0_r_solver               ), &
                  setval_c( p_out,     0.0_r_solver               ), &
                  setval_c( p_out_cma, 0.0_r_solver               ), &
                  setval_c( u_h_tmp,   0.0_r_solver               ) )
+
+    call invoke( assign_field_single_column_kernel_type( p_in ) )
 
     ! NOTE: CMA invokes are separate as joining them returns error in
     ! integration test. Example for Gnu:
