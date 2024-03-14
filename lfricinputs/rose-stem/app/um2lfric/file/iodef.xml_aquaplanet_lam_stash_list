@@ -54,6 +54,7 @@
 	<field id="z0msea" name="z0msea" long_name="Momentum roughness length" unit="m" domain_ref="face" />
 	<field id="tstar" name="tstar" long_name="surface_temperature" standard_name="surface_temperature" unit="K" domain_ref="face" />
 	<field id="ozone" name="ozone" long_name="mass_fraction_of_ozone_in_air" standard_name="mass_fraction_of_ozone_in_air" unit="1" grid_ref="full_level_face_grid" />
+
 	<!-- Additional fields for basic_gal -->
 	<field id="dd_mf_cb" name="dd_mf_cb" long_name="Downdraft massflux at cloud base" unit="Pa s-1" domain_ref="face" />
 	<field id="tile_snow_mass" name="tile_snow_mass" long_name="Tile snow mass" unit="kg" domain_ref="face" axis_ref="surface_tiles" />
@@ -78,7 +79,8 @@
 	<field id="tile_temperature" name="tile_temperature" long_name="Tile temperature" unit="K" domain_ref="face" axis_ref="surface_tiles" />
 	<field id="tstar_sea_ice" name="tstar_sea_ice" long_name="Sea ice surface temperature" unit="K" domain_ref="face" />
 	<field id="sea_ice_temperature" name="sea_ice_temperature" long_name="Sea-ice bulk temperature" unit="K" domain_ref="face" />
-	<!-- Fields currently unused -->
+
+	<!-- Fields currently unused NOT CHECKED -->
 	<field id="surface_altitude" name="surface_altitude" long_name="Surface altitude" unit="m" domain_ref="face"/>
 	<field id="unfrozen_soil_moisture" name="unfrozen_soil_moisture" long_name="Unfrozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />
 	<field id="frozen_soil_moisture" name="frozen_soil_moisture" long_name="Frozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />

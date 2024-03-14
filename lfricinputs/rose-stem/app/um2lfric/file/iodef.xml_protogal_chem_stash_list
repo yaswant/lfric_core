@@ -55,6 +55,7 @@
 	<field id="z0msea" name="z0msea" long_name="Momentum roughness length" unit="m" domain_ref="face" />
 	<field id="tstar" name="tstar" long_name="surface_temperature" standard_name="surface_temperature" unit="K" domain_ref="face" />
 	<field id="ozone" name="ozone" long_name="mass_fraction_of_ozone_in_air" standard_name="mass_fraction_of_ozone_in_air" unit="1" grid_ref="full_level_face_grid" />
+
 	<!-- Additional fields for basic_gal -->
 	<field id="dd_mf_cb" name="dd_mf_cb" long_name="Downdraft massflux at cloud base" unit="Pa s-1" domain_ref="face" />
 	<field id="tile_snow_mass" name="tile_snow_mass" long_name="Tile snow mass" unit="kg" domain_ref="face" axis_ref="land_tiles" />
@@ -79,29 +80,23 @@
 	<field id="tile_temperature" name="tile_temperature" long_name="Tile temperature" unit="K" domain_ref="face" axis_ref="land_tiles" />
 	<field id="tstar_sea_ice" name="tstar_sea_ice" long_name="Sea ice surface temperature" unit="K" domain_ref="face" />
 	<field id="sea_ice_temperature" name="sea_ice_temperature" long_name="Sea-ice bulk temperature" unit="K" domain_ref="face" />
+
 	<!-- New fields for proto_gal -->
 	<field id="q" name="q" long_name="humidity_mixing_ratio"  unit="kg/kg" grid_ref="full_level_face_grid" />
 	<field id="qcf" name="qcf" long_name="cloud_ice_mixing_ratio"  unit="kg/kg" grid_ref="full_level_face_grid" />
 	<field id="icefrac" name="icefrac" long_name="sea ice fraction" unit="1" domain_ref="face" />
 	<field id="icethick" name="icethick" long_name="sea ice depth" unit="m" domain_ref="face" />
-	<field id="rho_r2" name="rho_r2" long_name="density*R*R" unit="1" grid_ref="half_level_face_grid" axis_ref="land_tiles" />
-	<field id="qcl" name="qcl" long_name="cloud condensate specific liquid content" unit="kg/kg" domain_ref="full_level_face_grid" />
+	<field id="rho_r2" name="rho_r2" long_name="density*R*R" unit="1" grid_ref="half_level_face_grid"/>
+	<field id="qcl" name="qcl" long_name="cloud condensate specific liquid content" unit="kg/kg" grid_ref="full_level_face_grid" />
 	<field id="total_aero" name="total_aero" long_name="total aerosol" unit="kg" domain_ref="face" />
 	<field id="ls_snow_rate" name="ls_snow_rate" long_name="Large Scale Snow Rate" unit="kg m-2 s-1" domain_ref="face" />
 	<field id="conv_rain_rate" name="conv_rain_rate" long_name="Convective Rain Rate" unit="kg m-2 s-1" domain_ref="face" />
-	<field id="z0h_tile" name="z0h_tile" long_name="Thermal Roughness Lenght On Tiles" unit="m" domain_ref="face" />
-	<field id="dust1_mmr" name="dust1_mmr" long_name="Dust Division 1 Mass Mixing Ratio" unit="kg/kg" domain_ref="full_level_face_grid" />
-	<field id="dust2_mmr" name="dust2_mmr" long_name="sDust Division 2 Mass Mixing Ratio" unit="kg/kg" domain_ref="full_level_face_grid" />
-	<field id="qt" name="qt" long_name="Total Specific Humidity" unit="1" domain_ref="full_level_face_grid" />
+	<field id="z0h_tile" name="z0h_tile" long_name="Thermal Roughness Length On Tiles" unit="m" domain_ref="face" />
+	<field id="dust1_mmr" name="dust1_mmr" long_name="Dust Division 1 Mass Mixing Ratio" unit="kg/kg" grid_ref="full_level_face_grid" />
+	<field id="dust2_mmr" name="dust2_mmr" long_name="Dust Division 2 Mass Mixing Ratio" unit="kg/kg" grid_ref="full_level_face_grid" />
+	<field id="qt" name="qt" long_name="Total Specific Humidity" unit="1" grid_ref="full_level_face_grid" />
 	<field id="exner" name="exner_inc" long_name="Exner Pressure" unit="kg m-1 s-2" domain_ref="checkpoint_W3"/>
 
-	<!-- Fields currently unused -->
-	<field id="surface_altitude" name="surface_altitude" long_name="Surface altitude" unit="m" domain_ref="face"/>
-	<field id="unfrozen_soil_moisture" name="unfrozen_soil_moisture" long_name="Unfrozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />
-	<field id="frozen_soil_moisture" name="frozen_soil_moisture" long_name="Frozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />
-	<field id="soil_wet_frac" name="soil_wet_frac" long_name="Soil wet fraction" unit="1" domain_ref="face" />
-	<field id="tstar_sea" name="tstar_sea" long_name="Sea surface temperature" unit="K" domain_ref="face" />
-	<field id="land_mask" name="land_mask" long_name="land_mask" unit="1" domain_ref="checkpoint_W3" />
         <!--Chemistry fields -->
         <field id="o3p" name="o3p" long_name="mass_fraction_of_oxygen_ground_state_in_air" unit="1" grid_ref="full_level_face_grid" />
         <field id="o1d" name="o1d" long_name="mass_fraction_of_oxygen_excited_state_in_air" unit="1" grid_ref="full_level_face_grid" />
@@ -183,6 +178,14 @@
         <field id="so3" name="so3" long_name="mass_fraction_of_sulphur_trioxide_in_air" unit="1" grid_ref="full_level_face_grid" />
         <field id="passive_o3" name="passive_o3" long_name="mass_fraction_of_passive_ozone_in_air" unit="1" grid_ref="full_level_face_grid" />
         <field id="age_of_air" name="age_of_air" long_name="mass_fraction_of_age_of_air_in_air" unit="1" grid_ref="full_level_face_grid" />
+
+	<!-- Fields currently unused NOT CHECKED -->
+	<field id="surface_altitude" name="surface_altitude" long_name="Surface altitude" unit="m" domain_ref="face"/>
+	<field id="unfrozen_soil_moisture" name="unfrozen_soil_moisture" long_name="Unfrozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />
+	<field id="frozen_soil_moisture" name="frozen_soil_moisture" long_name="Frozen soil moisture proportion" unit="1" domain_ref="face" axis_ref="soil_levels" />
+	<field id="soil_wet_frac" name="soil_wet_frac" long_name="Soil wet fraction" unit="1" domain_ref="face" />
+	<field id="tstar_sea" name="tstar_sea" long_name="Sea surface temperature" unit="K" domain_ref="face" />
+	<field id="land_mask" name="land_mask" long_name="land_mask" unit="1" domain_ref="checkpoint_W3" />
       </field_group>
 
     </field_definition>

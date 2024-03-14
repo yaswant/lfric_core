@@ -111,13 +111,13 @@ CALL map_field_name(stashcode_qcf, 'qcf')                            ! stash 12
 CALL map_field_name(stashcode_soil_temp, 'soil_temperature')         ! stash 20
 CALL map_field_name(stashcode_tstar, 'tstar')                        ! stash 24
 CALL map_field_name(stashcode_bl_depth, 'zh')                        ! stash 25
+CALL map_field_name(stashcode_z0, 'z0msea')                          ! stash 26
 CALL map_field_name(stashcode_lsm, 'land_mask')                      ! stash 30
 CALL map_field_name(stashcode_icefrac, 'icefrac')                    ! stash 31
 CALL map_field_name(stashcode_icethick, 'icethick')                  ! stash 32
 CALL map_field_name(stashcode_orog, 'surface_altitude')              ! stash 33
-CALL map_field_name(stashcode_ozone, 'ozone')                        ! stash 60
-CALL map_field_name(stashcode_z0, 'z0msea')                          ! stash 26
 CALL map_field_name(stashcode_sea_ice_temp, 'sea_ice_temperature')   ! stash 49
+CALL map_field_name(stashcode_ozone, 'ozone')                        ! stash 60
 CALL map_field_name(stashcode_total_aero, 'total_aero')              ! stash 90
 CALL map_field_name(stashcode_w, 'upward_wind')                      ! stash 150
 CALL map_field_name(stashcode_ls_snow_rate, 'ls_snow_rate')          ! stash 187
@@ -141,9 +141,9 @@ CALL map_field_name(stashcode_bulk_cf, 'bulk_fraction')              ! stash 266
 CALL map_field_name(stashcode_liquid_cf, 'liquid_fraction')          ! stash 267
 CALL map_field_name(stashcode_frozen_cf, 'frozen_fraction')          ! stash 268
 CALL map_field_name(stashcode_qrain, 'qrain')                        ! stash 272
+CALL map_field_name(stashcode_zw, 'water_table')                     ! stash 278
 CALL map_field_name(stashcode_fsat, 'soil_sat_frac')                 ! stash 279
 CALL map_field_name(stashcode_fwetl, 'soil_wet_frac')                ! stash 280
-CALL map_field_name(stashcode_zw, 'water_table')                     ! stash 278
 CALL map_field_name(stashcode_sthzw, 'wetness_under_soil')           ! stash 281
 CALL map_field_name(stashcode_snowdep_grd_tile, 'tile_snow_depth')   ! stash 376
 CALL map_field_name(stashcode_snowpack_bk_dens, 'tile_snowpack_density')
