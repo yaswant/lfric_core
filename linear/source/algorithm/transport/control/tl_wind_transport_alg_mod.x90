@@ -37,6 +37,7 @@ module tl_wind_transport_alg_mod
   use transport_config_mod,           only: broken_w2_projection
   use tl_transport_field_mod,         only: tl_transport_field
   use transport_metadata_mod,         only: transport_metadata_type
+  use field_minmax_alg_mod,           only: log_field_minmax
 
   implicit none
 
@@ -146,7 +147,7 @@ contains
           call u_w3_np1(dir)%initialise( w3_fs )
           call ls_u_w3_n(dir)%initialise( w3_fs )
         end do
-        call wind_n%log_minmax( LOG_LEVEL_INFO, 'advected u' )
+        call log_field_minmax( LOG_LEVEL_INFO, 'advected u', wind_n )
         ! Linear part
         call invoke( setval_c(ls_u_w3_n(1), 0.0_r_def),                      &
                      setval_c(ls_u_w3_n(2), 0.0_r_def),                      &
@@ -159,9 +160,9 @@ contains
                      setval_c(u_w3_n(3), 0.0_r_def),                      &
                      dg_convert_hdiv_field_kernel_type(u_w3_n, wind_n,    &
                                                     chi, panel_id) )
-        call u_w3_n(1)%log_minmax(LOG_LEVEL_INFO, 'xdot')
-        call u_w3_n(2)%log_minmax(LOG_LEVEL_INFO, 'ydot')
-        call u_w3_n(3)%log_minmax(LOG_LEVEL_INFO, 'zdot')
+        call log_field_minmax( LOG_LEVEL_INFO, 'xdot', u_w3_n(1) )
+        call log_field_minmax( LOG_LEVEL_INFO, 'ydot', u_w3_n(2) )
+        call log_field_minmax( LOG_LEVEL_INFO, 'zdot', u_w3_n(3) )
 
         ! -------------------------------------------------------------------- !
         ! Transport wind components in W3

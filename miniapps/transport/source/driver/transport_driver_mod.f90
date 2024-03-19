@@ -455,6 +455,7 @@ contains
                                       subroutine_timers,    &
                                       write_diag
     use multires_coupling_config_mod, only: aerosol_mesh_name
+    use field_minmax_alg_mod,         only: log_field_minmax
 
     implicit none
 
@@ -470,12 +471,12 @@ contains
     call log_event( '        i_def kind = '//log_scratch_space , LOG_LEVEL_INFO )
 
     call mass_conservation( model_clock%get_step(), density, mr )
-    call density%log_minmax( LOG_LEVEL_INFO, 'rho' )
-    call theta%log_minmax( LOG_LEVEL_INFO, 'theta' )
-    call tracer_con%log_minmax( LOG_LEVEL_INFO, 'tracer_con' )
-    call tracer_adv%log_minmax( LOG_LEVEL_INFO, 'tracer_adv' )
-    call constant%log_minmax( LOG_LEVEL_INFO, 'constant' )
-    call mr(1)%log_minmax( LOG_LEVEL_INFO, 'm_v' )
+    call log_field_minmax( LOG_LEVEL_INFO, 'rho', density )
+    call log_field_minmax( LOG_LEVEL_INFO, 'theta', theta )
+    call log_field_minmax( LOG_LEVEL_INFO, 'tracer_con', tracer_con )
+    call log_field_minmax( LOG_LEVEL_INFO, 'tracer_adv', tracer_adv )
+    call log_field_minmax( LOG_LEVEL_INFO, 'constant', constant )
+    call log_field_minmax( LOG_LEVEL_INFO, 'm_v', mr(1) )
 
     mesh => mesh_collection%get_mesh(prime_mesh_name)
     if (use_multires_coupling) then
@@ -502,15 +503,15 @@ contains
 
     ! Write out conservation diagnostics
     call mass_conservation( model_clock%get_step(), density, mr )
-    call density%log_minmax( LOG_LEVEL_INFO, 'rho' )
-    call theta%log_minmax( LOG_LEVEL_INFO, 'theta' )
-    call tracer_con%log_minmax( LOG_LEVEL_INFO, 'tracer_con' )
-    call tracer_adv%log_minmax( LOG_LEVEL_INFO, 'tracer_adv' )
-    call constant%log_minmax( LOG_LEVEL_INFO, 'constant' )
-    call mr(1)%log_minmax( LOG_LEVEL_INFO, 'm_v' )
+    call log_field_minmax( LOG_LEVEL_INFO, 'rho', density )
+    call log_field_minmax( LOG_LEVEL_INFO, 'theta', theta )
+    call log_field_minmax( LOG_LEVEL_INFO, 'tracer_con', tracer_con )
+    call log_field_minmax( LOG_LEVEL_INFO, 'tracer_adv', tracer_adv )
+    call log_field_minmax( LOG_LEVEL_INFO, 'constant', constant )
+    call log_field_minmax( LOG_LEVEL_INFO, 'm_v', mr(1) )
     if (use_aerosols) then
-      call w3_aerosol%log_minmax( LOG_LEVEL_INFO, 'w3_aerosol' )
-      call wt_aerosol%log_minmax( LOG_LEVEL_INFO, 'wt_aerosol' )
+      call log_field_minmax( LOG_LEVEL_INFO, 'w3_aerosol', w3_aerosol )
+      call log_field_minmax( LOG_LEVEL_INFO, 'wt_aerosol', wt_aerosol )
     end if
 
     write( log_scratch_space, &

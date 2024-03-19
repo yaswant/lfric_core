@@ -82,6 +82,8 @@ module tl_rk_alg_timestep_mod
   use io_config_mod,                      only: subroutine_timers
   use timer_mod,                          only: timer
 
+  use field_minmax_alg_mod,               only: log_field_minmax
+
   implicit none
 
   private
@@ -470,10 +472,10 @@ contains
                           ls_moist_dyn(gas_law), chi,                &
                           panel_id, m3_inv, qr ) )
       ! Diagnostics
-      call inc(igh_t)%log_minmax(LOG_LEVEL_TRACE, 'theta_inc')
-      call inc(igh_u)%log_minmax(LOG_LEVEL_TRACE, 'u_inc')
-      call inc(igh_d)%log_minmax(LOG_LEVEL_TRACE, 'rho_inc')
-      call inc(igh_p)%log_minmax(LOG_LEVEL_TRACE, 'exner_inc')
+      call log_field_minmax( LOG_LEVEL_TRACE, 'theta_inc', inc(igh_t) )
+      call log_field_minmax( LOG_LEVEL_TRACE, 'u_inc',     inc(igh_u) )
+      call log_field_minmax( LOG_LEVEL_TRACE, 'rho_inc',   inc(igh_d) )
+      call log_field_minmax( LOG_LEVEL_TRACE, 'exner_inc', inc(igh_p) )
 
     end do
 

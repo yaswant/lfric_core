@@ -12,6 +12,7 @@ module printing_iau_mod
   use field_mod,               only : field_type
   use log_mod,                 only : log_level
   use print_meanrms_field_mod, only : print_meanrms_field
+  use field_minmax_alg_mod,    only : log_field_minmax
 
   implicit none
 
@@ -42,34 +43,34 @@ module printing_iau_mod
     if( log_level() <= level ) then
 
       call prognostic_fields % get_field( 'theta', prog_field )
-      call prog_field%log_minmax( level, 'theta' )
+      call log_field_minmax( level, 'theta', prog_field )
 
       call prognostic_fields % get_field( 'exner', prog_field )
-      call prog_field%log_minmax( level, 'exner' )
+      call log_field_minmax( level, 'exner', prog_field )
 
       call prognostic_fields % get_field( 'u', prog_field )
-      call prog_field%log_minmax( level, 'wind' )
+      call log_field_minmax( level, 'wind', prog_field )
 
       call prognostic_fields % get_field( 'm_v', prog_field )
-      call prog_field%log_minmax( level, 'm_v' )
+      call log_field_minmax( level, 'm_v', prog_field )
 
       call prognostic_fields % get_field( 'm_cl', prog_field )
-      call prog_field%log_minmax( level, 'm_cl' )
+      call log_field_minmax( level, 'm_cl', prog_field )
 
       call prognostic_fields % get_field( 'm_ci', prog_field )
-      call prog_field%log_minmax( level, 'm_ci' )
+      call log_field_minmax( level, 'm_ci', prog_field )
 
       call prognostic_fields % get_field( 'm_r', prog_field )
-      call prog_field%log_minmax( level, 'm_r' )
+      call log_field_minmax( level, 'm_r', prog_field )
 
       call prognostic_fields % get_field( 'm_s', prog_field )
-      call prog_field%log_minmax( level, 'm_s' )
+      call log_field_minmax( level, 'm_s', prog_field )
 
       call prognostic_fields % get_field( 'm_g', prog_field )
-      call prog_field%log_minmax( level, 'm_g' )
+      call log_field_minmax( level, 'm_g', prog_field )
 
       call prognostic_fields % get_field( 'rho', prog_field )
-      call prog_field%log_minmax( level, 'dry rho' )
+      call log_field_minmax( level, 'dry_rho', prog_field )
 
       nullify(prog_field)
 
@@ -147,16 +148,16 @@ module printing_iau_mod
     if( log_level() <= level ) then
 
       call cloud_fields % get_field( 'area_fraction', cld_field )
-      call cld_field%log_minmax( level, 'acf' )
+      call log_field_minmax( level, 'acf', cld_field )
 
       call cloud_fields % get_field( 'bulk_fraction', cld_field )
-      call cld_field%log_minmax( level, 'bcf' )
+      call log_field_minmax( level, 'bcf', cld_field )
 
       call cloud_fields % get_field( 'frozen_fraction', cld_field )
-      call cld_field%log_minmax( level, 'cff' )
+      call log_field_minmax( level, 'cff', cld_field )
 
       call cloud_fields % get_field( 'liquid_fraction', cld_field )
-      call cld_field%log_minmax( level, 'cfl' )
+      call log_field_minmax( level, 'cfl', cld_field )
 
       nullify( cld_field )
 
@@ -219,16 +220,16 @@ module printing_iau_mod
     if( log_level() <= level ) then
 
       call soil_fields % get_field( 'soil_moisture', surf_field )
-      call surf_field % log_minmax( level, 'soil_moisture' )
+      call log_field_minmax( level, 'soil_moisture', surf_field )
 
       call soil_fields % get_field( 'soil_temperature', surf_field )
-      call surf_field % log_minmax( level, 'soil_temperature' )
+      call log_field_minmax( level, 'soil_temperature', surf_field )
 
       call surface_fields % get_field( 'tile_temperature', surf_field )
-      call surf_field % log_minmax( level, 'tile_temperature' )
+      call log_field_minmax( level, 'tile_temperature', surf_field )
 
       call snow_fields % get_field( 'snow_layer_temp', surf_field )
-      call surf_field % log_minmax( level, 'snow_layer_temp' )
+      call log_field_minmax( level, 'snow_layer_temp', surf_field )
 
       nullify( surf_field )
 

@@ -40,6 +40,7 @@ module update_iau_inc_alg_mod
                                                print_meanrms_cld
   use print_meanrms_field_mod,          only : print_meanrms_field
   use locate_tropopause_alg_mod,        only : locate_tropopause_alg
+  use field_minmax_alg_mod,             only : log_field_minmax
 
   implicit none
 
@@ -205,7 +206,7 @@ module update_iau_inc_alg_mod
     call invoke( inc_X_plus_bY( u, iau_weight, u_inc ) )
 
     call log_event( '- After wind -', log_level_trace )
-    call u % log_minmax( log_level_trace, 'wind' )
+    call log_field_minmax( log_level_trace, 'wind', u )
     call print_meanrms_field( u, log_level_trace, 'wind' )
 
     ! Humidity mixing ratios
@@ -213,10 +214,10 @@ module update_iau_inc_alg_mod
                       m_r, m_s, m_g, one_minus_qs, cloud_fields )
 
     call log_event( '- After iau_humidity_inc -', log_level_trace )
-    call m_v % log_minmax( log_level_trace, 'm_v' )
-    call m_cl % log_minmax( log_level_trace, 'm_cl' )
-    call m_ci % log_minmax( log_level_trace, 'm_ci' )
-    call m_r % log_minmax( log_level_trace, 'm_r' )
+    call log_field_minmax( log_level_trace, 'm_v', m_v )
+    call log_field_minmax( log_level_trace, 'm_cl', m_cl )
+    call log_field_minmax( log_level_trace, 'm_ci', m_ci )
+    call log_field_minmax( log_level_trace, 'm_r', m_r )
     call print_meanrms_field( m_v, log_level_trace )
     call print_meanrms_field( m_cl, log_level_trace )
     call print_meanrms_field( m_ci, log_level_trace )
@@ -254,8 +255,8 @@ module update_iau_inc_alg_mod
     ! Calculate tropopause level
     call locate_tropopause_alg( trop_level, theta, exner_wth, twod_mesh )
     call log_event('- After locate tropopause  -', log_level_trace)
-    call theta % log_minmax( log_level_trace, 'theta' )
-    call exner_wth % log_minmax( log_level_trace, 'exner_wth' )
+    call log_field_minmax( log_level_trace, 'theta', theta )
+    call log_field_minmax( log_level_trace, 'exner_wth', exner_wth )
     call print_meanrms_field( theta, log_level_trace )
     call print_meanrms_field( exner_wth, log_level_trace )
 
@@ -265,8 +266,8 @@ module update_iau_inc_alg_mod
                               mv_earlier, temperature, pressure, trop_level )
 
     call log_event('- After iau_humidity_checks -', log_level_trace)
-    call temperature % log_minmax( log_level_trace, 'temperature' )
-    call pressure % log_minmax( log_level_trace, 'pressure' )
+    call log_field_minmax( log_level_trace, 'temperature', temperature )
+    call log_field_minmax( log_level_trace, 'pressure', pressure )
     call print_meanrms_field( temperature, log_level_trace )
     call print_meanrms_field( pressure, log_level_trace )
 
@@ -278,7 +279,7 @@ module update_iau_inc_alg_mod
     end if
 
     call log_event( '- After dry_rho -', log_level_trace )
-    call rho % log_minmax( log_level_trace, 'rho' )
+    call log_field_minmax( log_level_trace, 'rho', rho )
     call print_meanrms_field( rho, log_level_trace )
 
     nullify( u,rho, theta, exner, m_v, m_cl, m_ci, m_r, m_s, m_g )

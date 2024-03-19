@@ -92,11 +92,6 @@ module field_r64_mod
     ! Logging procedures
     procedure, public :: log_field
     procedure, public :: log_dofs
-    procedure, public :: log_minmax
-    procedure, public :: log_absmax
-
-    !> Return global min and max of field
-    procedure, public :: field_minmax
 
     !> Setter for the field write method
     procedure, public :: set_write_behaviour
@@ -715,104 +710,6 @@ contains
     end do
 
   end subroutine log_dofs
-
-  !> Sends the min/max of a field to the log
-  !!
-  !! @param[in] log_lev The level to use for logging.
-  !! @param[in] label A title added to the log before the data is written out
-  !!
-  subroutine log_minmax( self, log_lev, label )
-
-    implicit none
-
-    class( field_r64_type ), target, intent(in) :: self
-    integer(i_def),                  intent(in) :: log_lev
-    character( * ),                  intent(in) :: label
-
-    type(function_space_type),      pointer :: function_space => null()
-    integer(i_def)                          :: undf
-    type(scalar_r64_type)                   :: fmin, fmax
-
-    ! Get function space from parent
-    function_space => self%get_function_space()
-
-    ! If we aren't going to log the min and max then we don't need to
-    ! do any further work here.
-    if ( log_lev < log_level() ) return
-
-    undf = function_space%get_last_dof_owned()
-    fmin%value = minval( self%data(1:undf) )
-    fmax%value = maxval( self%data(1:undf) )
-
-    write( log_scratch_space, '( A, A, A, 2E16.8 )' ) &
-         "Min/max ", trim( label ),                   &
-         " = ", fmin%get_min(), fmax%get_max()
-    call log_event( log_scratch_space, log_lev )
-
-  end subroutine log_minmax
-
-  !> Sends the max of the absolute value of field to the log
-  !!
-  !! @param[in] log_lev The level to use for logging.
-  !! @param[in] label A title added to the log before the data is written out.
-  !!
-  subroutine log_absmax( self, log_lev, label )
-
-    implicit none
-
-    class( field_r64_type ), target, intent(in) :: self
-    integer(i_def),                  intent(in) :: log_lev
-    character( * ),                  intent(in) :: label
-
-    type(function_space_type),      pointer :: function_space => null()
-    integer(i_def)                          :: undf
-    type(scalar_r64_type)                   :: fmax
-
-    ! Get function space from parent
-    function_space => self%get_function_space()
-
-    ! If we aren't going to log the abs max then we don't need to
-    ! do any further work here.
-    if ( log_lev < log_level() ) return
-
-    undf = function_space%get_last_dof_owned()
-    fmax%value = maxval( abs(self%data(1:undf)) )
-
-    write( log_scratch_space, '( A, A, E16.8 )' ) &
-         trim( label ), " = ", fmax%get_max()
-    call log_event( log_scratch_space, log_lev )
-
-  end subroutine log_absmax
-
-  !> @brief Returns the min/max of a field.
-  !> @param[out] fmin Minimum value of the field
-  !> @param[out] fmax Maximum value of the field
-  !>
-  !> This routine should be PSy built-in (intrinsic) function.
-  !> PSyclone issue #489
-  !>
-  subroutine field_minmax( self, fmin, fmax )
-
-    implicit none
-
-    class( field_r64_type ), target, intent(in)  :: self
-    real(real64),                    intent(out) :: fmin, fmax
-
-    type(function_space_type),      pointer :: function_space => null()
-    integer(i_def)                          :: undf
-    type(scalar_r64_type)                   :: fmin1, fmax1
-
-    ! Get function space from parent
-    function_space => self%get_function_space()
-
-    undf = function_space%get_last_dof_owned()
-    fmin1%value = minval( self%data(1:undf) )
-    fmax1%value = maxval( self%data(1:undf) )
-
-    fmin = fmin1%get_min()
-    fmax = fmax1%get_max()
-
-  end subroutine field_minmax
 
   !> Calls the underlying IO implementation for writing a field
   !> throws an error if this has not been set

@@ -18,6 +18,7 @@ module skeleton_alg_mod
   use operator_mod,                   only: operator_type
   use matrix_vector_kernel_mod,       only: matrix_vector_kernel_type
   use skeleton_constants_mod,         only: get_div
+  use field_minmax_alg_mod,           only: log_field_minmax
 
   implicit none
 
@@ -59,7 +60,7 @@ contains
 
     ! The divergence of a constant field should be zero so lets check this by
     ! printing the min/max values in field_1
-    call field_1%log_minmax(LOG_LEVEL_INFO,'field_1')
+    call log_field_minmax( LOG_LEVEL_INFO, 'field_1', field_1 )
 
     nullify(mesh)
 

@@ -11,7 +11,7 @@
 
 module field_minmax_alg_mod
   use, intrinsic :: iso_fortran_env, only : real32, real64
-  use psykal_lite_mod,               only : invoke_r32_field_min_max, &
+  use psykal_builtin_light_mod,      only : invoke_r32_field_min_max, &
                                             invoke_r64_field_min_max
   use log_mod,                       only : log_event, log_scratch_space, &
                                             log_level
@@ -98,7 +98,7 @@ contains
     ! Calculate min and max field values for r32 field
     call invoke_r32_field_min_max( fmin, fmax, field )
     write( log_scratch_space, '( A, A, A, E16.8 )' ) &
-           "Min/max ", trim(label), " = ", fmax
+           "Max ", trim(label), " = ", fmax
     call log_event( log_scratch_space, log_lev )
   end subroutine log_abs_max_r32
 
@@ -115,7 +115,7 @@ contains
     ! Calculate min and max field values for r64 field
     call invoke_r64_field_min_max( fmin, fmax, field )
     write( log_scratch_space, '( A, A, A, E16.8 )' ) &
-           "Min/max ", trim(label), " = ", fmax
+           "Max ", trim(label), " = ", fmax
     call log_event( log_scratch_space, log_lev )
   end subroutine log_abs_max_r64
 

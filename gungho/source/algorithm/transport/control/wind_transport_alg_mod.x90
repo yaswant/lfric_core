@@ -65,6 +65,7 @@ contains
     use dg_inc_matrix_vector_kernel_mod, only: dg_inc_matrix_vector_kernel_type
     use matrix_vector_kernel_mod,        only: matrix_vector_kernel_type
     use average_w2b_to_w2_kernel_mod,    only: average_w2b_to_w2_kernel_type
+    use field_minmax_alg_mod,            only: log_field_minmax
 
     implicit none
 
@@ -128,15 +129,15 @@ contains
           call u_w3_inc(dir)%initialise( w3_fs )
           call u_w3_np1(dir)%initialise( w3_fs )
         end do
-        call wind_n%log_minmax( LOG_LEVEL_TRACE, 'advected u' )
+        call log_field_minmax( LOG_LEVEL_TRACE, 'advected u', wind_n )
         call invoke( setval_c(u_w3_n(1), 0.0_r_def), &
                      setval_c(u_w3_n(2), 0.0_r_def), &
                      setval_c(u_w3_n(3), 0.0_r_def), &
                      dg_convert_hdiv_field_kernel_type(u_w3_n, wind_n, &
                                                     chi, panel_id) )
-        call u_w3_n(1)%log_minmax(LOG_LEVEL_TRACE, 'xdot')
-        call u_w3_n(2)%log_minmax(LOG_LEVEL_TRACE, 'ydot')
-        call u_w3_n(3)%log_minmax(LOG_LEVEL_TRACE, 'zdot')
+        call log_field_minmax( LOG_LEVEL_TRACE, 'xdot', u_w3_n(1) )
+        call log_field_minmax( LOG_LEVEL_TRACE, 'ydot', u_w3_n(2) )
+        call log_field_minmax( LOG_LEVEL_TRACE, 'zdot', u_w3_n(3) )
 
         if ( subroutine_timers ) call timer('transport.wind_to_comps')
 

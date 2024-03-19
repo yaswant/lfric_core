@@ -39,6 +39,7 @@ module linear_step_mod
   use timestepping_config_mod,        only : method, &
                                              method_semi_implicit, &
                                              method_rk
+  use field_minmax_alg_mod,           only : log_field_minmax
 
   implicit none
 
@@ -157,8 +158,8 @@ module linear_step_mod
 
       if (write_minmax_tseries) call minmax_tseries(u, 'u', mesh)
 
-      call u%log_minmax(LOG_LEVEL_INFO, ' u')
-      call theta%log_minmax(LOG_LEVEL_INFO, 'theta')
+      call log_field_minmax( LOG_LEVEL_INFO, 'u', u )
+      call log_field_minmax( LOG_LEVEL_INFO, 'theta', theta )
 
     end if
 

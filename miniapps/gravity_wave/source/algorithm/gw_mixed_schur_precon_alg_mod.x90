@@ -98,6 +98,7 @@ module gw_mixed_schur_precon_alg_mod
   use mesh_mod,                          only: mesh_type
   use fs_continuity_mod,                 only: W0, W2, W3, Wtheta
   use boundaries_config_mod,             only: limited_area
+  use field_minmax_alg_mod,              only: log_field_minmax
 
   implicit none
 
@@ -460,7 +461,7 @@ contains
       call invoke( inc_X_times_Y(self%rhs_p, w3_mask) )
     endif
 
-    call self%rhs_p%log_minmax(LOG_LEVEL_DEBUG,  'gw_pressure_rhs ')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'gw_pressure_rhs ', self%rhs_p )
 
     nullify( mesh )
 
@@ -550,9 +551,9 @@ contains
       call invoke( inc_X_times_Y(self%b_inc, wtheta_mask) )
     endif
 
-    call self%u_inc%log_minmax(LOG_LEVEL_DEBUG,  'u increment')
-    call self%p_inc%log_minmax(LOG_LEVEL_DEBUG,  'p increment')
-    call self%b_inc%log_minmax(LOG_LEVEL_DEBUG,  'b increment')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'u increment', self%u_inc )
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'p increment', self%p_inc )
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'b increment', self%b_inc )
 
     call invoke( inc_X_plus_Y(state%vector(igw_u), self%u_inc), &
                  inc_X_plus_Y(state%vector(igw_p), self%p_inc), &

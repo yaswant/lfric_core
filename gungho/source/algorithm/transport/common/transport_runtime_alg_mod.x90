@@ -636,9 +636,9 @@ contains
                                 cast_dt )
 
         ! Get the required stencil size from the departure points
-        call self%departure_points_x_w2(mesh_idx)%field_minmax(dep_min, dep_max)
+        call get_field_minmax( self%departure_points_x_w2(mesh_idx), dep_min, dep_max )
         self%dep_stencil_extent_x(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
-        call self%departure_points_y_w2(mesh_idx)%field_minmax(dep_min, dep_max)
+        call get_field_minmax( self%departure_points_y_w2(mesh_idx), dep_min, dep_max )
         self%dep_stencil_extent_y(mesh_idx) = int( max( abs(dep_max), abs(dep_min) ) )
 
       end if
@@ -1717,10 +1717,10 @@ contains
                                           cap_dep_points) )
 
           ! Get the required stencil size from the departure points
-          call self%tracer_dep_pts_ix(i,step)%field_minmax(dep_min, dep_max)
+          call get_field_minmax( self%tracer_dep_pts_ix(i,step), dep_min, dep_max )
           self%tracer_stencil_extent_ix(i,step) = &
             MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
-          call self%tracer_dep_pts_iy(i,step)%field_minmax(dep_min, dep_max)
+          call get_field_minmax( self%tracer_dep_pts_iy(i,step), dep_min, dep_max )
           self%tracer_stencil_extent_iy(i,step) = &
             MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
 
@@ -1793,10 +1793,10 @@ contains
                                             cap_dep_points) )
 
             ! Get the required stencil size from the departure points
-            call self%tracer_dep_pts_ox(i,step)%field_minmax(dep_min, dep_max)
+            call get_field_minmax( self%tracer_dep_pts_ox(i,step), dep_min, dep_max )
             self%tracer_stencil_extent_ox(i,step) = &
               MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
-            call self%tracer_dep_pts_oy(i,step)%field_minmax(dep_min, dep_max)
+            call get_field_minmax( self%tracer_dep_pts_oy(i,step), dep_min, dep_max )
             self%tracer_stencil_extent_oy(i,step) = &
               MAX( int(abs(dep_max), i_def), int(abs(dep_min), i_def) )
 

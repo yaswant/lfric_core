@@ -32,6 +32,7 @@ module physics_mappings_alg_mod
   use dg_convert_hdiv_field_kernel_mod,      only: dg_convert_hdiv_field_kernel_type
   use nodal_xyz_coordinates_kernel_mod,      only: nodal_xyz_coordinates_kernel_type
   use psykal_builtin_light_mod,              only: invoke_convert_cart2sphere_vector
+  use field_minmax_alg_mod,                  only: log_field_minmax
 
   implicit none
 
@@ -62,7 +63,7 @@ contains
     type( mesh_type ),  pointer           :: mesh => null()
     integer( kind=i_def )                 :: space_dim
 
-    call source_field%log_minmax(LOG_LEVEL_DEBUG, 'source field')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'source field', source_field )
 
     mesh => source_field%get_mesh() ! Currently only coded for fields on the same mesh
 
@@ -104,7 +105,7 @@ contains
       call invoke( setval_X(target_field, projected_field(1)) )
     end if
 
-    call target_field%log_minmax(LOG_LEVEL_DEBUG, 'target field')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'target field', target_field )
 
   end subroutine map_physics_scalars
 

@@ -27,6 +27,7 @@ module linear_data_algorithm_mod
                                             LOG_LEVEL_INFO,    &
                                             LOG_LEVEL_DEBUG
   use mesh_mod,                       only: mesh_type
+  use field_minmax_alg_mod,           only: log_field_minmax
 
   implicit none
 
@@ -150,19 +151,19 @@ module linear_data_algorithm_mod
     call combine_ls_winds( ls_fields )
 
     call ls_fields%get_field("ls_u", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_DEBUG, 'ls_u')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'ls_u', ls_field )
 
     call ls_fields%get_field("ls_rho", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_DEBUG, 'ls_rho')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'ls_rho', ls_field )
 
     call ls_fields%get_field("ls_exner", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_DEBUG, 'ls_exner')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'ls_exner', ls_field )
 
     call ls_fields%get_field("ls_theta", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_DEBUG, 'ls_theta')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'ls_theta', ls_field )
 
     call ls_fields%get_field("ls_m_v", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_DEBUG, 'ls_m_v')
+    call log_field_minmax( LOG_LEVEL_DEBUG, 'ls_m_v', ls_field )
 
     nullify( ls_field )
 

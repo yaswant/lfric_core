@@ -74,6 +74,8 @@ contains
                                              chem_scheme_strattrop,            &
                                              chem_scheme_strat_test
 
+    use field_minmax_alg_mod,          only: log_field_minmax
+
     implicit none
 
     ! -- Arguments --
@@ -909,8 +911,8 @@ contains
     previous_time_daynum = current_time_daynum
 
     if ( chem_scheme == chem_scheme_strat_test ) then
-      call o3%log_minmax(LOG_LEVEL_DEBUG,' O3 Aft Chem ')
-      call ch4%log_minmax(LOG_LEVEL_DEBUG,' CH4 Aft Chem ')
+      call log_field_minmax( LOG_LEVEL_DEBUG, ' O3 Aft Chem ', o3 )
+      call log_field_minmax( LOG_LEVEL_DEBUG, ' CH4 Aft Chem ', ch4 )
     end if
 
     if ( write_diag .and. use_xios_io ) then

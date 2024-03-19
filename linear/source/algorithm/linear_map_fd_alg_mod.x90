@@ -19,6 +19,7 @@ module linear_map_fd_alg_mod
   use initialization_config_mod,       only: read_w2h_wind
   use combine_w2_field_kernel_mod,     only: combine_w2_field_kernel_type
   use map_fd_to_prognostics_alg_mod,   only: set_wind
+  use field_minmax_alg_mod,            only: log_field_minmax
 
   implicit none
 
@@ -123,10 +124,10 @@ contains
       call set_wind( u, ew_wind_in_w3, ns_wind_in_w3, upward_wind_in_wtheta )
     end if
 
-   call theta%log_minmax(LOG_LEVEL_INFO, 'theta pert')
-   call rho%log_minmax(LOG_LEVEL_INFO, 'rho pert')
-   call exner%log_minmax(LOG_LEVEL_INFO, 'exner pert')
-   call u%log_minmax(LOG_LEVEL_INFO, 'u pert')
+   call log_field_minmax( LOG_LEVEL_INFO, 'theta pert', theta )
+   call log_field_minmax( LOG_LEVEL_INFO, 'rho pert',   rho )
+   call log_field_minmax( LOG_LEVEL_INFO, 'exner pert', exner )
+   call log_field_minmax( LOG_LEVEL_INFO, 'u pert',     u )
 
    ! Update factors for moist dynamics
    call tl_moist_dyn_factors_alg( moist_dyn, mr )

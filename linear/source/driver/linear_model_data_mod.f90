@@ -234,6 +234,7 @@ contains
   subroutine linear_init_ls( mesh, twod_mesh, modeldb )
 
     use gungho_step_mod,                only : gungho_step
+    use field_minmax_alg_mod,           only : log_field_minmax
 
     implicit none
 
@@ -316,19 +317,19 @@ contains
 
     ! Print the min and max values of the linearisation fields.
     call modeldb%model_data%ls_fields%get_field("ls_u", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_INFO,'ls_u')
+    call log_field_minmax( LOG_LEVEL_INFO, 'ls_u', ls_field )
 
     call modeldb%model_data%ls_fields%get_field("ls_rho", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_INFO,'ls_rho')
+    call log_field_minmax( LOG_LEVEL_INFO, 'ls_rho', ls_field )
 
     call modeldb%model_data%ls_fields%get_field("ls_exner", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_INFO,'ls_exner')
+    call log_field_minmax( LOG_LEVEL_INFO, 'ls_exner', ls_field )
 
     call modeldb%model_data%ls_fields%get_field("ls_theta", ls_field)
-    call ls_field%log_minmax(LOG_LEVEL_INFO,'ls_theta')
+    call log_field_minmax( LOG_LEVEL_INFO, 'ls_theta', ls_field )
 
     ls_field => ls_mr_array%bundle(1)
-    call ls_field%log_minmax(LOG_LEVEL_INFO,'ls_mr')
+    call log_field_minmax( LOG_LEVEL_INFO, 'ls_mr', ls_field )
 
   end subroutine linear_init_ls
 

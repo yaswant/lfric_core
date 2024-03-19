@@ -35,6 +35,7 @@ module init_gungho_lbcs_alg_mod
                                              mr_names
   use io_config_mod,                   only: subroutine_timers
   use timer_mod,                       only: timer
+  use field_minmax_alg_mod,            only: log_field_minmax
 
   implicit none
 
@@ -289,16 +290,16 @@ module init_gungho_lbcs_alg_mod
 
     ! Print max and min
     call lbc_fields%get_field( 'lbc_u', lbc_field )
-    call lbc_field%log_minmax(LOG_LEVEL_INFO, 'lbc_u')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_u', lbc_field )
 
     call lbc_fields%get_field( 'lbc_theta', lbc_field )
-    call lbc_field%log_minmax(LOG_LEVEL_INFO, 'lbc_theta')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_theta', lbc_field )
 
     call lbc_fields%get_field( 'lbc_rho', lbc_field )
-    call lbc_field%log_minmax(LOG_LEVEL_INFO, 'lbc_rho')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_rho', lbc_field )
 
     call lbc_fields%get_field( 'lbc_exner', lbc_field )
-    call lbc_field%log_minmax(LOG_LEVEL_INFO, 'lbc_exner')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_exner', lbc_field )
 
     nullify( boundary_u, lbc_field, w2_boundary_mask, mesh )
 
@@ -385,8 +386,8 @@ module init_gungho_lbcs_alg_mod
     mesh        => lbc_exner%get_mesh()
     w3_lbc_mask => get_lbc_mask(W3, mesh%get_id())
 
-    call lbc_theta%log_minmax(LOG_LEVEL_INFO, 'lbc_theta')
-    call lbc_q%log_minmax(LOG_LEVEL_INFO, 'lbc_q')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_theta', lbc_theta )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_q', lbc_q )
 
     call map_um_lbc_inputs(lbc_q, lbc_qcl, lbc_qcf, lbc_qrain, lbc_rho_r2, &
                            lbc_m_v, lbc_m_cl, lbc_m_ci, lbc_m_r, lbc_rho   &
@@ -415,12 +416,12 @@ module init_gungho_lbcs_alg_mod
                               lbc_u, lbc_moist_dyn,          &
                               lbc_eos_height, w3_lbc_mask )
 
-    call lbc_rho%log_minmax(LOG_LEVEL_INFO, 'lbc_rho')
-    call lbc_exner%log_minmax(LOG_LEVEL_INFO, 'lbc_exner')
-    call lbc_m_v%log_minmax(LOG_LEVEL_INFO, 'lbc_m_v')
-    call lbc_m_cl%log_minmax(LOG_LEVEL_INFO, 'lbc_m_cl')
-    call lbc_m_ci%log_minmax(LOG_LEVEL_INFO, 'lbc_m_ci')
-    call lbc_m_r%log_minmax(LOG_LEVEL_INFO, 'lbc_m_r')
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_rho', lbc_rho )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_exner', lbc_exner )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_m_v', lbc_m_v )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_m_cl', lbc_m_cl )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_m_ci', lbc_m_ci )
+    call log_field_minmax( LOG_LEVEL_INFO, 'lbc_m_r', lbc_m_r )
 
 end subroutine map_lbc_inputs
 

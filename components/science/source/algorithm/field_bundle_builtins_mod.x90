@@ -148,6 +148,7 @@ contains
 
     use log_mod,                   only: lOG_LEVEL_INFO
     use finite_element_config_mod, only: element_order
+    use field_minmax_alg_mod,      only: log_field_minmax
 
     implicit none
     integer(kind=i_def), intent(in) :: bundle_size
@@ -155,7 +156,7 @@ contains
     integer(kind=i_def) :: i
 
     do i = 1,bundle_size
-      call x(i)%log_minmax(LOG_LEVEL_INFO, 'field')
+      call log_field_minmax( LOG_LEVEL_INFO, 'field', x(i) )
     end do
   end subroutine bundle_minmax
 
@@ -225,6 +226,7 @@ contains
 !> @param[in] bundle_size Number of fields in the bundle
 !> @return    is_zero     Logical value that is true when all fields are zero
   function bundle_is_zero(tolerance, bundle, bundle_size) result(is_zero)
+    use field_minmax_alg_mod,       only: get_field_minmax
     implicit none
     integer(kind=i_def), intent(in)    :: bundle_size
     real(kind=r_def),    intent(in)    :: tolerance
@@ -237,7 +239,7 @@ contains
 
     is_zero = .true.
     do i = 1,bundle_size
-      call bundle(i)%field_minmax( fmin, fmax )
+      call get_field_minmax( bundle(i), fmin, fmax )
       if ( abs(fmin) > tolerance .or. abs(fmax) > tolerance ) then
         is_zero = .false.
         return

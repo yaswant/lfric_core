@@ -139,6 +139,7 @@ contains
     use orography_config_mod,           only : orog_init_option, &
                                                orog_init_option_ancil, &
                                                orog_init_option_start_dump
+    use field_minmax_alg_mod,           only : log_field_minmax
 
     implicit none
 
@@ -296,8 +297,10 @@ contains
           call surface_altitude_alg( surface_altitude_w0, surface_altitude )
         end if
 
-        call surface_altitude%log_minmax(LOG_LEVEL_INFO, 'srf_alt')
-        call surface_altitude_w0%log_minmax(LOG_LEVEL_INFO, 'srf_alt_w0')
+        call log_field_minmax( LOG_LEVEL_INFO, 'srf_alt', surface_altitude )
+        call log_field_minmax( LOG_LEVEL_INFO, 'srf_alt_w0', &
+                                                      surface_altitude_w0 )
+
         nullify ( sf_mesh )
       end if
 
