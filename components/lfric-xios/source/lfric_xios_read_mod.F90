@@ -16,8 +16,8 @@ module lfric_xios_read_mod
                                       LARGE_REAL_NEGATIVE
   use lfric_xios_constants_mod, only: dp_xios
   use field_mod,                only: field_type, field_proxy_type
-  use field_r32_mod,            only: field_r32_type, field_r32_proxy_type
-  use field_r64_mod,            only: field_r64_type, field_r64_proxy_type
+  use field_real32_mod,         only: field_real32_type, field_real32_proxy_type
+  use field_real64_mod,         only: field_real64_type, field_real64_proxy_type
   use field_collection_iterator_mod, &
                                 only: field_collection_iterator_type
   use field_collection_mod,     only: field_collection_type
@@ -85,7 +85,7 @@ subroutine checkpoint_read_xios(xios_field_name, file_name, field_proxy)
 
   select type(field_proxy)
 
-    type is (field_r64_proxy_type)
+    type is (field_real64_proxy_type)
       call xios_recv_field("restart_"//trim(xios_field_name), field_proxy%data(1:undf))
       call field_proxy%set_dirty()
       ! Ensure annexed dofs for continuous fields are initialised
@@ -278,7 +278,7 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices, time_
       ! the undefined value by looking for a value <1 or >100000 and resetting
       ! it to 1. It's a hack, but it should be fixed properly by ticket #4348.
       time_index = max(time_index,1)
-      if( time_index > 100000) time_index=1
+      if( time_index > 10000) time_index=1
 
       ! Get correct time-entry from current multi-data level
       time_slice = ndata_slice( ( time_index - 1 ) * ( domain_size * vert_levels ) + 1 :  &
@@ -356,7 +356,7 @@ subroutine read_state(state, prefix, suffix)
     if ( .not.iter%has_next() ) exit
     fld => iter%next()
     select type(fld)
-      type is (field_r32_type)
+      type is (field_real32_type)
         if ( fld%can_read() ) then
           call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
                           LOG_LEVEL_INFO )
@@ -372,7 +372,7 @@ subroutine read_state(state, prefix, suffix)
                          ' not set up', LOG_LEVEL_INFO )
         end if
 
-      type is (field_r64_type)
+      type is (field_real64_type)
         if ( fld%can_read() ) then
           call log_event( 'Reading '//trim(adjustl(fld%get_name())), &
                           LOG_LEVEL_INFO )
@@ -450,7 +450,7 @@ subroutine read_checkpoint(state, timestep, checkpoint_stem_name, prefix, suffix
     if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
     if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
     select type(fld)
-    type is (field_r32_type)
+    type is (field_real32_type)
        if ( fld%can_checkpoint() ) then
 
           call log_event( 'Reading checkpoint file to restart '// &
@@ -467,7 +467,7 @@ subroutine read_checkpoint(state, timestep, checkpoint_stem_name, prefix, suffix
           call log_event( 'Reading not set up for  '// xios_field_id, &
                LOG_LEVEL_INFO )
        end if
-    type is (field_r64_type)
+    type is (field_real64_type)
        if ( fld%can_checkpoint() ) then
 
           call log_event( 'Reading checkpoint file to restart '// &

@@ -13,8 +13,8 @@ class field_collection_mod::field_collection_type {
   +remove_field( <<in>>field_name: string ) :
   +field_exists( <<in>>field_name: string ) :
   +get_first_item() : linked_list_item_type
-  +get_field( <<in>> field_name: string, <<out>> <<pointer>> field_r64_type )
-  +get_field( <<in>> field_name: string, <<out>> <<pointer>> field_r32_type )
+  +get_field( <<in>> field_name: string, <<out>> <<pointer>> field_real64_type )
+  +get_field( <<in>> field_name: string, <<out>> <<pointer>> field_real32_type )
   +get_field( <<in>> field_name: string, <<out>> <<pointer>> integer_field_type )
   +get_r_solver_field( <<in>>field_name: string ) : <<pointer>> r_solver_field_type
   +get_r_tran_field( <<in>>field_name: string ) : <<pointer>> r_tran_field_type

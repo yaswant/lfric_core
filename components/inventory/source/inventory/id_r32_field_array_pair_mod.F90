@@ -8,7 +8,7 @@
 module id_r32_field_array_pair_mod
 
   use constants_mod,         only: i_def
-  use field_r32_mod,         only: field_r32_type
+  use field_real32_mod,      only: field_real32_type
   use function_space_mod,    only: function_space_type
   use id_abstract_pair_mod,  only: id_abstract_pair_type
 
@@ -26,7 +26,7 @@ module id_r32_field_array_pair_mod
 
     private
 
-    type(field_r32_type), allocatable :: field_array_(:)
+    type(field_real32_type), allocatable :: field_array_(:)
 
   contains
 
@@ -74,7 +74,7 @@ contains
     implicit none
 
     class(id_r32_field_array_pair_type), intent(inout) :: self
-    type(field_r32_type),                intent(in)    :: field_array(:)
+    type(field_real32_type),             intent(in)    :: field_array(:)
     integer(kind=i_def),                 intent(in)    :: id
 
     integer(kind=i_def) :: i
@@ -99,7 +99,7 @@ contains
     implicit none
 
     class(id_r32_field_array_pair_type), target, intent(in) :: self
-    type(field_r32_type),                        pointer    :: field_array(:)
+    type(field_real32_type),                     pointer    :: field_array(:)
 
     field_array => self%field_array_
 

@@ -45,6 +45,8 @@ module field_parent_mod
     integer(kind=i_def), allocatable :: cpl_id( : )
     !> Depth of halo for this field
     integer(kind=i_def) :: field_halo_depth
+    !> marker for if a field has been initialised
+    logical(kind=l_def) :: initialised = .false.
   contains
     !> Initialiser for a field parent object
     !> @param [in] vector_space The function space that the field lives on
@@ -84,6 +86,8 @@ module field_parent_mod
     !> Return halo depth on this field
     !> @return The halo depth on this field
     procedure, public :: get_field_halo_depth
+    !> Returns whether this field has been initialised
+    procedure, public :: is_initialised
   end type field_parent_type
 
   !> Abstract field proxy type that is the patrent of any field proxy
@@ -253,6 +257,8 @@ contains
 
     nullify(mesh)
 
+    self%initialised = .true.
+
   end subroutine field_parent_initialiser
 
   ! Deallocate memory associated with a scalar field_parent_type instance.
@@ -268,6 +274,9 @@ contains
     if(allocated(self%cpl_id)) then
       deallocate(self%cpl_id)
     end if
+
+    self%initialised = .false.
+
   end subroutine field_parent_final
 
   ! Initialise public pointers that belong to the field_parent_type.
@@ -284,6 +293,15 @@ contains
    field_proxy%field_halo_depth => self%field_halo_depth
 
   end subroutine field_parent_proxy_initialiser
+
+  ! Checks if the field parent (so, hence, the field) has been initialised
+  function is_initialised(self) result(initialised)
+    implicit none
+    class(field_parent_type), intent(in) :: self
+    logical(l_def) :: initialised
+
+    initialised = self%initialised
+  end function is_initialised
 
   ! Copy the contents of one field_parent_type to another
   subroutine copy_field_parent(self, dest)

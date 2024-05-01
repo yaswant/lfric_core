@@ -13,8 +13,8 @@ module inventory_by_local_mesh_mod
 
   use constants_mod,                    only: i_def, l_def, str_def
   use field_mod,                        only: field_type
-  use field_r32_mod,                    only: field_r32_type
-  use field_r64_mod,                    only: field_r64_type
+  use field_real32_mod,                 only: field_real32_type
+  use field_real64_mod,                 only: field_real64_type
   use function_space_mod,               only: function_space_type
   use integer_field_mod,                only: integer_field_type
   use log_mod,                          only: log_event, log_scratch_space, &
@@ -504,7 +504,7 @@ subroutine add_r32_field(self, field, fs, local_mesh, name)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  type(field_r32_type),       pointer, intent(out)   :: field
+  type(field_real32_type),    pointer, intent(out)   :: field
   type(function_space_type),  pointer, intent(in)    :: fs
   type(local_mesh_type),               intent(in)    :: local_mesh
   character(*),              optional, intent(in)    :: name
@@ -534,7 +534,7 @@ subroutine add_r64_field(self, field, fs, local_mesh, name)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  type(field_r64_type),       pointer, intent(out)   :: field
+  type(field_real64_type),    pointer, intent(out)   :: field
   type(function_space_type),  pointer, intent(in)    :: fs
   type(local_mesh_type),               intent(in)    :: local_mesh
   character(*),              optional, intent(in)    :: name
@@ -632,7 +632,7 @@ subroutine copy_r32_field(self, field, local_mesh)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  type(field_r32_type),                intent(in)    :: field
+  type(field_real32_type),             intent(in)    :: field
   type(local_mesh_type),               intent(in)    :: local_mesh
   type(id_r32_field_pair_type)                       :: paired_object
 
@@ -650,7 +650,7 @@ subroutine copy_r64_field(self, field, local_mesh)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  type(field_r64_type),                intent(in)    :: field
+  type(field_real64_type),             intent(in)    :: field
   type(local_mesh_type),               intent(in)    :: local_mesh
   type(id_r64_field_pair_type)                       :: paired_object
 
@@ -691,7 +691,7 @@ subroutine get_r32_field(self, local_mesh, field)
 
   class(inventory_by_local_mesh_type), intent(in)  :: self
   type(local_mesh_type),               intent(in)  :: local_mesh
-  type(field_r32_type),       pointer, intent(out) :: field
+  type(field_real32_type),    pointer, intent(out) :: field
   class(id_abstract_pair_type),        pointer     :: paired_object
 
   paired_object => self%get_paired_object(local_mesh%get_id())
@@ -714,7 +714,7 @@ subroutine get_r64_field(self, local_mesh, field)
 
   class(inventory_by_local_mesh_type), intent(in)  :: self
   type(local_mesh_type),               intent(in)  :: local_mesh
-  type(field_r64_type),       pointer, intent(out) :: field
+  type(field_real64_type),    pointer, intent(out) :: field
   class(id_abstract_pair_type),        pointer     :: paired_object
 
   paired_object => self%get_paired_object(local_mesh%get_id())

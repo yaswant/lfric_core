@@ -1,15 +1,15 @@
 !-----------------------------------------------------------------------------
-! Copyright (c) 2017,  Met Office, on behalf of HMSO and Queen's Printer
-! For further details please refer to the file LICENCE.original which you
-! should have received as part of this distribution.
+! (C) Crown copyright 2024 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
 !-----------------------------------------------------------------------------
 
 !> Test the field representation
 !>
 !-------------------------------------------------------------------------------
-module field_r64_mod_test
+module field_int32_mod_test
 
-  use, intrinsic :: iso_fortran_env,  only : real64
+  use, intrinsic :: iso_fortran_env,  only : int32
   use constants_mod,                  only : i_def, str_def, imdi
   use halo_comms_mod,                 only : initialise_halo_comms, &
                                              finalise_halo_comms
@@ -30,12 +30,12 @@ module field_r64_mod_test
   implicit none
 
   private
-  public :: test_field_r64, &
-            test_field_r64_proxy, &
-            test_empty_field_r64
+  public :: test_field_int32, &
+            test_field_int32_proxy, &
+            test_empty_field_int32
 
   @TestCase
-  type, extends(MPITestCase), public :: field_r64_test_type
+  type, extends(MPITestCase), public :: field_int32_test_type
     private
     type(function_space_type), pointer :: w2_fs => null()
     type(function_space_type), pointer :: w3_fs => null()
@@ -45,10 +45,10 @@ module field_r64_mod_test
     procedure setUp
     procedure tearDown
     procedure get_local_mesh_ptr
-    procedure test_field_r64
-    procedure test_field_r64_proxy
-    procedure test_empty_field_r64
-  end type field_r64_test_type
+    procedure test_field_int32
+    procedure test_field_int32_proxy
+    procedure test_empty_field_int32
+  end type field_int32_test_type
 
   integer(i_def), parameter :: element_order = 0
 
@@ -59,7 +59,7 @@ contains
 
     implicit none
 
-    class(field_r64_test_type), intent(inout) :: this
+    class(field_int32_test_type), intent(inout) :: this
 
     type(local_mesh_type), pointer :: unit_test_local_mesh_ptr
     type(mesh_type) :: unit_test_mesh
@@ -99,7 +99,7 @@ contains
 
     implicit none
 
-    class(field_r64_test_type), intent(inout) :: this
+    class(field_int32_test_type), intent(inout) :: this
 
     call function_space_collection%clear()
     call mesh_collection%clear()
@@ -116,7 +116,7 @@ contains
 
   function get_local_mesh_ptr(this) result(unit_test_local_mesh_ptr)
     implicit none
-    class(field_r64_test_type), intent(inout), target :: this
+    class(field_int32_test_type), intent(inout), target :: this
     type(local_mesh_type), pointer :: unit_test_local_mesh_ptr
     unit_test_local_mesh_ptr => this%unit_test_local_mesh
   end function get_local_mesh_ptr
@@ -124,18 +124,18 @@ contains
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   @Test( npes=[1] )
-  subroutine test_field_r64( this )
+  subroutine test_field_int32( this )
 
-    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
+    use field_int32_mod, only: field_int32_type, field_int32_proxy_type
 
     implicit none
 
-    class(field_r64_test_type), intent(inout) :: this
+    class(field_int32_test_type), intent(inout) :: this
 
-    type(field_r64_type)          :: f1
-    type(field_r64_type)          :: f2
-    type(field_r64_proxy_type)    :: f1_p
-    type(field_r64_proxy_type)    :: f2_p
+    type(field_int32_type)          :: f1
+    type(field_int32_type)          :: f2
+    type(field_int32_proxy_type)    :: f1_p
+    type(field_int32_proxy_type)    :: f2_p
 
     character(str_def) :: name
     integer(i_def)     :: halo_depth
@@ -191,30 +191,30 @@ contains
     name = f2%get_name()
     @assertEqual( 'f2', trim(name) )
 
-  end subroutine test_field_r64
+  end subroutine test_field_int32
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   @Test( npes=[1] )
-  subroutine test_field_r64_proxy( this )
+  subroutine test_field_int32_proxy( this )
 
-    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
+    use field_int32_mod, only: field_int32_type, field_int32_proxy_type
 
     implicit none
 
-    class(field_r64_test_type), intent(inout) :: this
+    class(field_int32_test_type), intent(inout) :: this
 
-    type(field_r64_type)       :: f1
-    type(field_r64_type)       :: f2
-    type(field_r64_type)       :: f3
-    type(field_r64_proxy_type) :: f1_p
-    type(field_r64_proxy_type) :: f2_p
-    type(field_r64_proxy_type) :: f3_p
-    integer(i_def)             :: i
-    integer(i_def)             :: halo_depth
+    type(field_int32_type)       :: f1
+    type(field_int32_type)       :: f2
+    type(field_int32_type)       :: f3
+    type(field_int32_proxy_type) :: f1_p
+    type(field_int32_proxy_type) :: f2_p
+    type(field_int32_proxy_type) :: f3_p
+    integer(i_def)               :: i
+    integer(i_def)               :: halo_depth
     type(halo_routing_type), pointer :: halo_routing
-    integer(i_def)             :: order
-    real(real64)               :: test_sum, test_min, test_max
-    logical                    :: dirty
+    integer(i_def)               :: order
+    integer(int32)               :: test_sum, test_min, test_max
+    logical                      :: dirty
 
     ! Make a field with a function space
     call f1%initialise( vector_space = this%w2_fs, name='f1', halo_depth=3 )
@@ -224,14 +224,14 @@ contains
 
     !Initialise field data
     do i=1,f1_p%vspace%get_undf()
-      f1_p%data(i)=real(i)
+      f1_p%data(i)=int(i,kind=int32)
     end do
 
     ! Make a second field, identical to the first
     call f2%initialise( vector_space = this%w2_fs )
     f2_p = f2%get_proxy()
     do i=1,f2_p%vspace%get_undf()
-      f2_p%data(i)=real(i)
+      f2_p%data(i)=int(i,kind=int32)
     end do
 
     ! Perform a halo swap on the second field
@@ -240,17 +240,17 @@ contains
     call f2_p%halo_exchange_finish(1)
 
     ! For serial case, the halo swapped field should be the same as the original
-    @assertEqual( f1_p%data  , f2_p%data, 1.0e-2_real64 )
+    @assertEqual( f1_p%data  , f2_p%data, 1.0e-2_int32 )
 
     ! Test the global reductions
     test_sum=f1_p%get_sum()
-    @assertEqual( 4095.0  , test_sum, 1.0e-2_real64 )
+    @assertEqual( 4095_int32  , test_sum, 1.0e-2_int32 )
 
     test_min=f1_p%get_min()
-    @assertEqual( 1.0  , test_min, 1.0e-2_real64 )
+    @assertEqual( 1_int32  , test_min, 1.0e-2_int32 )
 
     test_max=f1_p%get_max()
-    @assertEqual( 90.0  , test_max, 1.0e-2_real64)
+    @assertEqual( 90_int32  , test_max, 1.0e-2_int32)
 
     halo_depth=f1_p%get_field_proxy_halo_depth()
     @assertEqual ( 3, halo_depth )
@@ -274,22 +274,22 @@ contains
     dirty=f1_p%is_dirty(1)
     @assertFalse ( dirty )
 
-  end subroutine test_field_r64_proxy
+  end subroutine test_field_int32_proxy
 
   @Test( npes=[1] )
-  subroutine test_empty_field_r64( this )
+  subroutine test_empty_field_int32( this )
 
-    use field_r64_mod, only: field_r64_type, field_r64_proxy_type
+    use field_int32_mod, only: field_int32_type, field_int32_proxy_type
 
     implicit none
 
-    class(field_r64_test_type), intent(inout) :: this
+    class(field_int32_test_type), intent(inout) :: this
 
-    type(field_r64_type)       :: f1
-    type(field_r64_proxy_type) :: f1_p
-    integer(i_def)             :: i
+    type(field_int32_type)       :: f1
+    type(field_int32_proxy_type) :: f1_p
+    integer(i_def)                :: i
 
-    real(real64), target :: empty_data(1)
+    integer(int32), target :: empty_data(1)
 
     ! Make a field, but provide override data
     call f1%initialise( vector_space = this%w2_fs, name = 'f1', override_data = empty_data )
@@ -318,6 +318,6 @@ contains
     ! Check that the proxy returns the empty_data array once again
     @assertTrue( associated( f1_p%data, empty_data ) )
 
-  end subroutine test_empty_field_r64
+  end subroutine test_empty_field_int32
 
-end module field_r64_mod_test
+end module field_int32_mod_test

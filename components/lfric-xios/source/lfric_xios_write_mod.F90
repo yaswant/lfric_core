@@ -13,8 +13,8 @@ module lfric_xios_write_mod
   use constants_mod,        only: i_def, l_def, str_def, str_max_filename
   use lfric_xios_constants_mod, &
                             only: dp_xios, xios_max_int
-  use field_r32_mod,        only: field_r32_type, field_r32_proxy_type
-  use field_r64_mod,        only: field_r64_type, field_r64_proxy_type
+  use field_real32_mod,     only: field_real32_type, field_real32_proxy_type
+  use field_real64_mod,     only: field_real64_type, field_real64_proxy_type
   use field_parent_mod,     only: field_parent_proxy_type
   use field_collection_iterator_mod, &
                             only: field_collection_iterator_type
@@ -128,10 +128,10 @@ subroutine checkpoint_write_xios(xios_field_name, file_name, field_proxy)
   ! Different field kinds are selected to access data
   select type(field_proxy)
 
-    type is (field_r32_proxy_type)
+    type is (field_real32_proxy_type)
     send_field = field_proxy%data(1:undf)
 
-    type is (field_r64_proxy_type)
+    type is (field_real64_proxy_type)
     send_field = field_proxy%data(1:undf)
 
     type is (integer_field_proxy_type)
@@ -179,7 +179,7 @@ subroutine write_state(state, prefix, suffix)
     if ( .not.iter%has_next() ) exit
     fld => iter%next()
     select type(fld)
-      type is (field_r32_type)
+      type is (field_real32_type)
         if ( fld%can_write() ) then
           write(log_scratch_space,'(3A,I6)') &
               "Writing ", trim(adjustl(fld%get_name()))
@@ -197,7 +197,7 @@ subroutine write_state(state, prefix, suffix)
                       ' not set up', LOG_LEVEL_INFO )
 
         end if
-      type is (field_r64_type)
+      type is (field_real64_type)
         if ( fld%can_write() ) then
           write(log_scratch_space,'(3A,I6)') &
               "Writing ", trim(adjustl(fld%get_name()))
@@ -279,7 +279,7 @@ subroutine write_checkpoint( state, clock, checkpoint_stem_name, prefix, suffix 
      if ( present(prefix) ) xios_field_id = trim(adjustl(prefix)) // trim(adjustl(xios_field_id))
      if ( present(suffix) ) xios_field_id = trim(adjustl(xios_field_id)) // trim(adjustl(suffix))
      select type(fld)
-     type is (field_r32_type)
+     type is (field_real32_type)
         if ( fld%can_checkpoint() ) then
            write(log_scratch_space,'(2A)') &
                 "Checkpointing ", xios_field_id
@@ -299,7 +299,7 @@ subroutine write_checkpoint( state, clock, checkpoint_stem_name, prefix, suffix 
            call log_event( 'Writing not set up for '// xios_field_id, &
                           LOG_LEVEL_INFO )
         end if
-     type is (field_r64_type)
+     type is (field_real64_type)
         if ( fld%can_checkpoint() ) then
            write(log_scratch_space,'(2A)') &
                 "Checkpointing ", xios_field_id

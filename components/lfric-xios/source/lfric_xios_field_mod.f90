@@ -12,8 +12,8 @@ module lfric_xios_field_mod
   use field_collection_iterator_mod, &
                             only: field_collection_iterator_type
   use field_mod,            only: field_type
-  use field_r32_mod,        only: field_r32_type
-  use field_r64_mod,        only: field_r64_type
+  use field_real32_mod,     only: field_real32_type
+  use field_real64_mod,     only: field_real64_type
   use field_parent_mod,     only: field_parent_type
   use function_space_mod,   only: function_space_type
   use fs_continuity_mod,    only: W0, W1, W2, W3, Wtheta, W2H, W2V, &
@@ -195,10 +195,10 @@ subroutine register(self)
 
   ! Set output field precision
   select type(fld => self%model_field)
-  type is (field_r32_type)
+  type is (field_real32_type)
     call xios_set_attr(self%handle, prec=4)
 
-  type is (field_r64_type)
+  type is (field_real64_type)
     call xios_set_attr(self%handle, prec=8)
 
   type is (integer_field_type)
@@ -225,10 +225,10 @@ subroutine recv(self)
                   log_level_trace )
 
   select type(fld => self%model_field)
-  type is (field_r32_type)
+  type is (field_real32_type)
     call fld%read_field(self%xios_id)
 
-  type is (field_r64_type)
+  type is (field_real64_type)
     call fld%read_field(self%xios_id)
 
   type is (integer_field_type)
@@ -252,10 +252,10 @@ subroutine send(self)
                   log_level_trace )
 
   select type(fld => self%model_field)
-  type is (field_r32_type)
+  type is (field_real32_type)
     call fld%write_field(self%xios_id)
 
-  type is (field_r64_type)
+  type is (field_real64_type)
     call fld%write_field(self%xios_id)
 
   type is (integer_field_type)

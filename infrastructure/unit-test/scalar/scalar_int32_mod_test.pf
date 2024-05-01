@@ -1,16 +1,16 @@
 !-----------------------------------------------------------------------------
-! (C) Crown copyright 2022 Met Office. All rights reserved.
+! (C) Crown copyright 2024 Met Office. All rights reserved.
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
-!-----------------------------------------------------------------------------
 !-----------------------------------------------------------------------------
 
 !> Test the scalar object
 !>
 !-------------------------------------------------------------------------------
-module scalar_r32_mod_test
+module scalar_int32_mod_test
 
-  use, intrinsic :: iso_fortran_env, only : real32
+  use, intrinsic :: iso_fortran_env, only : int32
+  use constants_mod, only: i_def
   use mpi_mod, only : global_mpi
   use pFUnit_Mod
 
@@ -20,13 +20,13 @@ module scalar_r32_mod_test
   public :: test_all
 
   @TestCase
-  type, extends(MPITestCase), public :: scalar_r32_test_type
+  type, extends(MPITestCase), public :: scalar_int32_test_type
     private
   contains
     procedure setUp
     procedure tearDown
     procedure test_all
-  end type scalar_r32_test_type
+  end type scalar_int32_test_type
 
 contains
 
@@ -35,7 +35,7 @@ contains
 
     implicit none
 
-    class(scalar_r32_test_type), intent(inout) :: this
+    class(scalar_int32_test_type), intent(inout) :: this
 
     !Store the MPI communicator for later use
     call global_mpi%initialise(this%getMpiCommunicator())
@@ -47,7 +47,7 @@ contains
 
     implicit none
 
-    class(scalar_r32_test_type), intent(inout) :: this
+    class(scalar_int32_test_type), intent(inout) :: this
 
     ! Clear the stored MPI communicator
     call global_mpi%finalise()
@@ -55,46 +55,50 @@ contains
   end subroutine tearDown
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  @Test( npes=[1] )
+  @Test( npes=[2] )
   subroutine test_all( this )
 
-    use scalar_r32_mod, only: scalar_r32_type
+    use scalar_int32_mod, only: scalar_int32_type
 
     implicit none
 
-    class(scalar_r32_test_type), intent(inout) :: this
+    class(scalar_int32_test_type), intent(inout) :: this
 
-    type(scalar_r32_type)          :: s1, s2
+    type(scalar_int32_type) :: s1, s2
 
-    real(real32) :: s1_val, s2_val
-    real(real32) :: sum, min, max
+    integer(int32) :: s1_val, s2_val
+    integer(int32) :: sum_val, min_val, max_val
 
-    s1_val = 23.0_real32
+    integer(i_def) :: local_rank
+
+    local_rank  = global_mpi%get_comm_rank()
+
+    s1_val = 10_int32 + int(local_rank, kind=int32)
 
     s1%value = s1_val
 
     ! Check the scalar type has been correctly constructed and that
     ! we have access to the data
-    @assertEqual( s1_val, s1%value, 1.0e-2_real32 )
+    @assertEqual( s1_val, s1%value )
 
     ! Test the global reductions
     ! - a bit trivial until we have parallel tests
-    sum = s1%get_sum()
-    @assertEqual( s1_val, sum, 1.0e-2_real32 )
+    sum_val = s1%get_sum()
+    @assertEqual( 21_int32, sum_val )
 
-    min = s1%get_min()
-    @assertEqual( s1_val, min, 1.0e-2_real32 )
+    min_val = s1%get_min()
+    @assertEqual( 10_int32, min_val )
 
-    max = s1%get_max()
-    @assertEqual( s1_val, max, 1.0e-2_real32 )
+    max_val = s1%get_max()
+    @assertEqual( 11_int32, max_val )
 
     ! Test alternative way to create a scalar - by calling the initialiser
-    s2_val = 47_real32
+    s2_val = 20_int32 + int(local_rank, kind=int32)
     call s2%initialise(s2_val, global_mpi)
     ! Make sure we can call one of the reductions on this scalar
-    sum = s2%get_sum()
-    @assertEqual( s2_val, sum, 1.0e-2_real32 )
+    sum_val = s2%get_sum()
+    @assertEqual( 41_int32, sum_val )
 
   end subroutine test_all
 
-end module scalar_r32_mod_test
+end module scalar_int32_mod_test

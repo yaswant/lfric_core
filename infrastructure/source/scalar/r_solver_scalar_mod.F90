@@ -16,9 +16,9 @@ module r_solver_scalar_mod
   ! PSyclone is expecting to "use" the definitions from here, so this is where
   ! it is set
 #if (R_SOLVER_PRECISION == 32)
-  use scalar_r32_mod, only: r_solver_scalar_type => scalar_r32_type
+  use scalar_real32_mod, only: r_solver_scalar_type => scalar_real32_type
 #else
-  use scalar_r64_mod, only: r_solver_scalar_type => scalar_r64_type
+  use scalar_real64_mod, only: r_solver_scalar_type => scalar_real64_type
 #endif
 
   implicit none

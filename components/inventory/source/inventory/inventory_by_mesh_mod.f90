@@ -13,8 +13,8 @@ module inventory_by_mesh_mod
 
   use constants_mod,                    only: i_def, l_def, str_def
   use field_mod,                        only: field_type
-  use field_r32_mod,                    only: field_r32_type
-  use field_r64_mod,                    only: field_r64_type
+  use field_real32_mod,                 only: field_real32_type
+  use field_real64_mod,                 only: field_real64_type
   use function_space_mod,               only: function_space_type
   use integer_field_mod,                only: integer_field_type
   use log_mod,                          only: log_event, log_scratch_space, &
@@ -653,7 +653,7 @@ subroutine add_r32_field(self, field, fs, mesh, name, halo_depth)
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r32_type),      pointer, intent(out)   :: field
+  type(field_real32_type),   pointer, intent(out)   :: field
   type(function_space_type), pointer, intent(in)    :: fs
   type(mesh_type),                    intent(in)    :: mesh
   character(*),             optional, intent(in)    :: name
@@ -687,7 +687,7 @@ subroutine add_r64_field(self, field, fs, mesh, name, halo_depth)
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r64_type),      pointer, intent(out)   :: field
+  type(field_real64_type),   pointer, intent(out)   :: field
   type(function_space_type), pointer, intent(in)    :: fs
   type(mesh_type),                    intent(in)    :: mesh
   character(*),             optional, intent(in)    :: name
@@ -720,7 +720,7 @@ subroutine add_r32_intermesh_field(self, field, fs, source_mesh, target_mesh)
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r32_type),      pointer, intent(out)   :: field
+  type(field_real32_type),   pointer, intent(out)   :: field
   type(function_space_type), pointer, intent(in)    :: fs
   type(mesh_type),                    intent(in)    :: source_mesh
   type(mesh_type),                    intent(in)    :: target_mesh
@@ -747,7 +747,7 @@ subroutine add_r64_intermesh_field(self, field, fs, source_mesh, target_mesh)
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r64_type),      pointer, intent(out)   :: field
+  type(field_real64_type),   pointer, intent(out)   :: field
   type(function_space_type), pointer, intent(in)    :: fs
   type(mesh_type),                    intent(in)    :: source_mesh
   type(mesh_type),                    intent(in)    :: target_mesh
@@ -809,7 +809,7 @@ subroutine add_r32_field_array(self, field_array, fs, array_size, mesh, halo_dep
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r32_type),      pointer, intent(out)   :: field_array(:)
+  type(field_real32_type),   pointer, intent(out)   :: field_array(:)
   type(function_space_type), pointer, intent(in)    :: fs
   integer(kind=i_def),                intent(in)    :: array_size
   type(mesh_type),                    intent(in)    :: mesh
@@ -836,7 +836,7 @@ subroutine add_r64_field_array(self, field_array, fs, array_size, mesh, halo_dep
   implicit none
 
   class(inventory_by_mesh_type),      intent(inout) :: self
-  type(field_r64_type),      pointer, intent(out)   :: field_array(:)
+  type(field_real64_type),   pointer, intent(out)   :: field_array(:)
   type(function_space_type), pointer, intent(in)    :: fs
   integer(kind=i_def),                intent(in)    :: array_size
   type(mesh_type),                    intent(in)    :: mesh
@@ -972,7 +972,7 @@ subroutine copy_r32_field(self, field, mesh)
   implicit none
 
   class(inventory_by_mesh_type), intent(inout) :: self
-  type(field_r32_type),          intent(in)    :: field
+  type(field_real32_type),          intent(in)    :: field
   type(mesh_type),               intent(in)    :: mesh
   type(id_r32_field_pair_type)                 :: paired_object
 
@@ -990,7 +990,7 @@ subroutine copy_r64_field(self, field, mesh)
   implicit none
 
   class(inventory_by_mesh_type), intent(inout) :: self
-  type(field_r64_type),          intent(in)    :: field
+  type(field_real64_type),       intent(in)    :: field
   type(mesh_type),               intent(in)    :: mesh
   type(id_r64_field_pair_type)                 :: paired_object
 
@@ -1009,7 +1009,7 @@ subroutine copy_r32_intermesh_field(self, field, source_mesh, target_mesh)
   implicit none
 
   class(inventory_by_mesh_type), intent(inout) :: self
-  type(field_r32_type),          intent(in)    :: field
+  type(field_real32_type),       intent(in)    :: field
   type(mesh_type),               intent(in)    :: source_mesh
   type(mesh_type),               intent(in)    :: target_mesh
   type(id_r32_field_pair_type)                 :: paired_object
@@ -1032,7 +1032,7 @@ subroutine copy_r64_intermesh_field(self, field, source_mesh, target_mesh)
   implicit none
 
   class(inventory_by_mesh_type), intent(inout) :: self
-  type(field_r64_type),          intent(in)    :: field
+  type(field_real64_type),       intent(in)    :: field
   type(mesh_type),               intent(in)    :: source_mesh
   type(mesh_type),               intent(in)    :: target_mesh
   type(id_r64_field_pair_type)                 :: paired_object
@@ -1072,7 +1072,7 @@ subroutine copy_r32_field_array(self, field_array, mesh)
   implicit none
 
   class(inventory_by_mesh_type),     intent(inout) :: self
-  type(field_r32_type),              intent(in)    :: field_array(:)
+  type(field_real32_type),           intent(in)    :: field_array(:)
   type(mesh_type),                   intent(in)    :: mesh
   type(id_r32_field_array_pair_type)               :: paired_object
 
@@ -1090,7 +1090,7 @@ subroutine copy_r64_field_array(self, field_array, mesh)
   implicit none
 
   class(inventory_by_mesh_type),     intent(inout) :: self
-  type(field_r64_type),              intent(in)    :: field_array(:)
+  type(field_real64_type),           intent(in)    :: field_array(:)
   type(mesh_type),                   intent(in)    :: mesh
   type(id_r64_field_array_pair_type)               :: paired_object
 
@@ -1165,10 +1165,10 @@ subroutine get_r32_field(self, mesh, field)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: mesh
-  type(field_r32_type), pointer, intent(out) :: field
-  class(id_abstract_pair_type),  pointer     :: paired_object
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: mesh
+  type(field_real32_type), pointer, intent(out) :: field
+  class(id_abstract_pair_type), pointer         :: paired_object
 
   paired_object => self%get_paired_object(mesh%get_id())
 
@@ -1188,10 +1188,10 @@ subroutine get_r64_field(self, mesh, field)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: mesh
-  type(field_r64_type), pointer, intent(out) :: field
-  class(id_abstract_pair_type),  pointer     :: paired_object
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: mesh
+  type(field_real64_type), pointer, intent(out) :: field
+  class(id_abstract_pair_type), pointer         :: paired_object
 
   paired_object => self%get_paired_object(mesh%get_id())
 
@@ -1212,12 +1212,12 @@ subroutine get_r32_intermesh_field(self, source_mesh, target_mesh, field)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: source_mesh
-  type(mesh_type),               intent(in)  :: target_mesh
-  type(field_r32_type), pointer, intent(out) :: field
-  class(id_abstract_pair_type),  pointer     :: paired_object
-  integer(kind=i_def)                        :: intermesh_id
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: source_mesh
+  type(mesh_type),                  intent(in)  :: target_mesh
+  type(field_real32_type), pointer, intent(out) :: field
+  class(id_abstract_pair_type), pointer         :: paired_object
+  integer(kind=i_def)                           :: intermesh_id
 
   ! Make a unique ID for transform between source and target mesh
   intermesh_id = self%compute_intermesh_id(source_mesh, target_mesh)
@@ -1241,12 +1241,12 @@ subroutine get_r64_intermesh_field(self, source_mesh, target_mesh, field)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: source_mesh
-  type(mesh_type),               intent(in)  :: target_mesh
-  type(field_r64_type), pointer, intent(out) :: field
-  class(id_abstract_pair_type),  pointer     :: paired_object
-  integer(kind=i_def)                        :: intermesh_id
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: source_mesh
+  type(mesh_type),                  intent(in)  :: target_mesh
+  type(field_real64_type), pointer, intent(out) :: field
+  class(id_abstract_pair_type), pointer         :: paired_object
+  integer(kind=i_def)                           :: intermesh_id
 
   ! Make a unique ID for transform between source and target mesh
   intermesh_id = self%compute_intermesh_id(source_mesh, target_mesh)
@@ -1292,10 +1292,10 @@ subroutine get_r32_field_array(self, mesh, field_array)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: mesh
-  type(field_r32_type), pointer, intent(out) :: field_array(:)
-  class(id_abstract_pair_type),  pointer     :: paired_object
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: mesh
+  type(field_real32_type), pointer, intent(out) :: field_array(:)
+  class(id_abstract_pair_type), pointer         :: paired_object
 
   paired_object => self%get_paired_object(mesh%get_id())
 
@@ -1315,10 +1315,10 @@ subroutine get_r64_field_array(self, mesh, field_array)
 
   implicit none
 
-  class(inventory_by_mesh_type), intent(in)  :: self
-  type(mesh_type),               intent(in)  :: mesh
-  type(field_r64_type), pointer, intent(out) :: field_array(:)
-  class(id_abstract_pair_type),  pointer     :: paired_object
+  class(inventory_by_mesh_type),    intent(in)  :: self
+  type(mesh_type),                  intent(in)  :: mesh
+  type(field_real64_type), pointer, intent(out) :: field_array(:)
+  class(id_abstract_pair_type), pointer         :: paired_object
 
   paired_object => self%get_paired_object(mesh%get_id())
 

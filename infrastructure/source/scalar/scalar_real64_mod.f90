@@ -4,15 +4,15 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing 32-bit real scalar related classes.
+!> @brief A module providing 64-bit real scalar related classes.
 !>
-!> @details A representation of a 32-bit real scalar which provides both easy
+!> @details A representation of a 64-bit real scalar which provides both easy
 !> access to the scalar data and a method by which the PSy layer can access the
 !> distributed memory aspects of the scalar
 
-module scalar_r32_mod
+module scalar_real64_mod
 
-  use, intrinsic :: iso_fortran_env, only : real32
+  use, intrinsic :: iso_fortran_env, only : real64
 
   use constants_mod,      only: i_def, l_def
   use mpi_mod,            only: mpi_type, global_mpi
@@ -25,10 +25,10 @@ module scalar_r32_mod
 
   !> PSy layer representation of a scalar.
   !>
-  type, public :: scalar_r32_type
+  type, public :: scalar_real64_type
     private
     !> The value of the scalar
-    real(kind=real32), public :: value
+    real(kind=real64), public :: value
     !> Object that describes what processes the scalar is represented over
     type(mpi_type)            :: mpi
     !> Logical for whether the initialiser has been called
@@ -51,7 +51,7 @@ module scalar_r32_mod
     !> Currently only have blocking reductions, so this
     !> subroutine currently returns without waiting.
     procedure reduction_finish
-  end type scalar_r32_type
+  end type scalar_real64_type
 
 contains
 
@@ -65,8 +65,8 @@ contains
   !>                 over which this scalar is held
   subroutine initialise(self, value, mpi)
     implicit none
-    class(scalar_r32_type), intent(inout) :: self
-    real(kind=real32), intent(in)         :: value
+    class(scalar_real64_type), intent(inout) :: self
+    real(kind=real64), intent(in)         :: value
     type(mpi_type), intent(in), optional  :: mpi
 
     self%value = value
@@ -82,8 +82,8 @@ contains
   function get_sum(self) result (g_sum)
     use mpi_mod, only: global_mpi
     implicit none
-    class(scalar_r32_type), intent(inout) :: self
-    real(real32) :: g_sum
+    class(scalar_real64_type), intent(inout) :: self
+    real(real64) :: g_sum
     ! If an mpi object has been specified, use that, otherwise use global_mpi
     if(self%mpi_initialised)then
       call self%mpi%global_sum( self%value, g_sum )
@@ -97,8 +97,8 @@ contains
   function get_min(self) result (g_min)
     use mpi_mod, only: global_mpi
     implicit none
-    class(scalar_r32_type), intent(inout) :: self
-    real(real32) :: g_min
+    class(scalar_real64_type), intent(inout) :: self
+    real(real64) :: g_min
     ! If an mpi object has been specified, use that, otherwise use global_mpi
     if(self%mpi_initialised)then
       call self%mpi%global_min( self%value, g_min )
@@ -112,8 +112,8 @@ contains
   function get_max(self) result (g_max)
     use mpi_mod, only: global_mpi
     implicit none
-    class(scalar_r32_type), intent(inout) :: self
-    real(real32) :: g_max
+    class(scalar_real64_type), intent(inout) :: self
+    real(real64) :: g_max
     ! If an mpi object has been specified, use that, otherwise use global_mpi
     if(self%mpi_initialised)then
       call self%mpi%global_max( self%value, g_max )
@@ -129,8 +129,8 @@ contains
   !! API so when non-blocking reductions are implemented, we can support them
   subroutine reduction_finish(self)
     implicit none
-    class(scalar_r32_type), intent(in) :: self
-    real(real32)    ::  value_tmp
+    class(scalar_real64_type), intent(in) :: self
+    real(real64)    ::  value_tmp
     value_tmp=self%value            ! reduction_finish currently does nothing.
                                     ! The "self" that is passed in automatically
                                     ! to a type-bound subroutine is not used -
@@ -138,4 +138,4 @@ contains
                                     ! it for something harmless.
   end subroutine reduction_finish
 
-end module scalar_r32_mod
+end module scalar_real64_mod

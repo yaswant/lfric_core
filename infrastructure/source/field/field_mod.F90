@@ -18,13 +18,13 @@ module field_mod
   ! within the model (as it is model information). For now, PSyclone is
   ! expecting to "use" the definitions from field_mod, so it is set here
 #if (RDEF_PRECISION == 32)
-  use field_r32_mod, only: field_type         => field_r32_type, &
-                           field_proxy_type   => field_r32_proxy_type, &
-                           field_pointer_type => field_r32_pointer_type
+  use field_real32_mod, only: field_type         => field_real32_type, &
+                              field_proxy_type   => field_real32_proxy_type, &
+                              field_pointer_type => field_real32_pointer_type
 #else
-  use field_r64_mod, only: field_type         => field_r64_type, &
-                           field_proxy_type   => field_r64_proxy_type, &
-                           field_pointer_type => field_r64_pointer_type
+  use field_real64_mod, only: field_type         => field_real64_type, &
+                              field_proxy_type   => field_real64_proxy_type, &
+                              field_pointer_type => field_real64_pointer_type
 #endif
 
   implicit none

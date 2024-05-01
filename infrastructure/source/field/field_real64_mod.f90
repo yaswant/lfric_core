@@ -4,19 +4,18 @@
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
 !
-!> @brief A module providing 64-bit real field related classes.
+!> @brief Provides field related classes for real field data of kind real64.
 !>
-!> @details This is a version of a field object that can hold 64-bit real data
-!> values. It contains both a representation of a 64-bit real field which
+!> @details This is a version of a field object that can hold real data values
+!> of kind real64. It contains both a representation of a field which
 !> provides no access to the underlying data (to be used in the algorithm layer)
 !> and an accessor class (to be used in the Psy layer).
 
-module field_r64_mod
+module field_real64_mod
 
   use, intrinsic :: iso_fortran_env, only : real64
 
-  use constants_mod,        only: i_def, i_halo_index, l_def, &
-                                  str_def, real_type, &
+  use constants_mod,        only: i_def, l_def, str_def, real_type, &
                                   default_halo_depth
   use field_parent_mod,     only: field_parent_type, &
                                   field_parent_proxy_type, &
@@ -39,7 +38,6 @@ module field_r64_mod
                                   log_level, &
                                   LOG_LEVEL_INFO, &
                                   LOG_LEVEL_ERROR
-  use scalar_r64_mod,       only: scalar_r64_type
   use signalling_value_mod, only: get_signalling_value
 
   use pure_abstract_field_mod, &
@@ -51,18 +49,18 @@ module field_r64_mod
 
 ! Public types
 
-!______field_r64_type_________________________________________________________
+!______field_real64_type______________________________________________________
 
-  !> Algorithm layer representation of a 64-bit real field.
+  !> Algorithm layer representation of real field data of kind real64.
   !>
   !> Objects of this type hold all the data of the field privately.
   !> Unpacking the data is done via the proxy type accessed by the Psy layer
   !> alone.
   !>
-  type, extends(field_parent_type), public :: field_r64_type
+  type, extends(field_parent_type), public :: field_real64_type
     private
 
-    !> The 64-bit floating point values of the field
+    !> The data values of the field
     real(kind=real64), allocatable :: data( : )
     !> Enable field to point to bespoke data provided by application
     !> instead of having allocated data
@@ -88,10 +86,6 @@ module field_r64_mod
     !> Function to get a proxy with public pointers to the data in a
     !! field_type.
     procedure, public :: get_proxy
-
-    ! Logging procedures
-    procedure, public :: log_field
-    procedure, public :: log_dofs
 
     !> Setter for the field write method
     procedure, public :: set_write_behaviour
@@ -138,43 +132,40 @@ module field_r64_mod
     !> Routine to destroy field_type
     procedure         :: field_final
 
-    !> Checks if field has been initialised
-    procedure, public :: is_initialised
-
     !> Finalizers for scalar and arrays of field_type objects
-    final             :: field_r64_destructor_scalar, &
-                         field_r64_destructor_array1d, &
-                         field_r64_destructor_array2d
+    final             :: field_real64_destructor_scalar, &
+                         field_real64_destructor_array1d, &
+                         field_real64_destructor_array2d
 
     !> Override default assignment for field_type pairs.
     generic           :: assignment(=) => field_type_assign
 
-  end type field_r64_type
+  end type field_real64_type
 
-!______field_pointer_type_______________________________________________________
+!______field_pointer_type_____________________________________________________
 
 !> a class to hold a pointer to a field in an object that is a child of
 !> the pure abstract field class
 
-  type, extends(pure_abstract_field_type), public :: field_r64_pointer_type
+  type, extends(pure_abstract_field_type), public :: field_real64_pointer_type
     private
     !> A pointer to a field
-    type(field_r64_type), pointer, public :: field_ptr
+    type(field_real64_type), pointer, public :: field_ptr
   contains
     !> Initialiser for a field pointer. May only be called once.
-    procedure, public :: initialise => field_r64_pointer_initialiser
+    procedure, public :: initialise => field_real64_pointer_initialiser
     !> Finaliser for a field pointer object
-    final :: field_r64_pointer_destructor
-  end type field_r64_pointer_type
+    final :: field_real64_pointer_destructor
+  end type field_real64_pointer_type
 
-!______field_r64_proxy_type_______________________________________________________
+!______field_real64_proxy_type________________________________________________
 
   !> Psy layer representation of a field.
   !>
   !> This is an accessor class that allows access to the actual field
   !> information with each element accessed via a public pointer.
   !>
-  type, extends(field_parent_proxy_type), public :: field_r64_proxy_type
+  type, extends(field_parent_proxy_type), public :: field_real64_proxy_type
 
     private
 
@@ -223,21 +214,21 @@ module field_r64_mod
     !> subroutine currently returns without waiting.
     procedure, public :: reduction_finish
 
-  end type field_r64_proxy_type
+  end type field_real64_proxy_type
 
 !______end of type declarations_______________________________________________
 
 contains
 
-!______field_r64_type procedures______________________________________________
+!______field_real64_type procedures___________________________________________
 
   !> Function to create a proxy with access to the data in the field_type.
   !>
   !> @return The proxy type with public pointers to the elements of
   !> field_type
-  type(field_r64_proxy_type) function get_proxy(self)
+  type(field_real64_proxy_type) function get_proxy(self)
     implicit none
-    class(field_r64_type), target, intent(in)  :: self
+    class(field_real64_type), target, intent(in)  :: self
 
     ! Call the routine that initialises the proxy for data held in the parent
     call self%field_parent_proxy_initialiser(get_proxy)
@@ -251,7 +242,7 @@ contains
 
   end function get_proxy
 
-  !> Initialise a <code>field_r64_type</code> object.
+  !> Initialise a <code>field_real64_type</code> object.
   !>
   !> @param [in] vector_space the function space that the field lives on
   !> @param [in] name The field name. 'none' (constant name_none) is a reserved name
@@ -269,7 +260,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(inout)           :: self
+    class(field_real64_type), intent(inout)        :: self
     type(function_space_type), pointer, intent(in) :: vector_space
     character(*), optional, intent(in)             :: name
     real(real64), target, optional, intent(in)     :: override_data( : )
@@ -302,7 +293,7 @@ contains
 
     ! In case the field is already initialised, destruct it ready for
     ! re-initialisation
-    call field_r64_destructor_scalar(self)
+    call field_real64_destructor_scalar(self)
 
     call self%field_parent_initialiser(vector_space, &
                                        name=local_name, &
@@ -340,26 +331,26 @@ contains
 
   end subroutine field_initialiser
 
-  !> Initialise a 64-bit real field pointer
+  !> Initialise a real64 field pointer
   !>
-  !> @param [in] field_r64_ptr A pointer to the field that is to be
-  !>                           stored as a reference
-  subroutine field_r64_pointer_initialiser(self, field_ptr)
+  !> @param [in] field_real64_ptr A pointer to the field that is to be
+  !>                              stored as a reference
+  subroutine field_real64_pointer_initialiser(self, field_ptr)
     implicit none
-    class(field_r64_pointer_type) :: self
-    type(field_r64_type), pointer :: field_ptr
+    class(field_real64_pointer_type) :: self
+    type(field_real64_type), pointer :: field_ptr
     self%field_ptr => field_ptr
-  end subroutine field_r64_pointer_initialiser
+  end subroutine field_real64_pointer_initialiser
 
-  ! Finaliser for a 64-bit real field pointer
+  ! Finaliser for a real64 field pointer
   !
   ! The following finaliser doesn't do anything. Without it, the Gnu compiler
   ! tries to create its own, but only ends up producing an Internal Compiler
   ! Error, so it is included here to prevent that.
-  subroutine field_r64_pointer_destructor(self)
+  subroutine field_real64_pointer_destructor(self)
     implicit none
-    type(field_r64_pointer_type), intent(inout) :: self
-  end subroutine field_r64_pointer_destructor
+    type(field_real64_pointer_type), intent(inout) :: self
+  end subroutine field_real64_pointer_destructor
 
   !> Create a new field that inherits the properties of the source field and
   !> has a copy of all the field data from the source field.
@@ -369,9 +360,9 @@ contains
   subroutine copy_field_serial(self, dest, name)
 
     implicit none
-    class(field_r64_type), target, intent(in)  :: self
-    type(field_r64_type),  target, intent(out) :: dest
-    character(*), optional, intent(in)     :: name
+    class(field_real64_type), target, intent(in)  :: self
+    type(field_real64_type),  target, intent(out) :: dest
+    character(*),           optional, intent(in)  :: name
 
     if ( .not. allocated(self%data) ) then
       call log_event( 'Error: copy_field_serial: Copied field must have field data', &
@@ -396,9 +387,9 @@ contains
   subroutine copy_field_properties(self, dest, name)
 
     implicit none
-    class(field_r64_type), target, intent(in)  :: self
-    type(field_r64_type),  target, intent(out) :: dest
-    character(*), optional, intent(in)     :: name
+    class(field_real64_type), target, intent(in)  :: self
+    type(field_real64_type),  target, intent(out) :: dest
+    character(*),           optional, intent(in)  :: name
 
     type(function_space_type), pointer :: function_space => null()
 
@@ -430,8 +421,8 @@ contains
   subroutine field_type_assign(dest, source)
 
     implicit none
-    class(field_r64_type), intent(in)  :: source
-    class(field_r64_type), intent(out) :: dest
+    class(field_real64_type), intent(in)  :: source
+    class(field_real64_type), intent(out) :: dest
 
     write(log_scratch_space,'(A,A)')&
               '"field2=field1" syntax no longer supported. '// &
@@ -446,7 +437,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(inout)    :: self
+    class(field_real64_type), intent(inout) :: self
 
     call self%field_parent_final()
 
@@ -461,47 +452,37 @@ contains
 
   end subroutine field_final
 
-  !> Return a logical indicating whether the field has been initialised
-  function is_initialised(self) result(initialised)
-    implicit none
-    class(field_r64_type), intent(in) :: self
-    logical(l_def)                :: initialised
-
-    initialised = allocated(self%data)
-
-  end function is_initialised
-
   !> Finalizer for a scalar <code>field_type</code> instance.
-  subroutine field_r64_destructor_scalar(self)
+  subroutine field_real64_destructor_scalar(self)
 
     implicit none
 
-    type(field_r64_type), intent(inout)    :: self
+    type(field_real64_type), intent(inout) :: self
 
     call self%field_final()
 
-  end subroutine field_r64_destructor_scalar
+  end subroutine field_real64_destructor_scalar
 
   !> Finalizer for a 1d array of <code>field_type</code> instances.
-  subroutine field_r64_destructor_array1d(self)
+  subroutine field_real64_destructor_array1d(self)
 
     implicit none
 
-    type(field_r64_type), intent(inout)    :: self(:)
+    type(field_real64_type), intent(inout) :: self(:)
     integer(i_def) :: i
 
     do i=lbound(self,1), ubound(self,1)
       call self(i)%field_final()
     end do
 
-  end subroutine field_r64_destructor_array1d
+  end subroutine field_real64_destructor_array1d
 
   !> Finalizer for a 2d array of <code>field_type</code> instances.
-  subroutine field_r64_destructor_array2d(self)
+  subroutine field_real64_destructor_array2d(self)
 
     implicit none
 
-    type(field_r64_type), intent(inout)    :: self(:,:)
+    type(field_real64_type), intent(inout) :: self(:,:)
     integer(i_def) :: i,j
 
     do i=lbound(self,1), ubound(self,1)
@@ -510,14 +491,14 @@ contains
       end do
     end do
 
-  end subroutine field_r64_destructor_array2d
+  end subroutine field_real64_destructor_array2d
 
   !> Setter for field write behaviour
   !> @param[in,out]  self  field_type
   !> @param [in] write_behaviour - pointer to procedure implementing write method
   subroutine set_write_behaviour(self, write_behaviour)
     implicit none
-    class(field_r64_type), intent(inout)            :: self
+    class(field_real64_type), intent(inout)         :: self
     procedure(write_interface), pointer, intent(in) :: write_behaviour
     self%write_method => write_behaviour
   end subroutine set_write_behaviour
@@ -531,7 +512,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in)                  :: self
+    class(field_real64_type), intent(in)               :: self
     procedure(write_interface), pointer, intent(inout) :: write_behaviour
 
     write_behaviour => self%write_method
@@ -543,7 +524,7 @@ contains
   !> @param [in] read_behaviour - pointer to procedure implementing read method
   subroutine set_read_behaviour(self, read_behaviour)
     implicit none
-    class(field_r64_type), intent(inout)           :: self
+    class(field_real64_type), intent(inout)        :: self
     procedure(read_interface), pointer, intent(in) :: read_behaviour
     self%read_method => read_behaviour
   end subroutine set_read_behaviour
@@ -556,7 +537,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in)                 :: self
+    class(field_real64_type), intent(in)              :: self
     procedure(read_interface), pointer, intent(inout) :: read_behaviour
 
     read_behaviour => self%read_method
@@ -571,8 +552,8 @@ contains
   !>             pointer to procedure implementing checkpoint write method
   subroutine set_checkpoint_write_behaviour(self, checkpoint_write_behaviour)
     implicit none
-    class(field_r64_type), intent(inout)              :: self
-    procedure(checkpoint_write_interface), pointer, intent(in)   :: checkpoint_write_behaviour
+    class(field_real64_type), intent(inout)                    :: self
+    procedure(checkpoint_write_interface), pointer, intent(in) :: checkpoint_write_behaviour
     self%checkpoint_write_method => checkpoint_write_behaviour
   end subroutine set_checkpoint_write_behaviour
 
@@ -582,8 +563,8 @@ contains
   !>             pointer to procedure implementing checkpoint read method
   subroutine set_checkpoint_read_behaviour(self, checkpoint_read_behaviour)
     implicit none
-    class(field_r64_type), intent(inout)              :: self
-    procedure(checkpoint_read_interface), pointer, intent(in)   :: checkpoint_read_behaviour
+    class(field_real64_type), intent(inout)                   :: self
+    procedure(checkpoint_read_interface), pointer, intent(in) :: checkpoint_read_behaviour
     self%checkpoint_read_method => checkpoint_read_behaviour
   end subroutine set_checkpoint_read_behaviour
 
@@ -594,7 +575,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in) :: self
+    class(field_real64_type), intent(in) :: self
     logical(l_def) :: checkpointable
 
     if (associated(self%checkpoint_write_method) .and. &
@@ -613,7 +594,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in) :: self
+    class(field_real64_type), intent(in) :: self
     logical(l_def) :: writeable
 
     writeable = associated(self%write_method)
@@ -627,89 +608,12 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in) :: self
+    class(field_real64_type), intent(in) :: self
     logical(l_def) :: readable
 
     readable = associated(self%read_method)
 
   end function can_read
-
-  !---------------------------------------------------------------------------
-  ! Contained functions/subroutines
-  !---------------------------------------------------------------------------
-
-  !> Sends field contents to the log.
-  !!
-  !! @param[in] dump_level The level to use when sending the dump to the log.
-  !! @param[in] label A title added to the log before the data is written out
-  !>
-  subroutine log_field( self, dump_level, label )
-
-    implicit none
-
-    class( field_r64_type ), target, intent(in) :: self
-    integer(i_def),                  intent(in) :: dump_level
-    character( * ),                  intent(in) :: label
-
-    type(function_space_type), pointer :: function_space => null()
-    integer(i_def)                     :: cell
-    integer(i_def)                     :: layer
-    integer(i_def)                     :: df
-    integer(i_def),            pointer :: map(:) => null()
-
-    ! Get function space from parent
-    function_space => self%get_function_space()
-
-    ! If we are not going to write the field to the log then do
-    ! not write the field to the scratch space.
-    if ( dump_level < log_level() ) return
-
-    write( log_scratch_space, '( A, A)' ) trim( label ), " =["
-    call log_event( log_scratch_space, dump_level )
-
-    do cell=1,function_space%get_ncell()
-      map => function_space%get_cell_dofmap( cell )
-      do df=1,function_space%get_ndf()
-        do layer=0,function_space%get_nlayers()-1
-          write( log_scratch_space, '( I6, I6, I6, E16.8 )' ) &
-              cell, df, layer+1, self%data( map( df ) + layer )
-          call log_event( log_scratch_space, dump_level )
-        end do
-      end do
-    end do
-
-    call log_event( '];', dump_level )
-    return
-
-  end subroutine log_field
-
-  !> Sends the field contents to the log
-  !!
-  !! @param[in] log_level The level to use for logging.
-  !! @param[in] label A title added to the log before the data is written out
-  !!
-  subroutine log_dofs( self, log_level, label )
-
-    implicit none
-
-    class( field_r64_type ), target, intent(in) :: self
-    integer(i_def),                  intent(in) :: log_level
-    character( * ),                  intent(in) :: label
-
-    type(function_space_type), pointer :: function_space => null()
-    integer(i_def) :: df
-
-    ! Get function space from parent
-    function_space => self%get_function_space()
-
-    call log_event( label, log_level )
-
-    do df=1,function_space%get_last_dof_halo(self%get_field_halo_depth())
-      write( log_scratch_space, '( A, I6, E16.8 )' ) label,df,self%data( df )
-      call log_event( log_scratch_space, log_level )
-    end do
-
-  end subroutine log_dofs
 
   !> Calls the underlying IO implementation for writing a field
   !> throws an error if this has not been set
@@ -718,7 +622,7 @@ contains
 
     implicit none
 
-    class(field_r64_type), intent(in) :: this
+    class(field_real64_type),   intent(in) :: this
     character(len=*), optional, intent(in) :: field_name
 
     character(str_def) :: name_used
@@ -754,11 +658,10 @@ contains
 
     implicit none
 
-    class( field_r64_type ),  target, intent( inout ) :: self
-    character(len=*),                 intent(in)      :: field_name
+    class( field_real64_type ),  target, intent(inout) :: self
+    character(len=*),                    intent(in)    :: field_name
 
-
-    type( field_r64_proxy_type )                      :: tmp_proxy
+    type( field_real64_proxy_type )                    :: tmp_proxy
 
     if (associated(self%read_method)) then
 
@@ -786,12 +689,11 @@ contains
 
     implicit none
 
-    class( field_r64_type ), target, intent( inout ) :: self
-    character(len=*),                intent(in)      :: field_name
-    character(len=*),                intent(in)      :: file_name
+    class( field_real64_type ), target, intent(inout) :: self
+    character(len=*),                   intent(in)    :: field_name
+    character(len=*),                   intent(in)    :: file_name
 
-
-    type( field_r64_proxy_type )                     :: tmp_proxy
+    type( field_real64_proxy_type )                   :: tmp_proxy
 
 
     if (associated(self%checkpoint_read_method)) then
@@ -820,9 +722,9 @@ contains
 
     implicit none
 
-    class( field_r64_type ), target, intent( inout ) :: self
-    character(len=*),                intent(in)      :: field_name
-    character(len=*),                intent(in)      :: file_name
+    class( field_real64_type ), target, intent( inout ) :: self
+    character(len=*),                   intent(in)      :: field_name
+    character(len=*),                   intent(in)      :: file_name
 
     if (associated(self%checkpoint_write_method)) then
 
@@ -844,7 +746,7 @@ contains
     use count_mod,       only : halo_calls
     implicit none
 
-    class( field_r64_proxy_type ), target, intent(inout) :: self
+    class( field_real64_proxy_type ), target, intent(inout) :: self
     integer(i_def), intent(in) :: depth
     type(halo_routing_type), pointer :: halo_routing => null()
 
@@ -877,7 +779,7 @@ contains
 
     implicit none
 
-    class( field_r64_proxy_type ), target, intent(inout) :: self
+    class( field_real64_proxy_type ), target, intent(inout) :: self
     integer(i_def), intent(in) :: depth
     type(halo_routing_type), pointer :: halo_routing => null()
     if ( self%vspace%is_writable() ) then
@@ -907,7 +809,7 @@ contains
     use count_mod,       only : halo_calls
     implicit none
 
-    class( field_r64_proxy_type ), target, intent(inout) :: self
+    class( field_real64_proxy_type ), target, intent(inout) :: self
     integer(i_def), intent(in) :: depth
 
     if ( self%vspace%is_writable() ) then
@@ -938,7 +840,7 @@ contains
     use mpi_mod, only: mpi_type
     implicit none
 
-    class(field_r64_proxy_type), intent(in) :: self
+    class(field_real64_proxy_type), intent(in) :: self
 
     type(mpi_type) :: mpi
     real(real64)   :: l_sum
@@ -963,7 +865,7 @@ contains
     use mpi_mod, only: mpi_type
     implicit none
 
-    class(field_r64_proxy_type), intent(in) :: self
+    class(field_real64_proxy_type), intent(in) :: self
 
     type(mpi_type) :: mpi
     real(real64)   :: l_min
@@ -989,7 +891,7 @@ contains
     use mpi_mod, only: mpi_type
     implicit none
 
-    class(field_r64_proxy_type), intent(in) :: self
+    class(field_real64_proxy_type), intent(in) :: self
 
     type(mpi_type) :: mpi
     real(real64)   :: l_max
@@ -1017,7 +919,7 @@ contains
 
     implicit none
 
-    class(field_r64_proxy_type), intent(in) :: self
+    class(field_real64_proxy_type), intent(in) :: self
 
     logical(l_def) :: is_dirty_tmp
 
@@ -1029,4 +931,4 @@ contains
 
   end subroutine reduction_finish
 
-end module field_r64_mod
+end module field_real64_mod

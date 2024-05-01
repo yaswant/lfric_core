@@ -8,7 +8,7 @@
 module id_r32_field_pair_mod
 
   use constants_mod,         only: i_def, l_def, str_def
-  use field_r32_mod,         only: field_r32_type
+  use field_real32_mod,      only: field_real32_type
   use function_space_mod,    only: function_space_type
   use id_abstract_pair_mod,  only: id_abstract_pair_type
 
@@ -26,7 +26,7 @@ module id_r32_field_pair_mod
 
     private
 
-    type(field_r32_type) :: field_
+    type(field_real32_type) :: field_
 
   contains
 
@@ -76,7 +76,7 @@ contains
     implicit none
 
     class(id_r32_field_pair_type), intent(inout) :: self
-    type(field_r32_type),          intent(in)    :: field
+    type(field_real32_type),       intent(in)    :: field
     integer(kind=i_def),           intent(in)    :: id
 
     call self%field_%initialise(field%get_function_space(), &
@@ -94,7 +94,7 @@ contains
     implicit none
 
     class(id_r32_field_pair_type), target, intent(in) :: self
-    type(field_r32_type),                  pointer    :: field
+    type(field_real32_type),               pointer    :: field
 
     field => self%field_
 

@@ -11,8 +11,8 @@ module lfric_xios_format_mod
   use constants_mod,                  only: i_def, l_def, rmdi, LARGE_REAL_NEGATIVE
   use lfric_xios_constants_mod,       only: dp_xios, xios_max_int
   use field_parent_mod,               only: field_parent_proxy_type
-  use field_r32_mod,                  only: field_r32_proxy_type
-  use field_r64_mod,                  only: field_r64_proxy_type
+  use field_real32_mod,               only: field_real32_proxy_type
+  use field_real64_mod,               only: field_real64_proxy_type
   use integer_field_mod,              only: integer_field_proxy_type
   use log_mod,                        only:                                   &
                                         log_event,                            &
@@ -71,7 +71,7 @@ subroutine format_field(xios_data, field_name, fpxy, m, n, legacy)
   end if
 
   select type(fpxy)
-    type is (field_r32_proxy_type)
+    type is (field_real32_proxy_type)
       if (legacy) then
         xios_data = fpxy%data(1:size(xios_data))
         return
@@ -81,7 +81,7 @@ subroutine format_field(xios_data, field_name, fpxy, m, n, legacy)
       do i = 1, m
         xios_data(1+(i-1)*n:i*n) = fpxy%data(i:mn:m)
       end do
-    type is (field_r64_proxy_type)
+    type is (field_real64_proxy_type)
       if (legacy) then
         xios_data = fpxy%data(1:size(xios_data))
         return
@@ -144,7 +144,7 @@ subroutine inverse_format_field(xios_data, field_name, fpxy, m, n, legacy)
   ! Reshape the data to what we require for the LFRic field.
   ! Note the conversion from dp_xios to real32, real64 or i_def.
   select type(fpxy)
-    type is (field_r32_proxy_type)
+  type is (field_real32_proxy_type)
     if (legacy) then
       fpxy%data(1:size(xios_data)) = real(xios_data, real32)
       return
@@ -153,7 +153,7 @@ subroutine inverse_format_field(xios_data, field_name, fpxy, m, n, legacy)
       fpxy%data(i:mn:m) = real(xios_data(1+(i-1)*n:i*n), real32)
     end do
 
-  type is (field_r64_proxy_type)
+  type is (field_real64_proxy_type)
     if (legacy) then
       fpxy%data(1:size(xios_data)) = real(xios_data, real64)
       return

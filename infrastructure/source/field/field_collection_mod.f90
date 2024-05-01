@@ -18,10 +18,10 @@ module field_collection_mod
   use field_mod,               only: field_type, &
                                      field_pointer_type
   use field_parent_mod,        only: field_parent_type
-  use field_r32_mod,           only: field_r32_type, &
-                                     field_r32_pointer_type
-  use field_r64_mod,           only: field_r64_type, &
-                                     field_r64_pointer_type
+  use field_real32_mod,        only: field_real32_type, &
+                                     field_real32_pointer_type
+  use field_real64_mod,        only: field_real64_type, &
+                                     field_real64_pointer_type
   use integer_field_mod,       only: integer_field_type, &
                                      integer_field_pointer_type
   use pure_abstract_field_mod, only: pure_abstract_field_type
@@ -61,12 +61,12 @@ module field_collection_mod
     procedure, public :: remove_field
     procedure, public :: field_exists
     procedure, public :: get_next_item
-    procedure, public :: get_r32_field
-    procedure, public :: get_r64_field
+    procedure, public :: get_real32_field
+    procedure, public :: get_real64_field
     procedure, public :: get_integer_field
     procedure, public :: get_field_array
-    generic           :: get_field => get_r32_field,     &
-                                      get_r64_field,     &
+    generic           :: get_field => get_real32_field,  &
+                                      get_real64_field,  &
                                       get_integer_field, &
                                       get_field_array
     procedure, public :: get_length
@@ -214,24 +214,24 @@ subroutine add_reference_to_field(self, field_ptr)
   class(field_collection_type), intent(inout)          :: self
   class(pure_abstract_field_type), pointer, intent(in) :: field_ptr
 
-  type(field_r32_type), pointer      :: fld_r32_ptr
-  type(field_r32_pointer_type)       :: field_r32_pointer
-  type(field_r64_type), pointer      :: fld_r64_ptr
-  type(field_r64_pointer_type)       :: field_r64_pointer
+  type(field_real32_type), pointer   :: fld_real32_ptr
+  type(field_real32_pointer_type)    :: field_real32_pointer
+  type(field_real64_type), pointer   :: fld_real64_ptr
+  type(field_real64_pointer_type)    :: field_real64_pointer
   type(integer_field_type), pointer  :: int_fld_ptr
   type(integer_field_pointer_type)   :: integer_field_pointer
 
   select type(field_ptr)
-    type is (field_r32_type)
-      ! Create a field pointer object that just contains an r32 field pointer
-      fld_r32_ptr => field_ptr
-      call field_r32_pointer%initialise(fld_r32_ptr)
-      call self%add_field( field_r32_pointer )
-    type is (field_r64_type)
-      ! Create a field pointer object that just contains an r64 field pointer
-      fld_r64_ptr => field_ptr
-      call field_r64_pointer%initialise(fld_r64_ptr)
-      call self%add_field( field_r64_pointer )
+    type is (field_real32_type)
+      ! Create a field pointer object that just contains an real32 field pointer
+      fld_real32_ptr => field_ptr
+      call field_real32_pointer%initialise(fld_real32_ptr)
+      call self%add_field( field_real32_pointer )
+    type is (field_real64_type)
+      ! Create a field pointer object that just contains an real64 field pointer
+      fld_real64_ptr => field_ptr
+      call field_real64_pointer%initialise(fld_real64_ptr)
+      call self%add_field( field_real64_pointer )
     type is (integer_field_type)
       ! Create an integer field pointer object that just contains a field ptr
       int_fld_ptr => field_ptr
@@ -336,12 +336,12 @@ end function get_next_item
 !> Access a 32-bit real field from the collection
 !> @param [in] field_name The name of the 32-bit real field to be accessed
 !> @param [out] field Pointer to the 32-bit real field that is extracted
-subroutine get_r32_field(self, field_name, field)
+subroutine get_real32_field(self, field_name, field)
 
   implicit none
 
   class(field_collection_type), intent(in) :: self
-  type(field_r32_type), pointer, intent(out) :: field
+  type(field_real32_type), pointer, intent(out) :: field
 
   character(*), intent(in) :: field_name
 
@@ -371,12 +371,12 @@ subroutine get_r32_field(self, field_name, field)
     name = get_field_name(loop%payload)
     ! 'cast' to the field_type
     select type(listfield => loop%payload)
-      type is (field_r32_type)
+      type is (field_real32_type)
       if ( trim(field_name) == trim(name) ) then
           field => listfield
           exit
       end if
-      type is (field_r32_pointer_type)
+      type is (field_real32_pointer_type)
       if ( trim(field_name) == trim(name) ) then
           field => listfield%field_ptr
           exit
@@ -386,17 +386,17 @@ subroutine get_r32_field(self, field_name, field)
     loop => loop%next
   end do
 
-end subroutine get_r32_field
+end subroutine get_real32_field
 
 !> Access a 64-bit real field from the collection
 !> @param [in] field_name The name of the 64-bit real field to be accessed
 !> @param [out] field Pointer to the 64-bit real field that is extracted
-subroutine get_r64_field(self, field_name, field)
+subroutine get_real64_field(self, field_name, field)
 
   implicit none
 
   class(field_collection_type), intent(in) :: self
-  type(field_r64_type), pointer, intent(out) :: field
+  type(field_real64_type), pointer, intent(out) :: field
 
   character(*), intent(in) :: field_name
 
@@ -426,12 +426,12 @@ subroutine get_r64_field(self, field_name, field)
     name = get_field_name(loop%payload)
     ! 'cast' to the field_type
     select type(listfield => loop%payload)
-      type is (field_r64_type)
+      type is (field_real64_type)
       if ( trim(field_name) == trim(name) ) then
           field => listfield
           exit
       end if
-      type is (field_r64_pointer_type)
+      type is (field_real64_pointer_type)
       if ( trim(field_name) == trim(name) ) then
           field => listfield%field_ptr
           exit
@@ -441,7 +441,7 @@ subroutine get_r64_field(self, field_name, field)
     loop => loop%next
   end do
 
-end subroutine get_r64_field
+end subroutine get_real64_field
 
 !> Access an integer field from the collection
 !> @param [in] field_name The name of the intager field to be accessed
@@ -704,9 +704,9 @@ end subroutine field_collection_destructor
       name = infield%get_name()
     ! If the field is actually a pointer, dereference to the specific actual
     ! field type and call get_name in that
-    type is (field_r32_pointer_type)
+    type is (field_real32_pointer_type)
       name = infield%field_ptr%get_name()
-    type is (field_r64_pointer_type)
+    type is (field_real64_pointer_type)
       name = infield%field_ptr%get_name()
     type is (integer_field_pointer_type)
       name = infield%field_ptr%get_name()

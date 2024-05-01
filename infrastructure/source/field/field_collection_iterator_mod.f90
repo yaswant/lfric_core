@@ -18,10 +18,10 @@ module field_collection_iterator_mod
   use field_collection_mod,    only: field_collection_type
   use field_mod,               only: field_type, &
                                      field_pointer_type
-  use field_r32_mod,           only: field_r32_type, &
-                                     field_r32_pointer_type
-  use field_r64_mod,           only: field_r64_type, &
-                                     field_r64_pointer_type
+  use field_real32_mod,        only: field_real32_type, &
+                                     field_real32_pointer_type
+  use field_real64_mod,        only: field_real64_type, &
+                                     field_real64_pointer_type
   use field_parent_mod,        only: field_parent_type
   use integer_field_mod,       only: integer_field_type, &
                                      integer_field_pointer_type
@@ -192,15 +192,15 @@ function next(self) result (field)
 
   ! Extract a pointer to the current field in the collection
   select type(listfield => self%current%payload)
-    type is (field_r32_type)
+    type is (field_real32_type)
       field => listfield
-    type is (field_r64_type)
+    type is (field_real64_type)
       field => listfield
     type is (integer_field_type)
       field => listfield
-    type is (field_r32_pointer_type)
+    type is (field_real32_pointer_type)
       field => listfield%field_ptr
-    type is (field_r64_pointer_type)
+    type is (field_real64_pointer_type)
       field => listfield%field_ptr
     type is (integer_field_pointer_type)
       field => listfield%field_ptr

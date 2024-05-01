@@ -14,11 +14,6 @@ class field_mod::field_type {
   +get_proxy() : field_proxy_type
   +copy_field_serial(<<out>> dest: field_type, <<in optional>> name: string)
   +copy_field_properties(<<out>> dest: field_type, <<in optional>> name: )
-  +log_dofs( <<in>>log_level: integer, <<in>>label: string )
-  +log_field( <<in>>dump_level: integer, <<in>>checksum_level: integer, <<in>>label: string )
-  +log_minmax( <<in>>log_level: integer, <<in>>label: string )
-  +log_absmax( <<in>>log_level: integer, <<in>>label: string )
-  +field_minmax( <<out>>fmin: real, <<out>>fmax: real )
   +set_write_behaviour(<<in>> procedure <<pointer>> : write_behaviour)
   +get_write_behaviour() :  procedure <<pointer>> : write_behaviour
   +can_write() : logical
