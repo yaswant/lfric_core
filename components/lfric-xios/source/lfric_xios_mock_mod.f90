@@ -117,24 +117,42 @@ real(real64), private :: var_var1
 
   end subroutine xios_get_domain_attr
 
-  !> Sets hard coded values for axis size based on the axis ID
-  !> @param[in] axis_id The ID of the axis to be tested
-  !> @param[in] n_glo   The size of the test axis
-  subroutine xios_get_axis_attr(axis_id, n_glo)
+  !> Sets hard coded value for axis size based on the axis ID
+  !> @param[in]     axis_id The ID of the axis to be tested
+  !> @param[in,out] n_glo   The size of the test axis
+  !> @param[in,out] value   The axis value
+  subroutine xios_get_axis_attr(axis_id, n_glo, value)
 
     implicit none
 
     character(len=*),       intent(in)    :: axis_id
-    integer(i_def),         intent(inout) :: n_glo
+    integer(i_def), optional, intent(inout) :: n_glo
+    real(real64), optional, intent(inout) :: value(:)
 
-    if ( axis_id == "test_axis_99" ) then
-      n_glo = 99
-    else if ( axis_id == "vert_axis_half_levels" ) then
-      n_glo = 3
-    else if ( axis_id == "vert_axis_full_levels" ) then
-      n_glo = 4
-    else
-      n_glo = 0
+    ! This block returns mock sizes of the axis
+    if (present(n_glo)) then
+      if ( axis_id == "test_axis_99" ) then
+        n_glo = 99
+      else if ( axis_id == "vert_axis_half_levels" ) then
+        n_glo = 3
+      else if ( axis_id == "vert_axis_full_levels" ) then
+        n_glo = 4
+      else
+        n_glo = 0
+      end if
+    end if
+
+    ! This block returns mock values for the axis
+    if (present(value)) then
+      if ( axis_id == "test_axis_99" ) then
+        value = 99
+      else if ( axis_id == "vert_axis_half_levels" ) then
+        value = 3
+      else if ( axis_id == "vert_axis_full_levels" ) then
+        value = 4
+      else
+        value = 0
+      end if
     end if
 
   end subroutine xios_get_axis_attr

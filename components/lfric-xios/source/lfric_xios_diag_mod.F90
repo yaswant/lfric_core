@@ -75,6 +75,7 @@ module lfric_xios_diag_mod
     get_field_domain_ref,                                                      &
     get_field_axis_ref,                                                        &
     get_axis_dimension,                                                        &
+    get_axis_values,                                                           &
     set_axis_dimension,                                                        &
     set_zoom_axis_attr,                                                        &
     set_variable,                                                              &
@@ -286,6 +287,18 @@ contains
     integer(i_def) :: dim
     call xios_get_axis_attr(unique_id, n_glo=dim)
   end function get_axis_dimension
+
+  !> @brief Return the values in an XIOS axis object.
+  !> @param[in]    unique_id    XIOS id of the axis
+  !> @param[in]    nval         Dimension of the axis object
+  !> @return                    Axis values
+  function get_axis_values(unique_id, nval) result(value)
+    implicit none
+    character(*), intent(in) :: unique_id
+    integer(i_def), intent(in) :: nval
+    real(real64) :: value(nval)
+    call xios_get_axis_attr(unique_id, value=value)
+  end function get_axis_values
 
   !> @brief Set the dimension of an XIOS axis object.
   !> @param[in]    unique_id    XIOS id of the axis
