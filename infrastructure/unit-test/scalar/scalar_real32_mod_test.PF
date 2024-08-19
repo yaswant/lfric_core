@@ -1,0 +1,12 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2024 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!> Test the scalar representation
+!>
+!-------------------------------------------------------------------------------
+#define TMPL_TYPE real
+#define TMPL_KIND real32
+#define TMPL_CAST real
+#include "scalar_mod_test.pf.inc"
