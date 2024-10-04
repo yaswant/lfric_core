@@ -9,6 +9,7 @@ module coordinate_jacobian_stretched_mod_test
 
   use pFUnit_Mod
   use constants_mod, only : r_def, i_def, PI
+  use, intrinsic :: iso_fortran_env, only : real32, real64
 
   implicit none
 
@@ -84,13 +85,20 @@ contains
 
     class(jacobian_stretched_test_type), intent(inout) :: this
 
-    real(kind=r_def), parameter :: tol = 1.0e-7_r_def
     real(kind=r_def), parameter :: radius = 29.1295_r_def
 
     real(kind=r_def) :: native_lon, native_lat
     real(kind=r_def) :: stretch, psi
     real(kind=r_def) :: jac(3,3), jac_answer(3,3)
+    real(kind=r_def) :: tol = 1.0e-7_r_def
 
+#if (RDEF_PRECISION == 64)
+    tol = 1.0e-7_real64
+#elif (RDEF_PRECISION == 32)
+    tol = 1.0e-6_real32
+#else
+    @assertFail("Unsupported default precision")
+#endif
 
     ! Stretching factor of 1/sqrt(3) takes equator to 30 degrees
     ! Consider lon = 0 and lat = 0, which yields some nice analytic values

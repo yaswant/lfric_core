@@ -37,7 +37,7 @@ contains
 #elif (RDEF_PRECISION == 32)
     tol = 2.0e-7_real32
 #else
-    @assertFail("Unsupported default precission")
+    @assertFail("Unsupported default precision")
 #endif
 
     ! Panel 1: tan(alpha) = Y/X, tan(beta) = Z/X
@@ -113,7 +113,7 @@ contains
 #elif (RDEF_PRECISION == 32)
     tol = 1.5e-7_real32
 #else
-    @assertFail("Unsupported default precission")
+    @assertFail("Unsupported default precision")
 #endif
 
     ! Panel 2: tan(alpha) = -X/Y, tan(beta) = Z/Y
@@ -183,7 +183,7 @@ contains
 #elif (RDEF_PRECISION == 32)
     tol = 1.0e-7_real32
 #else
-    @assertFail("Unsupported default precission")
+    @assertFail("Unsupported default precision")
 #endif
 
     ! Panel 1: tan(alpha) = Y/X, tan(beta) = Z/X
@@ -232,7 +232,7 @@ contains
 #elif (RDEF_PRECISION == 32)
     tol = 1.0e-7_real32
 #else
-    @assertFail("Unsupported default precission")
+    @assertFail("Unsupported default precision")
 #endif
 
     ! Panel 2: tan(alpha) = -X/Y, tan(beta) = Z/Y
@@ -280,7 +280,7 @@ contains
 #elif (RDEF_PRECISION == 32)
     tol = 1.0e-5_real32
 #else
-    @assertFail("Unsupported default precission")
+    @assertFail("Unsupported default precision")
 #endif
 
     lon = 180.0_r_def
@@ -357,9 +357,16 @@ contains
     real(kind=r_def) :: stretch, tol, radius
     real(kind=r_def) :: native_xyz(3), physical_xyz(3), true_physical_xyz(3)
 
-    tol = 1.0e-8_r_def
     radius = 190.19_r_def    ! Arbitrary radius
     stretch = 1.0_r_def/sqrt(3.0_r_def)
+
+#if (RDEF_PRECISION == 64)
+    tol = 1.0e-8_real64
+#elif (RDEF_PRECISION == 32)
+    tol = 1.0e-5_real32
+#else
+    @assertFail("Unsupported default precision")
+#endif
 
     ! Check that North pole stays the same -------------------------------------
     native_xyz(1) = 0.0_r_def
@@ -409,9 +416,16 @@ contains
     real(kind=r_def) :: stretch, tol, radius
     real(kind=r_def) :: native_xyz(3), physical_xyz(3), true_native_xyz(3)
 
-    tol = 1.0e-8_r_def
     radius = 6131.19_r_def    ! Arbitrary radius
     stretch = 1.0_r_def/sqrt(3.0_r_def)
+
+#if (RDEF_PRECISION == 64)
+    tol = 1.0e-8_real64
+#elif (RDEF_PRECISION == 32)
+    tol = 1.0e-5_real32
+#else
+    @assertFail("Unsupported default precision")
+#endif
 
     ! Check that North pole stays the same -------------------------------------
     physical_xyz(1) = 0.0_r_def
@@ -447,6 +461,15 @@ contains
 
     native_xyz = inverse_schmidt_transform_xyz(physical_xyz, stretch)
 
+    ! Checking zeros so can have a slacker tolerance
+#if (RDEF_PRECISION == 64)
+    tol = 1.0e-8_real64
+#elif (RDEF_PRECISION == 32)
+    tol = 1.0e-3_real32
+#else
+    @assertFail("Unsupported default precision")
+#endif
+
     @assertEqual(native_xyz, true_native_xyz, tol)
 
   end subroutine test_inverse_schmidt_transform_xyz
@@ -460,8 +483,15 @@ contains
     real(kind=r_def) :: stretch, tol
     real(kind=r_def) :: native_lat, physical_lat, true_physical_lat
 
-    tol = 1.0e-8_r_def
     stretch = 1.0_r_def/sqrt(3.0_r_def)
+
+#if (RDEF_PRECISION == 64)
+    tol = 1.0e-8_real64
+#elif (RDEF_PRECISION == 32)
+    tol = 2.0e-7_real32
+#else
+    @assertFail("Unsupported default precision")
+#endif
 
     ! Check that equator moves appropriately -----------------------------------
     native_lat = 0.0_r_def
