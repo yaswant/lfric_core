@@ -16,6 +16,25 @@ Developer Guide
    build_system/index
    using_doxygen
 
+Requirements
+------------
+
+.. toctree::
+   :maxdepth: 2
+
+   requirements
+
+Technical Overviews
+-------------------
+
+These sections describe key parts of the LFRic infrastructure, which will help
+explain the reasons for the design and implementation choices that have been made.
+
+.. toctree::
+   :maxdepth: 2
+
+   core_data_model/science_model_architecture
+
 Contributing
 ------------
 
