@@ -10,6 +10,7 @@ class function_space_chain_mod::function_space_chain_type{
 
 +add(<in>function_space:<<function_space_type,pointer>>)
 +get_start(): function_space_type <<pointer>>
++get_current(): function_space_type <<pointer>>
 +get_next(): function_space_type <<pointer>>
 +get_previous(): function_space_type <<pointer>>
 +exists(): <<logical>>

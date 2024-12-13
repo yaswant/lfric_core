@@ -19,8 +19,7 @@ module inventory_by_mesh_mod
   use integer_field_mod,                only: integer_field_type
   use log_mod,                          only: log_event, log_scratch_space, &
                                               LOG_LEVEL_ERROR,              &
-                                              LOG_LEVEL_DEBUG,              &
-                                              LOG_LEVEL_WARNING
+                                              LOG_LEVEL_DEBUG
   use linked_list_data_mod,             only: linked_list_data_type
   use linked_list_mod,                  only: linked_list_type, &
                                               linked_list_item_type
@@ -44,9 +43,10 @@ module inventory_by_mesh_mod
 
   private
 
-  ! Set the default table length to 1 - which produces a inventory_by_mesh type
-  ! constructed of a single linked list
-  integer(kind=i_def), parameter :: default_table_len = 1
+  ! Set the default table length -- this number should be higher than the
+  ! expected number of meshes. If this limit is actually reached, then
+  ! it can be increased in the future
+  integer(kind=i_def), parameter :: default_table_len = 20
 
   !-----------------------------------------------------------------------------
   ! Type that holds an inventory of paired objects in a linked list
@@ -148,7 +148,7 @@ module inventory_by_mesh_mod
     ! Overloaded routine (which will trigger a failure)
     procedure, private :: inventory_copy_constructor
 
-    procedure, private :: compute_intermesh_id
+    procedure, public :: compute_intermesh_id
 
     generic, public   :: assignment(=) => inventory_copy_constructor
     final             :: inventory_by_mesh_destructor
@@ -201,13 +201,14 @@ subroutine add_paired_object(self, paired_object)
   id = paired_object%get_id()
 
   ! Check if object exists in inventory already
-  ! If it does, replace existing object and provide a warning
+  ! If it does, throw an error
   if ( self%paired_object_exists( id ) ) then
-    write(log_scratch_space, '(A,I8,3A)') &
-        'Paired object on mesh [', id,                              &
-        '] already exists in inventory_by_mesh: ', trim(self%name), &
-        ', removing existing paired object...'
-    call log_event(log_scratch_space, LOG_LEVEL_WARNING)
+    write(log_scratch_space, '(A,I8,5A)')                                      &
+        'Paired object on mesh [', id, '] corresponds to a hash that',         &
+        ' already exists in inventory_by_mesh: ', trim(self%name),             &
+        '. If this object corresponds to a new mesh, you may need to ',        &
+        'increase the table length of the inventory'
+    call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     call self%remove_paired_object(id)
   end if
 

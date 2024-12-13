@@ -1,3 +1,6 @@
 # Files should only ever be removed or renamed in this file, never added.
 #
 source/kernel/geometry/sci_chi_transform_mod.F90
+source/algorithm/sci_fem_constants_mod.x90
+source/algorithm/sci_geometric_constants_mod.x90
+source/algorithm/sci_mapping_constants_mod.x90

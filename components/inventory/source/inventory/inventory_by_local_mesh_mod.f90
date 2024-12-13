@@ -18,7 +18,7 @@ module inventory_by_local_mesh_mod
   use function_space_mod,               only: function_space_type
   use integer_field_mod,                only: integer_field_type
   use log_mod,                          only: log_event, log_scratch_space, &
-                                              LOG_LEVEL_ERROR, LOG_LEVEL_WARNING
+                                              LOG_LEVEL_ERROR
   use linked_list_data_mod,             only: linked_list_data_type
   use linked_list_mod,                  only: linked_list_type, &
                                               linked_list_item_type
@@ -34,9 +34,10 @@ module inventory_by_local_mesh_mod
 
   private
 
-  ! Set the default table length to 1 - which produces a inventory_by_local_mesh type
-  ! constructed of a single linked list
-  integer(kind=i_def), parameter :: default_table_len = 1
+  ! Set the default table length -- this number should be higher than the
+  ! expected number of local meshes. If this limit is actually reached, then
+  ! it can be increased in the future
+  integer(kind=i_def), parameter :: default_table_len = 8
 
   !-----------------------------------------------------------------------------
   ! Type that holds an inventory of paired objects in a linked list
@@ -112,8 +113,8 @@ subroutine initialise(self, name, table_len)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  character(*),        optional, intent(in)    :: name
-  integer(kind=i_def), optional, intent(in)    :: table_len
+  character(*),              optional, intent(in)    :: name
+  integer(kind=i_def),       optional, intent(in)    :: table_len
 
   integer(kind=i_def) :: i
 
@@ -140,25 +141,27 @@ subroutine add_paired_object(self, paired_object)
   implicit none
 
   class(inventory_by_local_mesh_type), intent(inout) :: self
-  class(id_abstract_pair_type),  intent(in)    :: paired_object
+  class(id_abstract_pair_type),        intent(in)    :: paired_object
   integer(kind=i_def) :: hash, id
 
   ! Extract ID
   id = paired_object%get_id()
 
   ! Check if object exists in inventory already
-  ! If it does, replace existing object and provide a warning
+  ! If it does, throw an error
   if ( self%paired_object_exists( id ) ) then
-    write(log_scratch_space, '(A,I8,3A)') &
-        'Paired object on local mesh [', id,                              &
-        '] already exists in inventory_by_local_mesh: ', trim(self%name), &
-        ', removing existing paired object...'
-    call log_event(log_scratch_space, LOG_LEVEL_WARNING)
+    write(log_scratch_space, '(A,I8,5A)')                                      &
+        'Paired object on local mesh [', id, '] corresponds to a hash that',   &
+        ' already exists in inventory_by_local_mesh: ', trim(self%name),       &
+        '. If this object corresponds to a new local mesh, you may need to ',  &
+        'increase the table length of the inventory'
+    call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     call self%remove_paired_object(id)
   end if
 
-  ! Finished checking - so the object must be good to add - so add it
   hash = mod(id, self%get_table_len())
+
+  ! Finished checking - so the object must be good to add - so add it
   call self%paired_object_list(hash)%insert_item( paired_object )
 
 end subroutine add_paired_object

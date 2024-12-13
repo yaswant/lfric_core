@@ -295,8 +295,16 @@ test_function_space => function_space_chain%get_start()
 test_function_space => function_space_chain%get_next()
 @assertEqual ( this%function_space2%get_id(), test_function_space%get_id() )
 
-! Get prevous function space
+! Get current function space
+test_function_space => function_space_chain%get_current()
+@assertEqual ( this%function_space2%get_id(), test_function_space%get_id() )
+
+! Get previous function space
 test_function_space => function_space_chain%get_previous()
+@assertEqual ( this%function_space1%get_id(), test_function_space%get_id() )
+
+! Get current function space
+test_function_space => function_space_chain%get_current()
 @assertEqual ( this%function_space1%get_id(), test_function_space%get_id() )
 
 ! Get next function space

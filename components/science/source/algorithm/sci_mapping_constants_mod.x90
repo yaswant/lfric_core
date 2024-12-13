@@ -1,0 +1,1057 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2024 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!
+!> @brief Provides runtime-constant operators and fields, used for mapping
+!!        fields between meshes and function spaces.
+!>
+!> @details This module controls the set up of various objects that are used for
+!!          mapping fields between meshes and function spaces. These objects do
+!!          not change during a run, so can be pre-computed.
+!-------------------------------------------------------------------------------
+
+module sci_mapping_constants_mod
+
+  ! Infrastructure
+  use constants_mod,                     only: i_def, r_def, l_def, str_def
+  use copy_field_alg_mod,                only: copy_field
+  use extrusion_mod,                     only: PRIME_EXTRUSION, &
+                                               DOUBLE_LEVEL
+  use sci_fem_constants_mod,             only: get_qr
+  use field_mod,                         only: field_type
+  use function_space_mod,                only: function_space_type
+  use function_space_collection_mod,     only: function_space_collection
+  use fs_continuity_mod,                 only: W1, W2, W2H, W3, Wtheta
+  use inventory_by_local_mesh_mod,       only: inventory_by_local_mesh_type
+  use inventory_by_mesh_mod,             only: inventory_by_mesh_type
+  use local_mesh_mod,                    only: local_mesh_type
+  use log_mod,                           only: log_event,                      &
+                                               LOG_LEVEL_INFO,                 &
+                                               LOG_LEVEL_ERROR,                &
+                                               log_scratch_space
+  use mesh_collection_mod,               only: mesh_collection_type, &
+                                               mesh_collection
+  use mesh_mod,                          only: mesh_type
+  use operator_mod,                      only: operator_type
+  use quadrature_xyoz_mod,               only: quadrature_xyoz_type
+  use r_tran_field_mod,                  only: r_tran_field_type
+  use timer_mod,                         only: timer
+
+  ! Configuration
+  use finite_element_config_mod,         only: element_order, nqp_exact
+  use io_config_mod,                     only: subroutine_timers
+
+  ! Other algorithms
+  use sci_geometric_constants_mod,       only: get_coordinates, &
+                                               get_panel_id
+
+  ! Kernels
+  use sci_project_ws_to_w1_operator_kernel_mod, &
+                                         only: project_ws_to_w1_operator_kernel_type
+
+  implicit none
+
+  private
+
+  ! Variables private to this module that can only be accessed by public
+  ! functions returning pointers to them
+
+  ! ========================================================================== !
+  ! Inventories for use in the rest of the model
+  ! ========================================================================== !
+
+  ! Constants for mapping between meshes with different extrusion
+  type(inventory_by_mesh_type) :: proj_mr_to_sh_rho_inventory
+
+  ! Constants for mapping between meshes with different horizontal resolution
+  type(inventory_by_mesh_type) :: intermesh_wghts_w2_inventory
+  type(inventory_by_mesh_type) :: intermesh_wghts_rdef_w3_inventory
+  type(inventory_by_mesh_type) :: intermesh_wghts_rtran_w3_inventory
+
+  ! Constants for projecting Cartesian components from W3 to W2
+  type(inventory_by_mesh_type) :: project_xdot_to_w2_inventory
+  type(inventory_by_mesh_type) :: project_ydot_to_w2_inventory
+  type(inventory_by_mesh_type) :: project_zdot_to_w2_inventory
+
+  ! Constants for projecting spherical components to W2
+  type(inventory_by_mesh_type) :: u_lon_map_inventory
+  type(inventory_by_mesh_type) :: u_lat_map_inventory
+  type(inventory_by_mesh_type) :: u_up_map_inventory
+  type(inventory_by_mesh_type) :: u_lon_sample_inventory
+  type(inventory_by_mesh_type) :: u_lat_sample_inventory
+  type(inventory_by_mesh_type) :: u_up_sample_inventory
+
+  ! Constants for projecting spherical components from W3 to W1
+  type(inventory_by_mesh_type) :: project_lon_dot_to_w1_inventory
+  type(inventory_by_mesh_type) :: project_lat_dot_to_w1_inventory
+  type(inventory_by_mesh_type) :: project_r_dot_to_w1_inventory
+
+  ! Correction factor for mapping from W3 DoFs to W2 DoFs
+  type(inventory_by_local_mesh_type) :: w3_to_w2_displacement_inventory
+
+  ! ========================================================================== !
+  ! Public functions for accessing the module contents
+  ! ========================================================================== !
+
+  public :: final_mapping_constants
+  public :: get_proj_mr_to_sh_rho_rhs_op
+  public :: get_intermesh_weights_w3_rdef
+  public :: get_intermesh_weights_w3_rtran
+  public :: get_intermesh_weights_w2
+  public :: get_project_xdot_to_w2
+  public :: get_project_ydot_to_w2
+  public :: get_project_zdot_to_w2
+  public :: get_u_lon_map
+  public :: get_u_lat_map
+  public :: get_u_up_map
+  public :: get_u_lon_sample
+  public :: get_u_lat_sample
+  public :: get_u_up_sample
+  public :: get_project_lon_dot_to_w1
+  public :: get_project_lat_dot_to_w1
+  public :: get_project_r_dot_to_w1
+  public :: get_w3_to_w2_displacement
+
+  ! Private routines for creating constants
+  private :: create_cartesian_components_to_w2_matrices
+  private :: create_spherical_components_to_w2_projection
+  private :: create_spherical_components_to_w2_sample
+
+contains
+
+  ! ========================================================================== !
+  ! Private routines for creating some particular constants
+  ! ========================================================================== !
+
+  !> @brief Creates the operators for projecting a vector of components in W3
+  !!        to a field in W2
+  !> @param[in] mesh  The mesh to compute the operators for
+  subroutine create_cartesian_components_to_w2_matrices(mesh)
+
+    use sci_project_ws_to_w2_operator_kernel_mod, &
+                                    only: project_ws_to_w2_operator_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: mesh
+    type(operator_type),         pointer :: project_xdot_to_w2
+    type(operator_type),         pointer :: project_ydot_to_w2
+    type(operator_type),         pointer :: project_zdot_to_w2
+    type(field_type),            pointer :: chi(:)
+    type(field_type),            pointer :: panel_id
+    type(quadrature_xyoz_type),  pointer :: qr
+    type(function_space_type),   pointer :: w2_fs
+    type(function_space_type),   pointer :: w3_fs
+    integer(kind=i_def)                  :: mesh_id
+    integer(kind=i_def),       parameter :: xdirection = 1_i_def
+    integer(kind=i_def),       parameter :: ydirection = 2_i_def
+    integer(kind=i_def),       parameter :: zdirection = 3_i_def
+
+    if (.not. project_xdot_to_w2_inventory%is_initialised()) then
+      call project_xdot_to_w2_inventory%initialise(name='project_xdot_to_w2')
+    end if
+    if (.not. project_ydot_to_w2_inventory%is_initialised()) then
+      call project_ydot_to_w2_inventory%initialise(name='project_ydot_to_w2')
+    end if
+    if (.not. project_zdot_to_w2_inventory%is_initialised()) then
+      call project_zdot_to_w2_inventory%initialise(name='project_zdot_to_w2')
+    end if
+
+    mesh_id = mesh%get_id()
+    chi => get_coordinates(mesh_id)
+    panel_id => get_panel_id(mesh_id)
+    qr => get_qr()
+    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+
+    call project_xdot_to_w2_inventory%add_operator(project_xdot_to_w2, w2_fs, w3_fs, mesh)
+    call project_ydot_to_w2_inventory%add_operator(project_ydot_to_w2, w2_fs, w3_fs, mesh)
+    call project_zdot_to_w2_inventory%add_operator(project_zdot_to_w2, w2_fs, w3_fs, mesh)
+
+    call invoke( project_ws_to_w2_operator_kernel_type(project_xdot_to_w2,     &
+                                                       chi, panel_id,          &
+                                                       xdirection, qr),        &
+                 project_ws_to_w2_operator_kernel_type(project_ydot_to_w2,     &
+                                                       chi, panel_id,          &
+                                                       ydirection, qr),        &
+                 project_ws_to_w2_operator_kernel_type(project_zdot_to_w2,     &
+                                                       chi, panel_id,          &
+                                                       zdirection, qr) )
+
+  end subroutine
+
+  !> @brief Create the operators for projecting spherical components in
+  !!        (W3, W3, Wtheta) to a vector-valued field in W2
+  !> @param[in] mesh   The mesh to compute the operators for
+  subroutine create_spherical_components_to_w2_projection(mesh)
+
+    use sci_compute_map_u_operators_kernel_mod, &
+                                      only: compute_map_u_operators_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: mesh
+    integer(kind=i_def)                  :: mesh_id
+    type(function_space_type),   pointer :: w2_fs
+    type(function_space_type),   pointer :: w3_fs
+    type(function_space_type),   pointer :: wtheta_fs
+    type(field_type),            pointer :: chi(:)
+    type(field_type),            pointer :: panel_id
+    type(quadrature_xyoz_type),  pointer :: qr
+    type(operator_type),         pointer :: u_lon_map
+    type(operator_type),         pointer :: u_lat_map
+    type(operator_type),         pointer :: u_up_map
+
+    if (.not. u_lon_map_inventory%is_initialised()) then
+      call u_lon_map_inventory%initialise(name='u_lon_map')
+    end if
+    if (.not. u_lat_map_inventory%is_initialised()) then
+      call u_lat_map_inventory%initialise(name='u_lat_map')
+    end if
+    if (.not. u_up_map_inventory%is_initialised()) then
+      call u_up_map_inventory%initialise(name='u_up_map')
+    end if
+
+    mesh_id = mesh%get_id()
+    chi => get_coordinates(mesh_id)
+    panel_id => get_panel_id(mesh_id)
+    qr => get_qr()
+
+    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+    wtheta_fs => function_space_collection%get_fs(mesh, element_order, Wtheta)
+
+    call u_lon_map_inventory%add_operator(u_lon_map, w2_fs, w3_fs, mesh)
+    call u_lat_map_inventory%add_operator(u_lat_map, w2_fs, w3_fs, mesh)
+    call u_up_map_inventory%add_operator(u_up_map, w2_fs, wtheta_fs, mesh)
+
+    call invoke( name="compute_lonlatr_galerkin_operators",                    &
+                 compute_map_u_operators_kernel_type(u_lon_map,                &
+                                                     u_lat_map,                &
+                                                     u_up_map,                 &
+                                                     chi, panel_id,            &
+                                                     qr) )
+
+  end subroutine create_spherical_components_to_w2_projection
+
+  !> @brief Create the operators for sampling spherical components in
+  !!        (W3, W3, Wtheta) to a vector-valued field in W2
+  !> @param[in] mesh   The mesh to compute the operators for
+  subroutine create_spherical_components_to_w2_sample(mesh)
+
+    use sci_compute_sample_u_ops_kernel_mod, &
+                                      only: compute_sample_u_ops_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: mesh
+    integer(kind=i_def)                  :: mesh_id
+    type(function_space_type),   pointer :: w2_fs
+    type(function_space_type),   pointer :: w3_fs
+    type(function_space_type),   pointer :: wtheta_fs
+    type(field_type),            pointer :: chi(:)
+    type(field_type),            pointer :: panel_id
+    type(operator_type),         pointer :: u_lon_sample
+    type(operator_type),         pointer :: u_lat_sample
+    type(operator_type),         pointer :: u_up_sample
+
+    if (.not. u_lon_sample_inventory%is_initialised()) then
+      call u_lon_sample_inventory%initialise(name='u_lon_sample')
+    end if
+    if (.not. u_lat_sample_inventory%is_initialised()) then
+      call u_lat_sample_inventory%initialise(name='u_lat_sample')
+    end if
+    if (.not. u_up_sample_inventory%is_initialised()) then
+      call u_up_sample_inventory%initialise(name='u_up_sample')
+    end if
+
+    mesh_id = mesh%get_id()
+    chi => get_coordinates(mesh_id)
+    panel_id => get_panel_id(mesh_id)
+
+    if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+    wtheta_fs => function_space_collection%get_fs(mesh, element_order, Wtheta)
+
+    call u_lon_sample_inventory%add_operator(u_lon_sample, w2_fs, w3_fs, mesh)
+    call u_lat_sample_inventory%add_operator(u_lat_sample, w2_fs, w3_fs, mesh)
+    call u_up_sample_inventory%add_operator(u_up_sample, w2_fs, wtheta_fs, mesh)
+
+    call invoke( name="compute_lonlatr_sample_operators",                      &
+                 compute_sample_u_ops_kernel_type(u_lon_sample,                &
+                                                  u_lat_sample,                &
+                                                  u_up_sample,                 &
+                                                  chi, panel_id) )
+
+    if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+  end subroutine create_spherical_components_to_w2_sample
+
+  ! ========================================================================== !
+  ! GETTERS FOR INTER-MESH CONSTANTS
+  ! ========================================================================== !
+
+  !> @brief Returns a pointer to the Wtheta to shifted W3 integrals
+  !> @param[in] prime_extrusion_mesh  The prime extrusion mesh for the transform
+  !> @return The integrals for transforming a mixing ratio in Wtheta
+  !> to a density in shifted W3
+  function get_proj_mr_to_sh_rho_rhs_op(prime_extrusion_mesh) result(integrals)
+
+    use sci_proj_mr_to_sh_rho_rhs_op_kernel_mod, &
+                                      only: proj_mr_to_sh_rho_rhs_op_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: prime_extrusion_mesh
+    type(mesh_type),             pointer :: double_level_mesh
+    integer(kind=i_def)                  :: prime_mesh_id
+    type(field_type),            pointer :: integrals(:)
+    type(field_type),            pointer :: double_level_chi(:)
+    type(field_type),            pointer :: panel_id
+    type(function_space_type),   pointer :: w3_fs
+    type(function_space_type),   pointer :: wtheta_fs
+    type(quadrature_xyoz_type),  pointer :: qr
+    type(field_type)                     :: dummy_theta
+    integer(kind=i_def)                  :: k
+    logical(kind=l_def)                  :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. proj_mr_to_sh_rho_inventory%is_initialised()) then
+      call proj_mr_to_sh_rho_inventory%initialise(                             &
+              name='proj_mr_to_sh_rho_rhs_op'                                  &
+      )
+    end if
+
+    prime_mesh_id = prime_extrusion_mesh%get_id()
+    constant_exists = proj_mr_to_sh_rho_inventory%paired_object_exists(        &
+            prime_mesh_id                                                      &
+    )
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+
+      panel_id => get_panel_id(prime_mesh_id)
+      double_level_mesh => mesh_collection%get_mesh(                           &
+              prime_extrusion_mesh, DOUBLE_LEVEL                               &
+      )
+      double_level_chi => get_coordinates(double_level_mesh%get_id())
+      qr => get_qr()
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      w3_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, W3)
+      wtheta_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, Wtheta)
+
+      call proj_mr_to_sh_rho_inventory%add_field_array(                        &
+              integrals, w3_fs, 4, prime_extrusion_mesh                        &
+      )
+
+      do k = 1, 4
+        call invoke( setval_c(integrals(k), 0.0_r_def) )
+      end do
+
+      call dummy_theta%initialise( vector_space = wtheta_fs )
+      call invoke( proj_mr_to_sh_rho_rhs_op_kernel_type(integrals,             &
+                                                        double_level_chi,      &
+                                                        panel_id,              &
+                                                        dummy_theta,           &
+                                                        qr) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Get existing constant
+    call proj_mr_to_sh_rho_inventory%get_field_array(prime_extrusion_mesh, integrals)
+
+  end function get_proj_mr_to_sh_rho_rhs_op
+
+  !> @brief Returns a pointer to the weights for W2 prolongation
+  !> @param[in] fine_mesh    The fine mesh for the transform
+  !> @param[in] coarse_mesh  The coarse mesh for the transform
+  !> @return The field containing weights for W2 prolongation
+  function get_intermesh_weights_w2(fine_mesh, coarse_mesh) result(weights)
+
+    use sci_weights_prolong_w2_kernel_mod, only: weights_prolong_w2_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: coarse_mesh
+    type(mesh_type), pointer, intent(in) :: fine_mesh
+    integer(kind=i_def)                  :: intermesh_id
+    logical(kind=l_def)                  :: constant_exists
+    type(field_type),            pointer :: weights
+    type(field_type)                     :: dummy_w2_field
+    type(function_space_type),   pointer :: fine_w2_fs
+    type(function_space_type),   pointer :: coarse_w2_fs
+
+    ! Check inventory is initialised
+    if (.not. intermesh_wghts_w2_inventory%is_initialised()) then
+      call intermesh_wghts_w2_inventory%initialise(name='intermesh_weights_w2')
+    end if
+
+    intermesh_id = intermesh_wghts_w2_inventory%compute_intermesh_id(          &
+            coarse_mesh, fine_mesh                                             &
+    )
+    constant_exists = intermesh_wghts_w2_inventory%paired_object_exists(       &
+            intermesh_id                                                       &
+    )
+
+    if (.not. constant_exists) then
+
+      if (.not. coarse_mesh%query_mesh_map(fine_mesh)) then
+        write(log_scratch_space, '(A,I6,A,I6)')                                &
+            'No mesh map exists for mapping between meshes ',                  &
+            coarse_mesh%get_id(), ' and ', fine_mesh%get_id()
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      coarse_w2_fs => function_space_collection%get_fs(coarse_mesh, 0, W2)
+      fine_w2_fs => function_space_collection%get_fs(fine_mesh, 0, W2)
+
+      call dummy_w2_field%initialise( coarse_w2_fs )
+      call invoke( setval_c(dummy_w2_field, 0.0_r_def) )
+
+      call intermesh_wghts_w2_inventory%add_field(                             &
+              weights, fine_w2_fs, coarse_mesh, fine_mesh                      &
+      )
+
+      call invoke( setval_c(weights, 0.0_r_def),                               &
+                   weights_prolong_w2_kernel_type(weights, dummy_w2_field) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Get existing constant
+    call intermesh_wghts_w2_inventory%get_field(coarse_mesh, fine_mesh, weights)
+
+  end function get_intermesh_weights_w2
+
+  !> @brief Returns a pointer to the weights for conservative W3 mapping
+  !> @param[in] fine_mesh    The fine mesh for the transform
+  !> @param[in] coarse_mesh  The coarse mesh for the transform
+  !> @return The field containing weights for conservative W3 mapping
+  function get_intermesh_weights_w3_rdef(fine_mesh, coarse_mesh) result(weights_rdef)
+
+    use sci_fem_constants_mod,               only: get_mass_matrix_diagonal
+    use sci_weights_intermesh_w3_kernel_mod, only: weights_intermesh_w3_kernel_type
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: coarse_mesh
+    type(mesh_type), pointer, intent(in) :: fine_mesh
+    integer(kind=i_def)                  :: intermesh_id
+    logical(kind=l_def)                  :: constant_exists
+    type(field_type),            pointer :: weights_rdef
+    type(function_space_type),   pointer :: fine_w3_fs
+    type(function_space_type),   pointer :: coarse_w3_fs
+    type(field_type),            pointer :: mm_w3_fine
+    type(field_type),            pointer :: mm_w3_coarse
+
+    ! Check inventory is initialised
+    if (.not. intermesh_wghts_rdef_w3_inventory%is_initialised()) then
+      call intermesh_wghts_rdef_w3_inventory%initialise(                       &
+              name='intermesh_weights_rdef_w3'                                 &
+      )
+    end if
+
+    intermesh_id = intermesh_wghts_rdef_w3_inventory%compute_intermesh_id(     &
+            coarse_mesh, fine_mesh                                             &
+    )
+    constant_exists = intermesh_wghts_rdef_w3_inventory%paired_object_exists(  &
+            intermesh_id                                                       &
+    )
+
+    if (.not. constant_exists) then
+
+      if (.not. coarse_mesh%query_mesh_map(fine_mesh)) then
+        write(log_scratch_space, '(A,I6,A,I6)')                                &
+            'No mesh map exists for mapping between meshes ',                  &
+            coarse_mesh%get_id(), ' and ', fine_mesh%get_id()
+        call log_event(log_scratch_space, LOG_LEVEL_ERROR)
+      end if
+
+      ! @TODO #4487: this would be better as just the cell volumes
+      mm_w3_fine => get_mass_matrix_diagonal(W3, fine_mesh%get_id())
+      mm_w3_coarse => get_mass_matrix_diagonal(W3, coarse_mesh%get_id())
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      coarse_w3_fs => function_space_collection%get_fs(coarse_mesh, 0, W3)
+      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, W3)
+
+      call intermesh_wghts_rdef_w3_inventory%add_field(                        &
+              weights_rdef, fine_w3_fs, coarse_mesh, fine_mesh                 &
+      )
+
+      call invoke( weights_intermesh_w3_kernel_type(weights_rdef,              &
+                                                    mm_w3_fine,                &
+                                                    mm_w3_coarse) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Get existing constant
+    call intermesh_wghts_rdef_w3_inventory%get_field(                          &
+            coarse_mesh, fine_mesh, weights_rdef                               &
+    )
+
+  end function get_intermesh_weights_w3_rdef
+
+  !> @brief Returns a pointer to the weights for conservative W3 mapping
+  !> @param[in] fine_mesh    The fine mesh for the transform
+  !> @param[in] coarse_mesh  The coarse mesh for the transform
+  !> @return The field containing weights for conservative W3 mapping
+  function get_intermesh_weights_w3_rtran(fine_mesh, coarse_mesh) result(weights_rtran)
+
+    implicit none
+
+    type(mesh_type), pointer, intent(in) :: coarse_mesh
+    type(mesh_type), pointer, intent(in) :: fine_mesh
+    integer(kind=i_def)                  :: intermesh_id
+    logical(kind=l_def)                  :: constant_exists
+    type(field_type),            pointer :: weights_rdef
+    type(r_tran_field_type),     pointer :: weights_rtran
+    type(function_space_type),   pointer :: fine_w3_fs
+
+    ! Check inventory is initialised
+    if (.not. intermesh_wghts_rtran_w3_inventory%is_initialised()) then
+      call intermesh_wghts_rtran_w3_inventory%initialise(                      &
+              name='intermesh_weights_rtran_w3'                                &
+      )
+    end if
+
+    intermesh_id = intermesh_wghts_rtran_w3_inventory%compute_intermesh_id(    &
+            coarse_mesh, fine_mesh                                             &
+    )
+    constant_exists = intermesh_wghts_rtran_w3_inventory%paired_object_exists( &
+            intermesh_id                                                       &
+    )
+
+    if (.not. constant_exists) then
+      ! Create the object as it doesn't exist yet
+      weights_rdef => get_intermesh_weights_w3_rdef(fine_mesh, coarse_mesh)
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, W3)
+
+      call intermesh_wghts_rtran_w3_inventory%add_field(                       &
+              weights_rtran, fine_w3_fs, coarse_mesh, fine_mesh                &
+      )
+
+      call copy_field(weights_rdef, weights_rtran)
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Get existing constant
+    call intermesh_wghts_rtran_w3_inventory%get_field(                         &
+            coarse_mesh, fine_mesh, weights_rtran                              &
+    )
+
+  end function get_intermesh_weights_w3_rtran
+
+  ! ========================================================================== !
+  ! GETTERS FOR INTER-FUNCTION SPACE CONSTANTS
+  ! ========================================================================== !
+
+  !> @brief Returns a pointer to the operator projection from xdot to W2
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_xdot_to_w2(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: proj_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. project_xdot_to_w2_inventory%is_initialised()) then
+      call project_xdot_to_w2_inventory%initialise(name='project_xdot_to_w2')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_xdot_to_w2_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_cartesian_components_to_w2_matrices(mesh)
+
+    call project_xdot_to_w2_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_xdot_to_w2
+
+  !> @brief Returns a pointer to the operator projection from ydot to W2
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_ydot_to_w2(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: proj_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. project_ydot_to_w2_inventory%is_initialised()) then
+      call project_ydot_to_w2_inventory%initialise(name='project_ydot_to_w2')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_ydot_to_w2_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_cartesian_components_to_w2_matrices(mesh)
+
+    call project_ydot_to_w2_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_ydot_to_w2
+
+  !> @brief Returns a pointer to the operator projection from zdot to W2
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_zdot_to_w2(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: proj_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. project_zdot_to_w2_inventory%is_initialised()) then
+      call project_zdot_to_w2_inventory%initialise(name='project_zdot_to_w2')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_zdot_to_w2_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_cartesian_components_to_w2_matrices(mesh)
+
+    call project_zdot_to_w2_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_zdot_to_w2
+
+  !> @brief Returns a pointer to the u_lon mapping operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The mapping operator for u_lon to W2
+  function get_u_lon_map(mesh_id) result(u_lon_map_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_lon_map_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_lon_map_inventory%is_initialised()) then
+      call u_lon_map_inventory%initialise(name='u_lon_map')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_lon_map_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_projection(mesh)
+
+    ! Return constant
+    call u_lon_map_inventory%get_operator(mesh, u_lon_map_op)
+
+  end function get_u_lon_map
+
+  !> @brief Returns a pointer to the u_lat mapping operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The mapping operator for u_lat to W2
+  function get_u_lat_map(mesh_id) result(u_lat_map_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_lat_map_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_lat_map_inventory%is_initialised()) then
+      call u_lat_map_inventory%initialise(name='u_lat_map')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_lat_map_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_projection(mesh)
+
+    ! Return constant
+    call u_lat_map_inventory%get_operator(mesh, u_lat_map_op)
+
+  end function get_u_lat_map
+
+  !> @brief Returns a pointer to the u_up mapping operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The mapping operator for u_up to W2
+  function get_u_up_map(mesh_id) result(u_up_map_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_up_map_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_up_map_inventory%is_initialised()) then
+      call u_up_map_inventory%initialise(name='u_up_map')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_up_map_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_projection(mesh)
+
+    ! Return constant
+    call u_up_map_inventory%get_operator(mesh, u_up_map_op)
+
+  end function get_u_up_map
+
+  !> @brief Returns a pointer to the u_lon sampling operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The sampling operator for u_lon to W2
+  function get_u_lon_sample(mesh_id) result(u_lon_sample_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_lon_sample_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_lon_sample_inventory%is_initialised()) then
+      call u_lon_sample_inventory%initialise(name='u_lon_sample')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_lon_sample_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_sample(mesh)
+
+    ! Return constant
+    call u_lon_sample_inventory%get_operator(mesh, u_lon_sample_op)
+
+  end function get_u_lon_sample
+
+  !> @brief Returns a pointer to the u_lat sampling operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The sampling operator for u_lat to W2
+  function get_u_lat_sample(mesh_id) result(u_lat_sample_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_lat_sample_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_lat_sample_inventory%is_initialised()) then
+      call u_lat_sample_inventory%initialise(name='u_lat_sample')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_lat_sample_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_sample(mesh)
+
+    ! Return constant
+    call u_lat_sample_inventory%get_operator(mesh, u_lat_sample_op)
+
+  end function get_u_lat_sample
+
+  !> @brief Returns a pointer to the u_up sampling operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The sampling operator for u_up to W2
+  function get_u_up_sample(mesh_id) result(u_up_sample_op)
+
+    implicit none
+
+    integer(kind=i_def),   intent(in) :: mesh_id
+    type(mesh_type),          pointer :: mesh
+    type(operator_type),      pointer :: u_up_sample_op
+    logical(kind=l_def)               :: constant_exists
+
+    ! Check inventory is initialised
+    if (.not. u_up_sample_inventory%is_initialised()) then
+      call u_up_sample_inventory%initialise(name='u_up_sample')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = u_up_sample_inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) call create_spherical_components_to_w2_sample(mesh)
+
+    ! Return constant
+    call u_up_sample_inventory%get_operator(mesh, u_up_sample_op)
+
+  end function get_u_up_sample
+
+  !> @brief Returns a pointer to the operator projection from lon dot to W1
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_lon_dot_to_w1(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),     intent(in) :: mesh_id
+    type(mesh_type),            pointer :: mesh
+    type(operator_type),        pointer :: proj_op
+    logical(kind=l_def)                 :: constant_exists
+    type(function_space_type),  pointer :: w1_k0_fs
+    type(function_space_type),  pointer :: w3_fs
+    type(field_type),           pointer :: chi(:)
+    type(field_type),           pointer :: panel_id
+    type(quadrature_xyoz_type), pointer :: qr
+    integer(kind=i_def),      parameter :: xdirection = 1_i_def
+
+    ! Check inventory is initialised
+    if (.not. project_lon_dot_to_w1_inventory%is_initialised()) then
+      call project_lon_dot_to_w1_inventory%initialise(                         &
+              name='project_lon_dot_to_w1'                                     &
+      )
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_lon_dot_to_w1_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr => get_qr()
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+
+      call project_lon_dot_to_w1_inventory%add_operator(                       &
+              proj_op, w1_k0_fs, w3_fs, mesh                                   &
+      )
+
+      call invoke( name='proj_lon_dot_to_w1_op',                               &
+                   project_ws_to_w1_operator_kernel_type(proj_op,              &
+                                                         chi, panel_id,        &
+                                                         xdirection, qr) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Return constant
+    call project_lon_dot_to_w1_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_lon_dot_to_w1
+
+  !> @brief Returns a pointer to the operator projection from lat dot to W1
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_lat_dot_to_w1(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),     intent(in) :: mesh_id
+    type(mesh_type),            pointer :: mesh
+    type(operator_type),        pointer :: proj_op
+    logical(kind=l_def)                 :: constant_exists
+    type(function_space_type),  pointer :: w1_k0_fs
+    type(function_space_type),  pointer :: w3_fs
+    type(field_type),           pointer :: chi(:)
+    type(field_type),           pointer :: panel_id
+    type(quadrature_xyoz_type), pointer :: qr
+    integer(kind=i_def),      parameter :: ydirection = 2_i_def
+
+    ! Check inventory is initialised
+    if (.not. project_lat_dot_to_w1_inventory%is_initialised()) then
+      call project_lat_dot_to_w1_inventory%initialise(                         &
+              name='project_lat_dot_to_w1'                                     &
+      )
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_lat_dot_to_w1_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr => get_qr()
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+
+      call project_lat_dot_to_w1_inventory%add_operator(                       &
+              proj_op, w1_k0_fs, w3_fs, mesh                                   &
+      )
+
+      call invoke( name='proj_lat_dot_to_w1_op',                               &
+                   project_ws_to_w1_operator_kernel_type(proj_op,              &
+                                                         chi, panel_id,        &
+                                                         ydirection, qr) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Return constant
+    call project_lat_dot_to_w1_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_lat_dot_to_w1
+
+  !> @brief Returns a pointer to the operator projection from r dot to W1
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The projection operator
+  function get_project_r_dot_to_w1(mesh_id) result(proj_op)
+
+    implicit none
+
+    integer(kind=i_def),     intent(in) :: mesh_id
+    type(mesh_type),            pointer :: mesh
+    type(operator_type),        pointer :: proj_op
+    logical(kind=l_def)                 :: constant_exists
+    type(function_space_type),  pointer :: w1_k0_fs
+    type(function_space_type),  pointer :: w3_fs
+    type(field_type),           pointer :: chi(:)
+    type(field_type),           pointer :: panel_id
+    type(quadrature_xyoz_type), pointer :: qr
+    integer(kind=i_def),      parameter :: zdirection = 3_i_def
+
+    ! Check inventory is initialised
+    if (.not. project_r_dot_to_w1_inventory%is_initialised()) then
+      call project_r_dot_to_w1_inventory%initialise(name='project_r_dot_to_w1')
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = project_r_dot_to_w1_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr => get_qr()
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+
+      call project_r_dot_to_w1_inventory%add_operator(                         &
+              proj_op, w1_k0_fs, w3_fs, mesh                                   &
+      )
+
+      call invoke( name='proj_r_dot_to_w1_op',                                 &
+                   project_ws_to_w1_operator_kernel_type(proj_op,              &
+                                                         chi, panel_id,        &
+                                                         zdirection, qr) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+    ! Return constant
+    call project_r_dot_to_w1_inventory%get_operator(mesh, proj_op)
+
+  end function get_project_r_dot_to_w1
+
+  !> @brief Returns the displacement when averaging from W3 to W2
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The displacement field used for correcting mappings from W3 to W2
+  function get_w3_to_w2_displacement(mesh_id) result(w3_to_w2_displacement)
+
+    use sci_w3_to_w2_displacement_kernel_mod, &
+                                  only: w3_to_w2_displacement_kernel_type
+    implicit none
+
+    integer(kind=i_def),    intent(in) :: mesh_id
+    type(mesh_type),           pointer :: mesh
+    type(local_mesh_type),     pointer :: local_mesh
+    type(field_type),          pointer :: w3_to_w2_displacement
+    type(field_type)                   :: dummy_w3
+    logical(kind=l_def)                :: constant_exists
+    type(field_type),          pointer :: chi(:)
+    type(field_type),          pointer :: panel_id
+    type(function_space_type), pointer :: w2h_k0_fs
+    type(function_space_type), pointer :: w3_k0_fs
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. w3_to_w2_displacement_inventory%is_initialised()) then
+      call w3_to_w2_displacement_inventory%initialise(                         &
+              name="w3_to_w2_displacement"                                     &
+      )
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    local_mesh => mesh%get_local_mesh()
+    constant_exists =                                                          &
+      w3_to_w2_displacement_inventory%paired_object_exists(local_mesh%get_id())
+
+    if (constant_exists) then
+      ! Return existing constant
+      call w3_to_w2_displacement_inventory%get_field(                          &
+              local_mesh, w3_to_w2_displacement                                &
+      )
+    else
+      ! If this constant doesn't exist, create it
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+      w2h_k0_fs => function_space_collection%get_fs(mesh, 0, W2H)
+      w3_k0_fs => function_space_collection%get_fs(mesh, 0, W3)
+
+      call w3_to_w2_displacement_inventory%add_field(w3_to_w2_displacement,    &
+                                                     w2h_k0_fs, local_mesh)
+
+      call dummy_w3%initialise( w3_k0_fs )
+      call invoke( setval_c(w3_to_w2_displacement, 0.0_r_def),                 &
+                   w3_to_w2_displacement_kernel_type(w3_to_w2_displacement,    &
+                                                     chi, panel_id, dummy_w3) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.mapping')
+    end if
+
+  end function get_w3_to_w2_displacement
+
+  ! ========================================================================== !
+  ! FINALISE
+  ! ========================================================================== !
+  !> @brief Explicitly reclaim memory from module scope variables
+  subroutine final_mapping_constants()
+
+    implicit none
+
+    call proj_mr_to_sh_rho_inventory%clear()
+    call intermesh_wghts_w2_inventory%clear()
+    call intermesh_wghts_rdef_w3_inventory%clear()
+    call intermesh_wghts_rtran_w3_inventory%clear()
+    call w3_to_w2_displacement_inventory%clear()
+    call u_lon_map_inventory%clear()
+    call u_lat_map_inventory%clear()
+    call u_up_map_inventory%clear()
+    call u_lon_sample_inventory%clear()
+    call u_lat_sample_inventory%clear()
+    call u_up_sample_inventory%clear()
+    call project_lon_dot_to_w1_inventory%clear()
+    call project_lat_dot_to_w1_inventory%clear()
+    call project_r_dot_to_w1_inventory%clear()
+    call project_xdot_to_w2_inventory%clear()
+    call project_ydot_to_w2_inventory%clear()
+    call project_zdot_to_w2_inventory%clear()
+
+  end subroutine final_mapping_constants
+
+end module sci_mapping_constants_mod

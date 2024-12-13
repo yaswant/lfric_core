@@ -50,5 +50,6 @@ class inventory_by_mesh_mod::inventory_by_mesh_type {
   +get_integer_array( <<in>> mesh: mesh_type, <<out>> numbers: integer ) :
   +get_operator( <<in>> mesh: mesh_type, <<out>> operator_out: operator_real32_type ) :
   +get_operator( <<in>> mesh: mesh_type, <<out>> operator_out: operator_real64_type ) :
+  +compute_intermesh_id( <<in>> source_mesh: mesh_type, <<in>> target_mesh: mesh_type ) : integer
   <<destroy>>+inventory_by_mesh_destructor()
 }

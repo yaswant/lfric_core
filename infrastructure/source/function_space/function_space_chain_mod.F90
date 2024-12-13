@@ -60,6 +60,12 @@ module function_space_chain_mod
     !>                               Entry/Exit point of this chain.
     procedure, public :: get_start
     !>
+    !> @brief   Returns pointer to the current function space in this chain.
+    !> @details This function will keep the current position in this chain.
+    !> @return  current_function_space Pointer to the current function space in
+    !>                                 this chain.
+    procedure, public :: get_current
+    !>
     !> @brief   Returns pointer to the next function space in this chain.
     !> @details This function will increment the current position in this
     !>          chain tailwards (forward) by 1.
@@ -187,6 +193,35 @@ contains ! Module procedures
     nullify(function_space_pointer)
 
   end function get_start
+
+  !=============================================================================
+  function get_current(self) result (current_function_space)
+
+    implicit none
+
+    class(function_space_chain_type)           :: self
+    type(function_space_type),         pointer :: current_function_space
+    type(linked_list_item_type),       pointer :: current => null()
+
+    type(function_space_pointer_type), pointer :: &
+                                       function_space_pointer => null()
+
+    current => self%function_space_chain_list%get_current()
+
+    ! 'cast' to the function_space_type
+    select type(v => current%payload)
+    type is (function_space_pointer_type)
+      function_space_pointer => v
+    end select
+
+    current_function_space => function_space_pointer%get_target()
+
+    nullify(current)
+    nullify(function_space_pointer)
+
+  end function get_current
+
+  !=============================================================================
 
 
   !=============================================================================

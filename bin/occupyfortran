@@ -97,7 +97,7 @@ if __name__ == '__main__':
     stale_set = expected_dirty_set - dirty_set
     message = f"Found {len(new_files)} new files with global variables."
     getLogger('occupyfortran').info(message)
-    message = f"Ignored {len(ignored_set)} files already known to contain" \
+    message = f"Ignored {len(ignored_set)} files already known to contain " \
               "globals."
     getLogger('occupyfortran').info(message)
     message = f"Missed {len(stale_set)} expected files not found."

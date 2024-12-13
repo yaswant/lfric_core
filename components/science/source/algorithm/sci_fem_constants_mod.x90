@@ -1,0 +1,736 @@
+!-----------------------------------------------------------------------------
+! (C) Crown copyright 2021 Met Office. All rights reserved.
+! The file LICENCE, distributed with this code, contains details of the terms
+! under which the code may be used.
+!-----------------------------------------------------------------------------
+!
+!> @brief Provides pre-computed objects relating to finite element methods.
+!>
+!> @details This module controls the set up of finite element objects that
+!>          do not change during a run, such as mass matrices and differential
+!>          operators. These objects are accessed from this module through
+!>          appropriate 'get' functions.
+!-------------------------------------------------------------------------------
+
+module sci_fem_constants_mod
+
+  ! Infrastructure
+  use constants_mod,                      only: i_def, r_def, r_second,        &
+                                                str_def, l_def
+  use field_mod,                          only: field_type
+  use fs_continuity_mod,                  only: W0, W1, W2, W2broken, &
+                                                W2H, W2V, W3, Wtheta
+  use function_space_collection_mod,      only: function_space_collection
+  use function_space_mod,                 only: function_space_type
+  use inventory_by_mesh_mod,              only: inventory_by_mesh_type
+  use io_config_mod,                      only: subroutine_timers
+  use log_mod,                            only: log_event, LOG_LEVEL_ERROR
+  use mesh_collection_mod,                only: mesh_collection
+  use mesh_mod,                           only: mesh_type
+  use operator_mod,                       only: operator_type
+  use quadrature_xyoz_mod,                only: quadrature_xyoz_type
+  use quadrature_rule_gaussian_mod,       only: quadrature_rule_gaussian_type
+  use timer_mod,                          only: timer
+
+  ! Configuration
+  use finite_element_config_mod,          only: element_order, nqp_exact
+
+  ! Other algorithms
+  use sci_geometric_constants_mod,        only: get_coordinates,               &
+                                                get_panel_id
+  ! Kernels
+  use sci_compute_div_operator_kernel_mod, &
+                                          only: compute_div_operator_kernel_type
+  use matrix_vector_kernel_mod,           only: matrix_vector_kernel_type
+  use dg_inc_matrix_vector_kernel_mod,    only: dg_inc_matrix_vector_kernel_type
+  use sci_multiplicity_kernel_mod,        only: multiplicity_kernel_type
+
+  implicit none
+
+  private
+
+  ! Variables private to this module that can only be accessed by public
+  ! functions returning pointers to them
+
+  ! Mass matrices
+  type(inventory_by_mesh_type), target :: mm_w1_inventory
+  type(inventory_by_mesh_type), target :: mm_w2_inventory
+  type(inventory_by_mesh_type), target :: mm_w2v_inventory
+  type(inventory_by_mesh_type), target :: mm_w2h_inventory
+  type(inventory_by_mesh_type), target :: mm_w3_inventory
+  type(inventory_by_mesh_type), target :: mm_wtheta_inventory
+  type(inventory_by_mesh_type), target :: mm_w3_inv_inventory
+  type(inventory_by_mesh_type), target :: mm_w2b_inv_inventory
+
+  ! Generalised W2 mass matrices
+
+  ! Differential operators
+  type(inventory_by_mesh_type) :: curl_inventory
+  type(inventory_by_mesh_type) :: div_inventory
+  type(inventory_by_mesh_type) :: div_h_inventory
+  type(inventory_by_mesh_type) :: im3_div_inventory
+
+  ! Diagonals of mass matrices
+  type(inventory_by_mesh_type), target :: mm1_diag_inventory
+  type(inventory_by_mesh_type), target :: mm2_diag_inventory
+  type(inventory_by_mesh_type), target :: mm2v_diag_inventory
+  type(inventory_by_mesh_type), target :: mm2h_diag_inventory
+  type(inventory_by_mesh_type), target :: mm3_diag_inventory
+  type(inventory_by_mesh_type), target :: mmtheta_diag_inventory
+
+  ! Lumped inverse mass matrices
+  type(inventory_by_mesh_type), target :: mm1_lumped_inv_inventory
+  type(inventory_by_mesh_type), target :: mmtheta_lumped_inv_inventory
+
+  ! Multiplicities and normalisations
+  type(inventory_by_mesh_type), target :: nodal_rmultiplicity_w0_inventory
+  type(inventory_by_mesh_type), target :: nodal_rmultiplicity_w1_inventory
+  type(inventory_by_mesh_type), target :: nodal_rmultiplicity_w2h_inventory
+  type(inventory_by_mesh_type), target :: nodal_rmultiplicity_w2_inventory
+
+  ! Quadrature objects
+  type(quadrature_xyoz_type),  target :: qr
+  logical(kind=l_def)                 :: qr_set = .false.
+  type(quadrature_rule_gaussian_type) :: quadrature_rule
+
+  public :: final_fem_constants
+  public :: get_qr
+  public :: get_mass_matrix
+  public :: get_mass_matrix_diagonal
+  public :: get_inverse_lumped_mass_matrix
+  public :: get_inverse_mass_matrix
+  public :: get_div
+  public :: get_div_h
+  public :: get_curl
+  public :: get_im3_div
+  public :: get_rmultiplicity
+
+contains
+
+  ! ========================================================================== !
+  ! GETTERS
+  ! ========================================================================== !
+
+  !> @brief Returns a pointer to the quadrature object
+  !> @return The quadrature object
+  function get_qr() result(qr_obj)
+
+    implicit none
+
+    type(quadrature_xyoz_type), pointer :: qr_obj
+
+    if (.not. qr_set) then
+      qr = quadrature_xyoz_type(nqp_exact, quadrature_rule)
+      qr_set = .true.
+    end if
+
+    qr_obj => qr
+
+  end function get_qr
+
+  !> @brief Returns a pointer to a mass matrix
+  !> @param[in] space   The space of the desired mass matrix
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The mass matrix operator
+  function get_mass_matrix(space, mesh_id) result(mm_op)
+
+    use sci_compute_mass_matrix_kernel_w_scalar_mod, &
+                                  only: compute_mass_matrix_kernel_w_scalar_type
+    use sci_compute_mass_matrix_kernel_w2_mod,       &
+                                  only: compute_mass_matrix_kernel_w2_type
+    use sci_compute_mass_matrix_kernel_w1_mod,       &
+                                  only: compute_mass_matrix_kernel_w1_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: space
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: mm_op
+    logical(kind=l_def)                   :: constant_exists
+    type(field_type),             pointer :: chi(:)
+    type(field_type),             pointer :: panel_id
+    type(quadrature_xyoz_type),   pointer :: qr_ptr
+    type(function_space_type),    pointer :: fs
+    type(inventory_by_mesh_type), pointer :: inventory
+    character(len=str_def)                :: inventory_name
+    logical(kind=l_def),        parameter :: extend_mesh = .false.
+
+    ! Point to appropriate inventory for this space
+    select case (space)
+      case (W1)
+        inventory => mm_w1_inventory
+        inventory_name = 'mass_matrix_w1'
+      case (W2, W2broken)
+        inventory => mm_w2_inventory
+        inventory_name = 'mass_matrix_w2'
+      case (W2V)
+        inventory => mm_w2v_inventory
+        inventory_name = 'mass_matrix_w2v'
+      case (W2H)
+        inventory => mm_w2h_inventory
+        inventory_name = 'mass_matrix_w2h'
+      case (W3)
+        inventory => mm_w3_inventory
+        inventory_name = 'mass_matrix_w3'
+      case (Wtheta)
+        inventory => mm_wtheta_inventory
+        inventory_name = 'mass_matrix_wtheta'
+      case default
+        mm_op => null()
+        call log_event("Mass matrix operator does not exist", LOG_LEVEL_ERROR)
+        stop
+    end select
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. inventory%is_initialised()) then
+      call inventory%initialise(name=inventory_name)
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) then
+      ! Create constant if it doesn't already exist
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr_ptr => get_qr()
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+      fs => function_space_collection%get_fs(mesh, element_order, space)
+      call inventory%add_operator(mm_op, fs, fs, mesh)
+
+      ! The situation depends on the function space
+      select case (space)
+        case (W1)
+          call invoke( name="compute_w1_mass_matrix",                          &
+                       compute_mass_matrix_kernel_w1_type(mm_op, chi,          &
+                                                          panel_id, qr_ptr) )
+        case (W2, W2broken, W2H, W2V)
+          call invoke( name="compute_w2_mass_matrix",                          &
+                       compute_mass_matrix_kernel_w2_type(mm_op, chi,          &
+                                                          panel_id, qr_ptr) )
+        case (W3, Wtheta)
+          call invoke( name= "compute_scalar_mass_matrix",                     &
+                       compute_mass_matrix_kernel_w_scalar_type(mm_op, chi,    &
+                                                                panel_id,      &
+                                                                extend_mesh,   &
+                                                                qr_ptr) )
+      end select
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    ! Return existing constant
+    call inventory%get_operator(mesh, mm_op)
+
+  end function get_mass_matrix
+
+  !> @brief Returns a pointer to a mass matrix diagonal
+  !> @param[in] space   The space of the desired diagonal mass matrix
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The mass matrix diagonal field
+  function get_mass_matrix_diagonal(space, mesh_id) result(diagonal_mm)
+
+    use sci_mm_diagonal_kernel_mod,             only: mm_diagonal_kernel_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: space
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(field_type),             pointer :: diagonal_mm
+    type(operator_type),          pointer :: mass_matrix
+    logical(kind=l_def)                   :: constant_exists
+    type(function_space_type),    pointer :: fs
+    type(inventory_by_mesh_type), pointer :: inventory
+    character(len=str_def)                :: inventory_name
+
+    ! Point to appropriate inventory for this space
+    select case (space)
+      case (W1)
+        inventory => mm1_diag_inventory
+        inventory_name = 'mm_w1_diag'
+      case (W2)
+        inventory => mm2_diag_inventory
+        inventory_name = 'mm_w2_diag'
+      case (W2V)
+        inventory => mm2v_diag_inventory
+        inventory_name = 'mm_w2v_diag'
+      case (W2H)
+        inventory => mm2h_diag_inventory
+        inventory_name = 'mm_w2h_diag'
+      case (W3)
+        inventory => mm3_diag_inventory
+        inventory_name = 'mm_w3_diag'
+      case (Wtheta)
+        inventory => mmtheta_diag_inventory
+        inventory_name = 'mm_wtheta_diag'
+      case default
+        diagonal_mm => null()
+        call log_event("Diagonal mass matrix operator does not exist", LOG_LEVEL_ERROR)
+        stop
+    end select
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. inventory%is_initialised()) then
+      call inventory%initialise(name=inventory_name)
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) then
+      ! Create constant if it doesn't already exist
+      mass_matrix => get_mass_matrix(space, mesh_id)
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+
+      fs => function_space_collection%get_fs(mesh, element_order, space)
+      call inventory%add_field(diagonal_mm, fs, mesh)
+      call invoke ( setval_c(diagonal_mm, 0.0_r_def),                          &
+                    mm_diagonal_kernel_type(diagonal_mm, mass_matrix)  )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    ! Return existing constant
+    call inventory%get_field(mesh, diagonal_mm)
+
+  end function get_mass_matrix_diagonal
+
+  !> @brief Returns a pointer to a field for an inverse lumped mass matrix
+  !> @param[in] space   The space of the desired lumped inverse mass matrix
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The lumped inverse mass matrix
+  function get_inverse_lumped_mass_matrix(space, mesh_id) result(mm_linv)
+
+    use dg_matrix_vector_kernel_mod, only: dg_matrix_vector_kernel_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: space
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(field_type)                      :: ones
+    type(field_type),             pointer :: mm_linv
+    type(operator_type),          pointer :: mass_matrix
+    logical(kind=l_def)                   :: constant_exists
+    type(function_space_type),    pointer :: fs
+    type(inventory_by_mesh_type), pointer :: inventory
+    character(len=str_def)                :: inventory_name
+    integer(kind=i_def),        parameter :: i_minus_one = -1_i_def
+
+    ! Point to appropriate inventory for this space
+    select case (space)
+      case (W1)
+        inventory => mm1_lumped_inv_inventory
+        inventory_name = 'mm_w1_diag'
+      case (Wtheta)
+        inventory => mmtheta_lumped_inv_inventory
+        inventory_name = 'mm_wtheta_lumped_inv'
+      case default
+        mm_linv => null()
+        call log_event("Lumped inverse mass matrix does not exist", LOG_LEVEL_ERROR)
+        stop
+    end select
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. inventory%is_initialised()) then
+      call inventory%initialise(name=inventory_name)
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) then
+      ! Create constant if it doesn't already exist
+      mass_matrix => get_mass_matrix(space, mesh_id)
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+
+      fs => function_space_collection%get_fs(mesh, element_order, space)
+      call ones%initialise( fs )
+      call inventory%add_field(mm_linv, fs, mesh)
+
+      ! The situation depends on the function space
+      select case (space)
+        case (W1)
+          call invoke( setval_c(ones, 1.0_r_def),                              &
+                       setval_c(mm_linv, 0.0_r_def),                           &
+                       matrix_vector_kernel_type(mm_linv, ones, mass_matrix),  &
+                       inc_X_powint_n(mm_linv, i_minus_one) )
+        case (Wtheta)
+          call invoke( setval_c(ones, 1.0_r_def),                              &
+                       setval_c(mm_linv, 0.0_r_def),                           &
+                       dg_inc_matrix_vector_kernel_type(mm_linv,               &
+                                                        ones, mass_matrix),    &
+                       inc_X_powint_n(mm_linv, i_minus_one) )
+      end select
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    ! Return existing constant
+    call inventory%get_field(mesh, mm_linv)
+
+  end function get_inverse_lumped_mass_matrix
+
+  !> @brief Returns a pointer to the inverse W3 mass matrix operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The inverse W3 mass matrix operator
+  function get_inverse_mass_matrix(space, mesh_id) result(mm_inv)
+
+    use sci_invert_local_operator_kernel_mod, only: invert_local_operator_kernel_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: space
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: mass_matrix
+    type(operator_type),          pointer :: mm_inv
+    logical(kind=l_def)                   :: constant_exists
+    type(function_space_type),    pointer :: fs
+    type(inventory_by_mesh_type), pointer :: inventory
+    character(len=str_def)                :: inventory_name
+
+    ! Point to appropriate inventory for this space
+    select case (space)
+      case (W2broken)
+        inventory => mm_w2b_inv_inventory
+        inventory_name = 'mm_w2b_inv'
+      case (W3)
+        inventory => mm_w3_inv_inventory
+        inventory_name = 'mm_w3_inv'
+      case default
+        mm_inv => null()
+        call log_event("Inverse mass matrix operator does not exist", LOG_LEVEL_ERROR)
+        stop
+    end select
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. inventory%is_initialised()) then
+      call inventory%initialise(name=inventory_name)
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) then
+      ! Create constant if it doesn't already exist
+      mass_matrix => get_mass_matrix(space, mesh_id)
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+
+      fs => function_space_collection%get_fs(mesh, element_order, space)
+      call inventory%add_operator(mm_inv, fs, fs, mesh)
+
+      call invoke( name = "create_inv_mass_matrix",                            &
+                   invert_local_operator_kernel_type(mm_inv, mass_matrix) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    ! Return existing constant
+    call inventory%get_operator(mesh, mm_inv)
+
+  end function get_inverse_mass_matrix
+
+  !> @brief Returns a pointer to the curl operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The curl operator
+  function get_curl(mesh_id) result(curl)
+
+    use sci_compute_curl_operator_kernel_mod, only: compute_curl_operator_kernel_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: curl
+    logical(kind=l_def)                   :: constant_exists
+    type(field_type),             pointer :: chi(:)
+    type(field_type),             pointer :: panel_id
+    type(quadrature_xyoz_type),   pointer :: qr_ptr
+    type(function_space_type),    pointer :: w2_fs
+    type(function_space_type),    pointer :: w1_fs
+
+    ! Initialise inventory if it hasn't been done so already
+    if (.not. curl_inventory%is_initialised()) then
+      call curl_inventory%initialise(name="curl")
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = curl_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr_ptr => get_qr()
+
+      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
+      w1_fs => function_space_collection%get_fs( mesh, element_order, W1 )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+        call curl_inventory%add_operator(curl, w2_fs, w1_fs, mesh)
+        call invoke( name='calculate_curl',                                    &
+                     compute_curl_operator_kernel_type(curl, chi,              &
+                                                       panel_id, qr_ptr) )
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    call curl_inventory%get_operator(mesh, curl)
+
+  end function get_curl
+
+  !> @brief Returns a pointer to the div operator
+  !> @param[in] mesh_id              The ID of the mesh to get the object for
+  !> @return The div operator
+  function get_div(mesh_id) result(div)
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: div
+    logical(kind=l_def)                   :: constant_exists
+    type(field_type),             pointer :: chi(:)
+    type(field_type),             pointer :: panel_id
+    type(quadrature_xyoz_type),   pointer :: qr_ptr
+    type(function_space_type),    pointer :: w3_fs
+    type(function_space_type),    pointer :: w2_fs
+
+    ! Initialise inventory if it hasn't been done so already
+    if (.not. div_inventory%is_initialised()) then
+      call div_inventory%initialise(name="div")
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = div_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr_ptr => get_qr()
+
+      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
+      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+        call div_inventory%add_operator(div, w3_fs, w2_fs, mesh)
+        call invoke( name='calculate_div',                                     &
+                     compute_div_operator_kernel_type(div, chi,                &
+                                                      panel_id, qr_ptr) )
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    call div_inventory%get_operator(mesh, div)
+
+  end function get_div
+
+  !> @brief Returns a pointer to the div operator
+  !> @param[in] mesh_id              The ID of the mesh to get the object for
+  !> @return The div operator for W2H
+  function get_div_h(mesh_id) result(div_h)
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: div_h
+    logical(kind=l_def)                   :: constant_exists
+    type(field_type),             pointer :: chi(:)
+    type(field_type),             pointer :: panel_id
+    type(quadrature_xyoz_type),   pointer :: qr_ptr
+    type(function_space_type),    pointer :: w3_fs
+    type(function_space_type),    pointer :: w2h_fs
+
+    ! Initialise inventory if it hasn't been done so already
+    if (.not. div_h_inventory%is_initialised()) then
+      call div_h_inventory%initialise(name="div_h")
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = div_h_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr_ptr => get_qr()
+
+      w2h_fs => function_space_collection%get_fs( mesh, element_order, W2H )
+      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+        call div_h_inventory%add_operator(div_h, w3_fs, w2h_fs, mesh)
+        call invoke( name='calculate_div_h',                                   &
+                     compute_div_operator_kernel_type(div_h, chi,              &
+                                                      panel_id, qr_ptr) )
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    call div_h_inventory%get_operator(mesh, div_h)
+
+  end function get_div_h
+
+  !> @brief Returns a pointer to the inv_m3 * div operator
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The div operator
+  function get_im3_div(mesh_id) result(im3_div)
+
+    use sci_operator_x_times_y_kernel_mod,  only: operator_x_times_y_kernel_type
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(operator_type),          pointer :: im3_div
+    type(operator_type),          pointer :: mm_w3_inv
+    type(operator_type)                   :: div
+    logical(kind=l_def)                   :: constant_exists
+    type(field_type),             pointer :: chi(:)
+    type(field_type),             pointer :: panel_id
+    type(quadrature_xyoz_type),   pointer :: qr_ptr
+    type(function_space_type),    pointer :: w3_fs
+    type(function_space_type),    pointer :: w2_fs
+
+    ! Initialise inventory if it hasn't been done so already
+    if (.not. im3_div_inventory%is_initialised()) then
+      call im3_div_inventory%initialise(name="im3_div")
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = im3_div_inventory%paired_object_exists(mesh_id)
+
+    ! Create constant if it doesn't already exist
+    if (.not. constant_exists) then
+      chi => get_coordinates(mesh_id)
+      panel_id => get_panel_id(mesh_id)
+      qr_ptr => get_qr()
+      mm_w3_inv => get_inverse_mass_matrix(W3, mesh_id)
+
+      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
+      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+        call div%initialise( w3_fs, w2_fs )
+        call im3_div_inventory%add_operator(im3_div, w3_fs, w2_fs, mesh)
+        call invoke( compute_div_operator_kernel_type(div, chi,                &
+                                                      panel_id, qr_ptr),       &
+                     operator_x_times_y_kernel_type(im3_div, mm_w3_inv, div) )
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    call im3_div_inventory%get_operator(mesh, im3_div)
+
+  end function get_im3_div
+
+  !> @brief Returns a pointer to the reciprocal of the multiplicity field
+  !> @param[in] space   The space of the desired r-multiplicity field
+  !> @param[in] mesh_id The ID of the mesh to get the object for
+  !> @return The nodal reciprocal multiplicity field
+  function get_rmultiplicity(space, mesh_id) result(rmultiplicity)
+
+    implicit none
+
+    integer(kind=i_def),       intent(in) :: space
+    integer(kind=i_def),       intent(in) :: mesh_id
+    type(mesh_type),              pointer :: mesh
+    type(field_type),             pointer :: rmultiplicity
+    type(field_type)                      :: nodal_multiplicity
+    type(field_type)                      :: ones
+    logical(kind=l_def)                   :: constant_exists
+    type(function_space_type),    pointer :: fs
+    type(inventory_by_mesh_type), pointer :: inventory
+    character(len=str_def)                :: inventory_name
+
+    ! Point to appropriate inventory for this space
+    select case (space)
+      case (W0)
+        inventory => nodal_rmultiplicity_w0_inventory
+        inventory_name = 'nodal_rmultiplicity_w0'
+      case (W1)
+        inventory => nodal_rmultiplicity_w1_inventory
+        inventory_name = 'nodal_rmultiplicity_w1'
+      case (W2)
+        inventory => nodal_rmultiplicity_w2_inventory
+        inventory_name = 'nodal_rmultiplicity_w2'
+      case (W2H)
+        inventory => nodal_rmultiplicity_w2h_inventory
+        inventory_name = 'nodal_rmultiplicity_w2h'
+      case default
+        rmultiplicity => null()
+        call log_event( "Reciprocal multiplicity field does not exist", LOG_LEVEL_ERROR)
+        stop
+    end select
+
+    ! Initialise inventory if this is the first time getting this constant
+    if (.not. inventory%is_initialised()) then
+      call inventory%initialise(name=inventory_name)
+    end if
+
+    mesh => mesh_collection%get_mesh(mesh_id)
+    constant_exists = inventory%paired_object_exists(mesh_id)
+
+    if (.not. constant_exists) then
+      ! Create constant if it doesn't already exist
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+
+      fs => function_space_collection%get_fs(mesh, element_order, space)
+
+      call inventory%add_field(rmultiplicity, fs, mesh)
+
+      call ones%initialise( fs )
+      call nodal_multiplicity%initialise( fs )
+
+      call invoke( setval_c(ones, 1.0_r_def),                                  &
+                   setval_c(nodal_multiplicity, 0.0_r_def),                    &
+                   multiplicity_kernel_type(nodal_multiplicity),               &
+                   X_divideby_Y(rmultiplicity, ones, nodal_multiplicity) )
+
+      if ( subroutine_timers ) call timer('runtime_constants.fem')
+    end if
+
+    ! Return existing constant
+    call inventory%get_field(mesh, rmultiplicity)
+
+  end function get_rmultiplicity
+
+
+  !> @brief Explicitly reclaim memory from module scope variables
+  !
+  subroutine final_fem_constants()
+
+    implicit none
+
+    call nodal_rmultiplicity_w2_inventory%clear()
+    call nodal_rmultiplicity_w2h_inventory%clear()
+    call nodal_rmultiplicity_w1_inventory%clear()
+    call nodal_rmultiplicity_w0_inventory%clear()
+    call mmtheta_lumped_inv_inventory%clear()
+    call mm1_lumped_inv_inventory%clear()
+    call mmtheta_diag_inventory%clear()
+    call mm3_diag_inventory%clear()
+    call mm2_diag_inventory%clear()
+    call mm1_diag_inventory%clear()
+    call mm_w2h_inventory%clear()
+    call mm_w2v_inventory%clear()
+    call mm_w2b_inv_inventory%clear()
+    call mm_w3_inv_inventory%clear()
+    call curl_inventory%clear()
+    call mm_wtheta_inventory%clear()
+    call mm_w3_inventory%clear()
+    call mm_w2_inventory%clear()
+    call mm_w1_inventory%clear()
+    call im3_div_inventory%clear()
+    call div_h_inventory%clear()
+    call div_inventory%clear()
+
+    ! Quadrature
+    call qr%quadrature_final()
+
+  end subroutine final_fem_constants
+
+end module sci_fem_constants_mod

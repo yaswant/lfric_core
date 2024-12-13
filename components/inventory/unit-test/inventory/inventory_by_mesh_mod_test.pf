@@ -120,6 +120,7 @@ contains
 
     type(field_type)                      :: test_field_A
     type(field_type)                      :: test_field_B
+    type(field_type), pointer             :: test_field_C
     type(field_proxy_type)                :: test_field_A_p
     type(field_proxy_type)                :: test_field_B_p
 
@@ -138,11 +139,12 @@ contains
     type(operator_proxy_type)             :: returned_op_A_p
     type(operator_proxy_type)             :: returned_op_B_p
 
-    type(inventory_by_mesh_type), target :: test_inventory_by_mesh_A
-    type(inventory_by_mesh_type), target :: test_inventory_by_mesh_B
+    type(inventory_by_mesh_type),  target :: test_inventory_by_mesh_A
+    type(inventory_by_mesh_type),  target :: test_inventory_by_mesh_B
 
     real(r_def), parameter                :: tol = 1.0e-6_r_def
     integer(i_def)                        :: length
+    integer(i_def)                        :: intermesh_id
     logical(l_def)                        :: exists
 
     !---------------------------- Create fields -------------------------------!
@@ -201,6 +203,19 @@ contains
     call test_inventory_by_mesh_A%get_field(this%mesh_A, returned_field_A)
     returned_field_A_p = returned_field_A%get_proxy()
     @assertEqual(99.0_r_def, returned_field_A_p%data(1), tol)
+
+    ! Check computation of intermesh IDs
+    intermesh_id =                                                             &
+        test_inventory_by_mesh_A%compute_intermesh_id(this%mesh_A, this%mesh_B)
+    @assertEqual(18, intermesh_id)
+    intermesh_id =                                                             &
+        test_inventory_by_mesh_A%compute_intermesh_id(this%mesh_B, this%mesh_A)
+    @assertEqual(19, intermesh_id)
+
+    ! Check we can add an intermesh field
+    call test_inventory_by_mesh_A%add_field(                                   &
+            test_field_C, this%w3_fs_A, this%mesh_A, this%mesh_B               &
+    )
 
     !-------------- Create operator inventory 'B' & test extracts ------------!
     ! Create a inventory_by_mesh_B and put fields in it
