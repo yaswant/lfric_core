@@ -6,11 +6,15 @@
 {% do LOG.debug("Entered site/common/lfric_xios/tasks_lfric_xios.cylc") %}
 
 {% if task_ns.conf_name == "unit_tests" %}
-
     {% do task_dict.update({
         "placeholder": true,
     }) %}
+{% endif %}
 
+{% if task_ns.conf_name == "integration_tests" %}
+    {% do task_dict.update({
+        "placeholder": true,
+    }) %}
 {% endif %}
 
 {# Set default values for lfric_xios tasks #}

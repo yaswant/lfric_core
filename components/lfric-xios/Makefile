@@ -43,7 +43,7 @@ META_VN       ?= HEAD
 META_FILE_DIR  = $(PROJECT_DIR)/rose-meta/$(PROJECT_NAME)/$(META_VN)
 
 .PHONY: default
-default: unit-tests
+default: unit-tests integration-tests
 	$(Q)echo > /dev/null
 
 .PHONY: documentation doc docs
@@ -78,7 +78,7 @@ document-api: api-documentation
 # Unit tests
 #
 unit-tests/%: export BIN_DIR ?= $(PROJECT_DIR)/test
-unit-tests/%: export CXX_LINK = YES
+unit-tests/%: export CXX_LINK = TRUE
 unit-tests/%: export FFLAGS += -DUNIT_TEST
 unit-tests/%: export IMPORT_PARTS = $(CORE_ROOT_DIR)/infrastructure \
                                     $(CORE_ROOT_DIR)/components/science
@@ -90,6 +90,22 @@ unit-tests/%: export TEST_DIR = unit-test
 unit-tests/%: export WORKING_DIR := $(WORKING_DIR)/unit-tests
 unit-tests: unit-tests/run
 
+##############################################################################
+# Integration tests
+#
+integration-tests/%: export BIN_DIR      ?= $(PROJECT_DIR)/test
+integration-tests/%: export CXX_LINK = TRUE
+integration-tests/%: export IMPORT_PARTS  = $(CORE_ROOT_DIR)/infrastructure \
+                                            $(CORE_ROOT_DIR)/components/science
+integration-tests/%: export PYTHONPATH  := $(PYTHONPATH):$(PROJECT_DIR)/build/testframework
+integration-tests/%: export ADDITIONAL_EXTRACTION = \
+                        $(CORE_ROOT_DIR)/components/science/unit-test/support
+integration-tests/%: export META_FILE_DIR = rose-meta/lfric-xios/HEAD
+integration-tests/%: export PROJECT       = lfric_xios
+integration-tests/%: export SOURCE_DIR    = source
+integration-tests/%: export TEST_DIR      = integration-test
+integration-tests/%: export WORKING_DIR  := $(WORKING_DIR)/integration-tests
+integration-tests: integration-tests/run
 
 ##############################################################################
 # Test suite rules

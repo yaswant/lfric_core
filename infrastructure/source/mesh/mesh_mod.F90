@@ -2924,6 +2924,7 @@ contains
     self%nverts_per_cell = 8
     self%nedges_per_cell = 12
     self%nfaces_per_cell = 6
+    self%nverts_per_edge = 2
     self%nverts_per_2d_cell = 4
     self%nedges_per_2d_cell = 4
     self%ncolours        = -1  ! Initialise ncolours to error status

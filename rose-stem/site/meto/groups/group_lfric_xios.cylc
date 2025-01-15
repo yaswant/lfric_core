@@ -8,7 +8,8 @@
 {# SPICE Groups #}
 {% do site_groups.update({
     "lfric_xios_spice_developer": [
-        "lfric_xios_spice_unit_tests"
+        "lfric_xios_spice_unit_tests",
+        "lfric_xios_spice_integration_tests",
     ],
     "lfric_xios_spice": [
         "lfric_xios_spice_developer"
@@ -16,31 +17,61 @@
     "lfric_xios_spice_unit_tests": [
         "lfric_xios_unit_tests_spice_intel_64bit",
         "lfric_xios_unit_tests_spice_gnu_64bit"
+    ],
+    "lfric_xios_spice_integration_tests": [
+        "lfric_xios_integration_tests_spice_intel_64bit",
+        "lfric_xios_integration_tests_spice_gnu_64bit"
     ]
     }) %}
+
 
 {# Azspice Groups #}
 {% do site_groups.update({
     "lfric_xios_azspice_developer": [
+        "lfric_xios_azspice_integration_tests",
     ],
     "lfric_xios_azspice": [
         "lfric_xios_azspice_developer"
     ],
     "lfric_xios_azspice_unit_tests": [
         "lfric_xios_unit_tests_azspice_gnu_64bit"
+    ],
+    "lfric_xios_azspice_integration_tests": [
+        "lfric_xios_integration_tests_azspice_gnu_64bit"
     ]
     }) %}
+
 
 {# XC40 Groups #}
 {% do site_groups.update({
     "lfric_xios_xc40_developer": [
-        "lfric_xios_xc40_unit_tests"
+        "lfric_xios_xc40_unit_tests",
+        "lfric_xios_xc40_integration_tests",
     ],
     "lfric_xios_xc40": [
         "lfric_xios_xc40_developer"
     ],
     "lfric_xios_xc40_unit_tests": [
         "lfric_xios_unit_tests_xc40_intel_64bit"
+    ],
+    "lfric_xios_xc40_integration_tests": [
+        "lfric_xios_integration_tests_xc40_intel_64bit"
+    ]
+    }) %}
+
+{# EX1A Groups #}
+{% do site_groups.update({
+    "lfric_xios_ex1a_developer": [
+        "lfric_xios_ex1a_integration_tests",
+    ],
+    "lfric_xios_ex1a": [
+        "lfric_xios_ex1a_developer"
+    ],
+    "lfric_xios_ex1a_unit_tests": [
+        "lfric_xios_unit_tests_ex1a_cce_64bit"
+    ],
+    "lfric_xios_ex1a_integration_tests": [
+        "lfric_xios_integration_tests_ex1a_cce_64bit"
     ]
     }) %}
 
@@ -50,14 +81,22 @@
         "lfric_xios_developer": [
             "scripts",
             "lfric_xios_spice_developer",
-            "lfric_xios_xc40_developer"
+            "lfric_xios_xc40_developer",
+            "lfric_xios_unit_tests",
+            "lfric_xios_integration_tests"
         ],
         "lfric_xios": [
-            "lfric_xios_developer"
+            "lfric_xios_developer",
+            "lfric_xios_spice",
+            "lfric_xios_xc40"
         ],
         "lfric_xios_unit_tests": [
             "lfric_xios_spice_unit_tests",
             "lfric_xios_xc40_unit_tests"
+        ],
+        "lfric_xios_integration_tests": [
+            "lfric_xios_spice_integration_tests",
+            "lfric_xios_xc40_integration_tests"
         ]
         }) %}
 {% else %}
@@ -65,12 +104,21 @@
         "lfric_xios_developer": [
             "scripts",
             "lfric_xios_azspice_developer",
+            "lfric_xios_ex1a_developer",
+            "lfric_xios_integration_tests"
         ],
         "lfric_xios": [
-            "lfric_xios_developer"
+            "lfric_xios_developer",
+            "lfric_xios_azspice",
+            "lfric_xios_ex1a"
         ],
         "lfric_xios_unit_tests": [
             "lfric_xios_azspice_unit_tests",
+            "lfric_xios_ex1a_unit_tests"
+        ],
+        "lfric_xios_integration_tests": [
+            "lfric_xios_azspice_integration_tests",
+            "lfric_xios_ex1a_integration_tests"
         ]
         }) %}
 {% endif %}
@@ -79,20 +127,30 @@
 {% do site_groups.developer.extend(site_groups.lfric_xios_developer) %}
 {% do site_groups.all.extend(site_groups.lfric_xios) %}
 {% do site_groups.unit_tests.extend(site_groups.lfric_xios_unit_tests) %}
+{% do site_groups.unit_tests.extend(site_groups.lfric_xios_integration_tests) %}
 
 {# Spice Extends #}
 {% do site_groups.spice_developer.extend(site_groups.lfric_xios_spice_developer) %}
 {% do site_groups.spice.extend(site_groups.lfric_xios_spice) %}
 {% do site_groups.spice_unit_tests.extend(site_groups.lfric_xios_spice_unit_tests) %}
+{% do site_groups.spice_unit_tests.extend(site_groups.lfric_xios_spice_integration_tests) %}
 
 {# Azspice Extends #}
 {% do site_groups.azspice_developer.extend(site_groups.lfric_xios_azspice_developer) %}
 {% do site_groups.azspice.extend(site_groups.lfric_xios_azspice) %}
 {% do site_groups.azspice_unit_tests.extend(site_groups.lfric_xios_azspice_unit_tests) %}
+{% do site_groups.azspice_unit_tests.extend(site_groups.lfric_xios_azspice_integration_tests) %}
 
 {# XC40 Extends #}
 {% do site_groups.xc40_developer.extend(site_groups.lfric_xios_xc40_developer) %}
 {% do site_groups.xc40.extend(site_groups.lfric_xios_xc40) %}
 {% do site_groups.xc40_unit_tests.extend(site_groups.lfric_xios_xc40_unit_tests) %}
+{% do site_groups.xc40_unit_tests.extend(site_groups.lfric_xios_xc40_integration_tests) %}
+
+{# EX1A Extends #}
+{% do site_groups.ex1a_developer.extend(site_groups.lfric_xios_ex1a_developer) %}
+{% do site_groups.ex1a.extend(site_groups.lfric_xios_ex1a) %}
+{% do site_groups.ex1a_unit_tests.extend(site_groups.lfric_xios_ex1a_unit_tests) %}
+{% do site_groups.ex1a_unit_tests.extend(site_groups.lfric_xios_ex1a_integration_tests) %}
 
 {% do LOG.debug("Finished in site/meto/groups/group_lfric_xios.cylc") %}

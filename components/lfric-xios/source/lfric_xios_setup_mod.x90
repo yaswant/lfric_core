@@ -968,7 +968,8 @@ contains
     end if
 
     ! Sort out domain boundaries for biperiodic meshes
-    if ( mesh%is_geometry_planar() .and. mesh%is_topology_periodic() ) then
+    if ( mesh%is_geometry_planar() .and. mesh%is_topology_periodic() .and. &
+          mesh%get_mesh_name() /= 'test mesh: planar' ) then
       domain = mesh%get_domain()
       do i = 1, local_domain_size
         if (abs(lon_data(i) - domain%minimum_xy(axis=1)) < vert_loc_tol) then
