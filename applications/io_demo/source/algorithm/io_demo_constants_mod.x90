@@ -102,7 +102,7 @@ contains
     write(mesh_number, '(I8)') mesh_id
     field_name = trim('dx_at_w2_') // adjustl(mesh_number)
 
-    fs => function_space_collection%get_fs( mesh, 0, W2 )
+    fs => function_space_collection%get_fs( mesh, 0, 0, W2 )
 
     call dA_at_w2%initialise( vector_space = fs )
     call detj_at_w2%initialise( vector_space = fs )

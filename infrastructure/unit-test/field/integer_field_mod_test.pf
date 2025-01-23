@@ -45,7 +45,8 @@ module integer_field_mod_test
     procedure test_integer_field_proxy
   end type integer_field_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -83,7 +84,8 @@ contains
 
     ! Make a function space to be used to create fields in the tests
     this%w2_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W2 )
+                                                    element_order_h,            &
+                                                    element_order_v, W2 )
 
   end subroutine setUp
 
@@ -137,7 +139,7 @@ contains
     type(mesh_type),           pointer :: mesh_out => null()
 
     integer(i_def) :: iface, iedge, lid, test_integer
-    integer(i_def) :: order
+    integer(i_def) :: order_h, order_v
 
     ! Make a field with a function space
     call f1%initialise( vector_space = this%w2_fs, name='f1', halo_depth=3 )
@@ -160,8 +162,10 @@ contains
     @assertEqual( fs%get_undf(), this%w2_fs%get_undf() )
 
     ! Check the order the field thinks it is
-    order=f1%get_element_order()
-    @assertEqual( element_order, order )
+    order_h=f1%get_element_order_h()
+    @assertEqual( element_order_h, order_h )
+    order_v=f1%get_element_order_v()
+    @assertEqual( element_order_v, order_v )
 
     ! Check what the field thinks the mesh is
     mesh_out => f1%get_mesh()
@@ -198,7 +202,7 @@ contains
     integer(i_def)                   :: i
     integer(i_def)                   :: halo_depth
     type(halo_routing_type), pointer :: halo_routing
-    integer(i_def)                   :: order
+    integer(i_def)                   :: order_h, order_v
     integer(i_def)                   :: test_sum, test_min, test_max
     logical                          :: dirty
 
@@ -240,8 +244,10 @@ contains
     @assertEqual ( 3, halo_depth )
 
     halo_routing=>f1_p%get_halo_routing()
-    order = halo_routing%get_element_order()
-    @assertEqual( element_order, order )
+    order_h = halo_routing%get_element_order_h()
+    @assertEqual( element_order_h, order_h )
+    order_v = halo_routing%get_element_order_v()
+    @assertEqual( element_order_v, order_v )
 
     call f1_p%set_dirty()
     dirty=f1_p%is_dirty(1)

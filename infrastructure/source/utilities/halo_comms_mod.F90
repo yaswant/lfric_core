@@ -46,8 +46,10 @@ module halo_comms_mod
     !> Id of the mesh used in the function space that this information
     !> is valid for
     integer(i_def) :: mesh_id
-    !> Order of the function space that this information is valid for
-    integer(i_def) :: element_order
+    !> Horizontal order of the function space that this information is valid for
+    integer(i_def) :: element_order_h
+    !> Vertical order of the function space that this information is valid for
+    integer(i_def) :: element_order_v
     !> Enumerated value representing the continutity of the function space
     !> that this information is valid for
     integer(i_def) :: lfric_fs
@@ -72,8 +74,10 @@ module halo_comms_mod
   contains
     !> Gets the mesh_id for which the halo_routing object is valid
     procedure, public :: get_mesh_id
-    !> Gets the element_order for which the halo_routing object is valid
-    procedure, public :: get_element_order
+    !> Gets the element_order_h for which the halo_routing object is valid
+    procedure, public :: get_element_order_h
+    !> Gets the element_order_v for which the halo_routing object is valid
+    procedure, public :: get_element_order_v
     !> Gets the function space continuity type for which the halo_routing
     !> object is valid
     procedure, public :: get_lfric_fs
@@ -135,35 +139,39 @@ contains
 ! Type bound procedures for the halo_routing type
 
 !> @brief Constructor for a halo_routing object
-!> @param [in] global_dof_id List of global dof ids known to the local partition
-!> @param [in] last_owned_dof The position of the last owned dof in the list
-!> @param [in] halo_start The position of the first halo dof in the list
-!> @param [in] halo_finish The positions of the last halo dof un each of
-!>                         the halo depths
-!> @param [in] mesh_id  Id of the mesh for which this information will be valid
-!> @param [in] element_order The element order for which this information
-!>                           will be valid
-!> @param [in] lfric_fs The function space continuity type for which this
-!>                      information will be valid
-!> @param [in] ndata The number of multidata values per dof location for
-!>                   which this information will be valid
-!> @param [in] fortran_type The Fortran type of the data for which this
-!>                      information will be valid
-!> @param [in] fortran_kind The Fortran kind of the data for which this
-!>                      information will be valid
+!> @param [in] global_dof_id   List of global dof ids known to the local
+!>                             partition
+!> @param [in] last_owned_dof  The position of the last owned dof in the list
+!> @param [in] halo_start      The position of the first halo dof in the list
+!> @param [in] halo_finish     The positions of the last halo dof un each of
+!>                             the halo depths
+!> @param [in] mesh_id         Id of the mesh for which this information will
+!>                             be valid
+!> @param [in] element_order_h The horizontal element order for which this
+!>                             information will be valid
+!> @param [in] element_order_v The vertical element order for which this
+!>                             information will be valid
+!> @param [in] lfric_fs        The function space continuity type for which this
+!>                             information will be valid
+!> @param [in] ndata           The number of multidata values per dof location
+!>                             for which this information will be valid
+!> @param [in] fortran_type    The Fortran type of the data for which this
+!>                             information will be valid
+!> @param [in] fortran_kind    The Fortran kind of the data for which this
+!>                             information will be valid
 !> @return The new halo_routing object
-function halo_routing_constructor( global_dof_id, &
-                                   last_owned_dof, &
-                                   halo_start, &
-                                   halo_finish, &
-                                   mesh_id, &
-                                   element_order, &
-                                   lfric_fs, &
-                                   ndata, &
-                                   fortran_type, &
-                                   fortran_kind, &
-                                   halo_depth ) &
-                     result(self)
+function halo_routing_constructor( global_dof_id,   &
+                                   last_owned_dof,  &
+                                   halo_start,      &
+                                   halo_finish,     &
+                                   mesh_id,         &
+                                   element_order_h, &
+                                   element_order_v, &
+                                   lfric_fs,        &
+                                   ndata,           &
+                                   fortran_type,    &
+                                   fortran_kind,    &
+                                   halo_depth ) result(self)
 
   implicit none
 
@@ -173,7 +181,8 @@ function halo_routing_constructor( global_dof_id, &
   integer(i_def), intent(in) :: halo_finish(:)
 
   integer(i_def), intent(in) :: mesh_id
-  integer(i_def), intent(in) :: element_order
+  integer(i_def), intent(in) :: element_order_h
+  integer(i_def), intent(in) :: element_order_v
   integer(i_def), intent(in) :: lfric_fs
   integer(i_def), intent(in) :: ndata
   integer(i_def), intent(in) :: fortran_type
@@ -186,7 +195,8 @@ function halo_routing_constructor( global_dof_id, &
 
 
   self%mesh_id = mesh_id
-  self%element_order = element_order
+  self%element_order_h = element_order_h
+  self%element_order_v = element_order_v
   self%lfric_fs = lfric_fs
   self%ndata = ndata
   self%fortran_type = fortran_type
@@ -221,15 +231,25 @@ function get_mesh_id(self) result (mesh_id)
   return
 end function get_mesh_id
 
-!> @brief Gets the element_order for which this object is valid
+!> @brief Gets the element_order_h for which this object is valid
 !> @return The element order that this information is valid for
-function get_element_order(self) result (element_order)
+function get_element_order_h(self) result (element_order_h)
   implicit none
   class(halo_routing_type), intent(in) :: self
-  integer(i_def) :: element_order
-  element_order = self%element_order
+  integer(i_def) :: element_order_h
+  element_order_h = self%element_order_h
   return
-end function get_element_order
+end function get_element_order_h
+
+!> @brief Gets the element_order_v for which this object is valid
+!> @return The element order that this information is valid for
+function get_element_order_v(self) result (element_order_v)
+  implicit none
+  class(halo_routing_type), intent(in) :: self
+  integer(i_def) :: element_order_v
+  element_order_v = self%element_order_v
+  return
+end function get_element_order_v
 
 !> @brief Gets the function space continuity type for which this object is valid
 !> @return The function space continuity type that this information is valid for

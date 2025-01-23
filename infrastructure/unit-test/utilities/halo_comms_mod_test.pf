@@ -133,7 +133,7 @@ contains
 
     !Get indices of owned and halo cells
     function_space => function_space_collection%get_fs( mesh, &
-                                                        0, &
+                                                        0, 0,&
                                                         W3, &
                                                         ndata = ndata )
 
@@ -160,14 +160,14 @@ contains
 
     end do
 
-    ! Create a halo_routing object with a particular mesh_id, element_order,
-    ! lfric_fs, ndata, type and kind
+    ! Create a halo_routing object with a particular mesh_id, element_order_h,
+    ! element_order_v, lfric_fs, ndata, type and kind
     halo_routing = halo_routing_type( global_dof_id, &
                                       last_owned_dof, &
                                       halo_start, &
                                       halo_finish, &
                                       this%mesh_id, &
-                                      0, &
+                                      0, 0, &
                                       W3, &
                                       ndata, &
                                       real_type, &
@@ -180,7 +180,10 @@ contains
     result = halo_routing%get_mesh_id()
     @assertEqual( this%mesh_id, result )
 
-    result = halo_routing%get_element_order()
+    result = halo_routing%get_element_order_h()
+    @assertEqual( 0, result )
+
+    result = halo_routing%get_element_order_v()
     @assertEqual( 0, result )
 
     result = halo_routing%get_lfric_fs()
@@ -249,14 +252,14 @@ contains
     halo_finish(1) = 7
 
     ! Test synchronous halo exchanging 32-bit real data
-    ! Create a halo_routing object with a particular mesh_id, element_order,
-    ! lfric_fs, ndata, type and kind
+    ! Create a halo_routing object with a particular mesh_id, element_order_h,
+    ! element_order_v, lfric_fs, ndata, type and kind
     halo_routing = halo_routing_type( global_dof_id, &
                                       last_owned_dof, &
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, & ! element orders
                                       W3, &
                                       1_i_def, &
                                       real_type, &
@@ -281,7 +284,7 @@ contains
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, &
                                       W3, &
                                       1_i_def, &
                                       real_type, &
@@ -306,7 +309,7 @@ contains
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, &
                                       W3, &
                                       1_i_def, &
                                       integer_type, &
@@ -343,14 +346,14 @@ contains
     end if
 
     ! Test asynchronous halo exchanging 32-bit real data
-    ! Create a halo_routing object with a particular mesh_id, element_order,
-    ! lfric_fs, ndata, type and kind
+    ! Create a halo_routing object with a particular mesh_id, element_order_h,
+    ! element_order_v, lfric_fs, ndata, type and kind
     halo_routing = halo_routing_type( global_dof_id, &
                                       last_owned_dof, &
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, &
                                       W3, &
                                       1_i_def, &
                                       real_type, &
@@ -378,7 +381,7 @@ contains
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, &
                                       W3, &
                                       1_i_def, &
                                       real_type, &
@@ -406,7 +409,7 @@ contains
                                       halo_start, &
                                       halo_finish, &
                                       1_i_def, &
-                                      0_i_def, &
+                                      0_i_def, 0_i_def, &
                                       W3, &
                                       1_i_def, &
                                       integer_type, &

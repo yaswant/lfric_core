@@ -73,9 +73,12 @@ module field_parent_mod
     !> Return the id of the mesh used by this field
     !> @return mesh_id The id of the mesh object associated with the field
     procedure, public :: get_mesh_id
-    !> Returns the order of the FEM elements
-    !> @return elem Element order of this field
-    procedure, public :: get_element_order
+    !> Returns the horizontal order of the FEM elements
+    !> @return elem_h Element order of this field
+    procedure, public :: get_element_order_h
+    !> Returns the vertical order of the FEM elements
+    !> @return elem_v Element order of this field
+    procedure, public :: get_element_order_v
     !> Returns the name of the field
     !> @return field name
     procedure, public :: get_name
@@ -227,13 +230,14 @@ contains
     ! - so only need a routing table for writable function spaces
     if ( vector_space%is_writable() ) then
       self%halo_routing => &
-        halo_routing_collection%get_halo_routing( &
-                                             mesh, &
-                                             vector_space%get_element_order(), &
-                                             vector_space%which(), &
-                                             vector_space%get_ndata(), &
-                                             fortran_type, &
-                                             fortran_kind, &
+        halo_routing_collection%get_halo_routing(                                &
+                                             mesh,                               &
+                                             vector_space%get_element_order_h(), &
+                                             vector_space%get_element_order_v(), &
+                                             vector_space%which(),               &
+                                             vector_space%get_ndata(),           &
+                                             fortran_type,                       &
+                                             fortran_kind,                       &
                                              self%field_halo_depth )
     end if
 
@@ -359,17 +363,29 @@ contains
     return
   end function get_mesh_id
 
-  ! Function to get element order from the field.
-  function get_element_order(self) result(elem)
+  ! Function to get horizontal element order from the field.
+  function get_element_order_h(self) result(elem_h)
     implicit none
 
     class (field_parent_type) :: self
-    integer(i_def) :: elem
+    integer(i_def) :: elem_h
 
-    elem = self%vspace%get_element_order()
+    elem_h = self%vspace%get_element_order_h()
 
     return
-  end function get_element_order
+  end function get_element_order_h
+
+  ! Function to get vertical element order from the field.
+  function get_element_order_v(self) result(elem_v)
+    implicit none
+
+    class (field_parent_type) :: self
+    integer(i_def) :: elem_v
+
+    elem_v = self%vspace%get_element_order_v()
+
+    return
+  end function get_element_order_v
 
   !> Returns the name of the field
   function get_name(self) result(name)

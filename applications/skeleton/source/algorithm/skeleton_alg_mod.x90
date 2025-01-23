@@ -12,7 +12,7 @@ module skeleton_alg_mod
                                             LOG_LEVEL_INFO
   use mesh_mod,                       only: mesh_type
   use field_mod,                      only: field_type
-  use finite_element_config_mod,      only: element_order
+  use finite_element_config_mod,      only: element_order_h, element_order_v
   use fs_continuity_mod,              only: W2
   use function_space_collection_mod,  only: function_space_collection
   use operator_mod,                   only: operator_type
@@ -48,7 +48,8 @@ contains
 
     ! Create a new field on the W2 function space
     mesh => field_1%get_mesh()
-    call field_2%initialise( function_space_collection%get_fs( mesh, element_order, W2))
+    call field_2%initialise( function_space_collection%get_fs( mesh, element_order_h, &
+                                                               element_order_v, W2 ) )
 
     ! Set the new field to a constant value and compute the divergence of it
     divergence => get_div(mesh)

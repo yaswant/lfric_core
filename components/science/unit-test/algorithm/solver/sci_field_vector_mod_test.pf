@@ -28,7 +28,8 @@ module sci_field_vector_mod_test
   private
   public :: test_all
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -79,7 +80,8 @@ contains
     mesh_ptr => mesh_collection%get_mesh( mesh_id )
 
     ! Make a field with a function space
-    w2_fs => function_space_collection%get_fs( mesh_ptr, element_order, W2 )
+    w2_fs => function_space_collection%get_fs( mesh_ptr, element_order_h, &
+                                               element_order_v, W2 )
     call f1%initialise( vector_space = w2_fs )
 
     fv1 = field_vector_type(3_i_def)
@@ -111,9 +113,11 @@ contains
 
       ! Test for set_scalar
     call f1%initialise( vector_space = &
-         function_space_collection%get_fs(mesh_ptr, element_order, W0))
+         function_space_collection%get_fs(mesh_ptr, element_order_h, &
+                                          element_order_v, W0))
     call f3%initialise(vector_space = &
-         function_space_collection%get_fs(mesh_ptr, element_order, W3))
+         function_space_collection%get_fs(mesh_ptr, element_order_h, &
+                                          element_order_v, W3))
     call fv1%import_field(f1,1)
     call fv1%import_field(f3,3)
 

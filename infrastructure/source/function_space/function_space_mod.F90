@@ -8,7 +8,7 @@
 !> @brief Holds information about the function space.
 !>
 !> @details A container which holds type definition of the function space and
-!>          has holds a number of static copies of the function spaces require
+!>          holds a number of static copies of the function spaces required
 !>          by the model. It provides accessor functions (getters) to various
 !>          information held in the type.
 !
@@ -63,11 +63,21 @@ module function_space_mod
     !> Number of degrees of freedom located on cell vertex entities.
     integer(i_def) :: ndof_vert
 
-    !> Number of degrees of freedom located on cell edge entities.
-    integer(i_def) :: ndof_edge
+    !> Number of degrees of freedom located on horizontal cell edge entities
+    !> (edges which lie in a plane of constant z).
+    integer(i_def) :: ndof_edge_h
 
-    !> Number of degrees of freedom located on cell face entities.
-    integer(i_def) :: ndof_face
+    !> Number of degrees of freedom located on vertical cell edge entities
+    !> (edges which lie in a plane of contant x or y).
+    integer(i_def) :: ndof_edge_v
+
+    !> Number of degrees of freedom located on horizontal cell face entities
+    !> (faces whose normal vectors have 0 z-component).
+    integer(i_def) :: ndof_face_h
+
+    !> Number of degrees of freedom located on vertical cell face entities
+    !> (faces whose normal vectors have 0 x and y components).
+    integer(i_def) :: ndof_face_v
 
     !> Number of degrees of freedom located on cell volume entities.
     integer(i_def) :: ndof_vol
@@ -75,13 +85,17 @@ module function_space_mod
     !> Integer value for Gungho functions spaces, e.g. W0 would be 1
     integer(i_def) :: fs
 
-    !> Element base-order of Gungho function space
-    integer(i_def) :: element_order
+    !> Element base-order of Gungho function space in horizontal direction
+    integer(i_def) :: element_order_h
+
+    !> Element base-order of Gungho function space in vertical direction
+    integer(i_def) :: element_order_v
 
     ! Function space polynomial order? dynamics is still to provide us
     ! with a name for this, same as element order except for W0
-    ! where is it equal to element_order+1
-    integer(i_def) :: fs_order
+    ! where is it equal to element_order_h/v+1, in either horizontal or vertical
+    integer(i_def) :: fs_order_h
+    integer(i_def) :: fs_order_v
 
     !> The number of data values to be held at each dof location
     integer(i_def) :: ndata
@@ -126,6 +140,7 @@ module function_space_mod
     integer(i_def), allocatable :: basis_index(:,:)
     real(r_def),    allocatable :: basis_vector(:,:)
     real(r_def),    allocatable :: basis_x(:,:,:)
+    real(r_def),    allocatable :: basis_z(:,:)
     !> @}
 
     !> A one dimensional, allocatable array which holds a unique global index
@@ -198,15 +213,21 @@ module function_space_mod
     !> @brief Obtains the number of dofs per cell
     !> @return Integer, the number of dofs per cell
     procedure, public :: get_ndf
+
     !> @brief Obtains the number of interior dofs
     !> @return Integer, the number of dofs associated with the interior of
     !>         each cell
     procedure, public :: get_ndof_interior
 
-    !> @brief Obtains the number of face dofs
+    !> @brief Obtains the number of face dofs on each horizontal face
     !> @return Integer, the number of dofs associated with the faces of
     !>         each cell
-    procedure, public :: get_ndof_face
+    procedure, public :: get_ndof_face_h
+
+    !> @brief Obtains the number of face dofs on each vertical face
+    !> @return Integer, the number of dofs associated with the faces of
+    !>         each cell
+    procedure, public :: get_ndof_face_v
 
     !> Gets the coordinates of the function space
     !> @return A pointer to the two dimensional array of nodal_coords, (xyz,ndf)
@@ -280,11 +301,17 @@ module function_space_mod
     !> @return mesh_id ID of the mesh object
     procedure, public :: get_mesh_id
 
-    !> @brief Returns the element order of a function space
-    procedure, public :: get_element_order
+    !> @brief Returns the horizontal element order of a function space
+    procedure, public :: get_element_order_h
 
-    !> @brief Returns the order of a function space
-    procedure, public :: get_fs_order
+    !> @brief Returns the vertical element order of a function space
+    procedure, public :: get_element_order_v
+
+    !> @brief Returns the horizontal order of a function space
+    procedure, public :: get_fs_order_h
+
+    !> @brief Returns the vertical order of a function space
+    procedure, public :: get_fs_order_v
 
     !> @brief Returns the number of data values held at each dof
     procedure, public :: get_ndata
@@ -380,32 +407,41 @@ contains
   !>          function space. The pointer is to a function space singleton,
   !>          i.e. the function space is only created on the initial call,
   !>          all other calls just return a pointer to the function space.
-  !> @param[in] mesh           The mesh upon which to base this function space
-  !> @param[in] element_order  The element order for this function space,
-  !>                           0 being the lowest element order for function
-  !>                           spaces defined for Gungho.
-  !>                           @b Note: This is not necessarily the same as the
-  !>                           order of the function space
-  !> @param[in] lfric_fs       The integer number indicating which of the
-  !>                           function spaces predefined for lfric to base the
-  !>                           instantiated function space on. Recognised
-  !>                           integers are assigned to the function spaces
-  !>                           "handles" in the fs_handles_mod module.
-  !> @param[in] ndata          The number of data values to be held at each dof
-  !>                           location
-  !> @param[in] ndata_first    Flag to set data to be layer first (false) or
-  !!                           ndata first (true)
+  !> @param[in] mesh             The mesh upon which to base this function space
+  !> @param[in] element_order_h  The element order for this function space in
+  !>                             the horizontal direction, 0 being the lowest
+  !>                             element order for function spaces defined for
+  !>                             Gungho.
+  !>                             @b Note: This is not necessarily the same as
+  !>                             the order of the function space
+  !> @param[in] element_order_v  The element order for this function space in
+  !>                             the vertical direction, 0 being the lowest
+  !>                             element order for function spaces defined for
+  !>                             Gungho.
+  !>                             @b Note: This is not necessarily the same as the
+  !>                             order of the function space
+  !> @param[in] lfric_fs         The integer number indicating which of the
+  !>                             function spaces predefined for lfric to base the
+  !>                             instantiated function space on. Recognised
+  !>                             integers are assigned to the function spaces
+  !>                             "handles" in the fs_handles_mod module.
+  !> @param[in] ndata            The number of data values to be held at each dof
+  !>                             location
+  !> @param[in] ndata_first      Flag to set data to be layer first (false) or
+  !!                             ndata first (true)
   !> @return    A pointer to the function space held in this module
-  function fs_constructor( mesh_id,       &
-                           element_order, &
-                           lfric_fs,      &
-                           ndata,         &
+  function fs_constructor( mesh_id,                                            &
+                           element_order_h,                                    &
+                           element_order_v,                                    &
+                           lfric_fs,                                           &
+                           ndata,                                              &
                            ndata_first )  result(instance)
 
     implicit none
 
     integer(i_def),           intent(in) :: mesh_id
-    integer(i_def),           intent(in) :: element_order
+    integer(i_def),           intent(in) :: element_order_h
+    integer(i_def),           intent(in) :: element_order_v
     integer(i_def),           intent(in) :: lfric_fs
     integer(i_def), optional, intent(in) :: ndata
     logical(l_def), optional, intent(in) :: ndata_first
@@ -428,16 +464,19 @@ contains
 
     instance%mesh => mesh_collection%get_mesh(mesh_id)
     instance%fs = lfric_fs
-    instance%element_order = element_order
+    instance%element_order_h = element_order_h
+    instance%element_order_v = element_order_v
 
-    id = generate_fs_id(lfric_fs, element_order, mesh_id, &
+    id = generate_fs_id(lfric_fs, element_order_h, element_order_v, mesh_id, &
                         instance%ndata, instance%ndata_first)
     call instance%set_id(id)
 
     if (lfric_fs == W0) then
-      instance%fs_order = element_order + 1
+      instance%fs_order_h = element_order_h + 1
+      instance%fs_order_v = element_order_v + 1
     else
-      instance%fs_order = element_order
+      instance%fs_order_h = element_order_h
+      instance%fs_order_v = element_order_v
     end if
     call init_function_space(instance)
 
@@ -482,15 +521,22 @@ contains
 
     end select
 
-    call ndof_setup ( self%mesh, self%element_order, self%fs,         &
-                      self%ndof_vert, self%ndof_edge, self%ndof_face, &
-                      self%ndof_vol, self%ndof_cell, self%ndof_glob,  &
+    call ndof_setup ( self%mesh,                                               &
+                      self%element_order_h, self%element_order_v,              &
+                      self%fs,                                                 &
+                      self%ndof_vert,                                          &
+                      self%ndof_edge_h, self%ndof_edge_v,                      &
+                      self%ndof_face_h, self%ndof_face_v,                      &
+                      self%ndof_vol,                                           &
+                      self%ndof_cell,                                          &
+                      self%ndof_glob,                                          &
                       self%ndof_interior, self%ndof_exterior )
 
     if (allocated(self%basis_index))    deallocate(self%basis_index)
     if (allocated(self%basis_order))    deallocate(self%basis_order)
     if (allocated(self%basis_vector))   deallocate(self%basis_vector)
     if (allocated(self%basis_x))        deallocate(self%basis_x)
+    if (allocated(self%basis_z))        deallocate(self%basis_z)
     if (allocated(self%nodal_coords))   deallocate(self%nodal_coords)
     if (allocated(self%dof_on_vert_boundary)) &
                                         deallocate(self%dof_on_vert_boundary)
@@ -499,16 +545,21 @@ contains
     allocate(self%basis_index( 3, self%ndof_cell ))
     allocate(self%basis_order( 3, self%ndof_cell ))
     allocate(self%basis_vector( self%dim_space, self%ndof_cell ))
-    allocate(self%basis_x( self%element_order + 2, 3, self%ndof_cell ))
+
+    allocate(self%basis_x( self%element_order_h + 2, 2, self%ndof_cell ))
+    allocate(self%basis_z( self%element_order_v + 2, self%ndof_cell ))
     allocate(self%nodal_coords( 3, self%ndof_cell ))
     allocate(self%dof_on_vert_boundary ( self%ndof_cell, 2 ))
     allocate(self%entity_dofs(self%ndof_cell))
 
-    call basis_setup( self%element_order, self%fs,          &
+    call basis_setup( self%element_order_h,                 &
+                      self%element_order_v,                 &
+                      self%fs,                              &
                       self%ndof_vert, self%ndof_cell,       &
                       self%mesh%get_reference_element(),    &
                       self%basis_index, self%basis_order,   &
                       self%basis_vector, self%basis_x,      &
+                      self%basis_z,                         &
                       self%nodal_coords,                    &
                       self%dof_on_vert_boundary,            &
                       self%entity_dofs)
@@ -529,15 +580,24 @@ contains
 
     allocate(self%last_dof_halo (0 : self%mesh % get_halo_depth()))
 
-    call dofmap_setup ( self%mesh, self%fs, self%element_order, self%ndata, &
-                        self%ndata_first,                                   &
-                        ncells_2d_with_ghost,                               &
-                        self%ndof_vert, self%ndof_edge, self%ndof_face,     &
-                        self%ndof_vol, self%ndof_cell, self%last_dof_owned, &
-                        self%last_dof_annexed, self%last_dof_halo, dofmap,  &
-                        self%global_dof_id,                                 &
-                        self%global_cell_dof_id_2d,                         &
-                        self%global_edge_dof_id_2d,                         &
+    call dofmap_setup ( self%mesh,                                             &
+                        self%fs,                                               &
+                        self%element_order_h, self%element_order_v,            &
+                        self%ndata,                                            &
+                        self%ndata_first,                                      &
+                        ncells_2d_with_ghost,                                  &
+                        self%ndof_vert,                                        &
+                        self%ndof_edge_h, self%ndof_edge_v,                    &
+                        self%ndof_face_h, self%ndof_face_v,                    &
+                        self%ndof_vol,                                         &
+                        self%ndof_cell,                                        &
+                        self%last_dof_owned,                                   &
+                        self%last_dof_annexed,                                 &
+                        self%last_dof_halo,                                    &
+                        dofmap,                                                &
+                        self%global_dof_id,                                    &
+                        self%global_cell_dof_id_2d,                            &
+                        self%global_edge_dof_id_2d,                            &
                         self%global_vert_dof_id_2d )
 
     self%master_dofmap = master_dofmap_type(dofmap)
@@ -646,18 +706,32 @@ contains
   end function get_ndof_interior
 
   !-----------------------------------------------------------------------------
-  ! Gets the number of face dofs for a single cell
+  ! Gets the number of horizontal face dofs for a single cell
   !-----------------------------------------------------------------------------
-  function get_ndof_face(self) result(ndof_face)
+  function get_ndof_face_h(self) result(ndof_face_h)
 
     implicit none
 
     class(function_space_type), intent(in) :: self
-    integer(i_def) :: ndof_face
+    integer(i_def) :: ndof_face_h
 
-    ndof_face = self%ndof_face
+    ndof_face_h = self%ndof_face_h
 
-  end function get_ndof_face
+  end function get_ndof_face_h
+
+  !-----------------------------------------------------------------------------
+  ! Gets the number of vertical face dofs for a single cell
+  !-----------------------------------------------------------------------------
+  function get_ndof_face_v(self) result(ndof_face_v)
+
+    implicit none
+
+    class(function_space_type), intent(in) :: self
+    integer(i_def) :: ndof_face_v
+
+    ndof_face_v = self%ndof_face_v
+
+  end function get_ndof_face_v
 
   !-----------------------------------------------------------------------------
   ! Gets the dofmap for a single cell
@@ -822,7 +896,7 @@ contains
 
     p(:) = poly1d(self%basis_order(1, df), xi(1), self%basis_x(:, 1, df), self%basis_index(1, df)) &
          * poly1d(self%basis_order(2, df), xi(2), self%basis_x(:, 2, df), self%basis_index(2, df)) &
-         * poly1d(self%basis_order(3, df), xi(3), self%basis_x(:, 3, df), self%basis_index(3, df)) &
+         * poly1d(self%basis_order(3, df), xi(3), self%basis_z(:, df),    self%basis_index(3, df)) &
          * self%basis_vector(:, df)
 
   end function evaluate_basis
@@ -845,15 +919,15 @@ contains
 
     dpdx(1) = poly1d_deriv(self%basis_order(1, df), xi(1), self%basis_x(:, 1, df), self%basis_index(1, df)) &
             * poly1d      (self%basis_order(2, df), xi(2), self%basis_x(:, 2, df), self%basis_index(2, df)) &
-            * poly1d      (self%basis_order(3, df), xi(3), self%basis_x(:, 3, df), self%basis_index(3, df))
+            * poly1d      (self%basis_order(3, df), xi(3), self%basis_z(:, df), self%basis_index(3, df))
 
     dpdx(2) = poly1d      (self%basis_order(1, df), xi(1), self%basis_x(:, 1, df), self%basis_index(1, df)) &
             * poly1d_deriv(self%basis_order(2, df), xi(2), self%basis_x(:, 2, df), self%basis_index(2, df)) &
-            * poly1d      (self%basis_order(3, df), xi(3), self%basis_x(:, 3, df), self%basis_index(3, df))
+            * poly1d      (self%basis_order(3, df), xi(3), self%basis_z(:, df), self%basis_index(3, df))
 
     dpdx(3) = poly1d      (self%basis_order(1, df), xi(1), self%basis_x(:, 1, df), self%basis_index(1, df)) &
             * poly1d      (self%basis_order(2, df), xi(2), self%basis_x(:, 2, df), self%basis_index(2, df)) &
-            * poly1d_deriv(self%basis_order(3, df), xi(3), self%basis_x(:, 3, df), self%basis_index(3, df))
+            * poly1d_deriv(self%basis_order(3, df), xi(3), self%basis_z(:, df), self%basis_index(3, df))
 
     if (self%dim_space == 1 .and. self%dim_space_diff == 3) then
       ! grad(p)
@@ -967,35 +1041,66 @@ contains
   end subroutine compute_diff_basis_function
 
   !-----------------------------------------------------------------------------
-  ! Gets order for this space
+  ! Gets order for this space in the horizontal direction
   !-----------------------------------------------------------------------------
   !> @brief Gets the polynomial order for this space, returns an integer
   !> @param[in] self the calling function space
   !-----------------------------------------------------------------------------
-  function get_element_order(self) result (element_order)
+  function get_element_order_h(self) result (element_order_h)
 
     implicit none
 
     class(function_space_type), intent(in) :: self
-    integer(i_def) :: element_order
+    integer(i_def) :: element_order_h
 
-    element_order = self%element_order
+    element_order_h = self%element_order_h
 
-  end function get_element_order
+  end function get_element_order_h
 
   !-----------------------------------------------------------------------------
-  !> @details Gets the order for this function space
-  !> @return  The order of the function space
-  function get_fs_order(self) result (fs_order)
+  ! Gets order for this space in the vertical direction
+  !-----------------------------------------------------------------------------
+  !> @brief Gets the polynomial order for this space, returns an integer
+  !> @param[in] self the calling function space
+  !-----------------------------------------------------------------------------
+  function get_element_order_v(self) result (element_order_v)
 
     implicit none
 
     class(function_space_type), intent(in) :: self
-    integer(i_def) :: fs_order
+    integer(i_def) :: element_order_v
 
-    fs_order = self%fs_order
+    element_order_v = self%element_order_v
 
-  end function get_fs_order
+  end function get_element_order_v
+
+  !-----------------------------------------------------------------------------
+  !> @details Gets the order for this function space in the horizontal direction
+  !> @return  The order of the function space
+  function get_fs_order_h(self) result (fs_order_h)
+
+    implicit none
+
+    class(function_space_type), intent(in) :: self
+    integer(i_def) :: fs_order_h
+
+    fs_order_h = self%fs_order_h
+
+  end function get_fs_order_h
+
+  !-----------------------------------------------------------------------------
+  !> @details Gets the order for this function space in the vertical direction
+  !> @return  The order of the function space
+  function get_fs_order_v(self) result (fs_order_v)
+
+    implicit none
+
+    class(function_space_type), intent(in) :: self
+    integer(i_def) :: fs_order_v
+
+    fs_order_v = self%fs_order_v
+
+  end function get_fs_order_v
 
   !-----------------------------------------------------------------------------
   !> @details Gets the number of data values held at each dof
@@ -1440,6 +1545,7 @@ contains
     if (allocated(self%basis_index))      deallocate(self%basis_index)
     if (allocated(self%basis_vector))     deallocate(self%basis_vector)
     if (allocated(self%basis_x))          deallocate(self%basis_x)
+    if (allocated(self%basis_z))          deallocate(self%basis_z)
     if (allocated(self%global_dof_id))    deallocate(self%global_dof_id)
     if (allocated(self%global_cell_dof_id_2d))  &
                                           deallocate(self%global_cell_dof_id_2d)

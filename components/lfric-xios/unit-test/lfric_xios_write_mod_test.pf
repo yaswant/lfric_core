@@ -47,7 +47,8 @@ module lfric_xios_write_mod_test
     procedure get_local_mesh_ptr
   end type write_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -81,13 +82,17 @@ contains
 
     ! Make a function space to be used to create fields in the tests
     this%w0_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W0 )
+                                                    element_order_h, &
+                                                    element_order_v, W0 )
     this%w2h_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W2H )
+                                                    element_order_h, &
+                                                    element_order_v, W2H )
     this%wth_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, WTheta )
+                                                    element_order_h, &
+                                                    element_order_v, WTheta )
     this%w3_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W3 )
+                                                    element_order_h, &
+                                                    element_order_v, W3 )
 
   end subroutine setUp
 

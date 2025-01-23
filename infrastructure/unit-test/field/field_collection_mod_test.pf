@@ -62,7 +62,8 @@ module field_collection_mod_test
     procedure test_assignment_integer
   end type field_collection_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -100,15 +101,18 @@ contains
     this%mesh => mesh_collection%get_mesh( mesh_id )
 
     this%w0_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W0 )
 
     this%w2_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W2 )
 
     this%w3_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W3 )
 
   end subroutine setUp

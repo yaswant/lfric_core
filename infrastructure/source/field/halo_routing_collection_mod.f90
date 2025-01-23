@@ -71,8 +71,10 @@ end function halo_routing_collection_constructor
 !> Function to get an instance of a halo_routing object from the linked list
 !> or create it if it doesn't exist (and return the newly created one)
 !> @param [in] mesh     Mesh for which this information will be valid for
-!> @param [in] element_order The element order for which this information
-!>                           will be valid
+!> @param [in] element_order_h The horizontal element order for which this
+!>                             information will be valid
+!> @param [in] element_order_v The vertical element order for which this
+!>                             information will be valid
 !> @param [in] lfric_fs The function space continuity type for which this
 !>                      information will be valid
 !> @param [in] ndata The number of multidata values per dof location for
@@ -83,13 +85,14 @@ end function halo_routing_collection_constructor
 !>                      information will be valid
 !> @param [in] halo_depth Halo depth to get the routing to
 !> @return The halo_routing object that matches the input parameters
-function get_halo_routing( self, &
-                           mesh, &
-                           element_order, &
-                           lfric_fs, &
-                           ndata, &
-                           fortran_type, &
-                           fortran_kind, &
+function get_halo_routing( self,            &
+                           mesh,            &
+                           element_order_h, &
+                           element_order_v, &
+                           lfric_fs,        &
+                           ndata,           &
+                           fortran_type,    &
+                           fortran_kind,    &
                            halo_depth )  result(halo_routing)
   implicit none
 
@@ -99,7 +102,8 @@ function get_halo_routing( self, &
 
   type(mesh_type), intent(in), pointer :: mesh
 
-  integer(i_def), intent(in) :: element_order
+  integer(i_def), intent(in) :: element_order_h
+  integer(i_def), intent(in) :: element_order_v
   integer(i_def), intent(in) :: lfric_fs
   integer(i_def), intent(in) :: ndata
   integer(i_def), intent(in) :: fortran_type
@@ -116,21 +120,23 @@ function get_halo_routing( self, &
 
   nullify( function_space, global_dof_id )
 
-  halo_routing => get_halo_routing_from_list( self, &
-                                              mesh, &
-                                              element_order, &
-                                              lfric_fs, &
-                                              ndata, &
-                                              fortran_type, &
-                                              fortran_kind, &
+  halo_routing => get_halo_routing_from_list( self,            &
+                                              mesh,            &
+                                              element_order_h, &
+                                              element_order_v, &
+                                              lfric_fs,        &
+                                              ndata,           &
+                                              fortran_type,    &
+                                              fortran_kind,    &
                                               halo_depth )
 
   if (.not. associated(halo_routing)) then
 
     !Get indices of owned and halo cells
-    function_space => function_space_collection%get_fs( mesh, &
-                                                        element_order, &
-                                                        lfric_fs, &
+    function_space => function_space_collection%get_fs( mesh,            &
+                                                        element_order_h, &
+                                                        element_order_v, &
+                                                        lfric_fs,        &
                                                         ndata = ndata )
 
     last_owned_dof = function_space%get_last_dof_owned()
@@ -158,26 +164,28 @@ function get_halo_routing( self, &
 
     mesh_id = mesh%get_id()
 
-    call self%halo_routing_list%insert_item( halo_routing_type( global_dof_id,&
-                                                                last_owned_dof,&
-                                                                halo_start, &
-                                                                halo_finish, &
-                                                                mesh_id, &
-                                                                element_order, &
-                                                                lfric_fs, &
-                                                                ndata, &
-                                                                fortran_type, &
-                                                                fortran_kind, &
+    call self%halo_routing_list%insert_item( halo_routing_type( global_dof_id,   &
+                                                                last_owned_dof,  &
+                                                                halo_start,      &
+                                                                halo_finish,     &
+                                                                mesh_id,         &
+                                                                element_order_h, &
+                                                                element_order_v, &
+                                                                lfric_fs,        &
+                                                                ndata,           &
+                                                                fortran_type,    &
+                                                                fortran_kind,    &
                                                                 halo_depth ) )
     deallocate( halo_start, halo_finish )
 
-    halo_routing => get_halo_routing_from_list( self, &
-                                                mesh, &
-                                                element_order, &
-                                                lfric_fs, &
-                                                ndata, &
-                                                fortran_type, &
-                                                fortran_kind, &
+    halo_routing => get_halo_routing_from_list( self,            &
+                                                mesh,            &
+                                                element_order_h, &
+                                                element_order_v, &
+                                                lfric_fs,        &
+                                                ndata,           &
+                                                fortran_type,    &
+                                                fortran_kind,    &
                                                 halo_depth )
 
   end if
@@ -191,14 +199,15 @@ end function get_halo_routing
 ! halo_routing object with the given signature and return a pointer to it.
 ! A null pointer is returned if the requested halo_routing object does not exist.
 !
-function get_halo_routing_from_list(self, &
-                                    mesh, &
-                                    element_order, &
-                                    lfric_fs, &
-                                    ndata, &
-                                    fortran_type, &
-                                    fortran_kind, &
-                                    halo_depth) &
+function get_halo_routing_from_list(self,            &
+                                    mesh,            &
+                                    element_order_h, &
+                                    element_order_v, &
+                                    lfric_fs,        &
+                                    ndata,           &
+                                    fortran_type,    &
+                                    fortran_kind,    &
+                                    halo_depth)      &
     result(instance)
 
   implicit none
@@ -207,7 +216,8 @@ function get_halo_routing_from_list(self, &
 
   type(mesh_type), intent(in), pointer :: mesh
 
-  integer(i_def),  intent(in) :: element_order
+  integer(i_def),  intent(in) :: element_order_h
+  integer(i_def),  intent(in) :: element_order_v
   integer(i_def),  intent(in) :: lfric_fs
   integer(i_def),  intent(in) :: ndata
   integer(i_def),  intent(in) :: fortran_type
@@ -238,11 +248,12 @@ function get_halo_routing_from_list(self, &
     ! 'cast' to the halo_routing_type
     select type(listhalo_routing => loop%payload)
       type is (halo_routing_type)
-      if ( mesh_id == listhalo_routing%get_mesh_id() .and. &
-           element_order == listhalo_routing%get_element_order() .and. &
-           lfric_fs == listhalo_routing%get_lfric_fs() .and. &
-           ndata == listhalo_routing%get_ndata() .and. &
-           fortran_kind == listhalo_routing%get_fortran_kind() .and. &
+      if ( mesh_id == listhalo_routing%get_mesh_id()                 .and. &
+           element_order_h == listhalo_routing%get_element_order_h() .and. &
+           element_order_v == listhalo_routing%get_element_order_v() .and. &
+           lfric_fs == listhalo_routing%get_lfric_fs()               .and. &
+           ndata == listhalo_routing%get_ndata()                     .and. &
+           fortran_kind == listhalo_routing%get_fortran_kind()       .and. &
            halo_depth == listhalo_routing%get_halo_depth() ) then
         instance => listhalo_routing
         exit

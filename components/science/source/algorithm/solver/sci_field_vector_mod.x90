@@ -383,7 +383,8 @@ contains
     implicit none
     class(field_vector_type),                 intent(in)    :: self
     class(abstract_vector_type), allocatable, intent(inout) :: vec
-    integer(kind=i_def) :: pos, elem, fs_label, astat, nfctr
+    integer(kind=i_def) :: pos, fs_label, astat, nfctr
+    integer(kind=i_def) :: element_order_h, element_order_v
 
     type(mesh_type), pointer :: mesh => null()
 
@@ -399,10 +400,12 @@ contains
           mesh => self%vector(1)%get_mesh()
           nfctr = size(self%vector)
           do pos = 1, nfctr
-             elem = self%vector(pos)%get_element_order()
+             element_order_h = self%vector(pos)%get_element_order_h()
+             element_order_v = self%vector(pos)%get_element_order_v()
              fs_label = self%vector(pos)%which_function_space()
              call vec%vector(pos)%initialise(vector_space = &
-                   function_space_collection%get_fs(mesh, elem, fs_label) )
+                   function_space_collection%get_fs(mesh, element_order_h, &
+                                                    element_order_v, fs_label) )
           end do
        class default
           write(log_scratch_space,'(A)') &

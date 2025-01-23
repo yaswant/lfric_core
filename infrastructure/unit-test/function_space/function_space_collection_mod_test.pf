@@ -43,7 +43,8 @@ module function_space_collection_mod_test
     procedure test_all
   end type function_space_collection_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -120,15 +121,18 @@ contains
     integer(i_def) :: answer = 3
 
     ! Create 3 function spaces
-    this%w0_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
+    this%w0_fs => function_space_collection%get_fs( this%mesh,       &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W0 )
-    this%w2_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
+    this%w2_fs => function_space_collection%get_fs( this%mesh,       &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W2 )
-    this%w3_fs => function_space_collection%get_fs( this%mesh,     &
-                                                    element_order, &
-                                                    W3,            &
+    this%w3_fs => function_space_collection%get_fs( this%mesh,       &
+                                                    element_order_h, &
+                                                    element_order_v, &
+                                                    W3,              &
                                                     ndata=3 )
 
     ! Check we have 3 function spaces in the collection
@@ -138,8 +142,9 @@ contains
     ! Try to get a function space already in the list.
     ! The number of function spaces in the collection should not increase
 
-    this%temp_w0_fs => function_space_collection%get_fs( this%mesh,     &
-                                                         element_order, &
+    this%temp_w0_fs => function_space_collection%get_fs( this%mesh,       &
+                                                         element_order_h, &
+                                                         element_order_v, &
                                                          W0 )
 
     @assertEqual(answer, function_space_collection%get_fs_collection_size())

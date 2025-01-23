@@ -19,7 +19,7 @@ module lfric_xios_setup_mod
   use extrusion_mod,                 only: TWOD
   use field_mod,                     only: field_type, field_proxy_type
   use field_parent_mod,              only: field_parent_type
-  use finite_element_config_mod,     only: element_order
+  use finite_element_config_mod,     only: element_order_h, element_order_v
   use function_space_mod,            only: function_space_type, BASIS
   use function_space_collection_mod, only: function_space_collection
   use fs_continuity_mod,             only: W0, W1, W2, W3, Wtheta, W2H, W2V, &
@@ -280,7 +280,8 @@ contains
     endif
 
     ! Set up fields to hold the output coordinates
-    output_field_fs => function_space_collection%get_fs( mesh, element_order, W0 )
+    output_field_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                         element_order_v, W0 )
     do i = 1,3
       call coord_output(i)%initialise( vector_space = output_field_fs )
       proxy_coord_output(i) = coord_output(i)%get_proxy()
@@ -299,7 +300,8 @@ contains
 
     ! Calculate the local size of a W2H fs in order to determine
     ! how many edge dofs for the current partition
-    w2h_fs => function_space_collection%get_fs( twod_mesh, element_order, W2H )
+    w2h_fs => function_space_collection%get_fs( twod_mesh, element_order_h, &
+                                                element_order_v, W2H )
     num_edge_owned = w2h_fs%get_last_dof_owned()/size(w2h_fs%get_levels())
 
     ! Get the unique fractional levels to set up vertical output domain
@@ -553,7 +555,8 @@ contains
     allocate(basis_chi(dim_chi, ndf_chi, ndf_x))
 
     ! Get number of local edges on a single level from W2H function space & allocate
-    w2h_fs => function_space_collection%get_fs( twod_mesh, element_order, W2H )
+    w2h_fs => function_space_collection%get_fs( twod_mesh, element_order_h, &
+                                                element_order_v, W2H )
     last_owned_edge = w2h_fs%get_last_dof_owned()/size(w2h_fs%get_levels())
 
     ! Set processed edges to 0 to prevent comparison with un-initialised data
@@ -659,11 +662,13 @@ contains
   !> @param[in]  chi                Coordinate field
   !> @param[in]  use_index          Flag to specify use of domain index
   !!                                to preserve order over decomposition
-  !> @param[in]  k_order            Function space order (optional,
+  !> @param[in]  k_order_h          Function space order horizontal (optional,
+  !!                                default = 0)
+  !> @param[in]  k_order_v          Function space order vertical (optional,
   !!                                default = 0)
   !>
   subroutine checkpoint_domain_init(fs_id, domain_name, mesh, &
-                                    chi, use_index, k_order)
+                                    chi, use_index, k_order_h, k_order_v)
 
     implicit none
 
@@ -673,11 +678,12 @@ contains
     type(mesh_type),     pointer,  intent(in) :: mesh
     type(field_type),              intent(in) :: chi(3)
     logical(kind=l_def),           intent(in) :: use_index
-    integer(kind=i_def), optional, intent(in) :: k_order
+    integer(kind=i_def), optional, intent(in) :: k_order_h
+    integer(kind=i_def), optional, intent(in) :: k_order_v
 
     ! Local variables
     integer(kind=i_def) :: i
-    integer(kind=i_def) :: k_ord, ord_idx
+    integer(kind=i_def) :: k_ord_h, k_ord_v, ord_idx
 
     ! Checkpoint domain
     integer(kind=i_def)                 :: ibegin_checkpoint
@@ -715,10 +721,15 @@ contains
     end if
 
     ! Set k order value to 0 if unassigned
-    if (present(k_order))then
-      k_ord=k_order
+    if (present(k_order_h))then
+      k_ord_h=k_order_h
     else
-      k_ord=0
+      k_ord_h=0
+    end if
+    if (present(k_order_v))then
+      k_ord_v=k_order_v
+    else
+      k_ord_v=0
     end if
 
     ! Set up arrays to hold number of dofs for local and global domains
@@ -730,7 +741,7 @@ contains
     ! Create appropriate function space in order to be able to get the
     ! physical coordinates
     output_field_fs => function_space_collection%get_fs( mesh, &
-                                                         k_ord, &
+                                                         k_ord_h, k_ord_v, &
                                                          fs_id)
 
     ! Calculate the nodal coords for a field on the function space
@@ -808,7 +819,7 @@ contains
       cp_domain_index => output_field_fs%get_global_dof_id()
 
       ! temporary fix for higher-order domain decomposition
-      if (k_ord > 0) then
+      if (k_ord_h > 0 .or. k_ord_v > 0) then
         ord_idx = 2
       else
         ord_idx = 1
@@ -900,7 +911,8 @@ contains
 
     ! Here we use information from the input function space to calculate the
     ! physical coordinates for the horizontal domain
-    domain_fs => function_space_collection%get_fs( mesh, element_order, fs_id )
+    domain_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                   element_order_v, fs_id )
 
     ! Get the function space levels information
     dp_levels = real( domain_fs%get_levels(), kind=dp_xios )
@@ -1058,8 +1070,9 @@ contains
     type(xios_axisgroup) :: axis_definition
     type(xios_axis)      :: new_axis
 
-    domain_fs => function_space_collection%get_fs( mesh,          &
-                                                   element_order, &
+    domain_fs => function_space_collection%get_fs( mesh,            &
+                                                   element_order_h, &
+                                                   element_order_v, &
                                                    fs_id )
 
     ! Get the function space levels information

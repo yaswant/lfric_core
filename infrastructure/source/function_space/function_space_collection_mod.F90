@@ -75,17 +75,20 @@ contains
   !-----------------------------------------------------------------------------
   !> Function to get an instance of a function space from the linked list
   !> or create it if it doesn't exist
-  !> @param[in] mesh           mesh object
-  !> @param[in] element_order  function space order
-  !> @param[in] lfric_fs       lfric id code for given supported function space
-  !> @param[in] ndata          The number of data values to be held at each dof location
-  !> @param[in] ndata_first    Flag to set data to be layer first (false) or
-  !!                           ndata first (true)
-  function get_fs( self,          &
-                   mesh,          &
-                   element_order, &
-                   lfric_fs,      &
-                   ndata,         &
+  !> @param[in] mesh            mesh object
+  !> @param[in] element_order_h function space order in the horizontal direction
+  !> @param[in] element_order_v function space order in the vertical direction
+  !> @param[in] lfric_fs        lfric id code for given supported function space
+  !> @param[in] ndata           The number of data values to be held at each dof
+  !!                            location
+  !> @param[in] ndata_first     Flag to set data to be layer first (false) or
+  !!                            ndata first (true)
+  function get_fs( self,            &
+                   mesh,            &
+                   element_order_h, &
+                   element_order_v, &
+                   lfric_fs,        &
+                   ndata,           &
                    ndata_first )  result(fs)
 
     implicit none
@@ -93,7 +96,8 @@ contains
     class(function_space_collection_type), intent(inout) :: self
 
     type(mesh_type), intent(in), pointer  :: mesh
-    integer(i_def),  intent(in)           :: element_order
+    integer(i_def),  intent(in)           :: element_order_h
+    integer(i_def),  intent(in)           :: element_order_v
     integer(i_def),  intent(in)           :: lfric_fs
     integer(i_def),  intent(in), optional :: ndata
     logical(l_def),  intent(in), optional :: ndata_first
@@ -123,40 +127,44 @@ contains
     ! (this will produce an error if a match is not found)
     name = name_from_functionspace(lfric_fs)
 
-    if (element_order < 0) then
-      write(log_scratch_space, '(A,I0)') &
-      'Function space element order must be >= 0   ', element_order
+    if (element_order_h < 0 .or. element_order_v < 0) then
+      write(log_scratch_space, '(A,I0)')              &
+      'Function space element order must be >= 0   ', &
+      element_order_h, element_order_v
       call log_event(log_scratch_space, LOG_LEVEL_ERROR)
     end if
 
     mesh_id = mesh%get_id()
 
-    fs => get_existing_fs( self,          &
-                           mesh_id,       &
-                           element_order, &
-                           lfric_fs,      &
-                           ndata_sz,      &
+    fs => get_existing_fs( self,            &
+                           mesh_id,         &
+                           element_order_h, &
+                           element_order_v, &
+                           lfric_fs,        &
+                           ndata_sz,        &
                            ndata_first_sz )
 
     if (.not. associated(fs)) then
 
-      call self%fs_list%insert_item(               &
-               function_space_type( mesh_id,       &
-                                    element_order, &
-                                    lfric_fs,      &
-                                    ndata_sz,      &
+      call self%fs_list%insert_item(                 &
+               function_space_type( mesh_id,         &
+                                    element_order_h, &
+                                    element_order_v, &
+                                    lfric_fs,        &
+                                    ndata_sz,        &
                                     ndata_first_sz) )
 
-      write(log_scratch_space, '(A,I0,A)')                   &
-      'Generated order-', element_order,' ' // trim(name) // &
-      '-function space singleton'
+      write(log_scratch_space, '(A,I0,A,I0,A)')                          &
+      'Generated horizontal order-', element_order_h,' vertical order-', &
+      element_order_v, ' ' // trim(name) // '-function space singleton'
       call log_event(log_scratch_space, LOG_LEVEL_TRACE)
 
-      fs => get_existing_fs( self,          &
-                             mesh_id,       &
-                             element_order, &
-                             lfric_fs,      &
-                             ndata_sz,      &
+      fs => get_existing_fs( self,            &
+                             mesh_id,         &
+                             element_order_h, &
+                             element_order_v, &
+                             lfric_fs,        &
+                             ndata_sz,        &
                              ndata_first_sz )
 
     end if
@@ -215,30 +223,33 @@ contains
 
 
   !------------------------------------------------------------------------------
-  ! Private function (not accessible through the API - and only called from within
-  ! this module) to scan the function space collection for function space with the
-  ! given propeties and return a pointer to it. A null pointer is returned if the
-  ! requested function space does not exist.
+  ! Private function (not accessible through the API - and only called from
+  ! within this module) to scan the function space collection for function space
+  ! with the given properties and return a pointer to it. A null pointer is
+  ! returned if the requested function space does not exist.
   !
-  !> @param[in] mesh_id        ID of mesh object
-  !> @param[in] element_order  function space order
-  !> @param[in] lfric_fs       lfric id code for given supported function space
-  !> @param[in] ndata          The number of data values to be held at each dof location
-  !!                           return <pointer> Pointer to function space object or null()
-  !> @param[in] ndata_first    Flag to set data to be layer first (false) or
-  !!                           ndata first (true)
-  function get_existing_fs( self,           &
-                            mesh_id,        &
-                            element_order,  &
-                            lfric_fs,       &
-                            ndata,          &
+  !> @param[in] mesh_id         ID of mesh object
+  !> @param[in] element_order_h function space order in horizontal
+  !> @param[in] element_order_v function space order in vertical
+  !> @param[in] lfric_fs        lfric id code for given supported function space
+  !> @param[in] ndata           The number of data values to be held at each dof location
+  !!                            return <pointer> Pointer to function space object or null()
+  !> @param[in] ndata_first     Flag to set data to be layer first (false) or
+  !!                            ndata first (true)
+  function get_existing_fs( self,            &
+                            mesh_id,         &
+                            element_order_h, &
+                            element_order_v, &
+                            lfric_fs,        &
+                            ndata,           &
                             ndata_first ) result(instance)
 
     implicit none
 
     class(function_space_collection_type) :: self
     integer(i_def), intent(in) :: mesh_id
-    integer(i_def), intent(in) :: element_order
+    integer(i_def), intent(in) :: element_order_h
+    integer(i_def), intent(in) :: element_order_v
     integer(i_def), intent(in) :: lfric_fs
     integer(i_def), intent(in) :: ndata
     logical(l_def), intent(in) :: ndata_first
@@ -270,7 +281,12 @@ contains
       type is (function_space_type)
         ! Check the properties of the payload in the current item
         ! to see if it's the one being requested.
-        fs_id = generate_fs_id(lfric_fs, element_order, mesh_id, ndata, ndata_first)
+        fs_id = generate_fs_id(lfric_fs,        &
+                               element_order_h, &
+                               element_order_v, &
+                               mesh_id,         &
+                               ndata,           &
+                               ndata_first)
 
         if ( fs_id == listfs%get_id() ) then
           instance => listfs

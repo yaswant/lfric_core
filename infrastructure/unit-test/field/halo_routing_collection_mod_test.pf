@@ -128,28 +128,28 @@ contains
     mesh => mesh_collection%get_mesh(this%mesh_id)
 
     halo_routing1 => halo_routing_collection%get_halo_routing(mesh,      &
-                                                              0,         &
+                                                              0, 0,      &
                                                               W3,        &
                                                               1,         &
                                                               real_type, &
                                                               r_def,     &
                                                               1)
     halo_routing2 => halo_routing_collection%get_halo_routing(mesh,      &
-                                                              1,         &
+                                                              1, 1,      &
                                                               W2,        &
                                                               1,         &
                                                               real_type, &
                                                               r_def,     &
                                                               1)
     halo_routing3 => halo_routing_collection%get_halo_routing(mesh,      &
-                                                              0,         &
+                                                              0, 0,      &
                                                               W3,        &
                                                               1,         &
                                                               real_type, &
                                                               r_def,     &
                                                               1)
     halo_routing4 => halo_routing_collection%get_halo_routing(mesh,      &
-                                                              0,         &
+                                                              0, 0,      &
                                                               W3,        &
                                                               5,         &
                                                               real_type, &

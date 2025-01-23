@@ -70,8 +70,9 @@ integer(i_def), parameter :: total_ranks           = 1_i_def
 integer(i_def), parameter :: max_stencil_depth     = 1_i_def
 integer(i_def), parameter :: xproc                 = 1_i_def
 integer(i_def), parameter :: yproc                 = 1_i_def
+integer(i_def), parameter :: element_order_h       = 0_i_def
+integer(i_def), parameter :: element_order_v       = 0_i_def
 integer(i_def), parameter :: nlayers               = 5_i_def
-integer(i_def), parameter :: element_order         = 0_i_def
 logical(l_def), parameter :: generate_inner_haloes = .true.
 real(r_def),    parameter :: domain_top            = 10000.0_r_def
 
@@ -221,17 +222,21 @@ end do
 
 mesh_ptr => mesh_collection % get_mesh( mesh_id(1) )
 this%function_space1 => function_space_collection%get_fs( mesh_ptr, &
-                                                          element_order, W0 )
+                                                          element_order_h,      &
+                                                          element_order_v, W0 )
 
 mesh_ptr => mesh_collection % get_mesh( mesh_id(2) )
 this%function_space2 => function_space_collection%get_fs( mesh_ptr, &
-                                                          element_order, W0 )
+                                                          element_order_h,      &
+                                                          element_order_v, W0 )
 mesh_ptr => mesh_collection % get_mesh( mesh_id(3) )
 this%function_space3 => function_space_collection%get_fs( mesh_ptr, &
-                                                          element_order, W0 )
+                                                          element_order_h,      &
+                                                          element_order_v, W0 )
 mesh_ptr => mesh_collection % get_mesh( mesh_id(4) )
 this%function_space4 => function_space_collection%get_fs( mesh_ptr, &
-                                                          element_order, W0 )
+                                                          element_order_h,      &
+                                                          element_order_v, W0 )
 
 nullify(mesh_ptr)
 

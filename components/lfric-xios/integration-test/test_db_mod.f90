@@ -107,14 +107,14 @@ contains
     twod_mesh_ptr => mesh_collection%get_mesh_by_id(twod_mesh_id)
 
     ! Create function spaces
-    wchi_fs => function_space_collection%get_fs(mesh_ptr, 0, WChi)
+    wchi_fs => function_space_collection%get_fs(mesh_ptr, 0, 0, WChi)
 
-    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, W0)
-    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, W2H)
-    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, W3)
-    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, W0)
-    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, W2H)
-    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, W3)
+    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, 0, W0)
+    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, 0, W2H)
+    tmp_fs => function_space_collection%get_fs(mesh_ptr, 0, 0, W3)
+    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, 0, W0)
+    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, 0, W2H)
+    tmp_fs => function_space_collection%get_fs(twod_mesh_ptr, 0, 0, W3)
 
     ! Create coordinate fields
     do coord = 1, size(self%chi)

@@ -1435,17 +1435,18 @@ contains
     ! non-multidata, 32-bit integer, W3 data. As this is mesh data it's not
     !'on' a mesh as such - so just pass a mesh_id of zero.
     allocate(halo_routing)
-    halo_routing = halo_routing_type( global_dof_id  = cell_id, &
-                                      last_owned_dof = last_owned_cell, &
-                                      halo_start     = halo_start, &
-                                      halo_finish    = halo_finish, &
-                                      mesh_id        = 0_i_def, &
-                                      element_order  = 0_i_def, &
-                                      lfric_fs       = W3, &
-                                      ndata          = 1_i_def, &
-                                      fortran_type   = integer_type, &
-                                      fortran_kind   = i_def, &
-                                      halo_depth     = self%halo_depth )
+    halo_routing = halo_routing_type( global_dof_id    = cell_id,         &
+                                      last_owned_dof   = last_owned_cell, &
+                                      halo_start       = halo_start,      &
+                                      halo_finish      = halo_finish,     &
+                                      mesh_id          = 0_i_def,         &
+                                      element_order_h  = 0_i_def,         &
+                                      element_order_v  = 0_i_def,         &
+                                      lfric_fs         = W3,              &
+                                      ndata            = 1_i_def,         &
+                                      fortran_type     = integer_type,    &
+                                      fortran_kind     = i_def,           &
+                                      halo_depth       = self%halo_depth )
 
     deallocate(cell_id)
 

@@ -40,7 +40,9 @@ module sci_mapping_constants_mod
   use timer_mod,                         only: timer
 
   ! Configuration
-  use finite_element_config_mod,         only: element_order, nqp_exact
+  use finite_element_config_mod,         only: element_order_h, &
+                                               element_order_v, &
+                                               nqp_exact
   use io_config_mod,                     only: subroutine_timers
 
   ! Other algorithms
@@ -163,8 +165,10 @@ contains
     chi => get_coordinates(mesh_id)
     panel_id => get_panel_id(mesh_id)
     qr => get_qr()
-    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
-    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+    w2_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W3)
 
     call project_xdot_to_w2_inventory%add_operator(project_xdot_to_w2, w2_fs, w3_fs, mesh)
     call project_ydot_to_w2_inventory%add_operator(project_ydot_to_w2, w2_fs, w3_fs, mesh)
@@ -219,9 +223,12 @@ contains
     panel_id => get_panel_id(mesh_id)
     qr => get_qr()
 
-    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
-    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
-    wtheta_fs => function_space_collection%get_fs(mesh, element_order, Wtheta)
+    w2_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W3)
+    wtheta_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                  element_order_v, Wtheta)
 
     call u_lon_map_inventory%add_operator(u_lon_map, w2_fs, w3_fs, mesh)
     call u_lat_map_inventory%add_operator(u_lat_map, w2_fs, w3_fs, mesh)
@@ -273,9 +280,12 @@ contains
 
     if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-    w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
-    w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
-    wtheta_fs => function_space_collection%get_fs(mesh, element_order, Wtheta)
+    w2_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W2)
+    w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                              element_order_v, W3)
+    wtheta_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                  element_order_v, Wtheta)
 
     call u_lon_sample_inventory%add_operator(u_lon_sample, w2_fs, w3_fs, mesh)
     call u_lat_sample_inventory%add_operator(u_lat_sample, w2_fs, w3_fs, mesh)
@@ -343,8 +353,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      w3_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, W3)
-      wtheta_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, Wtheta)
+      w3_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, 0, W3)
+      wtheta_fs => function_space_collection%get_fs(prime_extrusion_mesh, 0, 0, Wtheta)
 
       call proj_mr_to_sh_rho_inventory%add_field_array(                        &
               integrals, w3_fs, 4, prime_extrusion_mesh                        &
@@ -411,8 +421,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      coarse_w2_fs => function_space_collection%get_fs(coarse_mesh, 0, W2)
-      fine_w2_fs => function_space_collection%get_fs(fine_mesh, 0, W2)
+      coarse_w2_fs => function_space_collection%get_fs(coarse_mesh, 0, 0, W2)
+      fine_w2_fs => function_space_collection%get_fs(fine_mesh, 0, 0, W2)
 
       call dummy_w2_field%initialise( coarse_w2_fs )
       call invoke( setval_c(dummy_w2_field, 0.0_r_def) )
@@ -482,8 +492,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      coarse_w3_fs => function_space_collection%get_fs(coarse_mesh, 0, W3)
-      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, W3)
+      coarse_w3_fs => function_space_collection%get_fs(coarse_mesh, 0, 0, W3)
+      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, 0, W3)
 
       call intermesh_wghts_rdef_w3_inventory%add_field(                        &
               weights_rdef, fine_w3_fs, coarse_mesh, fine_mesh                 &
@@ -539,7 +549,7 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, W3)
+      fine_w3_fs => function_space_collection%get_fs(fine_mesh, 0, 0, W3)
 
       call intermesh_wghts_rtran_w3_inventory%add_field(                       &
               weights_rtran, fine_w3_fs, coarse_mesh, fine_mesh                &
@@ -837,8 +847,9 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
-      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, W3)
 
       call project_lon_dot_to_w1_inventory%add_operator(                       &
               proj_op, w1_k0_fs, w3_fs, mesh                                   &
@@ -893,8 +904,9 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
-      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, W3)
 
       call project_lat_dot_to_w1_inventory%add_operator(                       &
               proj_op, w1_k0_fs, w3_fs, mesh                                   &
@@ -947,8 +959,9 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
 
-      w1_k0_fs => function_space_collection%get_fs(mesh, 0, W1)
-      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+      w1_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W1)
+      w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, W3)
 
       call project_r_dot_to_w1_inventory%add_operator(                         &
               proj_op, w1_k0_fs, w3_fs, mesh                                   &
@@ -1010,8 +1023,8 @@ contains
       panel_id => get_panel_id(mesh_id)
 
       if ( subroutine_timers ) call timer('runtime_constants.mapping')
-      w2h_k0_fs => function_space_collection%get_fs(mesh, 0, W2H)
-      w3_k0_fs => function_space_collection%get_fs(mesh, 0, W3)
+      w2h_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W2H)
+      w3_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W3)
 
       call w3_to_w2_displacement_inventory%add_field(w3_to_w2_displacement,    &
                                                      w2h_k0_fs, local_mesh)

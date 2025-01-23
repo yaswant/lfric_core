@@ -22,7 +22,7 @@ module lfric_xios_time_axis_mod
   use function_space_collection_mod, &
                             only: function_space_collection
   use finite_element_config_mod, &
-                            only: element_order
+                            only: element_order_h, element_order_v
   use file_mod,             only: FILE_OP_OPEN, FILE_MODE_READ
   use lfric_ncdf_dims_mod,  only: lfric_ncdf_dims_type
   use lfric_ncdf_field_mod, only: lfric_ncdf_field_type
@@ -624,7 +624,8 @@ contains
         ! If the data is on a different mesh to the model field, then an intermediate field
         ! is needed.  This has the same spatial and multidata structure as the input data
         ! field, but is a single time point.
-        data_fs => function_space_collection%get_fs(mesh_data, element_order, &
+        data_fs => function_space_collection%get_fs(mesh_data, element_order_h, &
+                                                    element_order_v,            &
            model_field%which_function_space(), ndata)
         call interpolating_field%initialise( data_fs )
         interpolating_field_ptr => interpolating_field

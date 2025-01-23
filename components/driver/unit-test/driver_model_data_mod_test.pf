@@ -45,7 +45,8 @@ module driver_model_data_mod_test
     procedure test_copy_model_data
   end type driver_model_data_test_type
 
-  integer(i_def), parameter    :: element_order = 0
+  integer(i_def), parameter    :: element_order_h = 0
+  integer(i_def), parameter    :: element_order_v = 0
 
 
 contains
@@ -80,8 +81,9 @@ contains
     mesh    => mesh_collection%get_mesh( mesh_id )
 
 
-    this%w3_fs => function_space_collection%get_fs( mesh,          &
-                                                    element_order, &
+    this%w3_fs => function_space_collection%get_fs( mesh,            &
+                                                    element_order_h, &
+                                                    element_order_v, &
                                                     W3 )
 
   end subroutine setUp

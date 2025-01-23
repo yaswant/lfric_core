@@ -29,10 +29,11 @@ module mesh_colouring_mod_test
 
   @testCase
   type, public, extends(MPITestCase) :: compute_colours_test_type
-    integer       :: total_ranks, local_rank
-    integer       :: xproc, yproc
-    integer       :: num_layers
-    integer       :: element_order
+    integer(kind=i_def)  :: total_ranks, local_rank
+    integer(kind=i_def)  :: xproc, yproc
+    integer(kind=i_def)  :: num_layers
+    integer(kind=i_def)  :: element_order_h
+    integer(kind=i_def)  :: element_order_v
   contains
     procedure     :: setUp
     procedure     :: tearDown
@@ -62,7 +63,8 @@ subroutine setUp(this)
   this%xproc = 1
   this%yproc = 1
   this%num_layers = 5
-  this%element_order = 0
+  this%element_order_h = 0
+  this%element_order_v = 0
 
 end subroutine setUp
 !-------------------------------------------------------------------------------
@@ -72,7 +74,7 @@ subroutine tearDown(this)
 
   class(compute_colours_test_type), intent(inout) :: this
 
-  integer  :: rc
+  integer(kind=i_def)  :: rc
 
   ! Finalise halo functionality
   call finalise_halo_comms()

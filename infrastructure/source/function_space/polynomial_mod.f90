@@ -5,10 +5,10 @@
 !-----------------------------------------------------------------------------
 !
 !-------------------------------------------------------------------------------
-!> @brief Contains routines for evaluating 1D polynomials and thier derivatives
+!> @brief Contains routines for evaluating 1D polynomials and their derivatives
 module polynomial_mod
 
-use constants_mod, only: r_def
+use constants_mod, only: r_def, i_def
 
 implicit none
 
@@ -27,18 +27,18 @@ contains
 pure function poly1d(order, xi, x, i)
   implicit none
   ! order of the basis function
-  integer,          intent(in) :: order
+  integer(kind=i_def), intent(in) :: order
   ! quadrature point to evaluate basis function at
-  real(kind=r_def), intent(in) :: xi
-  ! Index of basis function
-  integer,          intent(in) :: i
+  real(kind=r_def),    intent(in) :: xi
   ! nodal points
-  real(kind=r_def), intent(in) :: x(order+1)
+  real(kind=r_def),    intent(in) :: x(order+2)
+  ! Index of basis function
+  integer(kind=i_def), intent(in) :: i
 
   real(kind=r_def) :: poly1d
   ! internal tempories
   ! loop counters
-  integer       :: j
+  integer(kind=i_def)       :: j
 
   poly1d = 1.0_r_def
 
@@ -64,18 +64,18 @@ pure function poly1d_deriv(order,xi,x,i)
 
   implicit none
   ! Order of basis function
-  integer,          intent(in) :: order
+  integer(kind=i_def), intent(in) :: order
   ! Index of basis function
-  integer,          intent(in) :: i
-  ! quadrature point to evaluate basis function at
-  real(kind=r_def), intent(in) :: xi
-  ! nodal points
-  real(kind=r_def), intent(in) :: x(order+1)
+  integer(kind=i_def), intent(in) :: i
+  ! Quadrature point to evaluate basis function at
+  real(kind=r_def),    intent(in) :: xi
+  ! Nodal points
+  real(kind=r_def),    intent(in) :: x(order+2)
 
-  ! tempories
-  real(kind=r_def) :: poly1d_deriv
-  real(kind=r_def) :: denom,t
-  integer       :: k,j
+  ! Tempories
+  real(kind=r_def)    :: poly1d_deriv
+  real(kind=r_def)    :: denom,t
+  integer(kind=i_def) :: k,j
 
   poly1d_deriv = 0.0_r_def
   denom = 1.0_r_def

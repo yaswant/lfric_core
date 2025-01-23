@@ -32,7 +32,8 @@ module sci_geometric_constants_mod
   use timer_mod,                          only: timer
 
   ! Configuration
-  use finite_element_config_mod,          only: element_order
+  use finite_element_config_mod,          only: element_order_h, &
+                                                element_order_v
 
   implicit none
 
@@ -146,7 +147,8 @@ contains
 
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
     local_mesh => mesh%get_local_mesh()
-    twod_fs => function_space_collection%get_fs(twod_mesh, element_order, fs_id)
+    twod_fs => function_space_collection%get_fs(twod_mesh, element_order_h, &
+                                                element_order_v, fs_id)
     call lat_inventory%add_field(lat, twod_fs, local_mesh)
     call long_inventory%add_field(long, twod_fs, local_mesh)
 
@@ -191,8 +193,8 @@ contains
 
     twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
     local_mesh => mesh%get_local_mesh()
-    w2h_2d_fs => function_space_collection%get_fs(twod_mesh, 0, W2H)
-    w3_2d_fs => function_space_collection%get_fs(twod_mesh, 0, W3)
+    w2h_2d_fs => function_space_collection%get_fs(twod_mesh, 0, 0, W2H)
+    w3_2d_fs => function_space_collection%get_fs(twod_mesh, 0, 0, W3)
 
     ! Temporary W2H field, tracking the count for each face
     call face_counter%initialise( w2h_2d_fs )
@@ -347,7 +349,7 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      w2_k0_fs => function_space_collection%get_fs(mesh, 0, W2)
+      w2_k0_fs => function_space_collection%get_fs(mesh, 0, 0, W2)
       call dA_at_w2_inventory%add_field(dA_at_w2, w2_k0_fs, mesh)
 
       call invoke( setval_c(dA_at_w2, 0.0_r_def),                              &
@@ -407,7 +409,8 @@ contains
       ! Create the object as it doesn't exist yet
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      w3_fs => function_space_collection%get_fs(mesh, element_order, W3)
+      w3_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, W3)
       call detj_at_w3_inventory%add_field(detj_at_w3, w3_fs, mesh)
 
       ! @TODO #4487: it is inefficient to calculate this via mass matrices
@@ -467,7 +470,8 @@ contains
       ! Create the object as it doesn't exist yet
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      w2_fs => function_space_collection%get_fs(mesh, element_order, W2)
+      w2_fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, W2)
       call multiplicity_w2%initialise( w2_fs )
       call detj_at_w2_inventory%add_field(detj_at_w2, w2_fs, mesh)
 
@@ -517,7 +521,7 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      w3_fs => function_space_collection%get_fs(mesh, 0, W3)
+      w3_fs => function_space_collection%get_fs(mesh, 0, 0, W3)
       call dz_w3_inventory%add_field(dz_w3, w3_fs, mesh)
 
       call invoke( get_dz_w3_kernel_type(dz_w3, height_w2) )
@@ -557,7 +561,7 @@ contains
 
     ! Create constant if it doesn't already exist
     if (.not. constant_exists) then
-      wt_k0_fs => function_space_collection%get_fs(mesh, 0, Wtheta)
+      wt_k0_fs => function_space_collection%get_fs(mesh, 0, 0, Wtheta)
       dx_at_w2 => get_dx_at_w2(mesh_id)
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
@@ -599,7 +603,7 @@ contains
 
     ! Create constant if it doesn't already exist
     if (.not. constant_exists) then
-      w2_fs => function_space_collection%get_fs(mesh, 0, W2)
+      w2_fs => function_space_collection%get_fs(mesh, 0, 0, W2)
       detj_at_w2 => get_detj_at_w2(mesh_id)
       dA_at_w2 => get_dA_at_w2(mesh_id)
 
@@ -654,7 +658,7 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      wtheta_k0_fs => function_space_collection%get_fs(mesh, 0, Wtheta)
+      wtheta_k0_fs => function_space_collection%get_fs(mesh, 0, 0, Wtheta)
 
       call dz_at_wtheta_inventory%add_field(dz_at_wtheta, wtheta_k0_fs, mesh)
 
@@ -706,7 +710,7 @@ contains
     if (.not. constant_exists) then
       prime_mesh => mesh_collection%get_mesh(mesh, PRIME_EXTRUSION)
       twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
-      fs => function_space_collection%get_fs(twod_mesh, 0, W3)
+      fs => function_space_collection%get_fs(twod_mesh, 0, 0, W3)
       dA_at_w2 => get_dA_at_w2(prime_mesh%get_id())
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
@@ -899,7 +903,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.geometric')
 
-      space => function_space_collection%get_fs(mesh, element_order, space_id)
+      space => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, space_id)
       call inventory%add_field(height, space, mesh)
 
       call invoke( get_height_kernel_type(height, chi, scaled_radius) )

@@ -18,7 +18,7 @@ module init_simple_diffusion_mod
   use field_collection_mod,           only : field_collection_type
   use field_mod,                      only : field_type
   use field_parent_mod,               only : write_interface
-  use finite_element_config_mod,      only : element_order
+  use finite_element_config_mod,      only : element_order_h, element_order_v
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : Wtheta
   use log_mod,                        only : log_event,      &
@@ -57,7 +57,8 @@ module init_simple_diffusion_mod
     ! Create prognostic fields
     ! Creates a field in the Wtheta function space
     call diffusion_field%initialise( vector_space = &
-                    function_space_collection%get_fs(mesh, element_order, Wtheta), &
+                    function_space_collection%get_fs(mesh, element_order_h,    &
+                                                     element_order_v, Wtheta), &
                              name="diffusion_field")
 
     ! Set up field with an IO behaviour (XIOS only at present)

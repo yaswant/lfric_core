@@ -23,7 +23,8 @@ module sample_flux_kernel_mod_test
     procedure test_all
   end type sample_flux_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 

@@ -90,7 +90,7 @@ contains
     type(function_space_type), pointer :: fs_wa => null()
     type(function_space_type), pointer :: fs_wb => null()
     type(mesh_type), pointer :: mesh => null()
-    integer(kind=i_def) :: elem, fs_label
+    integer(kind=i_def) :: element_order_h, element_order_v, fs_label
 
     logical(kind=l_def) :: extended_mesh
 
@@ -107,15 +107,19 @@ contains
       mesh => fv%vector(1)%get_mesh()
 
       ! Make the mass_w0 operator
-      elem = fv%vector(1)%get_element_order()
+      element_order_h = fv%vector(1)%get_element_order_h()
+      element_order_v = fv%vector(1)%get_element_order_v()
       fs_label = fv%vector(1)%which_function_space()
-      fs_wa => function_space_collection%get_fs(mesh, elem, fs_label)
+      fs_wa => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, fs_label)
       call self%mass_w0%initialise(fs_wa, fs_wa)
 
       ! Make the mass_w3 operator
-      elem = fv%vector(2)%get_element_order()
+      element_order_h = fv%vector(2)%get_element_order_h()
+      element_order_v = fv%vector(2)%get_element_order_v()
       fs_label = fv%vector(2)%which_function_space()
-      fs_wb => function_space_collection%get_fs(mesh, elem, fs_label)
+      fs_wb => function_space_collection%get_fs(mesh, element_order_h, &
+                                                element_order_v, fs_label)
       call self%mass_w3%initialise(fs_wb, fs_wb)
 
       extended_mesh = .false.

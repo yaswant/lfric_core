@@ -16,7 +16,8 @@ module driver_fem_mod
                                             final_chi_transforms
   use constants_mod,                  only: i_def, l_def, str_def
   use extrusion_mod,                  only: TWOD, PRIME_EXTRUSION
-  use finite_element_config_mod,      only: element_order,    &
+  use finite_element_config_mod,      only: element_order_h,  &
+                                            element_order_v,  &
                                             coord_order
   use field_mod,                      only: field_type
   use fs_continuity_mod,              only: W0, W2, W3, Wtheta, Wchi, W2v, W2h
@@ -98,7 +99,7 @@ contains
 
         ! Initialise panel ID field object ---------------------------------------
         twod_mesh => mesh_collection%get_mesh(mesh, TWOD)
-        fs => function_space_collection%get_fs(twod_mesh, 0, W3)
+        fs => function_space_collection%get_fs(twod_mesh, 0, 0, W3)
         call panel_id%initialise( vector_space = fs, halo_depth = twod_mesh%get_halo_depth() )
 
         ! Initialise chi field object --------------------------------------------
@@ -109,7 +110,7 @@ contains
           chi_space = Wchi
           call log_event( "FEM specifics: Computing Wchi coordinate fields", LOG_LEVEL_INFO )
         end if
-        fs => function_space_collection%get_fs(mesh, coord_order, chi_space)
+        fs => function_space_collection%get_fs(mesh, coord_order, coord_order, chi_space)
 
         do coord = 1, size(chi)
           call chi(coord)%initialise(vector_space = fs, halo_depth = twod_mesh%get_halo_depth() )
@@ -168,19 +169,19 @@ contains
       mesh => mesh_collection%get_mesh( multigrid_mesh_names(i) )
 
       ! Make sure this function_space is in the collection
-      fs => function_space_collection%get_fs( mesh, 0, W3 )
+      fs => function_space_collection%get_fs( mesh, 0, 0, W3 )
       call multigrid_function_space_chain%add( fs )
 
-      fs => function_space_collection%get_fs( mesh, 0, W2 )
+      fs => function_space_collection%get_fs( mesh, 0, 0, W2 )
       call w2_multigrid_function_space_chain%add( fs )
 
-      fs => function_space_collection%get_fs( mesh, 0, W2v )
+      fs => function_space_collection%get_fs( mesh, 0, 0, W2v )
       call w2v_multigrid_function_space_chain%add( fs )
 
-      fs => function_space_collection%get_fs( mesh, 0, W2h )
+      fs => function_space_collection%get_fs( mesh, 0, 0, W2h )
       call w2h_multigrid_function_space_chain%add( fs )
 
-      fs => function_space_collection%get_fs( mesh, 0, Wtheta )
+      fs => function_space_collection%get_fs( mesh, 0, 0, Wtheta )
       call wtheta_multigrid_function_space_chain%add( fs )
     end do
 
@@ -188,7 +189,7 @@ contains
     do i = 1, size(multigrid_mesh_names)
       mesh => mesh_collection%get_mesh( multigrid_mesh_names(i) )
       twod_mesh => mesh_collection%get_mesh( mesh, TWOD )
-      fs => function_space_collection%get_fs( twod_mesh, 0, W3 )
+      fs => function_space_collection%get_fs( twod_mesh, 0, 0, W3 )
       call single_layer_function_space_chain%add( fs )
     end do
 

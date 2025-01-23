@@ -11,7 +11,6 @@ module sci_field_bundle_builtins_mod
   use constants_mod,                   only: i_def, r_def, l_def
   use field_mod,                       only: field_type
   use function_space_collection_mod,   only: function_space_collection
-  use finite_element_config_mod,       only: element_order
 
   implicit none
 
@@ -22,8 +21,6 @@ contains
 !> @param[in,out] y Output bundle to contain fields of the same type as x
 !> @param[in]     bundle_size Number of fields in the bundle
   subroutine clone_bundle(x, y, bundle_size)
-
-    use finite_element_config_mod, only: element_order
 
     implicit none
     integer(kind=i_def), intent(in)    :: bundle_size
@@ -147,7 +144,6 @@ contains
   subroutine bundle_minmax(x, bundle_size)
 
     use log_mod,                   only: lOG_LEVEL_INFO
-    use finite_element_config_mod, only: element_order
     use sci_field_minmax_alg_mod,  only: log_field_minmax
 
     implicit none

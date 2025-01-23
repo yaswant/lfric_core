@@ -33,7 +33,9 @@ module sci_fem_constants_mod
   use timer_mod,                          only: timer
 
   ! Configuration
-  use finite_element_config_mod,          only: element_order, nqp_exact
+  use finite_element_config_mod,          only: element_order_h, &
+                                                element_order_v, &
+                                                nqp_exact
 
   ! Other algorithms
   use sci_geometric_constants_mod,        only: get_coordinates,               &
@@ -197,7 +199,8 @@ contains
       qr_ptr => get_qr()
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
-      fs => function_space_collection%get_fs(mesh, element_order, space)
+      fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                             element_order_v, space)
       call inventory%add_operator(mm_op, fs, fs, mesh)
 
       ! The situation depends on the function space
@@ -285,7 +288,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
 
-      fs => function_space_collection%get_fs(mesh, element_order, space)
+      fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                             element_order_v, space)
       call inventory%add_field(diagonal_mm, fs, mesh)
       call invoke ( setval_c(diagonal_mm, 0.0_r_def),                          &
                     mm_diagonal_kernel_type(diagonal_mm, mass_matrix)  )
@@ -348,7 +352,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
 
-      fs => function_space_collection%get_fs(mesh, element_order, space)
+      fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                             element_order_v, space)
       call ones%initialise( fs )
       call inventory%add_field(mm_linv, fs, mesh)
 
@@ -421,7 +426,8 @@ contains
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
 
-      fs => function_space_collection%get_fs(mesh, element_order, space)
+      fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                             element_order_v, space)
       call inventory%add_operator(mm_inv, fs, fs, mesh)
 
       call invoke( name = "create_inv_mass_matrix",                            &
@@ -468,8 +474,10 @@ contains
       panel_id => get_panel_id(mesh_id)
       qr_ptr => get_qr()
 
-      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
-      w1_fs => function_space_collection%get_fs( mesh, element_order, W1 )
+      w2_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W2 )
+      w1_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W1 )
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
         call curl_inventory%add_operator(curl, w2_fs, w1_fs, mesh)
@@ -514,8 +522,10 @@ contains
       panel_id => get_panel_id(mesh_id)
       qr_ptr => get_qr()
 
-      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
-      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+      w2_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W2 )
+      w3_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W3 )
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
         call div_inventory%add_operator(div, w3_fs, w2_fs, mesh)
@@ -560,8 +570,10 @@ contains
       panel_id => get_panel_id(mesh_id)
       qr_ptr => get_qr()
 
-      w2h_fs => function_space_collection%get_fs( mesh, element_order, W2H )
-      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+      w2h_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                  element_order_v, W2H )
+      w3_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W3 )
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
         call div_h_inventory%add_operator(div_h, w3_fs, w2h_fs, mesh)
@@ -611,8 +623,10 @@ contains
       qr_ptr => get_qr()
       mm_w3_inv => get_inverse_mass_matrix(W3, mesh_id)
 
-      w2_fs => function_space_collection%get_fs( mesh, element_order, W2 )
-      w3_fs => function_space_collection%get_fs( mesh, element_order, W3 )
+      w2_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W2 )
+      w3_fs => function_space_collection%get_fs( mesh, element_order_h, &
+                                                 element_order_v, W3 )
 
       if ( subroutine_timers ) call timer('runtime_constants.fem')
         call div%initialise( w3_fs, w2_fs )
@@ -678,7 +692,8 @@ contains
       ! Create constant if it doesn't already exist
       if ( subroutine_timers ) call timer('runtime_constants.fem')
 
-      fs => function_space_collection%get_fs(mesh, element_order, space)
+      fs => function_space_collection%get_fs(mesh, element_order_h, &
+                                             element_order_v, space)
 
       call inventory%add_field(rmultiplicity, fs, mesh)
 

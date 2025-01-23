@@ -52,7 +52,8 @@ contains
              cellshape=cellshape_quadrilateral, &
              coord_order=0_i_def,               &
              coord_system=coord_system_native,  &
-             element_order=0_i_def,             &
+             element_order_h=0_i_def,           &
+             element_order_v=0_i_def,           &
              rehabilitate=.true. )
 
     call feign_planet_config( scaling_factor=1.0_r_def )

@@ -45,7 +45,8 @@ module inventory_by_mesh_mod_test
     procedure test_all
   end type inventory_by_mesh_test_type
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -76,15 +77,17 @@ contains
     unit_test_mesh_A = mesh_type( PLANE_BI_PERIODIC, unit_test_local_mesh_ptr )
     mesh_id_A = mesh_collection%add_new_mesh( unit_test_mesh_A )
     this%mesh_A => mesh_collection%get_mesh( mesh_id_A )
-    this%w3_fs_A => function_space_collection%get_fs( this%mesh_A,   &
-                                                      element_order, &
+    this%w3_fs_A => function_space_collection%get_fs( this%mesh_A,     &
+                                                      element_order_h, &
+                                                      element_order_v, &
                                                       W3 )
 
     unit_test_mesh_B = mesh_type( PLANE, unit_test_local_mesh_ptr )
     mesh_id_B = mesh_collection%add_new_mesh( unit_test_mesh_B )
     this%mesh_B => mesh_collection%get_mesh( mesh_id_B )
-    this%w3_fs_B => function_space_collection%get_fs( this%mesh_B,   &
-                                                      element_order, &
+    this%w3_fs_B => function_space_collection%get_fs( this%mesh_B,     &
+                                                      element_order_h, &
+                                                      element_order_v, &
                                                       W3 )
   end subroutine setUp
 

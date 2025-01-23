@@ -34,7 +34,8 @@ module TMPL_MODULE_NAME
     procedure test_all
   end type TMPL_TEST_CLASS
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 contains
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -111,8 +112,10 @@ contains
     mesh_id =  mesh_collection%add_new_mesh( unit_test_mesh )
     mesh    => mesh_collection%get_mesh( mesh_id )
 
-    fs1 => function_space_collection%get_fs( mesh, element_order, W1 )
-    fs2 => function_space_collection%get_fs( mesh, element_order, W2 )
+    fs1 => function_space_collection%get_fs( mesh, element_order_h,             &
+                                             element_order_v, W1 )
+    fs2 => function_space_collection%get_fs( mesh, element_order_h,             &
+                                             element_order_v, W2 )
 
     ! make an operator
     call Op%initialise( fs2, fs1 )  ! fs1 --> fs2

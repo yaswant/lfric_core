@@ -79,7 +79,7 @@ function quadrature_rule(self, nqp_1d)
 
     quadrature_rule(i,1) =  - z                                  ! Roots will be bewteen -1.0 & 1.0
     quadrature_rule(nqp_1d+1-i,1) =  + z                         ! and symmetric about the origin
-    quadrature_rule(i,2) = 2.0_r_def/((1.0_r_def - z*z) * pp*pp) ! Compute the wgpht and its
+    quadrature_rule(i,2) = 2.0_r_def/((1.0_r_def - z*z) * pp*pp) ! Compute the weight and its
     quadrature_rule(nqp_1d+1-i,2) = quadrature_rule(i,2)         ! symmetric counterpart
 
   end do ! i loop

@@ -83,7 +83,9 @@ def validate_app(app, source_dir, ignore_sc):
     Run rose macro --validate on rose-stem apps
     """
     app_dir = os.path.join(source_dir, "rose-stem", "app", app)
-    validate_command = f"rose macro --validate -M {source_dir} -C {app_dir}"
+    validate_command = (
+        f"rose macro --validate -M {source_dir} -C {app_dir} --no-warn version"
+    )
     process = run_subprocess(validate_command, False)
     print(process.stdout)
     if process.returncode:

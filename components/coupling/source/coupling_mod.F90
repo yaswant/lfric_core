@@ -153,7 +153,7 @@ contains
         "Currently, coupling only supports 2D meshes"
       call log_event( log_scratch_space, LOG_LEVEL_ERROR )
     endif
-    cpl_fs => function_space_collection%get_fs( twod_mesh, 0, W3 )
+    cpl_fs => function_space_collection%get_fs( twod_mesh, 0, 0, W3 )
     self%cpl_size = cpl_fs%get_last_dof_owned()
 
     allocate(global_index(self%cpl_size))

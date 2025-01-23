@@ -12,7 +12,8 @@ module io_demo_alg_mod
                                                  LOG_LEVEL_TRACE
   use mesh_mod,                            only: mesh_type
   use field_mod,                           only: field_type
-  use finite_element_config_mod,           only: element_order
+  use finite_element_config_mod,           only: element_order_h,  &
+                                                 element_order_v
   use fs_continuity_mod,                   only: Wtheta, W2
   use function_space_collection_mod,       only: function_space_collection
   use operator_mod,                        only: operator_type
@@ -51,8 +52,12 @@ contains
     call log_event( "io_demo: Running algorithm", LOG_LEVEL_TRACE )
     mesh => field_in%get_mesh()
     dx_at_w2 => get_dx_at_w2(mesh)
-    call dfield_in%initialise( function_space_collection%get_fs( mesh, element_order, Wtheta))
-    call visc%initialise( function_space_collection%get_fs( mesh, element_order, Wtheta))
+    call dfield_in%initialise( &
+      function_space_collection%get_fs( mesh, element_order_h, &
+                                        element_order_v, Wtheta))
+    call visc%initialise( &
+      function_space_collection%get_fs( mesh, element_order_h, &
+                                        element_order_v, Wtheta))
     call invoke( name = "compute_diffusion", &
                  setval_c(visc, visc_val), &
                  setval_c(dfield_in, 0.0_r_def), &

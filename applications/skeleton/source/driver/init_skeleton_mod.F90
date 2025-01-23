@@ -16,7 +16,7 @@ module init_skeleton_mod
   use field_collection_mod,           only : field_collection_type
   use field_mod,                      only : field_type
   use field_parent_mod,               only : write_interface
-  use finite_element_config_mod,      only : element_order
+  use finite_element_config_mod,      only : element_order_h, element_order_v
   use function_space_collection_mod,  only : function_space_collection
   use fs_continuity_mod,              only : W3
   use log_mod,                        only : log_event,      &
@@ -57,7 +57,8 @@ module init_skeleton_mod
     ! Create prognostic fields
     ! Creates a field in the W3 function space (fully discontinuous field)
     call field_1%initialise( vector_space = &
-                    function_space_collection%get_fs(mesh, element_order, W3), &
+                    function_space_collection%get_fs(mesh, element_order_h, &
+                                                     element_order_v, W3),  &
                              name="field_1")
 
     ! Set up field with an IO behaviour (XIOS only at present)

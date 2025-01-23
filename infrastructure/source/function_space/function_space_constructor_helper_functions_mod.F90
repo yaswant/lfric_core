@@ -23,7 +23,7 @@ module function_space_constructor_helper_functions_mod
                                    WB, SB, EB, NB,         &
                                    SW, SE, NE, NW,         &
                                    WT, ST, ET, NT
-
+  use log_mod,               only: log_event, LOG_LEVEL_ERROR
   implicit none
 
   private
@@ -197,41 +197,63 @@ contains
   !>          composite.
   !>
   !> @param[in] mesh              Mesh to define the function space on.
-  !> @param[in] element_order     Polynomial order of the function space.
+  !> @param[in] element_order_h   Polynomial order of the function space in the
+  !>                              horizontal directions.
+  !> @param[in] element_order_v   Polynomial order of the function space in the
+  !>                              vertical direction.
   !> @param[in] gungho_fs         Enumeration of the function space.
   !> @param[out] ndof_vert        Number of dofs on each vertex.
-  !> @param[out] ndof_edge        Number of dofs on each edge.
-  !> @param[out] ndof_face        Number of dofs on each face.
+  !> @param[out] ndof_edge_h      Number of dofs on each edge in the horizontal.
+  !> @param[out] ndof_edge_v      Number of dofs on each edge in the vertical.
+  !> @param[out] ndof_face_h      Number of dofs on each face in the horizontal.
+  !> @param[out] ndof_face_v      Number of dofs on each face in the vertical.
   !> @param[out] ndof_vol         Number of dofs in each volume.
-  !> @param[out] ndof_cell Total  Number of dofs associated with a cell.
-  !> @param[out] ndof_glob Total  Number of global dofs.
-  !> @param[out] ndof_interior    Number of dofs with no  vertical
-  !>                              connectivity.
+  !> @param[out] ndof_cell        Total number of dofs associated with a cell.
+  !> @param[out] ndof_glob        Total number of dofs on a rank.
+  !> @param[out] ndof_interior    Number of dofs with no vertical connectivity.
   !> @param[out] ndof_exterior    Number of dofs with vertical connectivity.
-  !>
-  subroutine ndof_setup( mesh, element_order, gungho_fs,            &
-                         ndof_vert, ndof_edge, ndof_face, ndof_vol, &
-                         ndof_cell, ndof_glob, ndof_interior, ndof_exterior )
+  !
+  !
+  !     .+---B--+      In the following an edge is called vertical if it is
+  !   .' |    .'|      normal to the horizontal plane (such as edge A), and
+  !  +---+--+'  A      horizontal if it is parallel to it (such as edge B).
+  !  | P |  |   |
+  !  |  ,+--+---+      A face will be called horizontal if it is normal to
+  !  |.'  Q | .'       the horizontal plane (such as face P) and vertical if it
+  !  +------+'         is parallel to it (such as face Q).
+  !
+  !                    These are chosen to agree with the naming of W2H and
+  !                    W2V.
+
+  subroutine ndof_setup( mesh, element_order_h, element_order_v, gungho_fs,    &
+                         ndof_vert, ndof_edge_h, ndof_edge_v, ndof_face_h,     &
+                         ndof_face_v, ndof_vol, ndof_cell, ndof_glob,          &
+                         ndof_interior, ndof_exterior )
 
     ! NOTE: ndofs will be used as short hand for Number of Degrees Of Freedom
     implicit none
 
     ! Input
     type(mesh_type), intent(in), pointer :: mesh
-    integer(i_def),  intent(in)          :: element_order
+    integer(i_def),  intent(in)          :: element_order_h, element_order_v
     integer(i_def),  intent(in)          :: gungho_fs
 
     ! Output
-    ! Number of dofs per ...
-    integer(i_def), intent(out) :: ndof_vert     ! vertex entity
-    integer(i_def), intent(out) :: ndof_edge     ! edge entity
-    integer(i_def), intent(out) :: ndof_face     ! face entity
-    integer(i_def), intent(out) :: ndof_vol      ! volume entity
+    integer(i_def), intent(out) :: ndof_vert     ! ndof per vertex entity
+    integer(i_def), intent(out) :: ndof_edge_h   ! ndof per horizontal edge
+                                                 ! entity
+    integer(i_def), intent(out) :: ndof_edge_v   ! ndof per vertical edge entity
+    integer(i_def), intent(out) :: ndof_face_h   ! ndof per horizontal face
+                                                 ! entity
+    integer(i_def), intent(out) :: ndof_face_v   ! ndof per vertical face entity
+    integer(i_def), intent(out) :: ndof_vol      ! ndof per volume entity
 
-    integer(i_def), intent(out) :: ndof_cell     ! 3D-cell entity
-    integer(i_def), intent(out) :: ndof_interior ! interior entity (in vertical)
-    integer(i_def), intent(out) :: ndof_exterior ! exterior entity (in vertical)
-    integer(i_def), intent(out) :: ndof_glob     ! 3D-mesh (on a rank)
+    integer(i_def), intent(out) :: ndof_cell     ! ndof per 3D-cell entity
+    integer(i_def), intent(out) :: ndof_interior ! ndof per interior entity
+                                                 ! (in vertical)
+    integer(i_def), intent(out) :: ndof_exterior ! ndof per exterior entity
+                                                 ! (in vertical)
+    integer(i_def), intent(out) :: ndof_glob     ! ndof per 3D-mesh (on a rank)
 
 
     ! Local variables
@@ -241,10 +263,7 @@ contains
     ! Variables for properties of the local 3D-Mesh
     integer(i_def) :: ncells           ! No. of 2D-cells in 3D-mesh partition
     integer(i_def) :: nlayers          ! No. of layers of 3D-cells
-    integer(i_def) :: nface_g          ! No. of faces
-    integer(i_def) :: nedge_g          ! No. of edges
-    integer(i_def) :: nvert_g          ! No. of vertices
-    integer(i_def) :: nedges_per_level ! No. of edges per level
+    integer(i_def) :: nedges_2d        ! No. of edges per level
 
     ! Variables for Exterior-Interior topology (vertical direction)
     integer(i_def) :: nverts_exterior  ! No. of vertices per exterior entity
@@ -253,25 +272,34 @@ contains
     integer(i_def) :: nedges_interior  ! No. of edges    per interior entity
     integer(i_def) :: nfaces_interior  ! No. of faces    per interior entity
 
-    integer(i_def) :: k
+    integer(i_def) :: nface_g_h        ! Global No. of horizontal faces
+    integer(i_def) :: nface_g_v        ! Global No. of vertical faces
+    integer(i_def) :: nedge_g_h        ! Global No. of horizontal edges
+    integer(i_def) :: nedge_g_v        ! Global No. of vertical edges
+    integer(i_def) :: nvert_g          ! Global No. of vertices
 
-    ! Adding ndof for exterior and interior composite entities
+    integer(i_def) :: k_h, k_v
+
+    ! Adding ndof for exterior and interior composite entities:
     !
-    !   ndof_exterior = ndof_edge*nedges_exterior
-    !                 + ndof_face*nfaces_exterior
-    !                 + ndof_vert*nverts_exterior
+    ! ndof_exterior = ndof_edge_h*nedges_exterior
+    !               + ndof_face_v*nfaces_exterior
+    !               + ndof_vert*nverts_exterior
+
+    ! ndof_interior = ndof_edge_v*nedges_interior
+    !               + ndof_face_h*nfaces_interior
+    !               + ndof_vol
     !
-    !   ndof_interior = ndof_edge*nedges_interior
-    !                 + ndof_face*nfaces_interior
-    !                 + ndof_vol
-    !
-    ! Elements on interior/exterior cell decomposition in vertical,
-    ! the horizontal faces and associated edges/vertices
-    ! (i.e. top OR bottom ) are classed as exterior entities.
-    ! The vertical faces/edges are classed as an interior entities.
+    ! Elements on interior/exterior cell decomposition in vertical.
+    ! The vertical faces, horizontal edges, and vertices (i.e. top OR bottom )
+    ! are classed as exterior entities.
+    ! The horizontal faces and vertical edges are classed as an interior
+    ! entities.
 
     reference_element => mesh%get_reference_element()
 
+    ! Local values:
+    ! Values for cell entity calculations
     nverts_exterior = reference_element%get_number_2d_vertices()
     nedges_exterior = reference_element%get_number_2d_edges()
     nfaces_exterior = 1
@@ -279,40 +307,45 @@ contains
     nedges_interior = reference_element%get_number_2d_vertices()
     nfaces_interior = reference_element%get_number_2d_edges()
 
+    ! Values for global calculations
+    nlayers   = mesh%get_nlayers()
+    ncells    = mesh%get_ncells_2d_with_ghost()
+    nedges_2d = mesh%get_nedges_2d()
 
-    ! Local values
-    nlayers  = mesh%get_nlayers()
-    ncells   = mesh%get_ncells_2d_with_ghost()
-    nface_g  = mesh%get_nfaces()
-    nedge_g  = mesh%get_nedges()
-    nvert_g  = mesh%get_nverts()
-    nedges_per_level = mesh%get_nedges_2d()
+    nface_g_v = ncells*(nlayers + 1)
+    nface_g_h = nedges_2d*nlayers
+    nedge_g_v = mesh%get_nverts_2d()*nlayers
+    nedge_g_h = nedges_2d*(nlayers + 1)
+    nvert_g   = mesh%get_nverts()
 
-    ndof_vert = 0
-    ndof_edge = 0
-    ndof_face = 0
-    ndof_vol  = 0
-    ndof_cell = 0
-    ndof_glob = 0
+    ! dof values
+    ndof_vert   = 0
+    ndof_edge_h = 0
+    ndof_edge_v = 0
+    ndof_face_h = 0
+    ndof_face_v = 0
+    ndof_vol    = 0
+    ndof_cell   = 0
+    ndof_glob   = 0
 
-    ndof_interior  = 0
-    ndof_exterior  = 0
-
-    k = element_order
+    k_h = element_order_h
+    k_v = element_order_v
 
     ! Possible modifications to number of dofs
     ! on edges depending on presets
     select case (gungho_fs)
 
     case (W0)
-      ! H1 locates dofs on the element vertices for a element order = 0,
+      ! H1 locates dofs on the element vertices for element order = 0,
       ! though the order for the H1 function space is k+1, i.e.
       ! linear across the element on each axis
-      ndof_vert = 1
-      ndof_edge = k
-      ndof_face = k * k
-      ndof_vol  = k * k * k
-      ndof_cell = (k + 2) * (k + 2) * (k + 2)
+      ndof_vert   = 1
+      ndof_edge_h = k_h
+      ndof_edge_v = k_v
+      ndof_face_h = k_h*k_v
+      ndof_face_v = k_h*k_h
+      ndof_vol    = k_h*k_h*k_v
+      ndof_cell   = (k_h + 2)*(k_h + 2)*(k_v + 2)
 
     case (W1)
       ! Dofs located on edges, as vectors
@@ -320,10 +353,14 @@ contains
 
       ! For order 0, the vector is constant along the
       ! edge, but can vary linearly normal to it.
-      ndof_edge = (k + 1)
-      ndof_face = 2 * (k + 1) * k
-      ndof_vol  = 3 * (k + 1) * k * k
-      ndof_cell = 3 * (k + 1) * (k + 2) * (k + 2)
+      ndof_edge_h = (k_h + 1)
+      ndof_edge_v = (k_v + 1)
+      ndof_face_h = (k_h + 1)*k_v + k_h*(k_v + 1)
+      ndof_face_v = 2*(k_h + 1)*k_h
+      ndof_vol    = 2*k_h*(k_h + 1)*k_v                                        &
+                  + k_h*k_h*(k_v + 1)
+      ndof_cell   = 2*(k_h + 1)*(k_h + 2)*(k_v + 2)                            &
+                  + (k_h + 2)*( k_h + 2)*(k_v + 1)
 
     case (W2)
       ! Dofs are located on faces for vector fields
@@ -334,26 +371,29 @@ contains
       ! vary linearly passing through the face(normal) to
       ! the next cell.
       !
-      ! So linear   in normal: 1-dim, ndof = 2
-      ! So constant in tangential: 2-dim, each ndof = 1
-      ! So 3 dimensions each with ndof (k+2)(k+1)(k+1)
-      !
       ! NOTE: Not correct for simplices
-      ndof_face = (k + 1) * (k + 1)
-      ndof_vol  = 3 * (k + 1) * (k + 1) * k
-      ndof_cell = 3 * (k + 1) * (k + 1) * (k + 2)
+      ndof_face_h = (k_h + 1)*(k_v + 1)
+      ndof_face_v = (k_h + 1)*(k_h + 1)
+      ndof_vol    = 2*k_h*(k_h + 1)*(k_v + 1)                                  &
+                  + (k_h + 1)*(k_h + 1)*k_v
+      ndof_cell   = 2*(k_h + 2)*(k_h + 1)*(k_v + 1)                            &
+                  + (k_h + 1)*(k_h + 1)*(k_v + 2)
 
     case (W2H)
+      ! Dofs are located at the horizontal components of W2, giving variables
+      ! the values of the first term in the sums in the W2 case.
       nfaces_exterior = 0
-      ndof_face = (k + 1) * (k + 1)
-      ndof_vol  = 2 * k * (k + 1) * (k + 1)
-      ndof_cell = 2 * (k + 2) * (k + 1) * (k + 1)
+      ndof_face_h = (k_h + 1)*(k_v + 1)
+      ndof_vol    = 2*k_h*(k_h + 1)*(k_v + 1)
+      ndof_cell   = 2*(k_h + 1)*(k_h + 2)*(k_v + 1)
 
     case (W2V)
+      ! Dofs are located at the vertical components of W2, giving variables
+      ! the values of the second term in the sums in the W2 case.
       nfaces_interior = 0
-      ndof_face = (k + 1) * (k + 1)
-      ndof_vol  = 1 * k * (k + 1) * (k + 1)
-      ndof_cell = 1 * (k + 2) * (k + 1) * (k + 1)
+      ndof_face_v = (k_h + 1)*(k_h + 1)
+      ndof_vol    = (k_h + 1)*(k_h + 1)*k_v
+      ndof_cell   = (k_h + 1)*(k_h + 1)*(k_v + 2)
 
     case (W2broken)
       ! Dofs are geometrically located on faces for
@@ -367,12 +407,9 @@ contains
       ! vary linearly passing through the face(normal) to
       ! the next cell.
       !
-      ! So linear   in normal: 1-dim, ndof = 2
-      ! So constant in tangengial: 2-dim, each ndof = 1
-      ! So 3 dimensions each with ndof (k+2)(k+1)(k+1)
-      !
       ! NOTE: Not correct for simplices
-      ndof_vol  = 3 * (k + 1) * (k + 1) * (k + 2)
+      ndof_vol  = 2*(k_h + 1)*(k_h + 2)*(k_v + 1)                              &
+                + (k_h + 1)*(k_h + 1)*(k_v + 2)
       ndof_cell = ndof_vol
 
     case (W2Hbroken)
@@ -387,12 +424,8 @@ contains
       ! vary linearly passing through the face(normal) to
       ! the next cell.
       !
-      ! So linear   in normal: 1-dim, ndof = 2
-      ! So constant in tangengial: 2-dim, each ndof = 1
-      ! So 3 dimensions each with ndof (k+2)(k+1)(k+1)
-      !
       ! NOTE: Not correct for simplices
-      ndof_vol  = 2 * (k + 1) * (k + 1) * (k + 2)
+      ndof_vol  = 2*(k_h + 1)*(k_h + 2)*(k_v + 1)
       ndof_cell = ndof_vol
 
     case (W2trace)
@@ -403,8 +436,9 @@ contains
       ! This space is discontinuous across edges/vertices.
       !
       ! NOTE: Not correct for simplices
-      ndof_face = (k + 1) * (k + 1)
-      ndof_cell = 6 * ndof_face
+      ndof_face_h = (k_h + 1)*(k_v + 1)
+      ndof_face_v = (k_h + 1)*(k_h + 1)
+      ndof_cell   = 4*ndof_face_h + 2*ndof_face_v
 
     case (W2Vtrace)
       ! This function space is the result of taking the trace
@@ -416,8 +450,9 @@ contains
       ! This space is discontinuous across edges/vertices.
       !
       ! NOTE: Not correct for simplices
-      ndof_face = (k + 1) * (k + 1)
-      ndof_cell = 2 * ndof_face
+      nfaces_interior = 0
+      ndof_face_v     = (k_h + 1)*(k_h + 1)
+      ndof_cell       = 2*ndof_face_v
 
     case (W2Htrace)
       ! This function space is the result of taking the trace
@@ -429,8 +464,9 @@ contains
       ! This space is discontinuous across edges/vertices.
       !
       ! NOTE: Not correct for simplices
-      ndof_face = (k + 1) * (k + 1)
-      ndof_cell = 4 * ndof_face
+      nfaces_exterior = 0
+      ndof_face_h     = (k_h + 1)*(k_v + 1)
+      ndof_cell       = 4*ndof_face_h
 
     case (W3)
       ! Order of this function space is same as base order
@@ -441,42 +477,36 @@ contains
       ! between cells.
 
       ! Number of dofs on each dimension is lowest order + 1
-      ndof_vol  = (k + 1) * (k + 1) * (k + 1)
+      ndof_vol  = (k_h + 1)*(k_h + 1)*(k_v + 1)
       ndof_cell = ndof_vol
 
     case (WTHETA)
       nfaces_interior = 0
-      ndof_face = (k + 1) * (k + 1)
-      ndof_vol  = k * (k + 1) * (k + 1)
-      ndof_cell = (k + 2) * (k + 1) * (k + 1)
+      ndof_face_v     = (k_h + 1)*(k_h + 1)
+      ndof_vol        = (k_h + 1)*(k_h + 1)*k_v
+      ndof_cell       = (k_h + 1)*(k_h + 1)*(k_v + 2)
+
     case (WCHI)
-      ndof_vol  = (k + 1) * (k + 1) * (k + 1)
+      ndof_vol  = (k_h + 1)*(k_h + 1)*(k_v + 1)
       ndof_cell = ndof_vol
 
     end select
 
     ndof_exterior = ndof_vert * nverts_exterior &
-                  + ndof_edge * nedges_exterior &
-                  + ndof_face * nfaces_exterior
+                  + ndof_edge_h * nedges_exterior &
+                  + ndof_face_v * nfaces_exterior
 
-    ndof_interior = ndof_edge * nedges_interior &
-                  + ndof_face * nfaces_interior &
+    ndof_interior = ndof_edge_v * nedges_interior &
+                  + ndof_face_h * nfaces_interior &
                   + ndof_vol
 
     ! Calculated the global number of dofs on the function space
-    select case (gungho_fs)
-    case (W0, W1, W2, W2broken,W2trace, W3, WCHI)
-      ndof_glob = ncells * nlayers * ndof_vol + nface_g * ndof_face &
-                + nedge_g * ndof_edge + nvert_g * ndof_vert
-
-    case (WTHETA, W2V, W2Vtrace)
-      ndof_glob = ncells * nlayers * ndof_vol + ncells * (nlayers + 1) &
-                * ndof_face
-
-    case (W2H, W2Htrace, W2Hbroken)
-      ndof_glob = ncells * nlayers * ndof_vol + nedges_per_level * nlayers &
-                * ndof_face + nedge_g * ndof_edge + nvert_g * ndof_vert
-    end select
+    ndof_glob = ncells*nlayers*ndof_vol &
+              + nface_g_h*ndof_face_h   &
+              + nface_g_v*ndof_face_v   &
+              + nedge_g_h*ndof_edge_h   &
+              + nedge_g_v*ndof_edge_v   &
+              + nvert_g*ndof_vert
 
     nullify(reference_element)
 
@@ -490,149 +520,216 @@ contains
   !> for cube elements. It is used by the function_space_type constructor and
   !> is unlikely to be useful elsewhere.
   !>
-  !> @param[in] element_order  Polynomial order of the function space.
-  !> @param[in] gungho_fs  Enumeration of the function space.
-  !> @param[in] ndof_vert  Number dofs on each vertex.
-  !> @param[in] ndof_cell  Total number of dofs associated with a cell.
+  !> @param[in] element_order_h    Polynomial order of the function space in
+  !>                               horizontal direction.
+  !> @param[in] element_order_v    Polynomial order of the function space in
+  !>                               vertical direction.
+  !> @param[in] gungho_fs          Enumeration of the function space.
+  !> @param[in] ndof_vert          Number dofs on each vertex.
+  !> @param[in] ndof_cell          Total number of dofs associated with a cell.
   !> @param[in] reference_element  Object describing the reference element of
   !>                               the mesh.
-  !> @param[out] basis_index  Array containing index of polynomial function.
-  !> @param[out] basis_order  Polynomial order of basis function.
-  !> @param[out] basis_vector  Direction of basis for vector functions.
-  !> @param[out] basis_x  Array of nodal points of the basis functions.
-  !> @param[out] nodal_coords  3D coordinates of zeros of the basis functions.
+  !> @param[out] basis_index       Array containing index of polynomial
+  !>                               function.
+  !> @param[out] basis_order       Polynomial order of basis function.
+  !> @param[out] basis_vector      Direction of basis for vector functions.
+  !> @param[out] basis_x           Array of nodal points of the x and y basis
+  !>                               functions.
+  !> @param[out] basis_z           Array of nodal points of the basis z basis
+  !>                               functions.
+  !> @param[out] nodal_coords      3D coordinates of zeros of the basis
+  !>                               functions.
   !> @param[out] dof_on_vert_boundary  Array indication if a dof is on the top
   !>                                   or bottom boundary of a cell.
-  !> @param[out] entity_dofs Array of labels which maps degree of freedom
-  !>                         index to geometric entity the dof lies on.
+  !> @param[out] entity_dofs       Array of labels which maps degree of freedom
+  !>                               index to geometric entity the dof lies on.
   !>
-  subroutine basis_setup( element_order, gungho_fs, ndof_vert,  ndof_cell, &
-                          reference_element,                               &
-                          basis_index, basis_order, basis_vector, basis_x, &
-                          nodal_coords, dof_on_vert_boundary, entity_dofs )
+  subroutine basis_setup( element_order_h, element_order_v, gungho_fs,         &
+                          ndof_vert,  ndof_cell, reference_element,            &
+                          basis_index, basis_order, basis_vector, basis_x,     &
+                          basis_z, nodal_coords, dof_on_vert_boundary,         &
+                          entity_dofs )
 
     implicit none
 
     ! Input
-    integer(i_def), intent(in) :: element_order
+    integer(i_def), intent(in) :: element_order_h
+    integer(i_def), intent(in) :: element_order_v
     integer(i_def), intent(in) :: gungho_fs
 
-    ! Number of dofs per entity
-    integer(i_def), intent(in) :: ndof_vert ! ndofs per vertex
-    integer(i_def), intent(in) :: ndof_cell ! ndofs per 3D-cell
+    integer(i_def), intent(in) :: ndof_vert ! ndofs (number of dofs) per vertex
+    integer(i_def), intent(in) :: ndof_cell ! ndofs (number of dofs) per 3D-cell
 
     class(reference_element_type), intent(in), pointer :: reference_element
 
     ! Output
-    integer(i_def), intent(out) :: basis_index  (:,:)
-    integer(i_def), intent(out) :: basis_order  (:,:)
-    real(r_def),    intent(out) :: basis_vector (:,:)
-    real(r_def),    intent(out) :: basis_x      (:,:,:)
-    real(r_def),    intent(out) :: nodal_coords (:,:)
-    integer(i_def), intent(out) :: dof_on_vert_boundary (:,:)
+    integer(i_def), intent(out) :: basis_index(:,:)
+    integer(i_def), intent(out) :: basis_order(:,:)
+    real(r_def),    intent(out) :: basis_vector(:,:)
+    real(r_def),    intent(out) :: basis_x(:,:,:)
+    real(r_def),    intent(out) :: basis_z(:,:)
+    real(r_def),    intent(out) :: nodal_coords(:,:)
+    integer(i_def), intent(out) :: dof_on_vert_boundary(:,:)
     integer(i_def), intent(out) :: entity_dofs(:)
 
-    integer(i_def) :: k
+    ! Local variables
+    integer(i_def) :: k_h, k_v    ! Horizontal and vertical element orders
+    integer(i_def) :: k_switch    ! Can be set to k_h or k_v
 
-    integer(i_def) :: i, jx, jy, jz, poly_order, idx, j1, j2
-    integer(i_def) :: j(3), j2l_edge(12, 3), j2l_face(6, 3), face_idx(6), &
-                      edge_idx(12, 2)
-    integer(i_def), allocatable :: lx(:), ly(:), lz(:)
-    real(r_def), allocatable :: unit_vec(:,:)
+    integer(i_def) :: i           ! General loop variable
+    integer(i_def) :: jx, jy, jz  ! x, y, z loop variables
+    integer(i_def) :: idx         ! Index of dof
+    integer(i_def) :: j1, j2      ! Face/edge loop variables
+    integer(i_def) :: j(3)        ! Tuple containing face or edge indices such
+                                  ! as j1, j2, face_idx and edge_idx
 
-    real(r_def) :: x1(element_order + 2)
-    real(r_def) :: x2(element_order + 2)
+    integer(i_def) :: j2l_edge(12, 3), j2l_face(6, 3) ! Indexes conversion from
+                                                      ! j to lx, ly and lz
 
-    real(r_def)    :: coordinate(3)
+    integer(i_def) :: face_idx(6), edge_idx(12, 2)    ! Indices of nodal points
+                                                      ! on faces and edges
+
+    integer(i_def), allocatable :: lx(:), ly(:), lz(:) ! 3d indices of dofs
+
+    real(r_def),    allocatable :: unit_vec(:,:) ! Unit tangent to an edge dof
+                                                 ! or normal to a face dof
+
+    real(r_def) :: x1h(element_order_h+2) ! Evenly spaces nodes of continuous
+                                          ! 1D element (used in horizontal)
+    real(r_def) :: x1v(element_order_v+2) ! Evenly spaces nodes of continuous
+                                          ! 1D element (used in vertical)
+
+    real(r_def) :: x2h(element_order_h+2) ! Evenly spaces nodes of discontinuous
+                                          ! 1D element (used in horizontal).
+                                          ! Note: one larger than required
+    real(r_def) :: x2v(element_order_v+2) ! Evenly spaces nodes of discontinuous
+                                          ! 1D element (used in vertical).
+                                          ! Note: one larger than required
+
+    real(r_def) :: coordinate(3) ! Coordinate of a vertex
+
     integer(i_def) :: edges_on_face(reference_element%get_number_edges())
     integer(i_def) :: number_faces, number_edges, number_vertices
-    integer(i_def) :: number_horizontal_edges
+    integer(i_def) :: number_2d_edges
+    integer(i_def) :: number_faces_h
 
     number_faces    = reference_element%get_number_faces()
     number_edges    = reference_element%get_number_edges()
     number_vertices = reference_element%get_number_vertices()
 
-    number_horizontal_edges = reference_element%get_number_2d_edges()
+    number_2d_edges = reference_element%get_number_2d_edges()
+    number_faces_h  = reference_element%get_number_2d_edges()
 
     ! To uniquely specify a 3D tensor product basis function the following is
     ! needed:
     ! basis_order(3): The polynomial order in the x,y,z directions
-    ! basis_x(3,basis_order+1): The nodal points of the polynomials in each
-    !                           direction
+    ! basis_x(element_order_h + 2, 2, ndof_cell):
+    !                 The nodal points of the polynomials in each horizontal
+    !                 direction at each dof
+    ! basis_z(element_order_v + 2, ndof_cell):
+    !                 The nodal points of the polynomials in each vertical
+    !                 direction at each dof
     ! basis_index(3): The index of the nodal points array at which the basis
     !                 function is unity
     ! basis_vector(3): Additionally if the function space is a vector then a
     !                  unit vector is needed.
 
     ! Although not strictly needed the nodal coordinates at which each basis
-    ! function equals 1 is stored as nodal_coords
+    ! function equals 1 is stored as nodal_coords.
     ! A flag is also set to 0 if a basis function is associated with an entity
     ! on the top or bottom of the cell, i.e has nodal_coord(3) = 0 or 1
 
-    k = element_order
+    k_h = element_order_h
+    k_v = element_order_v
 
-    ! Allocate to be larger than should be needed
-    allocate( lx(3 * (k + 2)**3) )
-    allocate( ly(3 * (k + 2)**3) )
-    allocate( lz(3 * (k + 2)**3) )
+    allocate( lx(ndof_cell) )
+    allocate( ly(ndof_cell) )
+    allocate( lz(ndof_cell) )
 
     lx(:) = 0
     ly(:) = 0
     lz(:) = 0
 
     ! Positional arrays - need two, i.e quadratic and linear for RT1
-    do i = 1, k + 2
-      x1(i) = real(i - 1, r_def) / real(k + 1, r_def)
+    do i = 1, k_h + 2
+      x1h(i) = real(i - 1, r_def) / real(k_h + 1, r_def)
     end do
 
-    if (k == 0) then
-      x2(1) = 0.5_r_def
+    if (k_h == 0) then
+      x2h(1) = 0.5_r_def
     else
       if (gungho_fs == W3 .or. gungho_fs == Wtheta) then
         ! Evenly space the points away from the element edges for high order
         ! spaces - this helps with visualising the output
-        do i = 1, k + 1
-          x2(i) = real(i, r_def) / real(k + 2, r_def)
+        do i = 1, k_h + 1
+          x2h(i) = real(i, r_def) / real(k_h + 2, r_def)
         end do
       else
-        do i = 1, k + 1
-          x2(i) = real(i - 1, r_def) / real(k, r_def)
+        do i = 1, k_h + 1
+          x2h(i) = real(i - 1, r_def) / real(k_h, r_def)
         end do
       end if
     end if
 
-    if (k == 0) x2(1) = 0.5_r_def
-    ! This value isn't needed and is always multipled by 0
-    x2(k + 2) = 0.0_r_def
+    ! The same for vertical positional arrays
+    do i = 1, k_v + 2
+      x1v(i) = real(i - 1, r_def) / real(k_v + 1, r_def)
+    end do
 
-    ! Some look arrays based upon reference cube topology
-    ! index of nodal points for dofs located on faces.
-    ! Faces are defined as having one coodinate fixed,
+    if (k_v == 0) then
+      x2v(1) = 0.5_r_def
+    else
+      if (gungho_fs == W3 .or. gungho_fs == Wtheta) then
+        ! Evenly space the points away from the element edges for high order
+        ! spaces - this helps with visualising the output
+        do i = 1, k_v + 1
+          x2v(i) = real(i, r_def) / real(k_v + 2, r_def)
+        end do
+      else
+        do i = 1, k_v + 1
+          x2v(i) = real(i - 1, r_def) / real(k_v, r_def)
+        end do
+      end if
+    end if
+
+    ! This value isn't needed and is always multipled by 0
+    x2h(k_h + 2) = 0.0_r_def
+    x2v(k_v + 2) = 0.0_r_def
+
+    ! Some look arrays based upon reference cube topology:
+
+    ! Index of nodal points for dofs located on faces.
+    ! Faces are defined as having one coordinate fixed,
     ! i.e. for face 1 x = 0 for all points on the face
-    ! and for face 4 y = 1 for all points on the face
+    ! and for face 4 y = 1 for all points on the face.
     ! This array give the index for the fixed coordinate for each face.
     ! If a face has fixed coordinate = 0 the index is 1
     ! If a face has fixed coordinate = 1 the index is k+2
-    face_idx = (/ 1, 1, k + 2, k + 2, 1, k + 2 /)
+    face_idx = (/ 1, 1, k_h + 2, k_h + 2, 1, k_v + 2 /)
 
-    ! index of nodal points for dofs located on edges
-    ! edges are defined as having two coodinates fixed,
-    ! i.e. for edge 1 x = 0 & z = 0 for all points on the edge
-    ! and for edge 6 x = 1 y = 0 for all points on the edge
+    ! Index of nodal points for dofs located on edges.
+    ! Edges are defined as having two coordinates fixed,
+    ! i.e. for edge 1 x = 0 & z = 0 for all points on the edge,
+    ! and for edge 6 x = 1 y = 0 for all points on the edge.
     ! These arrays give the index for the two fixed coordinates for each edge.
     ! If an edge has fixed coordinate = 0 the index is 1
     ! If an edge has fixed coordinate = 1 the index is k+2
-    edge_idx(:, 1) = (/ 1, 1, k + 2, k + 2, 1, k + 2, k + 2, 1, 1, 1, k + 2, k + 2 /)
-    edge_idx(:, 2) = (/ 1, 1, 1, 1, 1, 1, k + 2, k + 2, k + 2, k + 2, k + 2, k + 2 /)
+    ! The fixed coordinates are stored in order x, y, z so if the fixed
+    ! coordinates are x and z then edge_idx(:, 1) stores x and edge_idx(:, 1)
+    ! stores z, and for other combinations they remain in this order.
+    edge_idx(:, 1) =                                                           &
+    (/ 1, 1, k_h + 2, k_h + 2, 1, k_h + 2, k_h + 2, 1, 1, 1, k_h + 2, k_h + 2 /)
+    edge_idx(:, 2) =                                                           &
+    (/ 1, 1, 1, 1, 1, 1, k_h + 2, k_h + 2, k_v + 2, k_v + 2, k_v + 2, k_v + 2 /)
 
     ! Each dof living on a face or edge will have its index defined by three
     ! integers (j1, j2, j3) where:
-    !  for faces one j will be the face index and the other two can vary
-    !  for edges two j's will be the edge indices and the final one can vary
-    ! These j's need to be converted to the indices lx ,ly, lz
+    !  -for faces, one j will be the face index and the other two can vary.
+    !  -for edges, two j's will be the edge indices and the final one can vary.
+    ! These j's need to be converted to the indices lx ,ly, lz.
     ! For faces the first value of j2l is the l that corresponds to the
-    ! constant coordinate, so for face 1 lx = j3, ly = j2 and lz = j1/
-    ! for edge 1: lx = j2, ly = j1, and lz = j3
+    ! constant coordinate, so for face 1: lx = j3, ly = j2 and lz = j1; for
+    ! edge 1: lx = j2, ly = j1, and lz = j3.
     j2l_face(1,:) = (/ 3, 2, 1 /)
     j2l_face(2,:) = (/ 2, 3, 1 /)
     j2l_face(3,:) = (/ 3, 2, 1 /)
@@ -667,10 +764,9 @@ contains
     select case (gungho_fs)
 
     case (W0)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of CG spaces
-      !---------------------------------------------------------------------------
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       ! Compute indices of functions
       idx = 1
@@ -678,9 +774,9 @@ contains
       ! ===============================
       ! dofs in volume
       ! ===============================
-      do jz = 2, k + 1
-        do jy = 2, k + 1
-          do jx = 2, k + 1
+      do jz = 2, k_v + 1
+        do jy = 2, k_h + 1
+          do jx = 2, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -695,8 +791,16 @@ contains
       ! dofs on faces
       ! ===============================
       do i = 1, number_faces
-        do j1 = 2, k + 1
-          do j2 = 2, k + 1
+        ! For horizontal face loop over vertical then horizontal orders
+        if (i <= number_faces_h) then
+          k_switch = k_v
+        ! For vertical face loop over horizontal order twice
+        else
+          k_switch = k_h
+        end if
+
+        do j1 = 2, k_switch + 1
+          do j2 = 2, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -714,7 +818,16 @@ contains
       ! dofs on edges
       ! ===============================
       do i = 1, number_edges
-        do j1 = 2, k + 1
+        ! If edge is horizontal loop to k_h+1
+        if ((i <= number_2d_edges) .OR.           &
+            (i > number_edges - number_2d_edges)) then
+          k_switch = k_h
+        ! If edge vertical loop to k_v+1
+        else
+          k_switch = k_v
+        end if
+
+        do j1 = 2, k_switch + 1
           j(1) = j1
           j(2) = edge_idx(i, 1)
           j(3) = edge_idx(i, 2)
@@ -733,9 +846,9 @@ contains
       do i = 1, number_vertices
         do j1 = 1, ndof_vert
           coordinate = reference_element%get_vertex(i)
-          lx(idx) = 1 + (k + 1) * int(coordinate(1))
-          ly(idx) = 1 + (k + 1) * int(coordinate(2))
-          lz(idx) = 1 + (k + 1) * int(coordinate(3))
+          lx(idx) = 1 + (k_h + 1) * int(coordinate(1))
+          ly(idx) = 1 + (k_h + 1) * int(coordinate(2))
+          lz(idx) = 1 + (k_v + 1) * int(coordinate(3))
           ! Label vertex degrees of freedom
           entity_dofs(idx) = reference_element%get_vertex_entity(i)
           idx = idx + 1
@@ -743,17 +856,17 @@ contains
       end do
 
       do i = 1, ndof_cell
-
         ! Explicitly for quads, as ngp_h = ngp_v * ngp_v
-        nodal_coords(1, i) = x1(lx(i))
-        nodal_coords(2, i) = x1(ly(i))
-        nodal_coords(3, i) = x1(lz(i))
+        nodal_coords(1, i) = x1h(lx(i))
+        nodal_coords(2, i) = x1h(ly(i))
+        nodal_coords(3, i) = x1v(lz(i))
 
-        basis_order(:, i) = poly_order
-        basis_x(:, 1, i) = x1
-        basis_x(:, 2, i) = x1
-        basis_x(:, 3, i) = x1
-
+        basis_order(1, i) = k_h + 1
+        basis_order(2, i) = k_h + 1
+        basis_order(3, i) = k_v + 1
+        basis_x(:, 1, i) = x1h(:)
+        basis_x(:, 2, i) = x1h(:)
+        basis_z(:, i)    = x1v(:)
       end do
 
       basis_index(1,:) = lx(1:ndof_cell)
@@ -762,11 +875,9 @@ contains
       basis_vector(1,:) = 1.0_r_def
 
     case (W1)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of Hcurl spaces
-      !---------------------------------------------------------------------------
-
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -779,9 +890,9 @@ contains
 
       ! dofs in volume
       ! u components
-      do jz = 2, k + 1
-        do jy = 2, k + 1
-          do jx = 1, k + 1
+      do jz = 2, k_v + 1
+        do jy = 2, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -794,9 +905,9 @@ contains
       end do
 
       ! v components
-      do jz = 2, k + 1
-        do jy = 1, k + 1
-          do jx = 2, k + 1
+      do jz = 2, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 2, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -809,9 +920,9 @@ contains
       end do
 
       ! w components
-      do jz = 1, k + 1
-        do jy = 2, k + 1
-          do jx = 2, k + 1
+      do jz = 1, k_v + 1
+        do jy = 2, k_h + 1
+          do jx = 2, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -825,8 +936,18 @@ contains
 
       ! dofs on faces
       do i = 1, number_faces
-        do j1 = 2, k + 1
-          do j2 = 1, k + 1
+        ! For horizontal face loop over vertical then horizontal orders
+        if (i <= number_faces_h) then
+          k_switch = k_v
+        ! For vertical face loop over horizontal order twice
+        else
+          k_switch = k_h
+        end if
+
+        ! Loop twice to account for two components per face (i.e. vertical
+        ! faces contain x and y components)
+        do j1 = 2, k_switch + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -843,8 +964,8 @@ contains
             idx = idx + 1
           end do
         end do
-        do j1 = 1, k + 1
-          do j2 = 2, k + 1
+        do j1 = 1, k_switch + 1
+          do j2 = 2, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -865,7 +986,16 @@ contains
 
       ! dofs on edges
       do i = 1, number_edges
-        do j1 = 1, k + 1
+        ! If edge is horizontal loop to k_h+1
+        if ((i <= number_2d_edges) .OR.           &
+            (i > number_edges - number_2d_edges)) then
+          k_switch = k_h
+        ! If edge vertical loop to k_v+1
+        else
+          k_switch = k_v
+        end if
+
+        do j1 = 1, k_switch + 1
           j(1) = j1
           j(2) = edge_idx(i, 1)
           j(3) = edge_idx(i, 2)
@@ -873,9 +1003,9 @@ contains
           ly(idx) = j(j2l_edge(i, 2))
           lz(idx) = j(j2l_edge(i, 3))
           call reference_element%get_tangent_to_edge(i, unit_vec(:, idx))
-          if (i <= number_horizontal_edges) dof_on_vert_boundary(idx, 1) = 0
-          if (i > number_edges - number_horizontal_edges) &
-          dof_on_vert_boundary(idx, 2) = 0
+          if (i <= number_2d_edges) dof_on_vert_boundary(idx, 1) = 0
+          if (i > number_edges - number_2d_edges) &
+            dof_on_vert_boundary(idx, 2) = 0
           ! Label edge degrees of freedom
           entity_dofs(idx) = reference_element%get_edge_entity(i)
           idx = idx + 1
@@ -884,27 +1014,27 @@ contains
 
       do i = 1, ndof_cell
 
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x2(lx(i)) &
-        + (1.0_r_def - abs(unit_vec(1, i))) * x1(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x2h(lx(i)) &
+        + (1.0_r_def - abs(unit_vec(1, i))) * x1h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x2(ly(i)) &
-        + (1.0_r_def - abs(unit_vec(2, i))) * x1(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x2h(ly(i)) &
+        + (1.0_r_def - abs(unit_vec(2, i))) * x1h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x2(lz(i)) &
-        + (1.0_r_def - abs(unit_vec(3, i))) * x1(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x2v(lz(i)) &
+        + (1.0_r_def - abs(unit_vec(3, i))) * x1v(lz(i))
 
-        basis_order(1, i) = poly_order - int(abs(unit_vec(1, i)))
-        basis_order(2, i) = poly_order - int(abs(unit_vec(2, i)))
-        basis_order(3, i) = poly_order - int(abs(unit_vec(3, i)))
+        basis_order(1, i) = (k_h + 1) - int(abs(unit_vec(1, i)))
+        basis_order(2, i) = (k_h + 1) - int(abs(unit_vec(2, i)))
+        basis_order(3, i) = (k_v + 1) - int(abs(unit_vec(3, i)))
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x2(:) &
-        + (1.0_r_def - abs(unit_vec(1, i))) * x1(:)
+        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x2h(:) &
+                         + (1.0_r_def - abs(unit_vec(1, i))) * x1h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x2(:) &
-        + (1.0_r_def - abs(unit_vec(2, i))) * x1(:)
+        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x2h(:) &
+                         + (1.0_r_def - abs(unit_vec(2, i))) * x1h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x2(:) &
-        + (1.0_r_def - abs(unit_vec(3, i))) * x1(:)
+        basis_z(:, i)    = abs(unit_vec(3, i)) * x2v(:) &
+                         + (1.0_r_def - abs(unit_vec(3, i))) * x1v(:)
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -917,11 +1047,9 @@ contains
       basis_index(3,:) = lz(1:ndof_cell)
 
     case(W2, W2broken)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of Hdiv/discontinuous Hdiv spaces
-      !---------------------------------------------------------------------------
-
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -932,9 +1060,9 @@ contains
       idx = 1
       ! dofs in volume
       ! u components
-      do jz = 1, k + 1
-        do jy = 1, k + 1
-          do jx = 2, k + 1
+      do jz = 1, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 2, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -946,9 +1074,9 @@ contains
         end do
       end do
       ! v components
-      do jz = 1, k + 1
-        do jy = 2, k + 1
-          do jx = 1, k + 1
+      do jz = 1, k_v + 1
+        do jy = 2, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -960,9 +1088,9 @@ contains
         end do
       end do
       ! w components
-      do jz = 2, k + 1
-        do jy = 1, k + 1
-          do jx = 1, k + 1
+      do jz = 2, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -976,8 +1104,16 @@ contains
 
       ! dofs on faces
       do i = 1, number_faces
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! For horizontal face loop over vertical then horizontal orders
+        if (i <= number_faces_h) then
+          k_switch = k_v
+        ! For vertical face loop over horizontal order twice
+        else
+          k_switch = k_h
+        end if
+
+        do j1 = 1, k_switch + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -996,32 +1132,32 @@ contains
 
       do i = 1, ndof_cell
 
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-        + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-        + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-        + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(1, i)), i_def)
+        basis_order(1, i) = (k_h + 1) &
+                          - int(1.0_r_def - abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(2, i)), i_def)
+        basis_order(2, i) = (k_h + 1) &
+                          - int(1.0_r_def - abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(3, i)), i_def)
+        basis_order(3, i) = (k_v + 1) &
+                          - int(1.0_r_def - abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1h(:) &
+                         + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1h(:) &
+                         + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)    = abs(unit_vec(3, i)) * x1v(:) &
+                         + (1.0_r_def - abs(unit_vec(3, i))) * x2v(:)
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -1037,7 +1173,6 @@ contains
       !-------------------------------------------------------------------------
       ! Section for test/trial functions of Hdiv trace spaces
       !-------------------------------------------------------------------------
-      poly_order = k
 
       ! Compute indices of functions
       idx = 1
@@ -1046,8 +1181,16 @@ contains
       ! dofs on faces
       ! ===============================
       do i = 1, number_faces
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! For horizontal face loop over vertical then horizontal orders
+        if (i <= number_faces_h) then
+          k_switch = k_v
+        ! For vertical face loop over horizontal order twice
+        else
+          k_switch = k_h
+        end if
+
+        do j1 = 1, k_switch + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1066,35 +1209,35 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-                           + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-                           + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-                           + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order * int(1.0_r_def  &
-                          - abs(unit_vec(1, i)), i_def) &
+        basis_order(1, i) = k_h * int(1.0_r_def          &
+                          - abs(unit_vec(1, i)), i_def)  &
                           + int(abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order * int(1.0_r_def  &
-                          - abs(unit_vec(2, i)), i_def) &
+        basis_order(2, i) = k_h * int(1.0_r_def          &
+                          - abs(unit_vec(2, i)), i_def)  &
                           + int(abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order * int(1.0_r_def  &
-                          - abs(unit_vec(3, i)), i_def) &
+        basis_order(3, i) = k_v * int(1.0_r_def          &
+                          - abs(unit_vec(3, i)), i_def)  &
                           + int(abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i)  = abs(unit_vec(1, i)) * x1h(:) &
+                          + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i)  = abs(unit_vec(2, i)) * x1h(:) &
+                          + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)     = abs(unit_vec(3, i)) * x1v(:) &
+                          + (1.0_r_def - abs(unit_vec(3, i))) * x2v(:)
       end do
 
       basis_index(1,:) = lx(1:ndof_cell)
@@ -1103,18 +1246,17 @@ contains
       basis_vector(:,:) = 1.0_r_def
 
     case(W3)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of DG spaces
-      !---------------------------------------------------------------------------
-      poly_order = k
+      !-------------------------------------------------------------------------
 
       ! compute indices of functions
       idx = 1
 
       ! dofs in volume
-      do jz = 1, k + 1
-        do jy = 1, k + 1
-          do jx = 1, k + 1
+      do jz = 1, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1126,32 +1268,33 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = x2(lx(i))
-        nodal_coords(2, i) = x2(ly(i))
-        nodal_coords(3, i) = x2(lz(i))
-        basis_x(:, 1, i) = x2
-        basis_x(:, 2, i) = x2
-        basis_x(:, 3, i) = x2
+        nodal_coords(1, i) = x2h(lx(i))
+        nodal_coords(2, i) = x2h(ly(i))
+        nodal_coords(3, i) = x2v(lz(i))
+        basis_x(:, 1, i) = x2h(:)
+        basis_x(:, 2, i) = x2h(:)
+        basis_z(:, i)    = x2v(:)
       end do
 
       basis_index(1,:) = lx(1:ndof_cell)
       basis_index(2,:) = ly(1:ndof_cell)
       basis_index(3,:) = lz(1:ndof_cell)
       basis_vector(1,:) = 1.0_r_def
-      basis_order(:,:) = poly_order
+      basis_order(1,:) = k_h
+      basis_order(2,:) = k_h
+      basis_order(3,:) = k_v
 
     case (WTHETA)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of theta spaces
-      !---------------------------------------------------------------------------
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       idx = 1
       ! dofs in volume - (w only)
       ! w components
-      do jz = 2, k + 1
-        do jy = 1, k + 1
-          do jx = 1, k + 1
+      do jz = 2, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1165,8 +1308,9 @@ contains
 
       ! dofs on faces
       do i = number_faces - 1, number_faces
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! Loop on faces dependent on k_h only
+        do j1 = 1, k_h + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1183,17 +1327,17 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = x2(lx(i))
-        nodal_coords(2, i) = x2(ly(i))
-        nodal_coords(3, i) = x1(lz(i))
+        nodal_coords(1, i) = x2h(lx(i))
+        nodal_coords(2, i) = x2h(ly(i))
+        nodal_coords(3, i) = x1v(lz(i))
 
-        basis_order(1, i) = poly_order - 1
-        basis_order(2, i) = poly_order - 1
-        basis_order(3, i) = poly_order
+        basis_order(1, i) = k_h
+        basis_order(2, i) = k_h
+        basis_order(3, i) = k_v + 1
 
-        basis_x(:, 1, i) = x2(:)
-        basis_x(:, 2, i) = x2(:)
-        basis_x(:, 3, i) = x1(:)
+        basis_x(:, 1, i) = x2h(:)
+        basis_x(:, 2, i) = x2h(:)
+        basis_z(:, i)    = x1v(:)
       end do
 
       basis_index(1,:) = lx(1:ndof_cell)
@@ -1202,10 +1346,9 @@ contains
       basis_vector(:,:) = 1.0_r_def
 
     case (W2V)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of W2V space
-      !---------------------------------------------------------------------------
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -1216,9 +1359,9 @@ contains
       idx = 1
       ! dofs in volume - (w only)
       ! w components
-      do jz = 2, k + 1
-        do jy = 1, k + 1
-          do jx = 1, k + 1
+      do jz = 2, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1233,8 +1376,9 @@ contains
 
       ! dofs on faces
       do i = number_faces - 1, number_faces
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! Loop on faces dependent on k_h only
+        do j1 = 1, k_h + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1253,32 +1397,32 @@ contains
 
       do i = 1, ndof_cell
 
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-                           + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-                           + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-                           + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(1, i)), i_def)
+        basis_order(1, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(2, i)), i_def)
+        basis_order(2, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(3, i)), i_def)
+        basis_order(3, i)  = (k_v + 1) - int(1.0_r_def &
+                           - abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i)   = abs(unit_vec(1, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i)   = abs(unit_vec(2, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)      = abs(unit_vec(3, i)) * x1v(:) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(:)
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -1291,10 +1435,9 @@ contains
       basis_index(3,:) = lz(1:ndof_cell)
 
     case (W2Vtrace)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of W2Vtrace space
-      !---------------------------------------------------------------------------
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -1305,8 +1448,9 @@ contains
       idx = 1
       ! dofs on faces
       do i = number_faces - 1, number_faces
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! Loop on faces dependent on k_h only
+        do j1 = 1, k_h + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1325,32 +1469,32 @@ contains
 
       do i = 1, ndof_cell
 
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-                           + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-                           + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-                           + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(1, i)), i_def)
+        basis_order(1, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(2, i)), i_def)
+        basis_order(2, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(3, i)), i_def)
+        basis_order(3, i)  = (k_v + 1) - int(1.0_r_def &
+                           - abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i)   = abs(unit_vec(1, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:)  &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i)   = abs(unit_vec(2, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)      = abs(unit_vec(3, i)) * x1v(:) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(:)
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -1363,10 +1507,9 @@ contains
       basis_index(3,:) = lz(1:ndof_cell)
 
     case (W2H, W2Hbroken)
-      !---------------------------------------------------------------------------
+      !-------------------------------------------------------------------------
       ! Section for test/trial functions of W2H space
-      !---------------------------------------------------------------------------
-      poly_order = k + 1
+      !-------------------------------------------------------------------------
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -1380,9 +1523,9 @@ contains
       ! dofs in volume - (u and v only)
       !============================================
       ! u components
-      do jz = 1, k + 1
-        do jy = 1, k + 1
-          do jx = 2, k + 1
+      do jz = 1, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 2, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1394,9 +1537,9 @@ contains
         end do
       end do
       ! v components
-      do jz = 1, k + 1
-        do jy = 2, k + 1
-          do jx = 1, k + 1
+      do jz = 1, k_v + 1
+        do jy = 2, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1412,8 +1555,9 @@ contains
       ! dofs on faces
       !============================================
       do i = 1, number_faces - 2
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! No vertical faces considered so one horizontal and one vertical loop
+        do j1 = 1, k_v + 1
+          do j2 = 1, k_h + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1429,32 +1573,32 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-                           + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-                           + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-                           + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(1, i)), i_def)
+        basis_order(1, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(2, i)), i_def)
+        basis_order(2, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(3, i)), i_def)
+        basis_order(3, i)  = (k_v + 1) - int(1.0_r_def &
+                           - abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i)   = abs(unit_vec(1, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i)   = abs(unit_vec(2, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)      = abs(unit_vec(3, i)) * x1v(:) &
+                           + (1.0_r_def - abs(unit_vec(  3, i))) * x2v(:  )
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -1470,7 +1614,6 @@ contains
       !-------------------------------------------------------------------------
       ! Section for test/trial functions of W2Htrace space
       !-------------------------------------------------------------------------
-      poly_order = k + 1
 
       do idx = 1, ndof_cell
         do i = 1, 3
@@ -1483,8 +1626,9 @@ contains
       ! dofs on faces
       !============================================
       do i = 1, number_faces - 2
-        do j1 = 1, k + 1
-          do j2 = 1, k + 1
+        ! No vertical faces considered so one horizontal and one vertical loop
+        do j1 = 1, k_h + 1
+          do j2 = 1, k_v + 1
             j(1) = j1
             j(2) = j2
             j(3) = face_idx(i)
@@ -1500,32 +1644,32 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1(lx(i)) &
-                           + (1.0_r_def - abs(unit_vec(1, i))) * x2(lx(i))
+        nodal_coords(1, i) = abs(unit_vec(1, i)) * x1h(lx(i)) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(lx(i))
 
-        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1(ly(i)) &
-                           + (1.0_r_def - abs(unit_vec(2, i))) * x2(ly(i))
+        nodal_coords(2, i) = abs(unit_vec(2, i)) * x1h(ly(i)) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(ly(i))
 
-        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1(lz(i)) &
-                           + (1.0_r_def - abs(unit_vec(3, i))) * x2(lz(i))
+        nodal_coords(3, i) = abs(unit_vec(3, i)) * x1v(lz(i)) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(lz(i))
 
-        basis_order(1, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(1, i)), i_def)
+        basis_order(1, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(1, i)), i_def)
 
-        basis_order(2, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(2, i)), i_def)
+        basis_order(2, i)  = (k_h + 1) - int(1.0_r_def &
+                           - abs(unit_vec(2, i)), i_def)
 
-        basis_order(3, i) = poly_order - int(1.0_r_def &
-                          - abs(unit_vec(3, i)), i_def)
+        basis_order(3, i)  = (k_v + 1) - int(1.0_r_def &
+                           - abs(unit_vec(3, i)), i_def)
 
-        basis_x(:, 1, i) = abs(unit_vec(1, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(1, i))) * x2(:)
+        basis_x(:, 1, i)   = abs(unit_vec(1, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(1, i))) * x2h(:)
 
-        basis_x(:, 2, i) = abs(unit_vec(2, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(2, i))) * x2(:)
+        basis_x(:, 2, i)   = abs(unit_vec(2, i)) * x1h(:) &
+                           + (1.0_r_def - abs(unit_vec(2, i))) * x2h(:)
 
-        basis_x(:, 3, i) = abs(unit_vec(3, i)) * x1(:) &
-                         + (1.0_r_def - abs(unit_vec(3, i))) * x2(:)
+        basis_z(:, i)      = abs(unit_vec(3, i)) * x1v(:) &
+                           + (1.0_r_def - abs(unit_vec(3, i))) * x2v(:)
 
         do j1 = 1, size(basis_vector, 1)
           basis_vector(j1, i) = unit_vec(j1, i)
@@ -1541,15 +1685,14 @@ contains
       !-------------------------------------------------------------------------
       ! Section for test/trial functions of DG spaces
       !-------------------------------------------------------------------------
-      poly_order = k
 
       ! compute indices of functions
       idx = 1
 
       ! dofs in volume
-      do jz = 1, k + 1
-        do jy = 1, k + 1
-          do jx = 1, k + 1
+      do jz = 1, k_v + 1
+        do jy = 1, k_h + 1
+          do jx = 1, k_h + 1
             lx(idx) = jx
             ly(idx) = jy
             lz(idx) = jz
@@ -1561,19 +1704,21 @@ contains
       end do
 
       do i = 1, ndof_cell
-        nodal_coords(1, i) = x2(lx(i))
-        nodal_coords(2, i) = x2(ly(i))
-        nodal_coords(3, i) = x2(lz(i))
-        basis_x(:, 1, i) = x2
-        basis_x(:, 2, i) = x2
-        basis_x(:, 3, i) = x2
+        nodal_coords(1, i) = x2h(lx(i))
+        nodal_coords(2, i) = x2h(ly(i))
+        nodal_coords(3, i) = x2v(lz(i))
+        basis_x(:, 1, i) = x2h(:)
+        basis_x(:, 2, i) = x2h(:)
+        basis_z(:, i)    = x2v(:)
       end do
 
       basis_index(1,:) = lx(1:ndof_cell)
       basis_index(2,:) = ly(1:ndof_cell)
       basis_index(3,:) = lz(1:ndof_cell)
       basis_vector(1,:) = 1.0_r_def
-      basis_order(:,:) = poly_order
+      basis_order(1,:) = k_h
+      basis_order(2,:) = k_h
+      basis_order(3,:) = k_v
 
     end select
 
@@ -1600,15 +1745,20 @@ contains
   !>
   !> @param[in] mesh                   Mesh to define the function space on.
   !> @param[in] gungho_fs              Enumeration of the function space.
-  !> @param[in] element_order          Polynomial order of the function space.
+  !> @param[in] element_order_h        Polynomial order of the function space in
+  !>                                   horizontal direction.
+  !> @param[in] element_order_v        Polynomial order of the function space in
+  !>                                   vertical direction.
   !> @param[in] ndata                  The number of data values to be held
   !>                                   at each dof location
   !> @param[in] ndata_first            Flag for ndata or nlayer first data
   !>                                   layout
   !> @param[in] ncells_2d_with_ghost   Number of 2d cells with ghost cells.
   !> @param[in] ndof_vert              Number of dofs on vertices.
-  !> @param[in] ndof_edge              Number of dofs on edges.
-  !> @param[in] ndof_face              Number of dofs on faces.
+  !> @param[in] ndof_edge_h            Number of dofs on horizontal edges.
+  !> @param[in] ndof_edge_v            Number of dofs on vertical edges.
+  !> @param[in] ndof_face_h            Number of dofs on horizontal faces.
+  !> @param[in] ndof_face_v            Number of dofs on vertical faces.
   !> @param[in] ndof_vol               Number of dofs in volumes.
   !> @param[in] ndof_cell              Number of dofs associated with a cell.
   !> @param[out] last_dof_owned        Index of last owned dof for the
@@ -1626,51 +1776,81 @@ contains
   !>                                   horizontal domain
   !> @param[out] global_vert_dof_id_2d Global id of vertex dofs on the 2D
   !>                                   horizontal domain
-  !>
-  subroutine dofmap_setup( mesh, gungho_fs, element_order, ndata,   &
-                           ndata_first,                             &
-                           ncells_2d_with_ghost,                    &
-                           ndof_vert, ndof_edge, ndof_face,         &
-                           ndof_vol, ndof_cell, last_dof_owned,     &
-                           last_dof_annexed, last_dof_halo, dofmap, &
-                           global_dof_id,                           &
-                           global_cell_dof_id_2d,                   &
-                           global_edge_dof_id_2d,                   &
-                           global_vert_dof_id_2d )
+  !
+  !     .+---B--+      In the following an edge is called vertical if it is
+  !   .' |    .'|      normal to the horizontal plane (such as edge A), and
+  !  +---+--+'  A      horizontal if it is parallel to it (such as edge B).
+  !  | P |  |   |
+  !  |  ,+--+---+      A face will be called horizontal if it is normal to
+  !  |.'  Q | .'       the horizontal plane (such as face P) and vertical if it
+  !  +------+'         is parallel to it (such as face Q).
+  !
+  !                    These are chosen to agree with the naming of W2H and
+  !                    W2V.
+
+  subroutine dofmap_setup( mesh, gungho_fs, element_order_h, element_order_v,  &
+                           ndata, ndata_first, ncells_2d_with_ghost, ndof_vert,&
+                           ndof_edge_h, ndof_edge_v, ndof_face_h, ndof_face_v, &
+                           ndof_vol, ndof_cell, last_dof_owned,                &
+                           last_dof_annexed, last_dof_halo, dofmap,            &
+                           global_dof_id, global_cell_dof_id_2d,               &
+                           global_edge_dof_id_2d, global_vert_dof_id_2d )
     implicit none
 
+    ! Input
     type(mesh_type), intent(in), pointer :: mesh
-    integer(i_def), intent(in) :: gungho_fs
-    integer(i_def), intent(in) :: element_order
-    integer(i_def), intent(in) :: ndata
-    logical(l_def), intent(in) :: ndata_first
-    integer(i_def), intent(in) :: ncells_2d_with_ghost
-    integer(i_def), intent(in) :: ndof_vert
-    integer(i_def), intent(in) :: ndof_edge
-    integer(i_def), intent(in) :: ndof_face
-    integer(i_def), intent(in) :: ndof_vol
-    integer(i_def), intent(in) :: ndof_cell
+    integer(i_def),  intent(in) :: gungho_fs
+    integer(i_def),  intent(in) :: element_order_h
+    integer(i_def),  intent(in) :: element_order_v
+    integer(i_def),  intent(in) :: ndata
+
+    logical(l_def),  intent(in) :: ndata_first
+
+    integer(i_def),  intent(in) :: ncells_2d_with_ghost
+    integer(i_def),  intent(in) :: ndof_vert
+    integer(i_def),  intent(in) :: ndof_edge_h
+    integer(i_def),  intent(in) :: ndof_edge_v
+    integer(i_def),  intent(in) :: ndof_face_h
+    integer(i_def),  intent(in) :: ndof_face_v
+    integer(i_def),  intent(in) :: ndof_vol
+    integer(i_def),  intent(in) :: ndof_cell
+
+    ! Output
     integer(i_def), intent(out) :: last_dof_owned
     integer(i_def), intent(out) :: last_dof_annexed
     integer(i_def), intent(out) :: last_dof_halo(0:)
+
     integer(i_def), intent(out) :: dofmap(ndof_cell, 0:ncells_2d_with_ghost)
 
     integer(i_halo_index), intent(out) :: global_dof_id(:)
+
     integer(i_def), intent(out) :: global_cell_dof_id_2d(:)
     integer(i_def), intent(out) :: global_edge_dof_id_2d(:)
     integer(i_def), intent(out) :: global_vert_dof_id_2d(:)
 
+    ! Local variables
+
     class(reference_element_type), pointer :: reference_element => null()
 
-    integer(i_def) :: number_horizontal_faces, &
-                      number_horizontal_edges, &
-                      number_horizontal_vertices
-    integer(i_def) :: number_faces, number_edges, number_vertices
+    integer(i_def) :: number_faces    ! Number of faces per cell
+    integer(i_def) :: number_edges    ! Number of edges per cell
+    integer(i_def) :: number_vertices ! Number of vertices per cell
 
-    integer(i_def) :: ncells
+    integer(i_def) :: number_horizontal_faces ! Number of horizontal faces per
+                                              ! cell
+    integer(i_def) :: number_horizontal_edges ! Number of horizontal edges per
+                                              ! cell
+    integer(i_def) :: number_2d_vertices      ! Number of vertices of 2d cell
+                                              ! entity
+
+
+    integer(i_def) :: ncells ! Number of cells in the rank (including ghosts)
 
     ! Loop counters
     integer(i_def) :: icell, iface, iedge, ivert, idof, idepth, k, m
+
+    ! Loop upper bound for ndof loops on vertical or horizontal edges
+    integer(i_def) :: ndof_stop
 
     ! Number of layers
     integer(i_def) :: nlayers
@@ -1734,14 +1914,15 @@ contains
     !===========================================================================
 
     local_mesh => mesh%get_local_mesh()
-
     reference_element => mesh%get_reference_element()
-    number_faces               = reference_element%get_number_faces()
-    number_edges               = reference_element%get_number_edges()
-    number_vertices            = reference_element%get_number_vertices()
-    number_horizontal_faces    = reference_element%get_number_horizontal_faces()
-    number_horizontal_edges    = reference_element%get_number_2d_edges()
-    number_horizontal_vertices = reference_element%get_number_2d_vertices()
+
+    number_faces    = reference_element%get_number_faces()
+    number_edges    = reference_element%get_number_edges()
+    number_vertices = reference_element%get_number_vertices()
+
+    number_horizontal_faces = reference_element%get_number_horizontal_faces()
+    number_horizontal_edges = reference_element%get_number_2d_edges()
+    number_2d_vertices      = reference_element%get_number_2d_vertices()
 
     ncells = ncells_2d_with_ghost
 
@@ -1766,8 +1947,8 @@ contains
 
     dofmap_size(:) = 1
     dofmap_size(0) = max(dofmap_size(0), ndof_vert)
-    dofmap_size(1) = max(dofmap_size(1), ndof_edge)
-    dofmap_size(2) = max(dofmap_size(2), ndof_face)
+    dofmap_size(1) = max(dofmap_size(1), ndof_edge_h, ndof_edge_v)
+    dofmap_size(2) = max(dofmap_size(2), ndof_face_h, ndof_face_v)
     dofmap_size(3) = max(dofmap_size(3), ndof_vol)
 
     allocate( dof_column_height (ndof_cell, 0:ncells))
@@ -1836,9 +2017,9 @@ contains
     ! loop over 3 entities (cells) starting with core + inner halos + edge
     ! + first depth halo then proceding with further halo depths as required
     start = 1
-    finish = tot_num_inner + &
-    mesh%get_num_cells_edge() + &
-    mesh%get_num_cells_halo(1)
+    finish = tot_num_inner              &
+           + mesh%get_num_cells_edge()  &
+           + mesh%get_num_cells_halo(1)
 
     select case (gungho_fs)
     case(W0, W1, W2, W2broken, W2trace, W3, WCHI)
@@ -1874,43 +2055,44 @@ contains
 
         ! Assign dofs for connectivity (3,2) (dofs on faces)
         !---------------------------------------------------------
+
+        ! Horizontal faces
         do iface = 1, number_horizontal_faces
           if (any(select_entity%faces == iface)) then
             face_id = mesh%get_face_on_cell(iface, icell)
-
             if (mesh%is_edge_owned(iface, icell)) then
-
               if (dofmap_d2(1, face_id) == 0) then
-                do idof = 1, ndof_face
+                do idof = 1, ndof_face_h
                   dofmap_d2(idof, face_id) = id_owned
                   dof_column_height_d2(idof, face_id) = nlayers
                   dof_cell_owner_d2(idof, face_id) = &
                   mesh%get_edge_cell_owner(iface, icell)
+
                   id_owned = id_owned + (ndata * nlayers)
                 end do
               end if
             else
               if (dofmap_d2(1, face_id) == 0) then
-                do idof = 1, ndof_face
+                do idof = 1, ndof_face_h
                   dofmap_d2(idof, face_id) = id_halo
                   dof_column_height_d2(idof, face_id) = nlayers
                   dof_cell_owner_d2(idof, face_id) = &
                   mesh%get_edge_cell_owner(iface, icell)
+
                   id_halo = id_halo - (ndata * nlayers)
                 end do
               end if
             end if
           end if ! select_entity
         end do
-
+        ! Vertical faces
         if (mesh%is_cell_owned(icell)) then
           id0 = id_owned
           do iface = number_horizontal_faces + 1, number_faces
             if (any(select_entity%faces==iface)) then
               face_id = mesh%get_face_on_cell(iface, icell)
-
               if (dofmap_d2(1, face_id) == 0) then
-                do idof = 1, ndof_face
+                do idof = 1, ndof_face_v
                   dofmap_d2(idof, face_id) = id_owned
                   if (iface == number_horizontal_faces + 1) then
                     dof_column_height_d2(idof, face_id) = nlayers + 1
@@ -1936,7 +2118,7 @@ contains
             if (any(select_entity%faces == iface)) then
               face_id = mesh%get_face_on_cell(iface, icell)
               if (dofmap_d2(1, face_id) == 0) then
-                do idof = 1, ndof_face
+                do idof = 1, ndof_face_v
                   dofmap_d2(idof, face_id) = id_halo
                   if (iface == number_horizontal_faces + 1) then
                     dof_column_height_d2(idof, face_id) = nlayers + 1
@@ -1957,64 +2139,72 @@ contains
         end if ! is cell owned
 
         ! assign dofs for connectivity (3,1) (dofs on edges)
+
+        ! Horizontal edges
         do iedge = 1, number_horizontal_edges
           bottom_edge_id = mesh%get_edge_on_cell(iedge, icell)
-          top_edge_id = mesh%get_edge_on_cell(iedge + number_edges       &
-          - number_horizontal_edges, &
-          icell)
+          top_edge_id    = mesh%get_edge_on_cell(iedge + number_edges       &
+                                                 - number_horizontal_edges, &
+                                                 icell)
           if (mesh%is_edge_owned(iedge, icell)) then
             if (dofmap_d1(1, bottom_edge_id) == 0) then
-              do idof = 1, ndof_edge
+              do idof = 1, ndof_edge_h
                 dofmap_d1(idof, bottom_edge_id) = id_owned
                 dofmap_d1(idof, top_edge_id) = id_owned + ndata_offset
                 dof_column_height_d1(idof, bottom_edge_id) = nlayers + 1
                 dof_column_height_d1(idof, top_edge_id) = 0
                 dof_cell_owner_d1(idof, bottom_edge_id) = &
                 mesh%get_edge_cell_owner(iedge, icell)
+
                 dof_cell_owner_d1(idof, top_edge_id) = &
                 mesh%get_edge_cell_owner(iedge, icell)
+
                 id_owned = id_owned + (ndata * (nlayers + 1))
               end do
             end if
           else
             if (dofmap_d1(1, bottom_edge_id) == 0) then
-              do idof = 1, ndof_edge
+              do idof = 1, ndof_edge_h
                 dofmap_d1(idof, bottom_edge_id) = id_halo
                 dofmap_d1(idof, top_edge_id) = id_halo - ndata_offset
                 dof_column_height_d1(idof, bottom_edge_id) = nlayers + 1
                 dof_column_height_d1(idof, top_edge_id) = 0
                 dof_cell_owner_d1(idof, bottom_edge_id) = &
                 mesh%get_edge_cell_owner(iedge, icell)
+
                 dof_cell_owner_d1(idof, top_edge_id) = &
                 mesh%get_edge_cell_owner(iedge, icell)
+
                 id_halo = id_halo - (ndata * (nlayers + 1))
               end do
             end if
           end if
         end do
-        do iedge = number_horizontal_edges + 1, &
-        number_edges - number_horizontal_edges
+        ! Vertical edges
+        do iedge = number_horizontal_edges + 1, number_edges &
+                                                - number_horizontal_edges
           side_edge_id = mesh%get_edge_on_cell(iedge, icell)
-          if (mesh%is_vertex_owned(iedge - number_horizontal_edges, &
-          icell)) then
+          if (mesh%is_vertex_owned(iedge - number_horizontal_edges, icell)) then
             if (dofmap_d1(1, side_edge_id) == 0) then
-              do idof = 1, ndof_edge
+              do idof = 1, ndof_edge_v
                 dofmap_d1(idof, side_edge_id) = id_owned
                 dof_column_height_d1(idof, side_edge_id) = nlayers
-                dof_cell_owner_d1(idof, side_edge_id) &
-                = mesh%get_vertex_cell_owner(iedge - number_horizontal_edges, &
-                icell)
+                dof_cell_owner_d1(idof, side_edge_id) = &
+                mesh%get_vertex_cell_owner(iedge - number_horizontal_edges, &
+                                           icell)
+
                 id_owned = id_owned + (nlayers * ndata)
               end do
             end if
           else
             if (dofmap_d1(1, side_edge_id) == 0) then
-              do idof = 1, ndof_edge
+              do idof = 1, ndof_edge_v
                 dofmap_d1(idof, side_edge_id) = id_halo
                 dof_column_height_d1(idof, side_edge_id) = nlayers
-                dof_cell_owner_d1(idof, side_edge_id) &
-                = mesh%get_vertex_cell_owner(iedge - number_horizontal_edges, &
-                icell)
+                dof_cell_owner_d1(idof, side_edge_id) = &
+                mesh%get_vertex_cell_owner(iedge - number_horizontal_edges, &
+                                           icell)
+
                 id_halo = id_halo - (nlayers * ndata)
               end do
             end if
@@ -2024,14 +2214,10 @@ contains
 
         ! Assign dofs for connectivity (3,0) (dofs on verts)
         !---------------------------------------------------------
-        do ivert = 1, number_horizontal_vertices
+        do ivert = 1, number_2d_vertices
           bottom_vert_id = mesh%get_vert_on_cell(ivert, icell)
-          top_vert_id &
-          = mesh%get_vert_on_cell(ivert + number_horizontal_vertices, &
-          icell)
-
+          top_vert_id = mesh%get_vert_on_cell(ivert + number_2d_vertices, icell)
           if (mesh%is_vertex_owned(ivert, icell)) then
-
             if (dofmap_d0(1, bottom_vert_id) == 0) then
               do idof = 1, ndof_vert
                 dofmap_d0(idof, bottom_vert_id) = id_owned
@@ -2040,8 +2226,10 @@ contains
                 dof_column_height_d0(idof, top_vert_id) = 0
                 dof_cell_owner_d0(idof, bottom_vert_id) = &
                 mesh%get_vertex_cell_owner(ivert, icell)
+
                 dof_cell_owner_d0(idof, top_vert_id) = &
                 mesh%get_vertex_cell_owner(ivert, icell)
+
                 id_owned = id_owned + (ndata * (nlayers + 1))
               end do
             end if
@@ -2054,23 +2242,26 @@ contains
                 dof_column_height_d0(idof, top_vert_id) = 0
                 dof_cell_owner_d0(idof, bottom_vert_id) = &
                 mesh%get_vertex_cell_owner(ivert, icell)
+
                 dof_cell_owner_d0(idof, top_vert_id) = &
                 mesh%get_vertex_cell_owner(ivert, icell)
+
                 id_halo = id_halo - (ndata * (nlayers + 1))
               end do
             end if
           end if
         end do
 
-        if(icell == tot_num_inner + mesh%get_num_cells_edge())then
+        if (icell == tot_num_inner + mesh%get_num_cells_edge()) then
           last_dof_owned = id_owned - 1
           last_dof_annexed = id_owned - id_halo - 2
         end if
 
       end do cell_loop
 
-      if (idepth <= mesh%get_halo_depth()) &
-      last_dof_halo(idepth) = id_owned - id_halo - 2
+      if (idepth <= mesh%get_halo_depth()) then
+        last_dof_halo(idepth) = id_owned - id_halo - 2
+      end if
 
       start = finish + 1
       if (idepth < mesh%get_halo_depth()) then
@@ -2116,7 +2307,13 @@ contains
       !----------------------------------------
       do iface = 1, number_faces
         face_id = mesh%get_face_on_cell(iface, icell)
-        do idof = 1, ndof_face
+        if (iface <= number_horizontal_faces) then
+          ndof_stop = ndof_face_h ! Horizontal faces
+        else
+          ndof_stop = ndof_face_v ! Vertical faces
+        end if
+
+        do idof = 1, ndof_stop
           if (dofmap_d2(idof, face_id) /= 0) then
             if (dofmap_d2(idof, face_id) > 0) then
               dofmap(dof_idx, icell) = dofmap_d2(idof, face_id)
@@ -2137,13 +2334,21 @@ contains
       !----------------------------------------
       do iedge = 1, number_edges
         edge_id = mesh%get_edge_on_cell(iedge, icell)
-        do idof = 1, ndof_edge
+        if ((iedge <= number_horizontal_edges) .or. &
+            (iedge > number_edges - number_horizontal_edges)) then
+          ndof_stop = ndof_edge_h ! Horizontal edges
+        else
+          ndof_stop = ndof_edge_v ! Vertical edges
+        end if
+
+        do idof = 1, ndof_stop
           if (dofmap_d1(idof, edge_id) /= 0) then
             if (dofmap_d1(idof, edge_id) > 0) then
               dofmap(dof_idx, icell) = dofmap_d1(idof, edge_id)
             else if (dofmap_d1(idof, edge_id) < 0) then
               dofmap(dof_idx, icell) = id_owned - (dofmap_d1(idof, edge_id) + 1)
             end if
+
             dof_column_height(dof_idx, icell) = dof_column_height_d1(idof, &
                                                                      edge_id)
             dof_cell_owner(dof_idx, icell) = dof_cell_owner_d1(idof, edge_id)
@@ -2163,6 +2368,7 @@ contains
             else if (dofmap_d0(idof, vert_id) < 0) then
               dofmap(dof_idx, icell) = id_owned - (dofmap_d0(idof, vert_id) + 1)
             end if
+
             dof_column_height(dof_idx, icell) = dof_column_height_d0(idof, &
                                                                      vert_id)
             dof_cell_owner(dof_idx, icell) = dof_cell_owner_d0(idof, vert_id)
@@ -2193,11 +2399,15 @@ contains
     ! Special cases for lowest order w3 and wtheta. These allow global_dof_id
     ! to have an index space with no gaps in it for these specific funct spaces
     num_layers = int(nlayers, i_halo_index) + 1_i_halo_index
-    if(element_order == 0  .and. gungho_fs == W3)num_layers = int(nlayers, &
-                                                                  i_halo_index)
     num_dofs = int(ndof_cell, i_halo_index)
-    if(element_order == 0  .and. gungho_fs == WTHETA)num_dofs = 1_i_halo_index
     num_ndata = int(ndata, i_halo_index)
+    if( element_order_h == 0 .and. element_order_v == 0 ) then
+      if (gungho_fs == W3) then
+        num_layers = int(nlayers, i_halo_index)
+      else if( gungho_fs == WTHETA ) then
+        num_dofs = 1_i_halo_index
+      end if
+    end if
 
     ! Calculate a globally unique id for each dof, such that each partition
     ! that needs access to that dof will calculate the same id
@@ -2210,16 +2420,17 @@ contains
             do m = 1, ndata
               ! The following line is very confused by the casting that is
               ! required, but it is actually calculating the global id as being:
-              !      (global_cell_id-1) * num_dofs*ndata*num_layers +
-              !      (idof-1) * ndata*num_layers +
-              !      (k - 1)* ndata +
-              !      (m - 1)
+              !      (global_cell_id-1) * num_dofs * ndata * num_layers
+              !      + (idof-1) * ndata*num_layers
+              !      + (k - 1) * ndata
+              !      + (m - 1)
               global_dof_id(dofmap(idof, icell) + (k - 1) * ndata + (m - 1)) = &
-                (int(global_cell_id, i_halo_index) - 1_i_halo_index) *         &
-                num_dofs * num_ndata * num_layers +                            &
-                (int(idof, i_halo_index) - 1_i_halo_index) * num_ndata *       &
-                num_layers + (int(k, i_halo_index) - 1_i_halo_index) *         &
-                num_ndata + int(m, i_halo_index) - 1_i_halo_index
+                  (int(global_cell_id, i_halo_index) - 1_i_halo_index)         &
+                    * num_dofs * num_ndata * num_layers                        &
+                  + (int(idof, i_halo_index) - 1_i_halo_index)                 &
+                    * num_ndata * num_layers                                   &
+                  + (int(k, i_halo_index) - 1_i_halo_index) * num_ndata        &
+                  + (int(m, i_halo_index) - 1_i_halo_index)
             end do
           end do
         end if
@@ -2235,8 +2446,9 @@ contains
       global_cell_id = mesh%get_gid_from_lid(icell)
       do m = 1, ndata
         ! The global ids must be 0 based
-        global_cell_dof_id_2d((icell - 1) * ndata + m) = &
-          (global_cell_id - 1) * ndata + m - 1
+        global_cell_dof_id_2d((icell - 1) * ndata + m) = (global_cell_id - 1)  &
+                                                         * ndata               &
+                                                       + m - 1
       end do
     end do
 
@@ -2245,17 +2457,20 @@ contains
     ! function spaces that (appear to) have 2d edge dofs
     ! (for the moment, using W2H as an example of such a function space
     ! - the 2d layer at the half levels appears to have edge dofs).
-    if(element_order == 0 .and. gungho_fs == W2H)then
+    if (element_order_h == 0 .and.                                             &
+        element_order_v == 0 .and.                                             &
+        gungho_fs == W2H) then
       ! loop over local cells
       do icell = 1, mesh%get_last_edge_cell()
         ! loop over 2d edges within a cell
         do iedge = 1, mesh%get_nedges_per_cell_2d()
           if(mesh%is_edge_owned(iedge, icell))then
             do m = 1, ndata
-              global_edge_dof_id_2d(((dofmap(iedge, icell) - 1) / (nlayers * ndata)) + 1) = &
-                (local_mesh%get_edge_gid_on_cell(iedge, icell) - 1) * ndata + m - 1
+              global_edge_dof_id_2d(                                           &
+                    ((dofmap(iedge, icell) - 1) / (nlayers * ndata)) + 1 )     &
+                = (local_mesh%get_edge_gid_on_cell(iedge, icell) - 1) * ndata + m - 1
             end do
-          endif
+          end if
         end do
       end do
     else
@@ -2266,17 +2481,20 @@ contains
     ! in the 2D horizontal part of the local domain - only possible for
     ! function spaces that have vertex dofs.
     ! (for the moment, using W0 as an example of such a function space).
-    if(element_order == 0 .and. gungho_fs == W0)then
+    if (element_order_h == 0 .and.                                             &
+        element_order_v == 0 .and.                                             &
+        gungho_fs == W0) then
       ! loop over local cells
       do icell = 1, mesh%get_last_edge_cell()
         ! loop over 2d vertices within a cell
         do ivert = 1, mesh%get_nverts_per_cell_2d()
           if(mesh%is_vertex_owned(ivert, icell))then
             do m = 1, ndata
-              global_vert_dof_id_2d(((dofmap(ivert, icell) - 1) / ((nlayers + 1) * ndata)) + 1) = &
-                (local_mesh%get_vert_gid_on_cell(ivert, icell) - 1) * ndata + m - 1
+              global_vert_dof_id_2d(                                             &
+                    ((dofmap(ivert, icell) - 1) / ((nlayers + 1) * ndata)) + 1 ) &
+                = (local_mesh%get_vert_gid_on_cell(ivert, icell) - 1) * ndata + m - 1
             end do
-          endif
+          end if
         end do
       end do
     else
@@ -2316,8 +2534,10 @@ contains
     implicit none
 
     type(mesh_type), intent(in) :: mesh
+
     integer(i_def), intent(in) :: nlayers
     integer(i_def), intent(in) :: fs
+
     real(r_def), intent(out), allocatable :: levels(:)
 
     class(reference_element_type), pointer :: reference_element => null()
@@ -2494,18 +2714,21 @@ contains
   end subroutine compute_levels
 
   !> @brief Generate a unique integer id for a function space
-  !> @param[in] lfric_fs      Function space continuity flag
-  !> @param[in] element_order Polynomial order of the space
-  !> @param[in] mesh_id       Id of the mesh to build the function space on
-  !> @param[in] ndata         Number of multidata points
-  !> @param[in] ndata_first   ndata of layer first layout of multidata array
-  !> @result    fs_id         Unique id for the function space
-  function generate_fs_id(lfric_fs, element_order, mesh_id, ndata, ndata_first) result(fs_id)
+  !> @param[in] lfric_fs        Function space continuity flag
+  !> @param[in] element_order_h Polynomial order of the space in the horizontal
+  !> @param[in] element_order_v Polynomial order of the space in the vertical
+  !> @param[in] mesh_id         Id of the mesh to build the function space on
+  !> @param[in] ndata           Number of multidata points
+  !> @param[in] ndata_first     ndata of layer first layout of multidata array
+  !> @result    fs_id           Unique id for the function space
+  function generate_fs_id(lfric_fs, element_order_h, element_order_v, mesh_id, &
+                          ndata, ndata_first) result(fs_id)
 
     implicit none
 
     integer(i_def), intent(in) :: lfric_fs
-    integer(i_def), intent(in) :: element_order
+    integer(i_def), intent(in) :: element_order_h
+    integer(i_def), intent(in) :: element_order_v
     integer(i_def), intent(in) :: mesh_id
     integer(i_def), intent(in) :: ndata
     logical(l_def), intent(in) :: ndata_first
@@ -2519,8 +2742,17 @@ contains
       ndata_first_int = 2
     end if
 
-    fs_id = ndata + 1000_i_def*element_order + 100000_i_def*lfric_fs &
-      + 10000000_i_def*mesh_id + 1000000000_i_def*ndata_first_int
+    ! Temporary clause for #4443, will be removed when split element orders are
+    ! fully enabled in #4462
+    if ( element_order_h /= element_order_v ) then
+      call log_event(                                                          &
+      'Current infrastructure requires element orders to match',               &
+      LOG_LEVEL_ERROR)
+    else
+      fs_id = ndata + 1000_i_def*element_order_h + 10000_i_def*element_order_v &
+            + 100000_i_def*lfric_fs + 10000000_i_def*mesh_id                   &
+            + 1000000000_i_def*ndata_first_int
+    end if
 
   end function generate_fs_id
 

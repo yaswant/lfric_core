@@ -51,7 +51,8 @@ module TMPL_MODULE_NAME
     procedure get_local_mesh_ptr
   end type TMPL_TEST_CLASS
 
-  integer(i_def), parameter :: element_order = 0
+  integer(i_def), parameter :: element_order_h = 0
+  integer(i_def), parameter :: element_order_v = 0
 
 contains
 
@@ -89,9 +90,11 @@ contains
 
     ! Make a function space to be used to create fields in the tests
     this%w2_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W2 )
+                                                    element_order_h,            &
+                                                    element_order_v, W2 )
     this%w3_fs => function_space_collection%get_fs( this%mesh, &
-                                                    element_order, W3 )
+                                                    element_order_h,            &
+                                                    element_order_v, W3 )
 
   end subroutine setUp
 
@@ -178,8 +181,11 @@ contains
     @assertEqual( fs%get_undf(), context%w2_fs%get_undf() )
 
     ! Check the order the field thinks it is
-    order=f1%get_element_order()
-    @assertEqual( element_order, order )
+    order=f1%get_element_order_h()
+    @assertEqual( element_order_h, order )
+
+    order=f1%get_element_order_v()
+    @assertEqual( element_order_v, order )
 
     ! Check what the field thinks the mesh_id is
     mesh => f1%get_mesh()
@@ -260,8 +266,11 @@ contains
     @assertEqual ( 3, halo_depth )
 
     halo_routing=>f1_p%get_halo_routing()
-    order = halo_routing%get_element_order()
-    @assertEqual( element_order, order )
+    order = halo_routing%get_element_order_h()
+    @assertEqual( element_order_h, order )
+
+    order = halo_routing%get_element_order_v()
+    @assertEqual( element_order_v, order )
 
     dirty=f1_p%is_dirty(0)
     @assertFalse ( dirty )

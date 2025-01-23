@@ -26,7 +26,8 @@ module compute_trace_operator_kernel_mod_test
      procedure test_all
   end type compute_trace_operator_test_type
 
-  integer(kind=i_def), parameter :: element_order = 0
+  integer(kind=i_def), parameter :: element_order_h = 0
+  integer(kind=i_def), parameter :: element_order_v = 0
 
 contains
 
