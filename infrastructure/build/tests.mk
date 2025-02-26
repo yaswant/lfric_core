@@ -7,6 +7,12 @@
 ##############################################################################
 UNIT_TEST_EXE = $(BIN_DIR)/$(firstword $(PROGRAMS))
 
+UNIT_TEST_FILTER ?=
+UNIT_TEST_FILTER_ARG =
+ifdef UNIT_TEST_FILTER
+  UNIT_TEST_FILTER_ARG = -f $(UNIT_TEST_FILTER)
+endif
+
 ifdef MPI_TESTS
   UNIT_TEST_PRE_PROCESS_MACROS = USE_MPI=YES
   LAUNCHER = mpiexec -n 4
@@ -25,8 +31,11 @@ UNIT_TEST_DATA_DIR = $(if $(wildcard $(TEST_DIR)/data), $(WORKING_DIR)/data)
 .PHONY: do-unit-test/%
 do-unit-test/run: $(UNIT_TEST_EXE) $(UNIT_TEST_DATA_DIR)
 	$(call MESSAGE,Running,$(PROGRAMS))
+ifdef UNIT_TEST_FILTER
+	$(call MESSAGE,Filter,$(UNIT_TEST_FILTER))
+endif
 	$Qcd $(WORKING_DIR); \
-	    $(LAUNCHER) $(UNIT_TEST_EXE) $(DOUBLE_VERBOSE_ARG)
+	    $(LAUNCHER) $(UNIT_TEST_EXE) $(DOUBLE_VERBOSE_ARG) $(UNIT_TEST_FILTER_ARG)
 
 # The addition of this target is a bit messy but it allows us to guarantee that
 # no build will happen when running from a test suite.
