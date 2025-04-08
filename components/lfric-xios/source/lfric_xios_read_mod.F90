@@ -13,7 +13,7 @@ module lfric_xios_read_mod
   use, intrinsic :: iso_fortran_env, only : real32, real64
 
   use constants_mod,            only: i_def, l_def, str_def, r_def, rmdi, &
-                                      LARGE_REAL_NEGATIVE
+                                      LARGE_DP_NEGATIVE
   use lfric_xios_constants_mod, only: dp_xios
   use io_value_mod,             only: io_value_type
   use field_mod,                only: field_type, field_proxy_type
@@ -284,6 +284,13 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices, time_
   ! Read the data into a temporary array
   call xios_recv_field( trim(xios_field_name)//'_data', recv_field )
 
+  ! Replace any bad mdi values with our own
+  do i = 1, domain_size * vert_levels * time_axis_size * ndata
+    if (recv_field(i) == LARGE_DP_NEGATIVE) then
+      recv_field(i) = rmdi
+    end if
+  end do
+
   ! Incoming data is shaped with multi-data axis first, then time axis, so set
   ! up an array for each multi-data level
   do i = 0, ndata - 1
@@ -322,9 +329,6 @@ subroutine read_field_time_var(xios_field_name, field_proxy, time_indices, time_
     end do
 
   end do
-
-  ! Use our own mdi indicator
-  where (field_data(1:undf) == LARGE_REAL_NEGATIVE) field_data = rmdi
 
   ! Pass reshaped data array to field object via proxy
   field_proxy%data( 1 : undf ) = field_data( 1 : undf )

@@ -30,7 +30,7 @@ module constants_mod
             EPS, tiny_eps,                                               &
             str_def, str_long, str_max_filename, str_short,              &
             str_longlong,                                                &
-            LARGE_REAL_NEGATIVE, LARGE_REAL_POSITIVE,                    &
+            LARGE_REAL_NEGATIVE, LARGE_DP_NEGATIVE, LARGE_REAL_POSITIVE, &
             PI, degrees_to_radians, radians_to_degrees,                  &
             cache_block, PRECISION_REAL, PRECISION_R_SOLVER,             &
             PRECISION_R_TRAN, EPS_R_TRAN, default_halo_depth
@@ -154,6 +154,8 @@ module constants_mod
   !<                                positive number of kind r_def that is not an infinity.
   real(kind=r_def), parameter    :: LARGE_REAL_NEGATIVE = -LARGE_REAL_POSITIVE !< The largest
   !<                                negative number of kind r_def that is not an infinity.
+  real(kind=r_double), parameter :: LARGE_DP_NEGATIVE = -huge(0.0_r_double)
+  ! Largest non-infinite negative number in double precision
 
   integer, parameter :: cache_block = 256 !< Size of a cache block, for padding
   !<                                arrays to ensure access to different cache lines
