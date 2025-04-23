@@ -14,7 +14,7 @@ module partition_mod_test
   use global_mesh_mod,            only: global_mesh_type
   use global_mesh_collection_mod, only: global_mesh_collection_type, &
                                         global_mesh_collection
-  use mpi_mod,                    only: global_mpi, &
+  use lfric_mpi_mod,              only: global_mpi, &
                                         lfric_comm_type
   use partition_mod,              only: partition_type,                 &
                                         partitioner_planar,             &

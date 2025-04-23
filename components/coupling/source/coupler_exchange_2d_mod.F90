@@ -26,13 +26,13 @@ module coupler_exchange_2d_mod
   use function_space_collection_mod,  &
                                 only: function_space_collection
   use function_space_mod,       only: function_space_type
+  use lfric_mpi_mod,            only: global_mpi
   use log_mod,                  only: log_event,       &
                                       LOG_LEVEL_DEBUG, &
                                       LOG_LEVEL_INFO,  &
                                       LOG_LEVEL_ERROR, &
                                       log_scratch_space
   use model_clock_mod,          only: model_clock_type
-  use mpi_mod,                  only: global_mpi
 
   implicit none
 

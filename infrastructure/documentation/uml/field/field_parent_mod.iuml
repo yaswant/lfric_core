@@ -40,7 +40,7 @@ abstract class field_parent_mod::field_parent_proxy_type {
   +is_dirty( <<in>>depth: integer ) : logical
   +set_dirty()
   +set_clean( <<in>>depth: integer )
-  +get_mpi() : mpi_type
+  +get_mpi() : lfric_mpi_type
 }
 
 field_parent_mod::field_parent_type <- field_parent_mod::field_parent_proxy_type

@@ -8,8 +8,8 @@
 module computed_mod
 
   use constants_mod, only : i_def
+  use lfric_mpi_mod, only : global_mpi
   use log_mod,       only : log_scratch_space, log_event, LOG_LEVEL_ERROR
-  use mpi_mod,       only : global_mpi
 
   implicit none
 

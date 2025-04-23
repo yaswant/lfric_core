@@ -61,6 +61,8 @@ module function_space_mod_test
                                     fs2htk0_basis_diff_function
 
   use function_space_mod,    only : function_space_type
+  use lfric_mpi_mod,         only : global_mpi, &
+                                    lfric_comm_type
   use local_mesh_mod,        only : local_mesh_type
   use mesh_collection_mod,   only : mesh_collection_type, &
                                     mesh_collection
@@ -78,8 +80,6 @@ module function_space_mod_test
                                     WB, SB, EB, NB,         &
                                     SW, SE, NE, NW,         &
                                     WT, ST, ET, NT
-  use mpi_mod,               only : global_mpi, &
-                                    lfric_comm_type
 
   implicit none
 

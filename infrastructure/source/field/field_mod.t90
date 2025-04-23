@@ -837,12 +837,12 @@ contains
   !!
   function get_sum(self) result (answer)
 
-    use mpi_mod, only: mpi_type
+    use lfric_mpi_mod, only: lfric_mpi_type
     implicit none
 
     class(field_{{kind}}_proxy_type), intent(in) :: self
 
-    type(mpi_type) :: mpi
+    type(lfric_mpi_type) :: mpi
     {{type}}({{kind}})   :: l_sum
     {{type}}({{kind}})   :: answer
 
@@ -862,12 +862,12 @@ contains
   !!
   function get_min(self) result (answer)
 
-    use mpi_mod, only: mpi_type
+    use lfric_mpi_mod, only: lfric_mpi_type
     implicit none
 
     class(field_{{kind}}_proxy_type), intent(in) :: self
 
-    type(mpi_type) :: mpi
+    type(lfric_mpi_type) :: mpi
     {{type}}({{kind}})   :: l_min
     {{type}}({{kind}})   :: answer
 
@@ -888,12 +888,12 @@ contains
   !!
   function get_max(self) result (answer)
 
-    use mpi_mod, only: mpi_type
+    use lfric_mpi_mod, only: lfric_mpi_type
     implicit none
 
     class(field_{{kind}}_proxy_type), intent(in) :: self
 
-    type(mpi_type) :: mpi
+    type(lfric_mpi_type) :: mpi
     {{type}}({{kind}})   :: l_max
     {{type}}({{kind}})   :: answer
 

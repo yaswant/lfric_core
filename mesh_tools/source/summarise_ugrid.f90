@@ -15,17 +15,18 @@
 !-----------------------------------------------------------------------------
 program summarise_ugrid
 
-  use cli_mod,         only : get_initial_filename
-  use constants_mod,   only : i_def, r_def, str_def, str_long, str_longlong, l_def
   use, intrinsic :: iso_fortran_env, only : output_unit
-  use ncdf_quad_mod,   only : ncdf_quad_type
-  use ugrid_2d_mod,    only : ugrid_2d_type
-  use ugrid_file_mod,  only : ugrid_file_type
+  use cli_mod,         only : get_initial_filename
+  use constants_mod,   only : i_def, r_def, str_def, str_long, str_longlong, &
+                              l_def
+  use lfric_mpi_mod,   only : global_mpi, create_comm, destroy_comm, &
+                              lfric_comm_type
   use log_mod,         only : initialise_logging, finalise_logging, &
                               log_event, log_scratch_space,         &
                               LOG_LEVEL_ERROR, LOG_LEVEL_INFO
-  use mpi_mod,         only : global_mpi, create_comm, destroy_comm, &
-                              lfric_comm_type
+  use ncdf_quad_mod,   only : ncdf_quad_type
+  use ugrid_2d_mod,    only : ugrid_2d_type
+  use ugrid_file_mod,  only : ugrid_file_type
 
   implicit none
 

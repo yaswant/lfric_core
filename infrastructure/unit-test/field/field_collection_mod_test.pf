@@ -32,11 +32,11 @@ module field_collection_mod_test
                                               integer_field_proxy_type
     use field_collection_mod,          only : field_collection_type
     use fs_continuity_mod,             only : W0, W2, W3
+    use lfric_mpi_mod,                 only : global_mpi, &
+                                              lfric_comm_type
     use linked_list_mod,               only : linked_list_item_type
     use local_mesh_mod,                only : local_mesh_type
     use pure_abstract_field_mod,       only : pure_abstract_field_type
-    use mpi_mod,                       only : global_mpi, &
-                                              lfric_comm_type
 
     use pfunit
 

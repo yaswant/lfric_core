@@ -31,6 +31,8 @@ program planar_mesh_generator
   use halo_comms_mod,                 only: initialise_halo_comms, &
                                             finalise_halo_comms
   use io_utility_mod,                 only: open_file, close_file
+  use lfric_mpi_mod,                  only: global_mpi, create_comm, &
+                                            destroy_comm, lfric_comm_type
   use local_mesh_collection_mod,      only: local_mesh_collection, &
                                             local_mesh_collection_type
 
@@ -38,8 +40,6 @@ program planar_mesh_generator
                            log_event, log_set_level,             &
                            log_scratch_space, LOG_LEVEL_INFO,    &
                            LOG_LEVEL_ERROR
-  use mpi_mod,       only: global_mpi, create_comm, destroy_comm, &
-                           lfric_comm_type
 
   use namelist_collection_mod, only: namelist_collection_type
   use namelist_mod,            only: namelist_type

@@ -20,10 +20,10 @@ program skeleton
   use driver_log_mod,          only: init_logger, final_logger
   use driver_modeldb_mod,      only: modeldb_type
   use driver_time_mod,         only: init_time, final_time
+  use lfric_mpi_mod,           only: global_mpi
   use log_mod,                 only: log_event,       &
                                      log_level_trace, &
                                      log_scratch_space
-  use mpi_mod,                 only: global_mpi
 
   use skeleton_mod,        only: skeleton_required_namelists
   use skeleton_driver_mod, only: initialise, step, finalise

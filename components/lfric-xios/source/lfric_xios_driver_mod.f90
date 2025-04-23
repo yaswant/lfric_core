@@ -9,7 +9,7 @@
 module lfric_xios_driver_mod
 
   use constants_mod, only: i_def
-  use mpi_mod,       only: lfric_comm_type
+  use lfric_mpi_mod, only: lfric_comm_type
   use mod_wait,      only: init_wait
   use xios,          only: xios_initialize, xios_finalize
 

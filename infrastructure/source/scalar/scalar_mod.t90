@@ -15,7 +15,7 @@ module scalar_{{kind}}_mod
   use, intrinsic :: iso_fortran_env, only : {{kind}}
 
   use constants_mod,      only: l_def
-  use mpi_mod,            only: mpi_type, global_mpi
+  use lfric_mpi_mod,      only: lfric_mpi_type, global_mpi
   implicit none
   private
 
@@ -30,7 +30,7 @@ module scalar_{{kind}}_mod
     !> The value of the scalar
     {{type}}(kind={{kind}}), public :: value
     !> Object that describes what processes the scalar is represented over
-    type(mpi_type)              :: mpi
+    type(lfric_mpi_type)        :: mpi
     !> Logical for whether the initialiser has been called
     logical(l_def)              :: mpi_initialised = .false.
   contains
@@ -67,7 +67,7 @@ contains
     implicit none
     class(scalar_{{kind}}_type),   intent(inout) :: self
     {{type}}(kind={{kind}}),      intent(in)    :: value
-    type(mpi_type), optional, intent(in)    :: mpi
+    type(lfric_mpi_type), optional, intent(in)  :: mpi
 
     self%value = value
     if(present(mpi))then
@@ -80,7 +80,7 @@ contains
   !! Start performing a global sum operation on a scalar
   !!
   function get_sum(self) result (g_sum)
-    use mpi_mod, only: global_mpi
+    use lfric_mpi_mod, only: global_mpi
     implicit none
     class(scalar_{{kind}}_type), intent(inout) :: self
     {{type}}(kind={{kind}}) :: g_sum
@@ -95,7 +95,7 @@ contains
   !! Start the calculation of the global minimum of a scalar
   !!
   function get_min(self) result (g_min)
-    use mpi_mod, only: global_mpi
+    use lfric_mpi_mod, only: global_mpi
     implicit none
     class(scalar_{{kind}}_type), intent(inout) :: self
     {{type}}(kind={{kind}}) :: g_min
@@ -110,7 +110,7 @@ contains
   !! Start the calculation of the global maximum of a scalar
   !!
   function get_max(self) result (g_max)
-    use mpi_mod, only: global_mpi
+    use lfric_mpi_mod, only: global_mpi
     implicit none
     class(scalar_{{kind}}_type), intent(inout) :: self
     {{type}}(kind={{kind}}) :: g_max

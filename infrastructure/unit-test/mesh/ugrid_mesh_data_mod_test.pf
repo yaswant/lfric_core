@@ -10,10 +10,10 @@ module ugrid_mesh_data_mod_test
 
   use constants_mod,       only: r_def, i_def, l_def, imdi, &
                                  str_def, str_longlong
+  use lfric_mpi_mod,       only: global_mpi, &
+                                 lfric_comm_type
   use ugrid_mesh_data_mod, only: ugrid_mesh_data_type
 
-  use mpi_mod, only: global_mpi, &
-                     lfric_comm_type
   use pfunit
 
   implicit none

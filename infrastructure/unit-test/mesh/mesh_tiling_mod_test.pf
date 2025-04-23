@@ -9,14 +9,15 @@
 module mesh_tiling_mod_test
 !-------------------------------------------------------------------------------
 
-  use constants_mod, only: r_def, i_def, l_def, str_max_filename, str_def
+  use constants_mod,              only: r_def, i_def, l_def, str_max_filename, &
+                                        str_def
   use global_mesh_collection_mod, only: global_mesh_collection_type, &
                                         global_mesh_collection
-  use mesh_mod, only : mesh_type
-  use halo_comms_mod, only: initialise_halo_comms, &
-                            finalise_halo_comms
-  use mpi_mod, only: global_mpi, &
-                     lfric_comm_type
+  use mesh_mod,                   only: mesh_type
+  use halo_comms_mod,             only: initialise_halo_comms, &
+                                        finalise_halo_comms
+  use lfric_mpi_mod,              only: global_mpi, &
+                                        lfric_comm_type
 
   use pfunit
 

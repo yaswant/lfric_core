@@ -16,11 +16,11 @@ module sci_field_vector_mod_test
                                              function_space_collection
   use halo_comms_mod,                 only : initialise_halo_comms, &
                                              finalise_halo_comms
+  use lfric_mpi_mod,                  only : global_mpi
   use local_mesh_mod,                 only : local_mesh_type
   use mesh_collection_mod,            only : mesh_collection_type, &
                                              mesh_collection
   use fs_continuity_mod,              only : W0, W2, W3
-  use mpi_mod,                        only : global_mpi
   use funit
 
   implicit none

@@ -25,8 +25,8 @@ module TMPL_MODULE_NAME
 
   use, intrinsic :: iso_fortran_env, only : TMPL_KIND
   use constants_mod, only: i_def
-  use mpi_mod, only : global_mpi, &
-                      lfric_comm_type
+  use lfric_mpi_mod, only : global_mpi, &
+                            lfric_comm_type
   use pfunit
 
   implicit none

@@ -27,6 +27,7 @@ module simple_diffusion_driver_mod
   use init_simple_diffusion_mod,   only : init_simple_diffusion
   use inventory_by_mesh_mod,       only : inventory_by_mesh_type
   use key_value_mod,               only : abstract_value_type
+  use lfric_mpi_mod,               only : lfric_mpi_type
   use log_mod,                     only : log_event,         &
                                           log_scratch_space, &
                                           LOG_LEVEL_INFO,    &
@@ -34,7 +35,6 @@ module simple_diffusion_driver_mod
                                           LOG_LEVEL_TRACE
   use mesh_mod,                    only : mesh_type
   use mesh_collection_mod,         only : mesh_collection
-  use mpi_mod,                     only : mpi_type
   use namelist_mod,                only : namelist_type
   use random_number_generator_mod, only : random_number_generator_type
   use simple_diffusion_alg_mod,    only : simple_diffusion_alg

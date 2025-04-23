@@ -116,11 +116,11 @@ contains
   !> @param in opt_unit (optional) optional unit number to which the output
   !>                               should be written
   subroutine output_counters(self, opt_suffix, opt_unit)
-    use mpi_mod, only: global_mpi
-    use log_mod,    only: log_event,         &
-                          LOG_LEVEL_ERROR,   &
-                          LOG_LEVEL_WARNING,    &
-                          log_scratch_space
+    use lfric_mpi_mod,  only: global_mpi
+    use log_mod,        only: log_event,         &
+                              LOG_LEVEL_ERROR,   &
+                              LOG_LEVEL_WARNING, &
+                              log_scratch_space
     use io_utility_mod, only: claim_io_unit, release_io_unit
     implicit none
     class(count_type),           intent(inout) :: self

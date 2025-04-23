@@ -30,7 +30,7 @@ contains
                                       field_bundle, bundle_name)
     use field_mod,       only: field_type
     use constants_mod,   only: i_def, r_def, str_max_filename
-    use mpi_mod,         only: global_mpi
+    use lfric_mpi_mod,   only: global_mpi
     use log_mod,         only: log_event,         &
                                LOG_LEVEL_ERROR
     implicit none

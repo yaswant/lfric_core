@@ -2,6 +2,7 @@ module driver_log_mod
 
 use constants_mod,        only: i_def
 use convert_to_upper_mod, only: convert_to_upper
+use lfric_mpi_mod,        only: lfric_comm_type
 use log_mod,              only: log_event,          &
                                 log_set_level,      &
                                 log_scratch_space,  &
@@ -20,7 +21,6 @@ use logging_config_mod,   only: run_log_level,          &
                                 RUN_LOG_LEVEL_DEBUG,    &
                                 RUN_LOG_LEVEL_TRACE,    &
                                 RUN_LOG_LEVEL_WARNING
-use mpi_mod,              only: lfric_comm_type
 
 implicit none
 

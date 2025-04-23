@@ -15,10 +15,10 @@ module io_mod
   use field_parent_mod,     only: field_parent_proxy_type
   use file_mod,             only: FILE_MODE_READ, FILE_MODE_WRITE, &
                                   FILE_OP_CREATE, FILE_OP_OPEN
+  use lfric_mpi_mod,        only: global_mpi
   use lfric_ncdf_dims_mod,  only: lfric_ncdf_dims_type
   use lfric_ncdf_field_mod, only: lfric_ncdf_field_type
   use lfric_ncdf_file_mod,  only: lfric_ncdf_file_type
-  use mpi_mod,              only: global_mpi
 
   implicit none
 

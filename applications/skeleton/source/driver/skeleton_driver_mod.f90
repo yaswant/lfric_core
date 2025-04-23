@@ -27,13 +27,13 @@ module skeleton_driver_mod
   use field_mod,                  only : field_type
   use init_skeleton_mod,          only : init_skeleton
   use inventory_by_mesh_mod,      only : inventory_by_mesh_type
+  use lfric_mpi_mod,              only : lfric_mpi_type
   use log_mod,                    only : log_event, log_scratch_space, &
                                          LOG_LEVEL_ALWAYS,             &
                                          LOG_LEVEL_ERROR,              &
                                          LOG_LEVEL_INFO
   use mesh_mod,                   only : mesh_type
   use mesh_collection_mod,        only : mesh_collection
-  use mpi_mod,                    only : mpi_type
   use namelist_mod,               only : namelist_type
 
   use skeleton_alg_mod,           only : skeleton_alg

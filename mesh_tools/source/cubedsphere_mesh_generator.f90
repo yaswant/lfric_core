@@ -30,6 +30,8 @@ program cubedsphere_mesh_generator
                                             finalise_halo_comms
   use io_utility_mod,                 only: open_file, close_file
   use namelist_collection_mod,        only: namelist_collection_type
+  use lfric_mpi_mod,                  only: global_mpi, create_comm, &
+                                            destroy_comm, lfric_comm_type
   use local_mesh_collection_mod,      only: local_mesh_collection, &
                                             local_mesh_collection_type
 
@@ -37,8 +39,6 @@ program cubedsphere_mesh_generator
                            log_event, log_set_level,             &
                            log_scratch_space, LOG_LEVEL_INFO,    &
                            LOG_LEVEL_ERROR, LOG_LEVEL_WARNING
-  use mpi_mod,       only: global_mpi, create_comm, destroy_comm, &
-                           lfric_comm_type
 
   use namelist_collection_mod, only: namelist_collection_type
   use namelist_mod,            only: namelist_type

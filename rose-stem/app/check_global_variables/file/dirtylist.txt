@@ -22,7 +22,7 @@ infrastructure/source/mesh/mesh_collection_mod.F90
 infrastructure/source/mesh/mesh_mod.F90
 infrastructure/source/utilities/count_mod.f90
 infrastructure/source/utilities/log_mod.F90
-infrastructure/source/utilities/mpi_mod.F90
+infrastructure/source/utilities/lfric_mpi_mod.F90
 infrastructure/source/utilities/timer_mod.F90
 mesh_tools/source/support/calc_global_cell_map_mod.F90
 mesh_tools/source/support/gen_lbc_mod.F90

@@ -4,11 +4,11 @@
 @startuml
 
 !include look.iuml
-!include utilities/mpi_mod.iuml
+!include utilities/lfric_mpi_mod.iuml
 
-mpi_mod::mpi_type *-- mpi_comm_type
-mpi_mod::mpi_type .. mpi_mod::lfric_comm_type
-mpi_mod::lfric_comm_type *-- mpi_comm_type
+lfric_mpi_mod::lfric_mpi_type *-- mpi_comm_type
+lfric_mpi_mod::lfric_mpi_type .. lfric_mpi_mod::lfric_comm_type
+lfric_mpi_mod::lfric_comm_type *-- mpi_comm_type
 mpi_comm_type *-- mpi_val
 
 @enduml

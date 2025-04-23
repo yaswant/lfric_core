@@ -9,9 +9,9 @@ module cheese_config_mod
 
   use constants_mod, only: i_def, &
                            r_def
+  use lfric_mpi_mod, only: global_mpi
   use log_mod,       only: log_event, log_scratch_space &
                          , LOG_LEVEL_ERROR, LOG_LEVEL_DEBUG, LOG_LEVEL_INFO
-  use mpi_mod,       only: global_mpi
 
   use namelist_mod,      only: namelist_type
   use namelist_item_mod, only: namelist_item_type

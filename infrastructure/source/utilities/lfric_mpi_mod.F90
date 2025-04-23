@@ -8,7 +8,7 @@
 !>
 !> Provides access to global reduction functions, all_gather and broadcasts
 !>
-module mpi_mod
+module lfric_mpi_mod
 
   use, intrinsic :: iso_fortran_env, only : int32, real32, real64
 
@@ -45,7 +45,7 @@ module mpi_mod
   end type
 #endif
 
-  type, public :: mpi_type
+  type, public :: lfric_mpi_type
     private
     !> The mpi communicator
 #ifdef NO_MPI
@@ -116,7 +116,7 @@ module mpi_mod
     procedure, public :: get_comm_size
     procedure, public :: get_comm_rank
 
-  end type mpi_type
+  end type lfric_mpi_type
 
   ! Define an "LFRic" type that we can pass around that holds a communicator
   type, public :: lfric_comm_type
@@ -163,7 +163,7 @@ module mpi_mod
   !Global MPI object
   !> @todo This needs to be moved out of global scope and into the modeldb
   !>       object, when that object exists
-  type(mpi_type), target :: global_mpi
+  type(lfric_mpi_type), target :: global_mpi
 
 contains
 
@@ -272,7 +272,7 @@ contains
   !>
   subroutine initialise(self, in_comm)
     implicit none
-    class(mpi_type),       intent(inout) :: self
+    class(lfric_mpi_type), intent(inout) :: self
     type(lfric_comm_type), intent(in)    :: in_comm
     integer :: ierr
 
@@ -293,7 +293,7 @@ contains
   !>
   subroutine finalise(self)
     implicit none
-    class(mpi_type), intent(inout) :: self
+    class(lfric_mpi_type), intent(inout) :: self
     self%comm_set = .false.
   end subroutine finalise
 
@@ -302,7 +302,7 @@ contains
   !>
   function get_comm(self) result(communicator)
     implicit none
-    class(mpi_type), intent(in) :: self
+    class(lfric_mpi_type), intent(in) :: self
     type(lfric_comm_type) :: communicator
     communicator%comm = self%comm
   end function get_comm
@@ -312,7 +312,7 @@ contains
   !>
   function is_comm_set(self) result(comm_state)
     implicit none
-    class(mpi_type), intent(inout) :: self
+    class(lfric_mpi_type), intent(inout) :: self
     logical :: comm_state
     comm_state = self%comm_set
   end function is_comm_set
@@ -324,9 +324,9 @@ contains
   !>
   subroutine global_sum_real64(self, l_sum, g_sum)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real64), intent(in)       :: l_sum
-    real(real64), intent(out)      :: g_sum
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(in)    :: l_sum
+    real(real64),          intent(out)   :: g_sum
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -364,9 +364,9 @@ contains
   !>
   subroutine global_sum_real32(self, l_sum, g_sum)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real32), intent(in)       :: l_sum
-    real(real32), intent(out)      :: g_sum
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(in)    :: l_sum
+    real(real32),          intent(out)   :: g_sum
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -404,9 +404,9 @@ contains
   !>
   subroutine global_sum_int32(self, l_sum, g_sum)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    integer(int32), intent(in)     :: l_sum
-    integer(int32), intent(out)    :: g_sum
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(in)    :: l_sum
+    integer(int32),        intent(out)   :: g_sum
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -444,9 +444,9 @@ contains
   !>
   subroutine global_min_real64(self, l_min, g_min)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real64), intent(in)       :: l_min
-    real(real64), intent(out)      :: g_min
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(in)    :: l_min
+    real(real64),          intent(out)   :: g_min
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -483,9 +483,9 @@ contains
   !>
   subroutine global_min_real32(self, l_min, g_min)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real32), intent(in)       :: l_min
-    real(real32), intent(out)      :: g_min
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(in)    :: l_min
+    real(real32),          intent(out)   :: g_min
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -523,9 +523,9 @@ contains
   !>
   subroutine global_min_int32(self, l_min, g_min)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    integer(int32), intent(in)     :: l_min
-    integer(int32), intent(out)    :: g_min
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(in)    :: l_min
+    integer(int32),        intent(out)   :: g_min
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -563,9 +563,9 @@ contains
   !>
   subroutine global_max_real64(self, l_max, g_max)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real64), intent(in)       :: l_max
-    real(real64), intent(out)      :: g_max
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(in)    :: l_max
+    real(real64),          intent(out)   :: g_max
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -603,9 +603,9 @@ contains
   !>
   subroutine global_max_real32(self, l_max, g_max)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    real(real32), intent(in)       :: l_max
-    real(real32), intent(out)      :: g_max
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(in)    :: l_max
+    real(real32),          intent(out)   :: g_max
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -643,9 +643,9 @@ contains
   !>
   subroutine global_max_int32(self, l_max, g_max)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    integer(int32), intent(in)     :: l_max
-    integer(int32), intent(out)    :: g_max
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(in)    :: l_max
+    integer(int32),        intent(out)   :: g_max
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -685,10 +685,10 @@ contains
   !> @param count The number of items in send_buffer
   subroutine all_gather(self, send_buffer, recv_buffer, count)
     implicit none
-    class(mpi_type), intent(inout) :: self
-    integer(int32), intent(in)     :: send_buffer(:)
-    integer(int32), intent(out)    :: recv_buffer(:)
-    integer(int32), intent(in)     :: count
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(in)    :: send_buffer(:)
+    integer(int32),        intent(out)   :: recv_buffer(:)
+    integer(int32),        intent(in)    :: count
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -728,10 +728,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    logical,         intent(inout) :: buffer(:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    logical,               intent(inout) :: buffer(:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     integer(int32) :: err
 
@@ -765,10 +765,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    integer(int32),  intent(inout) :: buffer(:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(inout) :: buffer(:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -806,10 +806,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real64),    intent(inout) :: buffer(:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(inout) :: buffer(:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -848,10 +848,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real32),    intent(inout) :: buffer(:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(inout) :: buffer(:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -890,10 +890,10 @@ contains
 
     implicit none
 
-    class(mpi_type),  intent(inout) :: self
-    character(len=*), intent(inout) :: buffer(:)
-    integer,          intent(in)    :: count
-    integer,          intent(in)    :: root
+    class(lfric_mpi_type),  intent(inout) :: self
+    character(len=*),       intent(inout) :: buffer(:)
+    integer,                intent(in)    :: count
+    integer,                intent(in)    :: root
 
     integer :: err
 
@@ -927,10 +927,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    logical,         intent(inout) :: buffer(:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    logical,               intent(inout) :: buffer(:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     integer :: err
 
@@ -964,10 +964,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    integer(int32),  intent(inout) :: buffer(:,:)
-    integer, intent(in)            :: count
-    integer, intent(in)            :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(inout) :: buffer(:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -1005,10 +1005,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real64),    intent(inout) :: buffer(:,:)
-    integer, intent(in)            :: count
-    integer, intent(in)            :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(inout) :: buffer(:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -1047,10 +1047,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real32),    intent(inout) :: buffer(:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(inout) :: buffer(:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -1089,10 +1089,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    logical,         intent(inout) :: buffer(:,:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    logical,               intent(inout) :: buffer(:,:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     integer :: err
 
@@ -1126,10 +1126,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    integer(int32),  intent(inout) :: buffer(:,:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    integer(int32),        intent(inout) :: buffer(:,:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer(int32) :: err
@@ -1167,10 +1167,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real64),    intent(inout) :: buffer(:,:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real64),          intent(inout) :: buffer(:,:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -1209,10 +1209,10 @@ contains
 
     implicit none
 
-    class(mpi_type), intent(inout) :: self
-    real(real32),    intent(inout) :: buffer(:,:,:)
-    integer,         intent(in)    :: count
-    integer,         intent(in)    :: root
+    class(lfric_mpi_type), intent(inout) :: self
+    real(real32),          intent(inout) :: buffer(:,:,:)
+    integer,               intent(in)    :: count
+    integer,               intent(in)    :: root
 
     type(lfric_datatype_type) :: lfric_datatype
     integer :: err
@@ -1247,7 +1247,7 @@ contains
   !> @return c_size The number of MPI ranks in the communicator
   function get_comm_size(self) result(c_size)
     implicit none
-    class(mpi_type), intent(inout)  :: self
+    class(lfric_mpi_type), intent(inout)  :: self
     integer :: c_size
 #ifdef NO_MPI
     ! A non-mpi run is serial, therefore, number of ranks has to be one
@@ -1268,7 +1268,7 @@ contains
   !> @return c_size The number of the local MPI rank
   function get_comm_rank(self) result(c_rank)
     implicit none
-    class(mpi_type), intent(inout)  :: self
+    class(lfric_mpi_type), intent(inout)  :: self
     integer :: c_rank
 #ifdef NO_MPI
     ! A non-mpi run is serial, therefore, local rank is always rank zero
@@ -1356,4 +1356,4 @@ contains
     datatype = self%datatype
   end function get_mpi_datatype
 
-end module mpi_mod
+end module lfric_mpi_mod

@@ -11,8 +11,8 @@
 module {{modulename}}
 
   use constants_mod, only : {{kinds | sort | join( ', ' )}}
+  use lfric_mpi_mod, only : global_mpi
   use log_mod,       only : log_scratch_space, log_event, LOG_LEVEL_ERROR
-  use mpi_mod,       only : global_mpi
 
   implicit none
 

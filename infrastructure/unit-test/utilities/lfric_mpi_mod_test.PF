@@ -3,11 +3,11 @@
 ! The file LICENCE, distributed with this code, contains details of the terms
 ! under which the code may be used.
 !-----------------------------------------------------------------------------
-!> @brief Test the functionality of mpi_mod
+!> @brief Test the functionality of lfric_mpi_mod
 !>
 !> @details A pFUnit test module to exercise the functionality in mpi_mod.
 !>
-module mpi_mod_test
+module lfric_mpi_mod_test
 
   use pfunit
   use, intrinsic   :: iso_fortran_env, only : int32, real32, real64
@@ -23,7 +23,7 @@ module mpi_mod_test
 !>  use mpi_f08, only      : MPI_DOUBLE_PRECISION, MPI_REAL4, MPI_INTEGER
   use mpi,     only      : MPI_DOUBLE_PRECISION, MPI_REAL4, MPI_INTEGER
 #endif
-  use mpi_mod, only      : global_mpi, create_comm, get_lfric_datatype, &
+  use lfric_mpi_mod, only: global_mpi, create_comm, get_lfric_datatype, &
                            lfric_comm_type, lfric_datatype_type
 
   implicit none
@@ -455,4 +455,4 @@ contains
 
   end subroutine test_bcast_int
 
-end module mpi_mod_test
+end module lfric_mpi_mod_test

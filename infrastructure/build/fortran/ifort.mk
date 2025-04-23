@@ -76,7 +76,7 @@ FFLAGS_FORTRAN_STANDARD   = -stand f08
 # When the Intel bug is fixed, this option will be removed by #1490
 export FFLAGS_INTEL_FIX_ARG         = -qoverride-limits
 #
-# -warn noexternals applied to code that imports mpi_mod to avoid
+# -warn noexternals applied to code that imports lfric_mpi_mod to avoid
 # a warning-turned-error about missing interfaces for MPI calls in
 # mpi.mod, such as MPI_Allreduce - switching to mpi_f08.mod resolves
 # this via polymorphic interface declarations. Some SOCRATES functions

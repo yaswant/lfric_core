@@ -21,7 +21,7 @@ module driver_comm_mod
   use driver_modeldb_mod,    only: modeldb_type
   use halo_comms_mod,        only: initialise_halo_comms, &
                                    finalise_halo_comms
-  use mpi_mod,               only: create_comm, destroy_comm, &
+  use lfric_mpi_mod,         only: create_comm, destroy_comm, &
                                    lfric_comm_type
 
 #ifdef MCT

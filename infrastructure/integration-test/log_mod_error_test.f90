@@ -9,10 +9,10 @@
 program log_mod_error_test
 
   use, intrinsic :: iso_fortran_env, only : error_unit
-  use log_mod, only : initialise_logging, finalise_logging, log_event, &
-                      LOG_LEVEL_ERROR
-  use mpi_mod, only : global_mpi, create_comm, destroy_comm, &
-                      lfric_comm_type
+  use lfric_mpi_mod, only : global_mpi, create_comm, destroy_comm, &
+                            lfric_comm_type
+  use log_mod,       only : initialise_logging, finalise_logging, log_event, &
+                            LOG_LEVEL_ERROR
 
   implicit none
 

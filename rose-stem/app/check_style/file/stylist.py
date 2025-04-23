@@ -40,9 +40,9 @@ if __name__ == '__main__':
 #
 # We limit the usage of "bare" MPI to a handful of modules.
 allowed_mpi = (
-    "mpi_mod_test",
+    "lfric_mpi_mod_test",
     "lfric_abort_mod",
-    "mpi_mod",
+    "lfric_mpi_mod",
     "log_mod"
 )
 

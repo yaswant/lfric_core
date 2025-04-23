@@ -15,13 +15,13 @@ module coupler_exchange_0d_mod
   use constants_mod,            only: i_def, r_def, str_def, imdi
   use field_mod,                only: field_type
   use field_collection_mod,     only: field_collection_type
+  use lfric_mpi_mod,            only: global_mpi
   use log_mod,                  only: log_event,       &
                                       LOG_LEVEL_DEBUG, &
                                       LOG_LEVEL_INFO,  &
                                       LOG_LEVEL_ERROR, &
                                       log_scratch_space
   use model_clock_mod,          only: model_clock_type
-  use mpi_mod,                  only: global_mpi
 
   implicit none
 

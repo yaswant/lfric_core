@@ -142,10 +142,10 @@ contains
 !=============================================================================!
 !> @brief Calculate statistics required for output
    subroutine calculate_timer_stats()
-     use mpi_mod, only: global_mpi
-     use log_mod, only: log_event,         &
-                        LOG_LEVEL_ERROR,   &
-                        log_scratch_space
+     use lfric_mpi_mod, only: global_mpi
+     use log_mod,       only: log_event,         &
+                              LOG_LEVEL_ERROR,   &
+                              log_scratch_space
 
      implicit none
 
@@ -181,11 +181,11 @@ contains
 !=============================================================================!
    !> @brief write out timer information to file
    subroutine output_timer()
-     use mpi_mod,    only: global_mpi
-     use log_mod,    only: log_event,       &
-                           LOG_LEVEL_ERROR, &
-                           LOG_LEVEL_INFO,  &
-                           log_scratch_space
+     use lfric_mpi_mod,  only: global_mpi
+     use log_mod,        only: log_event,       &
+                               LOG_LEVEL_ERROR, &
+                               LOG_LEVEL_INFO,  &
+                               log_scratch_space
      use io_utility_mod, only: claim_io_unit, close_file
 
      implicit none

@@ -10,7 +10,7 @@
 module hash_mod_test
 
   use pfunit
-  use mpi_mod, only : global_mpi
+  use lfric_mpi_mod, only : global_mpi
   use constants_mod, only: i_def, str_def
 
   implicit none

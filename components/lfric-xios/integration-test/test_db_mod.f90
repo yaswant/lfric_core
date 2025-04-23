@@ -19,6 +19,9 @@ module test_db_mod
   use halo_comms_mod,                 only: halo_routing_type
   use function_space_collection_mod,  only: function_space_collection_type, &
                                             function_space_collection
+  use lfric_mpi_mod,                  only: lfric_mpi_type, global_mpi, &
+                                            create_comm, destroy_comm, &
+                                            lfric_comm_type
   use local_mesh_mod,                 only: local_mesh_type
   use log_mod,                        only: initialise_logging, &
                                             finalise_logging,   &
@@ -32,9 +35,6 @@ module test_db_mod
   use model_clock_mod,                only: model_clock_type
   use function_space_mod,             only: function_space_type
   use fs_continuity_mod,              only: Wchi, W0, W2H, W3
-  use mpi_mod,                        only: mpi_type, global_mpi, &
-                                            create_comm, destroy_comm, &
-                                            lfric_comm_type
   use step_calendar_mod,              only: step_calendar_type
 
 

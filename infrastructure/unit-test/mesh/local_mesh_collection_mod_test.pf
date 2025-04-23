@@ -13,11 +13,11 @@ module local_mesh_collection_mod_test
   use global_mesh_collection_mod, only : global_mesh_collection_type, &
                                          global_mesh_collection
   use global_mesh_mod,            only : global_mesh_type
+  use lfric_mpi_mod,              only : global_mpi, &
+                                         lfric_comm_type
   use local_mesh_collection_mod,  only : local_mesh_collection_type, &
                                          local_mesh_collection
   use local_mesh_mod,             only : local_mesh_type
-  use mpi_mod,                    only : global_mpi, &
-                                         lfric_comm_type
   use partition_mod,              only : partition_type,     &
                                          partitioner_planar, &
                                          partitioner_interface

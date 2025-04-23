@@ -321,7 +321,7 @@ contains
                                       corner_halos, nw_cell_partition,        &
                                       valid_partition_spec )
 
-    use mpi_mod, only : global_mpi
+    use lfric_mpi_mod, only : global_mpi
 
     implicit none
 

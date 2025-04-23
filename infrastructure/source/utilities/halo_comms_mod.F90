@@ -15,9 +15,9 @@ module halo_comms_mod
 
   use constants_mod,         only: i_def, i_halo_index
   use linked_list_data_mod,  only: linked_list_data_type
-  use log_mod,               only: log_event, LOG_LEVEL_ERROR
-  use mpi_mod,               only: global_mpi, get_lfric_datatype, &
+  use lfric_mpi_mod,         only: global_mpi, get_lfric_datatype, &
                                    lfric_comm_type, lfric_datatype_type
+  use log_mod,               only: log_event, LOG_LEVEL_ERROR
 #ifdef NO_MPI
   ! If this is a non-mpi build - YAXT won't work - so don't "use" it
 #else

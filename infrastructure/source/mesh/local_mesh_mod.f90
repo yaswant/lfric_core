@@ -1386,8 +1386,8 @@ contains
   !> every processor has its halo cells filled with their owner id.
   !>
   subroutine init_cell_owner(self)
+    use lfric_mpi_mod,     only: global_mpi
     use fs_continuity_mod, only: W3
-    use mpi_mod,           only: global_mpi
 
     implicit none
     class (local_mesh_type), intent(inout), target :: self

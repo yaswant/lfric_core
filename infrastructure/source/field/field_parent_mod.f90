@@ -18,9 +18,9 @@ module field_parent_mod
   use function_space_mod,          only: function_space_type
   use halo_routing_collection_mod, only: halo_routing_collection
   use halo_comms_mod,              only: halo_routing_type
-  use pure_abstract_field_mod,     only: pure_abstract_field_type
+  use lfric_mpi_mod,               only: global_mpi, lfric_mpi_type
   use mesh_mod,                    only: mesh_type
-  use mpi_mod,                     only: global_mpi, mpi_type
+  use pure_abstract_field_mod,     only: pure_abstract_field_type
 
   implicit none
 
@@ -480,8 +480,8 @@ contains
     implicit none
 
     class(field_parent_proxy_type), intent(in) :: self
-    type(mpi_type) :: mpi
-    integer        :: value_tmp
+    type(lfric_mpi_type) :: mpi
+    integer              :: value_tmp
 
     ! This is a placeholder for when fields can be built on different mpi
     ! objects. To support future use, it currently just returns the global

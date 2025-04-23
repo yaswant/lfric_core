@@ -17,14 +17,14 @@ module integer_field_mod_test
   use halo_comms_mod,                 only : halo_routing_type
   use function_space_collection_mod,  only : function_space_collection_type, &
                                              function_space_collection
+  use lfric_mpi_mod,                  only : global_mpi, &
+                                             lfric_comm_type
   use local_mesh_mod,                 only : local_mesh_type
   use mesh_collection_mod,            only : mesh_collection_type, &
                                              mesh_collection
   use mesh_mod,                       only : mesh_type, PLANE_BI_PERIODIC
   use function_space_mod,             only : function_space_type
   use fs_continuity_mod,              only : W2
-  use mpi_mod,                        only : global_mpi, &
-                                             lfric_comm_type
   use pfunit
 
   implicit none

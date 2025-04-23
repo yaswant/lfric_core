@@ -14,12 +14,12 @@ module mesh_map_collection_mod_test
   use global_mesh_mod,            only: global_mesh_type
   use halo_comms_mod,             only: initialise_halo_comms, &
                                         finalise_halo_comms
+  use lfric_mpi_mod,              only: global_mpi, &
+                                        lfric_comm_type
   use local_mesh_mod,             only: local_mesh_type
   use mesh_map_collection_mod,    only: mesh_map_collection_type
   use mesh_map_mod,               only: mesh_map_type
   use mesh_mod,                   only: mesh_type
-  use mpi_mod,                    only: global_mpi, &
-                                        lfric_comm_type
   use partition_mod,              only: partition_type, partitioner_interface, &
                                         partitioner_cubedsphere_serial
   use ugrid_mesh_data_mod,        only: ugrid_mesh_data_type

@@ -28,14 +28,14 @@ module coupling_mod
   use function_space_collection_mod, only : function_space_collection
   use key_value_collection_mod,      only : key_value_collection_type
   use key_value_mod,                 only : abstract_value_type
+  use lfric_mpi_mod,                 only : lfric_mpi_type, &
+                                            lfric_comm_type
   use log_mod,                       only : log_event,         &
                                             log_scratch_space, &
                                             LOG_LEVEL_ERROR,   &
                                             LOG_LEVEL_INFO,   &
                                             LOG_LEVEL_DEBUG
   use mesh_mod,                      only : mesh_type
-  use mpi_mod,                       only : mpi_type, &
-                                            lfric_comm_type
   use sort_mod,                      only : bubble_sort
 
   implicit none
@@ -131,7 +131,7 @@ contains
     implicit none
 
     class(coupling_type), intent(inout)     :: self
-    type(mpi_type), intent(inout)           :: mpi
+    type(lfric_mpi_type), intent(inout)     :: mpi
     type( mesh_type ),  intent(in), pointer :: twod_mesh
 
 #ifdef MCT

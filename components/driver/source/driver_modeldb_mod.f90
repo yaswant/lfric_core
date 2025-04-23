@@ -15,8 +15,8 @@ module driver_modeldb_mod
   use calendar_mod,              only: calendar_type
   use driver_model_data_mod,     only: model_data_type
   use key_value_collection_mod,  only: key_value_collection_type
+  use lfric_mpi_mod,             only: lfric_mpi_type
   use model_clock_mod,           only: model_clock_type
-  use mpi_mod,                   only: mpi_type
   use namelist_collection_mod,   only: namelist_collection_type
   use io_context_collection_mod, only: io_context_collection_type
 
@@ -53,7 +53,7 @@ module driver_modeldb_mod
     !> @todo  Currently, this is juat a pointer to the global MPI object, as
     !>        this is the only MPI object that PSyclone can use at the moment
     !>        When PSyclone is updated, this can be the actual MPI object.
-    type(mpi_type), pointer, public :: mpi
+    type(lfric_mpi_type), pointer, public :: mpi
 
     contains
 

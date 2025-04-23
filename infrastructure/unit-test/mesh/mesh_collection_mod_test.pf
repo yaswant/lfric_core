@@ -17,12 +17,12 @@ module mesh_collection_mod_test
                                      global_mesh_collection
     use halo_comms_mod,       only : initialise_halo_comms, &
                                      finalise_halo_comms
+    use lfric_mpi_mod,        only : global_mpi, &
+                                     lfric_comm_type
     use local_mesh_mod,       only : local_mesh_type
     use mesh_collection_mod,  only : mesh_collection_type,                  &
                                      mesh_collection
     use mesh_mod,             only : mesh_type, PLANE_BI_PERIODIC, PLANE
-    use mpi_mod,              only : global_mpi, &
-                                     lfric_comm_type
     use pfunit
 
   implicit none

@@ -25,6 +25,7 @@ module io_demo_driver_mod
   use field_mod,                  only : field_type
   use init_io_demo_mod,           only : init_io_demo
   use inventory_by_mesh_mod,      only : inventory_by_mesh_type
+  use lfric_mpi_mod,              only : lfric_mpi_type
   use log_mod,                    only : log_event,         &
                                          log_scratch_space, &
                                          LOG_LEVEL_INFO,    &
@@ -33,7 +34,6 @@ module io_demo_driver_mod
   use mesh_mod,                   only : mesh_type
   use mesh_collection_mod,        only : mesh_collection
   use model_clock_mod,            only : model_clock_type
-  use mpi_mod,                    only : mpi_type
   use multifile_field_setup_mod,  only : create_multifile_io_fields
   use multifile_io_mod,           only : init_multifile_io, step_multifile_io
   use namelist_mod,               only : namelist_type

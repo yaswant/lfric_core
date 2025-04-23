@@ -8,7 +8,7 @@ program configuration_test
 
   use, intrinsic :: iso_fortran_env, &
                                 only : error_unit
-  use mpi_mod,                  only : global_mpi, create_comm, destroy_comm, &
+  use lfric_mpi_mod,            only : global_mpi, create_comm, destroy_comm, &
                                        lfric_comm_type
   use one_of_each_test_config_mod,                                            &
                                 only : key_from_an_enum,                      &

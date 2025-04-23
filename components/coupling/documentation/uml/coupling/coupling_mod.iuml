@@ -10,7 +10,7 @@ class coupling_mod::coupling_type {
   -local_index : integer[] <<allocatable>>
 
   +initialise(<<out>> comm_out : integer, <<in>> comm_in : integer ) :
-  +define_partitions( <<inout>> mpi : mpi_type, <<in>> twod_mesh : mesh_type ) :
+  +define_partitions( <<inout>> mpi : lfric_mpi_type, <<in>> twod_mesh : mesh_type ) :
   +define_variables( <<inout>> cpl_snd_2d : field_collection_type, <<inout>> cpl_rcv_2d : field_collection_type, <<inout>> cpl_snd_0d : field_collection_type ) :
   +end_definition( <<inout>> cpl_snd_2d : field_collection_type, <<inout>> cpl_rcv_2d : field_collection_type, <<inout>> cpl_snd_0d : field_collection_type ) :
   +get_local_index() : integer[] <<pointer>>

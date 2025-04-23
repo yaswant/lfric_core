@@ -26,11 +26,11 @@ use function_space_collection_mod, only: function_space_collection, &
                                          function_space_collection_type
 use global_mesh_collection_mod,    only: global_mesh_collection_type, &
                                          global_mesh_collection
+use lfric_mpi_mod,                 only: global_mpi, &
+                                         lfric_comm_type
 use local_mesh_mod,                only: local_mesh_type
 use local_mesh_collection_mod,     only: local_mesh_collection_type, &
                                          local_mesh_collection
-use mpi_mod,                       only: global_mpi, &
-                                         lfric_comm_type
 use ugrid_mesh_data_mod,           only: ugrid_mesh_data_type
 
 implicit none

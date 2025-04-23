@@ -16,6 +16,7 @@ module lfric_xios_context_mod
   use file_mod,             only : file_type
   use io_context_mod,       only : io_context_type, callback_clock_arg
   use lfric_xios_file_mod,  only : lfric_xios_file_type
+  use lfric_mpi_mod,        only : lfric_comm_type
   use log_mod,              only : log_event, log_scratch_space,      &
                                    log_level_error, &
                                    log_level_info
@@ -25,7 +26,6 @@ module lfric_xios_context_mod
   use lfric_xios_file_mod,  only : lfric_xios_file_type
   use linked_list_mod,      only : linked_list_type, linked_list_item_type
   use model_clock_mod,      only : model_clock_type
-  use mpi_mod,              only : lfric_comm_type
   use timer_mod,            only : timer
   use xios,                 only : xios_context,                  &
                                    xios_context_initialize,       &

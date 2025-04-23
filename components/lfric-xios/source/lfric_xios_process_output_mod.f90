@@ -15,6 +15,7 @@ module lfric_xios_process_output_mod
   use io_config_mod,              only: file_convention,       &
                                         file_convention_ugrid, &
                                         file_convention_cf
+  use lfric_mpi_mod,              only: global_mpi
   use lfric_ncdf_dims_mod,        only: lfric_ncdf_dims_type
   use lfric_ncdf_field_mod,       only: lfric_ncdf_field_type
   use lfric_ncdf_field_group_mod, only: lfric_ncdf_field_group_type
@@ -22,7 +23,6 @@ module lfric_xios_process_output_mod
   use lfric_xios_constants_mod,   only: dp_xios
   use lfric_xios_utils_mod,       only: parse_date_as_xios, seconds_from_date
   use log_mod,                    only: log_event, log_level_trace
-  use mpi_mod,                    only: global_mpi
   use xios,                       only: xios_date, xios_get_start_date
 
   implicit none

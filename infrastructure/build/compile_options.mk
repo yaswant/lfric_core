@@ -8,4 +8,4 @@ $(info LFRic compile options required for files with OpenMP when using Intel - s
 %psy.o %psy.mod:   private FFLAGS_EXTRA = $(FFLAGS_INTEL_FIX_ARG)
 psy/%.o psy/%.mod: private FFLAGS_EXTRA = $(FFLAGS_INTEL_FIX_ARG)
 $(info Disable warnings-turned-error caused by undeclared external functions - see ifort.mk)
-%mpi_mod.o %mpi_mod.mod: private FFLAGS_EXTRA = $(FFLAGS_INTEL_EXTERNALS)
+%lfric_mpi_mod.o %lfric_mpi_mod.mod: private FFLAGS_EXTRA = $(FFLAGS_INTEL_EXTERNALS)

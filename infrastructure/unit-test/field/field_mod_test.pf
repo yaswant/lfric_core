@@ -17,14 +17,14 @@ module field_mod_test
   use halo_comms_mod,                 only : halo_routing_type
   use function_space_collection_mod,  only : function_space_collection_type, &
                                              function_space_collection
+  use lfric_mpi_mod,                  only : lfric_mpi_type, global_mpi, &
+                                             lfric_comm_type
   use local_mesh_mod,                 only : local_mesh_type
   use mesh_collection_mod,            only : mesh_collection_type, &
                                              mesh_collection
   use mesh_mod,                       only : mesh_type, PLANE_BI_PERIODIC
   use function_space_mod,             only : function_space_type
   use fs_continuity_mod,              only : W2, W3
-  use mpi_mod,                        only : mpi_type, global_mpi, &
-                                             lfric_comm_type
   use pfunit
 
   implicit none
@@ -265,7 +265,7 @@ contains
     integer(i_def)         :: order_h, order_v
     real(r_def)            :: test_sum, test_min, test_max
     logical                :: dirty
-    type(mpi_type)         :: f1_mpi
+    type(lfric_mpi_type)   :: f1_mpi
 
     ! Make a field with a function space
     call f1%initialise( vector_space = this%w2_fs, name='f1', halo_depth=3 )
