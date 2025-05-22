@@ -45,6 +45,9 @@
             R_TRAN_PRECISION        = {{task_values["precision"]["rtran"]}}
             R_BL_PRECISION          = {{task_values["precision"]["rbl"]}}
             PRE_PROCESS_MACROS      = {{task_values["pre_process_macros"]}}
+{% if task_ns.application == "skeleton" %}
+            NO_MPI = 1
+{% endif %}
 
         [[[directives]]]
 

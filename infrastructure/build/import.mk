@@ -4,7 +4,12 @@
 # under which the code may be used.
 ##############################################################################
 export IGNORE_DEPENDENCIES += netcdf mpi mpi_f08 yaxt mod_oasis
-export EXTERNAL_DYNAMIC_LIBRARIES += yaxt yaxt_c netcdff netcdf
+
+# Sorry about the reverse logic: "if not defined no_mpi" really means: "if mpi"
+ifndef NO_MPI
+ export EXTERNAL_DYNAMIC_LIBRARIES += yaxt yaxt_c
+endif
+export EXTERNAL_DYNAMIC_LIBRARIES += netcdff netcdf
 
 TEMPLATE_TOOL = $(LFRIC_BUILD)/tools/Templaterator
 TYPE_TABLE_real32 = real
