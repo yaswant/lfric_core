@@ -13,7 +13,7 @@ their application in PSyclone optimisations scripts.
 
 from psyclone.domain.lfric import LFRicConstants
 from psyclone.psyGen import InvokeSchedule
-from psyclone.psyir.nodes import Loop, Routine
+from psyclone.psyir.nodes import Loop, Routine, Directive
 from psyclone.transformations import (
     Dynamo0p3ColourTrans,
     Dynamo0p3OMPLoopTrans,
@@ -68,9 +68,10 @@ def redundant_computation_setval(psyir):
 
 
 # -----------------------------------------------------------------------------
-def colour_loops(psyir):
+def colour_loops(psyir, enable_tiling=False):
     """
-    Applies the colouring transformation to all applicable loops.
+    Applies the colouring transformation to all applicable loops and optionally
+    enables tiling.
     It creates the instance of `Dynamo0p3ColourTrans` only once.
 
     :param psyir: the PSyIR of the PSy-layer.
@@ -91,7 +92,7 @@ def colour_loops(psyir):
                 and child.field_space.orig_name
                 not in const.VALID_DISCONTINUOUS_NAMES
             ):
-                ctrans.apply(child)
+                ctrans.apply(child, options={"tiling": enable_tiling})
 
 
 # -----------------------------------------------------------------------------
@@ -108,9 +109,12 @@ def openmp_parallelise_loops(psyir):
 
     # Loop over all the InvokeSchedule in the PSyIR object
     for subroutine in psyir.walk(InvokeSchedule):
-        # Add OpenMP to loops unless they are over colours or are null
+        # Add OpenMP to loops unless they are over colours, are null,
+        # or if an outer loop is already parallelised (OpenMP is applied
+        # to loop over tiles instead of cells if tiling is enabled)
         for loop in subroutine.loops():
-            if loop.loop_type not in ["colours", "null"]:
+            if loop.loop_type not in ["colours", "null"] and \
+               not loop.ancestor(Directive):
                 oregtrans.apply(loop)
                 otrans.apply(loop, options={"reprod": True})
 
