@@ -34,7 +34,8 @@ module sci_field_minmax_alg_mod
 
   interface get_local_field_minmax
      module procedure get_local_field_minmax_real32, &
-                      get_local_field_minmax_real64
+                      get_local_field_minmax_real64, &
+                      get_local_field_minmax_int32
   end interface get_local_field_minmax
 
   interface log_field_minmax
