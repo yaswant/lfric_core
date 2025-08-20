@@ -22,7 +22,7 @@
 {% set set_ulimit = 'ulimit -s unlimited -c unlimited; '~
                     'ulimit -a '%}
 
-{% set ex1a_scitools = 'module load scitools/production-os46-3' %}
+{% set ex1a_scitools = 'module load scitools/production-os47-1' %}
 {% set ex1a_tech = 'module load nccmp' %}
 
     [[EX1A_BASE]]
@@ -101,14 +101,12 @@
     [[EX1A_MESH_GNU]]
         inherit=EX1A_GNU,EX1A_MESH
         {{ generate_script("pre-script", [ex1a_base,
-                                          ex1a_compiler_gnu,
-                                          ex1a_scitools]) }}
+                                          ex1a_compiler_gnu]) }}
 
     [[EX1A_MESH_CCE]]
         inherit=EX1A_CCE,EX1A_MESH
         {{ generate_script("pre-script", [ex1a_base,
-                                          ex1a_compiler_cce,
-                                          ex1a_scitools]) }}
+                                          ex1a_compiler_cce]) }}
 
 
     [[EX1A_TECH_BASE]]
